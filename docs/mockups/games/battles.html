@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Short-answer battles — game mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="games.css">
+<style>
+/* Board: write */
+.bt-head { position: absolute; left: 100px; right: 380px; top: 128px; }
+.bt-head.wide { right: 100px; }
+.bt-q { margin: 0; font-size: 46px; font-weight: 700; line-height: 1.18; letter-spacing: -.015em; text-wrap: balance; }
+.bt-crit { margin-top: 14px; font-size: 28px; color: var(--stage-muted); }
+.bt-crit b { color: var(--stage-ink); }
+.bt-ring { position: absolute; right: 120px; top: 136px; }
+.bt-grid { position: absolute; left: 100px; right: 100px; top: 420px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 18px; }
+.bt-tile { position: relative; height: 108px; border-radius: 22px; padding: 0 16px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; grid-template-columns: 56px 1fr 22px; align-items: center; gap: 12px; overflow: hidden; transition: background .4s, box-shadow .4s; }
+.bt-tile .b-avatar { width: 56px; height: 56px; font-size: 21px; }
+.bt-tile .meta { display: grid; line-height: 1.1; }
+.bt-tile .meta b { font-size: 30px; }
+.bt-tile .meta span { font-size: 26px; color: var(--stage-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bt-tile .pulse { position: relative; width: 18px; height: 18px; border-radius: 50%; background: var(--stage-line); transition: background .3s; }
+.bt-tile.typing .pulse { background: var(--high-sea); }
+.bt-tile.typing .pulse::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 3px solid var(--high-sea); animation: btRipple 1.1s var(--ease) infinite; }
+@keyframes btRipple { from { transform: scale(.5); opacity: 1; } to { transform: scale(1.9); opacity: 0; } }
+.bt-tile .wbar { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: var(--stage-line); }
+.bt-tile .wbar i { display: block; height: 100%; background: var(--high-sea); transform-origin: left; transform: scaleX(0); transition: transform .6s var(--ease); }
+.bt-tile.in { box-shadow: 0 0 0 3px var(--game-right), var(--stage-glow); }
+.bt-tile.in .pulse { background: var(--game-right); }
+.bt-tile.in .pulse::after { content: "✓"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; font-weight: 800; color: #04210f; border: 0; animation: none; }
+.bt-tile.in .wbar i { background: var(--game-right); }
+.bt-foot { position: absolute; left: 100px; bottom: 40px; display: flex; align-items: baseline; gap: 34px; font-size: 28px; color: var(--stage-muted); }
+.bt-foot b { color: var(--stage-ink); font-size: 44px; font-variant-numeric: tabular-nums; }
+
+/* Board: battle */
+.bt-card { position: absolute; top: 320px; height: 340px; border-radius: 30px; background: var(--stage-card); box-shadow: var(--stage-glow); padding: 30px 34px; }
+.bt-count { left: 100px; width: 520px; display: grid; align-content: center; justify-items: center; text-align: center; }
+.bt-count .num { font-size: 168px; font-weight: 700; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.bt-count .lbl { font-size: 28px; color: var(--stage-muted); }
+.bt-clash { left: 660px; width: 600px; background: transparent; box-shadow: none; overflow: hidden; }
+.bt-mini { position: absolute; top: 70px; width: 210px; height: 200px; border-radius: 22px; background: var(--stage-card-hi); box-shadow: var(--stage-glow); padding: 26px 22px; display: grid; gap: 14px; align-content: start; }
+.bt-mini i { display: block; height: 12px; border-radius: 6px; background: var(--stage-line); }
+.bt-mini i:nth-child(2) { width: 86%; } .bt-mini i:nth-child(3) { width: 92%; } .bt-mini i:nth-child(4) { width: 60%; }
+.bt-mini.l { left: 60px; } .bt-mini.r { right: 60px; }
+.bt-mini.win { box-shadow: 0 0 0 4px var(--game-gold), 0 0 50px rgba(242,193,78,.45); }
+.bt-vs { position: absolute; left: 50%; top: 50%; width: 92px; height: 92px; margin: -46px 0 0 -46px; border-radius: 50%; display: grid; place-items: center; font-size: 32px; font-weight: 800; background: var(--high-sea); color: var(--depth); box-shadow: 0 10px 30px rgba(246,134,32,.4); z-index: 2; }
+.bt-rel { left: 1300px; right: 100px; display: grid; align-content: center; gap: 20px; }
+.bt-rel .top { display: flex; align-items: baseline; justify-content: space-between; font-size: 28px; color: var(--stage-muted); }
+.bt-rel .top b { font-size: 72px; color: var(--stage-ink); font-variant-numeric: tabular-nums; line-height: 1; }
+.bt-rel .meter { position: relative; height: 22px; border-radius: 22px; background: var(--stage-line); }
+.bt-rel .meter i { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--wave), var(--game-right)); transform-origin: left; transform: scaleX(0); transition: transform .9s var(--ease); }
+.bt-rel .meter u { position: absolute; left: 70%; top: -12px; bottom: -12px; width: 4px; border-radius: 2px; background: var(--stage-ink); }
+.bt-rel .note { font-size: 26px; color: var(--stage-muted); }
+.bt-rel.ok .note { color: var(--game-right); font-weight: 700; }
+.bt-scale { position: absolute; left: 100px; right: 100px; top: 712px; height: 200px; }
+.bt-scale .cap { font-size: 26px; color: var(--stage-muted); }
+.bt-scale .track { position: absolute; left: 0; right: 0; top: 104px; height: 4px; border-radius: 4px; background: var(--stage-line); }
+.bt-scale .dot { position: absolute; left: 0; top: 80px; width: 30px; height: 30px; margin-left: -15px; border-radius: 50%; background: var(--stage-ink); opacity: .78; transition: transform 1s var(--ease); box-shadow: 0 0 0 4px rgba(0,0,0,.08); }
+.bt-scale .ends { position: absolute; left: 0; right: 0; top: 150px; display: flex; justify-content: space-between; font-size: 26px; color: var(--stage-muted); }
+
+/* Board: spotlight */
+.bt-spot-h { position: absolute; left: 100px; right: 100px; top: 126px; text-align: center; }
+.bt-spot-h h2 { margin: 0; font-size: 50px; letter-spacing: -.015em; }
+.bt-side { position: absolute; top: 290px; width: 790px; height: 620px; border-radius: 32px; padding: 40px 44px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; grid-template-rows: auto 1fr auto; gap: 22px; }
+.bt-side.a { left: 100px; } .bt-side.b { right: 100px; }
+.bt-side .tag { display: inline-flex; align-self: start; justify-self: start; padding: 8px 22px; border-radius: 999px; font-size: 28px; font-weight: 800; letter-spacing: .04em; color: #fff; }
+.bt-side .txt { font-size: 34px; line-height: 1.38; font-weight: 500; text-wrap: pretty; }
+.bt-side .split { display: grid; gap: 12px; opacity: 0; transform: translateY(14px); transition: opacity .5s, transform .5s var(--ease); }
+.bt-side .split .bar { height: 18px; border-radius: 18px; background: var(--stage-line); overflow: hidden; }
+.bt-side .split .bar i { display: block; height: 100%; border-radius: inherit; transform-origin: left; transform: scaleX(0); transition: transform 1s var(--ease); }
+.bt-side .split .row { display: flex; align-items: baseline; gap: 16px; font-size: 28px; color: var(--stage-muted); flex-wrap: wrap; }
+.bt-side .split .row b { font-size: 40px; color: var(--stage-ink); font-variant-numeric: tabular-nums; }
+.board.split .bt-side .split { opacity: 1; transform: none; }
+.bt-bigvs { position: absolute; left: 960px; top: 600px; width: 130px; height: 130px; margin: -65px 0 0 -65px; border-radius: 50%; display: grid; place-items: center; font-size: 44px; font-weight: 800; background: var(--high-sea); color: var(--depth); box-shadow: 0 0 0 10px rgba(246,134,32,.18), 0 20px 50px rgba(0,0,0,.3); z-index: 3; }
+
+/* Chips (board) */
+.bt-chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.bt-chip { display: inline-flex; align-items: center; gap: 10px; padding: 6px 16px; border-radius: 999px; background: var(--stage-card-hi); font-size: 26px; font-weight: 600; white-space: nowrap; }
+.bt-chip b { font-variant-numeric: tabular-nums; color: var(--game-gold); }
+[data-board-theme="light"] .bt-chip b { color: var(--pastel-gold-ink); }
+
+/* Board: results */
+.bt-res-h { position: absolute; left: 100px; right: 100px; top: 124px; display: flex; align-items: flex-end; gap: 24px; }
+.bt-res-h h2 { margin: 0; font-size: 50px; letter-spacing: -.015em; }
+.bt-res-h .b-pill { margin-left: auto; color: var(--game-right); }
+.bt-top3 { position: absolute; left: 100px; right: 100px; top: 260px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px; align-items: start; }
+.bt-res { border-radius: 30px; padding: 34px 36px 36px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; gap: 20px; }
+.bt-res.r1 { box-shadow: 0 0 0 3px var(--game-gold), 0 0 60px rgba(242,193,78,.25), var(--stage-glow); }
+.bt-res .medal { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; font-size: 36px; font-weight: 800; color: var(--depth); }
+.bt-res .medal.m1 { background: linear-gradient(var(--game-gold), #d9a531); }
+.bt-res .medal.m2 { background: linear-gradient(#e3e7ef, #b9c1cf); }
+.bt-res .medal.m3 { background: linear-gradient(#efc29d, #cf9466); }
+.bt-res .top { display: flex; align-items: center; gap: 18px; font-size: 28px; font-weight: 700; color: var(--stage-muted); }
+.bt-res .txt { font-size: 32px; line-height: 1.4; }
+.bt-res .won { font-size: 22px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: var(--stage-muted); }
+
+/* Board: judges podium */
+.bt-jh { position: absolute; left: 0; right: 0; top: 140px; text-align: center; }
+.bt-jh h2 { margin: 0; font-size: 54px; letter-spacing: -.015em; }
+.bt-jh p { margin: 10px 0 0; font-size: 28px; color: var(--stage-muted); }
+.bt-jh .runners { margin-top: 18px; display: inline-flex; gap: 16px; }
+
+/* Board: teacher view */
+.bt-tv { position: absolute; left: 100px; right: 100px; top: 124px; bottom: 120px; display: grid; grid-template-columns: 1000px 1fr; gap: 56px; }
+.bt-tv h3 { margin: 0 0 14px; font-size: 30px; }
+.bt-scalelist { display: grid; grid-template-columns: 1fr 1fr; grid-auto-flow: column; grid-template-rows: repeat(12, 54px); gap: 8px 30px; }
+.bt-srow { display: grid; grid-template-columns: 44px 42px 54px 1fr; align-items: center; gap: 10px; font-size: 26px; font-weight: 600; }
+.bt-srow .rk { color: var(--stage-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.bt-srow .b-avatar { width: 42px; height: 42px; font-size: 16px; }
+.bt-srow .th { position: relative; height: 16px; border-radius: 8px; background: var(--stage-line); }
+.bt-srow .th::before { content: ""; position: absolute; left: 50%; top: -6px; bottom: -6px; width: 2px; background: var(--stage-muted); }
+.bt-srow .th i { position: absolute; top: 0; bottom: 0; border-radius: 8px; }
+.bt-srow.me { color: var(--high-sea); }
+.bt-ins { display: grid; gap: 16px; align-content: start; }
+.bt-ins .lb-row { grid-template-columns: 1fr; font-size: 26px; gap: 6px; padding: 16px 24px; }
+.bt-ins .lb-row span { color: var(--stage-muted); font-weight: 500; }
+.bt-hist { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; align-items: end; height: 150px; }
+.bt-hist div { display: grid; justify-items: center; gap: 6px; align-self: end; font-size: 22px; color: var(--stage-muted); }
+.bt-hist div i { width: 100%; border-radius: 10px 10px 4px 4px; background: var(--wave); }
+
+/* Phone */
+.phone { overflow-wrap: normal; word-break: normal; hyphens: manual; }
+.bt-pcrit { padding: 10px 14px; border-radius: 14px; background: var(--pastel-gold); color: var(--pastel-gold-ink); font-size: 14px; font-weight: 600; }
+.bt-ta { font-family: var(--font-ui); color: var(--ink); min-height: 230px; padding: 14px 16px; font-size: 17px; line-height: 1.45; resize: none; display: block; }
+.bt-wc { display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: var(--muted); }
+.bt-wc b { color: var(--navy); font-size: 17px; font-variant-numeric: tabular-nums; }
+.bt-link { border: 0; background: none; color: var(--wave); font-weight: 600; font-size: 15px; min-height: 44px; padding: 0 4px; }
+.bt-ans { width: 100%; border: 0; border-radius: 20px; padding: 14px 16px 16px; background: #fff; box-shadow: 0 1px 2px rgba(20,35,70,.06), 0 0 0 1px rgba(23,55,94,.12); text-align: left; display: grid; gap: 8px; font-size: 16px; line-height: 1.45; color: var(--ink); transition: box-shadow .2s, opacity .25s, transform .3s var(--ease-spring); }
+.bt-ans .lab { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.bt-ans .lab .pick { letter-spacing: 0; text-transform: none; font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--navy); color: #fff; opacity: 0; transition: opacity .2s; }
+.bt-ans.sel { box-shadow: 0 0 0 3px var(--navy); transform: scale(1.01); }
+.bt-ans.sel .lab .pick { opacity: 1; }
+.bt-ans.off { opacity: .55; }
+.bt-pchips { display: flex; flex-wrap: wrap; gap: 8px; }
+.bt-pchips button { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 0; background: var(--cotton); font-size: 15px; font-weight: 600; box-shadow: inset 0 0 0 1px rgba(23,55,94,.1); }
+.bt-pchips button[aria-pressed="true"] { background: var(--pastel-gold); color: var(--pastel-gold-ink); box-shadow: inset 0 0 0 2px var(--pastel-gold-ink); }
+.bt-pips { display: flex; gap: 6px; }
+.bt-pips i { width: 26px; height: 8px; border-radius: 8px; background: rgba(23,55,94,.12); }
+.bt-pips i.on { background: var(--high-sea); }
+.bt-wait { flex: 1; display: grid; place-items: center; text-align: center; gap: 10px; color: var(--muted); }
+.bt-wait .big { font-size: 60px; font-weight: 700; color: var(--navy); line-height: 1; font-variant-numeric: tabular-nums; }
+.bt-tick { width: 84px; height: 84px; margin: 0 auto 10px; border-radius: 50%; display: grid; place-items: center; font-size: 40px; font-weight: 800; background: #e3f4ea; color: var(--success); }
+.bt-list { display: grid; gap: 8px; padding: 14px 16px; border-radius: 20px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1); font-size: 15px; }
+.bt-list div { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.bt-list .ok { color: var(--success); font-weight: 700; }
+.bt-list .no { color: var(--danger); font-weight: 700; }
+.bt-third { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 18px; background: var(--pastel-sage); color: var(--pastel-sage-ink); font-size: 15px; font-weight: 600; }
+.bt-third b { font-size: 20px; white-space: nowrap; }
+</style>
+</head>
+<body>
+<script src="games.js"></script>
+<script>
+// ── Content (invented: The Lantern House) ─────────────────────
+const PROMPT = 'How does the narrator make the house feel threatening in Chapter 3? Use one quotation.';
+const CRIT = 'Which answer better explains how the language creates the feeling?';
+const CHIPS = ['Apt quotation', 'Names the technique', 'Explains the effect', 'Links to the question', 'Clear and concise'];
+const ANS = {
+  A1: { t: 2.1, txt: 'Mira says the windows “watched the lane like a row of patient eyes”. The simile turns the house into a hunter that can wait, so the threat is slow rather than sudden, and the reader starts to feel watched too.' },
+  A2: { t: 1.8, txt: 'The personification in “the house leaned toward the sea as though it were listening” makes the building seem alive and secretive. Because it listens for something under the water, we sense a danger Mira can’t see yet.' },
+  A3: { t: 1.5, txt: '“Every lamp I lit only showed me how much dark was left” is a paradox: light should keep Mira safe, but it shows her the dark is bigger. Her whole job can never win against the house.' },
+  A11: { t: 1.2, txt: 'The sibilance in “silent stairs slid down into the cellar” slows the sentence and sounds like a whisper, so even the building seems to be hushing Mira before something happens.' },
+  A4: { t: .9, txt: 'The narrator uses personification when the house “held its breath”. This makes it feel like the house is waiting for something bad to happen, which builds tension.' },
+  A12: { t: .7, txt: 'Old Tobin warns Mira to “keep to the lit rooms”. This foreshadows that the dark parts of the house are dangerous, so it feels threatening before anything happens.' },
+  A5: { t: .5, txt: 'The house is described with dark imagery like “black stone” and “cold halls”. These words have negative connotations that make the reader uneasy about the house.' },
+  A6: { t: .2, txt: 'The writer uses lots of description to make the house scary. For example the windows are like eyes. This shows the house is threatening and Mira is scared.' },
+  A7: { t: 0, txt: 'The house is threatening because Doctor Hask lives there and he is a mysterious character who might be hiding something from Mira and Ellis.' },
+  A8: { t: -.4, txt: 'The house is old and has lots of rooms. Gothic houses are usually haunted, so the reader expects something bad to happen there.' },
+  A9: { t: -.8, txt: 'The author uses a simile, “the house was dark”. This shows the house is dark, which is scary for the reader and for Mira.' },
+  A10: { t: -1.2, txt: 'It is threatening because of the setting, the mood and the atmosphere the writer creates in Chapter 3.' }
+};
+const MY_PAIRS = [['A4', 'A6'], ['A2', 'A11'], ['A5', 'A12'], ['A7', 'A9'], ['A3', 'A1']];
+const SPOT = ['A3', 'A11'];
+const TOP_CHIPS = { A1: [['Explains the effect', 14], ['Apt quotation', 11]], A2: [['Names the technique', 12], ['Explains the effect', 9]], A3: [['Links to the question', 10], ['Explains the effect', 8]] };
+const SAMPLE = 'The simile “like a row of patient eyes” makes the windows seem to watch Mira. It suggests the house is waiting for her to make a mistake, so the threat feels quiet but constant.';
+const MY_THETA = .6, ROUNDS = 5, TARGET = 80;
+const others = GM.class.filter((c) => c !== GM.me);
+
+let S, loops = [];
+function fresh() {
+  loops.forEach(clearInterval); loops = [];
+  S && S.timer && S.timer.stop();
+  GM.rand();
+  const texted = Object.keys(ANS);
+  const owners = GM.shuffle(others);
+  const owner = {}; const theta = { [GM.me]: MY_THETA };
+  owners.forEach((c, k) => { if (k < texted.length) { owner[texted[k]] = c; theta[c] = ANS[texted[k]].t; } else theta[c] = -2 + GM.rand() * 3.1; });
+  S = {
+    phase: 'write', owner, theta,
+    words: Object.fromEntries(GM.class.map((c) => [c, 0])), goal: Object.fromEntries(GM.class.map((c) => [c, 34 + Math.floor(GM.rand() * 60)])),
+    handed: {}, myText: '', round: 0, pick: null, chips: [], mine: [],
+    done: Object.fromEntries(GM.class.map((c) => [c, 0])), total: 0,
+    jitter: Object.fromEntries(GM.class.map((c) => [c, (GM.rand() - .5) * 3])),
+    chipTally: JSON.parse(JSON.stringify(TOP_CHIPS))
+  };
+}
+const { board, phone } = GM.scaffold({
+  title: '<b>Short-answer battles</b> · The Lantern House',
+  note: '<b>How to use:</b> you are JW. Write on the phone and hand in, then press <b>Start battles</b> on the board. Judge five pairs of anonymous answers (tap the better one, add chips if you like). Try <b>Spotlight</b> during the battles, then <b>Show results</b>. The other 23 students are simulated.',
+  onRestart: () => { fresh(); startWrite(); }
+});
+
+// ── Helpers ───────────────────────────────────────────────────
+const wc = (s) => (s.trim().match(/\S+/g) || []).length;
+const D = (ms) => (GM.calm() ? 1 : ms);
+function clearStage() { board.classList.remove('split'); board.querySelectorAll('.stage-x').forEach((n) => n.remove()); }
+function setControls(html) { board.querySelector('.board-controls')?.remove(); if (html) board.insertAdjacentHTML('beforeend', `<div class="stage-x board-controls">${html}</div>`); }
+function enter(nodes, { y = 30, step = 90, delay = 0 } = {}) {
+  [...nodes].forEach((n, k) => n.animate([{ opacity: 0, transform: `translateY(${y}px) scale(.97)` }, { opacity: 1, transform: 'none' }], { duration: D(600), delay: GM.calm() ? 0 : delay + k * step, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+}
+function pulse(n, s = 1.08) { if (n && !GM.calm()) n.animate([{ transform: 'scale(1)' }, { transform: `scale(${s})` }, { transform: 'scale(1)' }], { duration: 420, easing: 'cubic-bezier(.22,1,.36,1)' }); }
+function phoneShell(body, dock = '', score = '') {
+  phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av">${GM.me}</span>JW</span><span class="ph-score">${score || 'Battles'}</span></div>
+    <div class="ph-timer"><i></i></div><div class="ph-body">${body}</div>${dock ? `<div class="ph-dock">${dock}</div>` : ''}`;
+}
+
+// ── 1. Write ──────────────────────────────────────────────────
+function startWrite() {
+  S.phase = 'write'; clearStage();
+  board.insertAdjacentHTML('beforeend', `
+    <div class="stage-x bt-head"><span class="b-eyebrow">Write · 4 minutes · on your phone</span><p class="bt-q">${PROMPT}</p><div class="bt-crit">Judged on: <b>${CRIT}</b></div></div>
+    <div class="stage-x bt-ring"></div>
+    <div class="stage-x bt-grid">${GM.class.map((c) => `<div class="bt-tile" data-c="${c}"><span class="b-avatar" style="${GM.avatarStyle(c)}">${c}</span><span class="meta"><b>${c}</b><span><span class="n">0</span> words</span></span><span class="pulse"></span><span class="wbar"><i></i></span></div>`).join('')}</div>
+    <div class="stage-x bt-foot"><span><b class="tot">0</b> words written</span><span><b class="inn">0</b> of ${GM.class.length} handed in</span><span>Answers stay hidden until the battles</span></div>`);
+  setControls('<button class="bctl" data-a="more">+1 min</button><button class="bctl primary" data-a="battle">Start battles</button>');
+  enter(board.querySelectorAll('.bt-tile'), { y: 20, step: 22, delay: 200 });
+  enter(board.querySelectorAll('.bt-head'), { y: 16 });
+  S.timer = GM.ring(board.querySelector('.bt-ring'), 240, { onEnd: startBattles, bar: () => phone.querySelector('.ph-timer i') });
+  renderPhone();
+  loops.push(setInterval(simWrite, 650));
+}
+function tileUpdate(c, typing) {
+  const t = board.querySelector(`.bt-tile[data-c="${c}"]`); if (!t) return;
+  t.querySelector('.n').textContent = S.words[c];
+  t.querySelector('.wbar i').style.transform = `scaleX(${Math.min(1, S.words[c] / TARGET)})`;
+  t.classList.toggle('in', !!S.handed[c]);
+  if (typing && !S.handed[c]) { t.classList.add('typing'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('typing'), 1400); }
+  const tot = board.querySelector('.bt-foot .tot'); if (tot) tot.textContent = Object.values(S.words).reduce((a, b) => a + b, 0).toLocaleString();
+  const inn = board.querySelector('.bt-foot .inn'); if (inn) inn.textContent = Object.keys(S.handed).length;
+}
+function simWrite() {
+  if (S.paused) return;
+  const busy = others.filter((c) => !S.handed[c]);
+  GM.shuffle(busy).slice(0, 5).forEach((c) => {
+    if (S.words[c] >= S.goal[c]) {
+      if (GM.rand() < .35) { S.handed[c] = true; tileUpdate(c); pulse(board.querySelector(`.bt-tile[data-c="${c}"]`), 1.05); GM.sound.click(); }
+      return;
+    }
+    S.words[c] = Math.min(S.goal[c], S.words[c] + 1 + Math.floor(GM.rand() * 5)); tileUpdate(c, true);
+  });
+}
+
+// ── 2. Battles ────────────────────────────────────────────────
+function startBattles() {
+  if (S.phase !== 'write') return;
+  S.timer && S.timer.stop(); loops.forEach(clearInterval); loops = [];
+  if (!S.myText.trim()) S.myText = SAMPLE;
+  S.words[GM.me] = wc(S.myText);
+  GM.class.forEach((c) => { S.handed[c] = true; if (!S.words[c]) S.words[c] = S.goal[c]; });
+  S.phase = 'battle'; S.round = 0; S.pick = null; S.chips = [];
+  S.sides = MY_PAIRS.map((p) => (GM.rand() < .5 ? p.slice() : p.slice().reverse()));
+  GM.sound.whoosh();
+  renderBattleBoard(); renderPhone();
+  loops.push(setInterval(simJudge, 380));
+}
+function renderBattleBoard() {
+  clearStage();
+  board.insertAdjacentHTML('beforeend', `
+    <div class="stage-x bt-head wide"><span class="b-eyebrow bt-round">Battle round 1 of ${ROUNDS}</span><p class="bt-q">${CRIT}</p><div class="bt-crit">Every phone gets two anonymous answers, never its own. Tap the better one.</div></div>
+    <div class="stage-x bt-card bt-count"><span class="num">${S.total}</span><span class="lbl">judgements made</span></div>
+    <div class="stage-x bt-card bt-clash"><div class="bt-mini l"><i></i><i></i><i></i><i></i></div><span class="bt-vs">VS</span><div class="bt-mini r"><i></i><i></i><i></i><i></i></div></div>
+    <div class="stage-x bt-card bt-rel"><div class="top"><span>Scale reliability</span><b class="rv">0.00</b></div><div class="meter"><i></i><u></u></div><span class="note">Reliable from 0.70</span></div>
+    <div class="stage-x bt-scale"><span class="cap">The class scale is forming · ${GM.class.length} answers, no names</span><span class="track"></span>${GM.class.map((c) => `<span class="dot" data-c="${c}"></span>`).join('')}<span class="ends"><span>Weaker</span><span>Stronger</span></span></div>
+    <div class="stage-x bt-foot"><span><b class="judging">${GM.class.length}</b> judging</span><span><b class="fin">0</b> finished</span></div>`);
+  setControls('<button class="bctl" data-a="spot">Spotlight</button><button class="bctl primary" data-a="results">Show results</button>');
+  enter(board.querySelectorAll('.bt-card'), { step: 120 });
+  updateBattleBoard(true);
+}
+function reliability() { return .92 * (1 - Math.exp(-S.total / 45)); }
+function updateBattleBoard(first) {
+  if (S.phase !== 'battle') return;
+  const num = board.querySelector('.bt-count .num'); if (!num) return;
+  num.textContent = S.total; if (!first) pulse(num, 1.06);
+  const r = reliability();
+  board.querySelector('.bt-rel .rv').textContent = r.toFixed(2);
+  board.querySelector('.bt-rel .meter i').style.transform = `scaleX(${r})`;
+  const rel = board.querySelector('.bt-rel'); const ok = r >= .7;
+  if (ok && !rel.classList.contains('ok')) { rel.classList.add('ok'); rel.querySelector('.note').textContent = 'Reliable: ready for results'; GM.sound.ding(); pulse(rel, 1.03); }
+  const avg = GM.class.reduce((a, c) => a + S.done[c], 0) / GM.class.length;
+  board.querySelector('.bt-round').textContent = `Battle round ${Math.min(ROUNDS, Math.floor(avg) + 1)} of ${ROUNDS}`;
+  const fin = GM.class.filter((c) => S.done[c] >= ROUNDS).length;
+  board.querySelector('.bt-foot .fin').textContent = fin; board.querySelector('.bt-foot .judging').textContent = GM.class.length - fin;
+  // dots settle into order as judgements arrive (estimate = truth + shrinking noise)
+  const conf = Math.min(1, S.total / 100), W = 1720;
+  board.querySelectorAll('.bt-scale .dot').forEach((d, k) => {
+    const c = d.dataset.c, est = S.theta[c] * conf + S.jitter[c] * (1 - conf);
+    const x = Math.max(15, Math.min(W - 15, ((est + 2.6) / 5.2) * W));
+    d.style.transform = `translate(${x}px, ${((k % 3) - 1) * 26}px)`;
+  });
+}
+function clash() {
+  const st = board.querySelector('.bt-clash'); if (!st || st._busy || GM.calm()) return;
+  st._busy = true;
+  const l = st.querySelector('.l'), r = st.querySelector('.r'), win = GM.rand() < .5 ? l : r;
+  [l, r].forEach((n) => n.classList.remove('win'));
+  l.animate([{ transform: 'translateX(-120px) rotate(-6deg)', opacity: 0 }, { transform: 'translateX(26px) rotate(0)', opacity: 1, offset: .55 }, { transform: 'none', opacity: 1 }], { duration: 520, easing: 'cubic-bezier(.22,1,.36,1)' });
+  r.animate([{ transform: 'translateX(120px) rotate(6deg)', opacity: 0 }, { transform: 'translateX(-26px) rotate(0)', opacity: 1, offset: .55 }, { transform: 'none', opacity: 1 }], { duration: 520, easing: 'cubic-bezier(.22,1,.36,1)' });
+  setTimeout(() => { win.classList.add('win'); win.animate([{ transform: 'none' }, { transform: 'translateY(-16px) scale(1.05)' }, { transform: 'none' }], { duration: 480, easing: 'cubic-bezier(.22,1,.36,1)' }); setTimeout(() => { st._busy = false; }, 650); }, 520);
+}
+function simJudge() {
+  if (S.paused || S.phase !== 'battle') return;
+  const busy = others.filter((c) => S.done[c] < ROUNDS);
+  if (!busy.length) return;
+  const c = GM.pick(busy); S.done[c]++; S.total++;
+  clash(); updateBattleBoard();
+}
+function lockJudgement() {
+  const [a, b] = S.sides[S.round], picked = S.pick === 0 ? a : b, other = S.pick === 0 ? b : a;
+  const agree = ANS[picked].t > ANS[other].t;
+  S.mine.push({ picked, other, agree, close: Math.abs(ANS[picked].t - ANS[other].t), chips: S.chips.slice() });
+  S.chips.forEach((ch) => { const t = S.chipTally[picked]; if (!t) return; const row = t.find((x) => x[0] === ch); if (row) row[1]++; else t.push([ch, 1]); });
+  S.done[GM.me]++; S.total++; clash(); updateBattleBoard();
+}
+
+// ── 3. Spotlight ──────────────────────────────────────────────
+function spotlight() {
+  S.view = 'spot'; clearStage();
+  const [a, b] = SPOT;
+  board.insertAdjacentHTML('beforeend', `
+    <div class="stage-x bt-spot-h"><span class="b-eyebrow">Spotlight · the closest battle so far</span><h2>Which explains the effect better? Talk with your partner.</h2></div>
+    ${[['a', a, 'k1', 'Answer A', 11, 'Explains the effect', 'Links to the question'], ['b', b, 'k4', 'Answer B', 10, 'Names the technique', 'Apt quotation']].map(([s, id, k, lab, n, c1, c2]) => `
+      <div class="stage-x bt-side ${s}"><span class="tag ${k}">${lab}</span><div class="txt">${ANS[id].txt}</div>
+        <div class="split"><div class="row"><b>${n}</b> judges chose it <span class="bt-chips"><span class="bt-chip">${c1}</span><span class="bt-chip">${c2}</span></span></div><div class="bar"><i class="${k}" style="--w:${n / 21}"></i></div></div></div>`).join('')}
+    <div class="stage-x bt-bigvs">VS</div>`);
+  setControls('<button class="bctl" data-a="split">Show the split</button><button class="bctl primary" data-a="back">Back to battles</button>');
+  if (!GM.calm()) {
+    board.querySelector('.bt-side.a').animate([{ transform: 'translateX(-140px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 700, easing: 'cubic-bezier(.22,1,.36,1)' });
+    board.querySelector('.bt-side.b').animate([{ transform: 'translateX(140px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 700, easing: 'cubic-bezier(.22,1,.36,1)' });
+    board.querySelector('.bt-bigvs').animate([{ transform: 'scale(0) rotate(-90deg)' }, { transform: 'scale(1.2) rotate(8deg)', offset: .7 }, { transform: 'none' }], { duration: 700, delay: 380, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' });
+  }
+  GM.sound.reveal();
+  GM.toast(phone, 'Spotlight on the board<small>Look up: talk about Answer A and Answer B.</small>');
+}
+function showSplit() {
+  board.classList.add('split'); GM.sound.whoosh();
+  board.querySelectorAll('.bt-side .bar i').forEach((i) => { i.style.transform = `scaleX(${i.style.getPropertyValue('--w')})`; });
+}
+
+// ── 4. Results ────────────────────────────────────────────────
+function myScore() {
+  const pts = S.mine.reduce((a, m) => a + (m.agree ? Math.round(60 + 40 * Math.max(0, 1 - m.close / 3)) : 0), 0);
+  return { agree: S.mine.filter((m) => m.agree).length, pts };
+}
+function judges() {
+  if (!S.judgePts) {
+    S.judgePts = {};
+    others.forEach((c) => { const ag = [2, 3, 3, 4, 4, 4, 5, 5][Math.floor(GM.rand() * 8)]; S.judgePts[c] = { agree: ag, pts: ag ? ag * 62 + Math.floor(GM.rand() * ag * 30) : 0 }; });
+  }
+  S.judgePts[GM.me] = myScore();
+  return GM.class.map((c) => ({ c, ...S.judgePts[c] })).sort((a, b) => b.pts - a.pts);
+}
+function showResults() {
+  loops.forEach(clearInterval); loops = [];
+  // finish any outstanding judgements (JW's unjudged pairs are skipped)
+  others.forEach((c) => { S.total += ROUNDS - S.done[c]; S.done[c] = ROUNDS; });
+  S.phase = 'results'; S.view = 'results'; clearStage();
+  const top = ['A1', 'A2', 'A3'];
+  board.insertAdjacentHTML('beforeend', `
+    <div class="stage-x bt-res-h"><div><span class="b-eyebrow">Results · ${S.total} judgements</span><h2>The class’s top three answers</h2></div><span class="b-pill">Scale reliable · ${Math.max(.84, reliability()).toFixed(2)}</span></div>
+    <div class="stage-x bt-top3">${top.map((id, k) => `<div class="bt-res r${k + 1}"><div class="top"><span class="medal m${k + 1}">${k + 1}</span>${['First', 'Second', 'Third'][k]}</div><div class="txt">${ANS[id].txt}</div><span class="won">Won on</span><div class="bt-chips">${S.chipTally[id].slice().sort((x, y) => y[1] - x[1]).slice(0, 2).map(([ch, n]) => `<span class="bt-chip">${ch} <b>${n}</b></span>`).join('')}</div></div>`).join('')}</div>`);
+  setControls('<button class="bctl" data-a="teacher">Teacher view</button><button class="bctl primary" data-a="judges">Sharpest judges</button>');
+  const cards = [...board.querySelectorAll('.bt-res')];
+  [2, 1, 0].forEach((k, n) => cards[k].animate([{ opacity: 0, transform: 'translateY(80px) scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: D(800), delay: GM.calm() ? 0 : 300 + n * 650, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  GM.sound.reveal(); setTimeout(() => GM.sound.right(), D(1700));
+  renderPhone();
+}
+function showJudges() {
+  S.view = 'judges'; clearStage();
+  const ranked = judges(), [a, b, c] = ranked;
+  board.insertAdjacentHTML('beforeend', `
+    <div class="stage-x bt-jh"><span class="b-eyebrow">Sharpest judges</span><h2>Points for agreeing with the class scale</h2><p>Close calls are worth more than easy ones.</p>
+      <div class="runners">${ranked.slice(3, 5).map((r, i) => `<span class="b-pill"><b>${i + 4}</b> ${r.c} · ${r.pts}</span>`).join('')}</div></div>
+    <div class="stage-x podium">${[[b, 'p2', 2], [a, 'p1', 1], [c, 'p3', 3]].map(([r, cls, n]) => `<div class="pod ${cls}"><span class="b-avatar" style="${GM.avatarStyle(r.c)}">${r.c}</span><span class="name">${r.c}</span><span class="score">${r.pts} pts · ${r.agree} of 5</span><div class="block">${n}</div></div>`).join('')}</div>`);
+  setControls('<button class="bctl" data-a="resultsback">Top answers</button><button class="bctl primary" data-a="teacher">Teacher view</button>');
+  board.querySelectorAll('.pod').forEach((p, k) => p.animate([{ transform: 'translateY(100%)' }, { transform: 'none' }], { duration: D(900), delay: GM.calm() ? 0 : [400, 1100, 0][k], easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  setTimeout(() => { GM.sound.fanfare(); GM.confetti(board); }, GM.calm() ? 0 : 1300);
+}
+function showTeacher() {
+  S.view = 'teacher'; clearStage();
+  const scale = GM.class.map((c) => ({ c, t: S.theta[c] })).sort((a, b) => b.t - a.t);
+  const ranked = judges();
+  const pct = (r) => Math.round((r.agree / 5) * 100);
+  const bins = [0, 1, 2, 3, 4, 5].map((n) => ranked.filter((r) => r.agree === n).length), maxb = Math.max(...bins, 1);
+  const low = ranked.filter((r) => r.agree <= 2).map((r) => r.c);
+  const perfect = ranked.filter((r) => r.agree === 5).map((r) => r.c);
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x bt-tv">
+    <div><span class="b-eyebrow">Teacher only · not for the projector</span><h3>Answer scale (comparative judgement) · reliability 0.84</h3>
+      <div class="bt-scalelist">${scale.map((r, i) => { const w = Math.abs(r.t) / 2.6 * 50; return `<div class="bt-srow ${r.c === GM.me ? 'me' : ''}"><span class="rk">${i + 1}</span><span class="b-avatar" style="${GM.avatarStyle(r.c)}">${r.c}</span><span>${r.c}</span><span class="th"><i style="left:${r.t >= 0 ? 50 : 50 - w}%;width:${w}%;background:${r.t >= 0 ? 'var(--game-right)' : 'var(--game-wrong)'}"></i></span></div>`; }).join('')}</div></div>
+    <div class="bt-ins"><span class="b-eyebrow" style="visibility:hidden">.</span><h3>Judging accuracy</h3>
+      <div class="lb-row"><b>Agreement with the final scale</b><div class="bt-hist">${bins.map((n, k) => `<div><i style="height:${(n / maxb) * 100}px"></i>${k}/5</div>`).join('')}</div></div>
+      <div class="lb-row"><b>Check in with: ${low.join(', ') || 'nobody'}</b><span>Agreed on 2 or fewer. Two of them picked the Doctor Hask answer, which talks about character, not language.</span></div>
+      <div class="lb-row"><b>Every call right: ${perfect.slice(0, 6).join(', ') || 'nobody yet'}</b><span>Good pairing partners for the next redraft.</span></div>
+      <div class="lb-row"><b>Written answers → To mark</b><span>All ${GM.class.length} answers go to To mark with their scale position. JW: ${pct(S.judgePts[GM.me])}% judging agreement.</span></div>
+    </div></div>`);
+  setControls('<button class="bctl" data-a="resultsback">Top answers</button><button class="bctl primary" data-a="restart">Play again</button>');
+  enter(board.querySelectorAll('.bt-srow'), { y: 10, step: 18 });
+}
+
+// ── Board controls ────────────────────────────────────────────
+board.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+  GM.sound.click();
+  if (a === 'more') { GM.toast(phone, '+1 minute added'); }
+  if (a === 'battle') startBattles();
+  if (a === 'spot') spotlight();
+  if (a === 'split') showSplit();
+  if (a === 'back') { S.view = 'battle'; renderBattleBoard(); }
+  if (a === 'results') showResults();
+  if (a === 'judges') showJudges();
+  if (a === 'resultsback') showResults();
+  if (a === 'teacher') showTeacher();
+  if (a === 'restart') { fresh(); startWrite(); }
+});
+
+// ── Phone ─────────────────────────────────────────────────────
+function renderPhone() {
+  if (S.phase === 'write' && !S.handed[GM.me]) {
+    const n = wc(S.myText);
+    phoneShell(`<p class="ph-sub">Write · 4 minutes</p><p class="ph-h">${PROMPT}</p>
+      <div class="bt-pcrit">Judged on: ${CRIT}</div>
+      <textarea class="pinput bt-ta" placeholder="Write your answer here…" aria-label="Your answer">${S.myText}</textarea>
+      <div class="bt-wc"><span><b class="mywc">${n}</b> words · aim for 40 to 80</span><button class="bt-link" data-p="sample">Fill a sample</button></div>`,
+    `<button class="pbtn cta orange" data-p="hand" ${n ? '' : 'disabled'}>Hand in</button>`);
+    const ta = phone.querySelector('textarea');
+    ta.addEventListener('input', () => {
+      S.myText = ta.value; const k = wc(ta.value); phone.querySelector('.mywc').textContent = k;
+      phone.querySelector('[data-p="hand"]').disabled = !k; S.words[GM.me] = k; tileUpdate(GM.me, true);
+    });
+    return;
+  }
+  if (S.phase === 'write') {
+    phoneShell(`<div class="bt-wait"><div><div class="bt-tick">✓</div><span class="ph-sub">Handed in</span><div class="big">${wc(S.myText)}</div><p class="ph-sub">words</p><p class="ph-sub" style="margin-top:16px">You can edit until the battles start.</p></div></div>`,
+      '<button class="pbtn cta" data-p="edit">Edit my answer</button>');
+    return;
+  }
+  if (S.phase === 'battle' && S.round < ROUNDS) {
+    const [a, b] = S.sides[S.round];
+    phoneShell(`<div style="display:flex;align-items:center;justify-content:space-between"><p class="ph-sub">Battle ${S.round + 1} of ${ROUNDS}</p><span class="bt-pips">${Array.from({ length: ROUNDS }, (_, k) => `<i class="${k < S.round ? 'on' : ''}"></i>`).join('')}</span></div>
+      <p class="ph-h" style="font-size:18px">${CRIT}</p>
+      <div class="bt-pair" style="display:grid;gap:12px">${[a, b].map((id, k) => `<button class="bt-ans ${S.pick === k ? 'sel' : S.pick != null ? 'off' : ''}" data-pick="${k}"><span class="lab">Answer ${'AB'[k]}<span class="pick">Your pick</span></span>${ANS[id].txt}</button>`).join('')}</div>
+      ${S.pick != null ? `<p class="ph-sub" style="font-size:14px">What made it better? Optional.</p><div class="bt-pchips">${CHIPS.map((c) => `<button data-chip="${c}" aria-pressed="${S.chips.includes(c)}">${c}</button>`).join('')}</div>` : ''}`,
+    `<button class="pbtn cta orange" data-p="lock" ${S.pick == null ? 'disabled' : ''}>${S.pick == null ? 'Tap the better answer' : `Lock in Answer ${'AB'[S.pick]}`}</button>`, `${S.round} / ${ROUNDS} judged`);
+    return;
+  }
+  if (S.phase === 'battle') {
+    phoneShell(`<div class="bt-wait"><div><div class="bt-tick">✓</div><span class="ph-sub">All judged</span><div class="big">5 of 5</div><p class="ph-sub">Your picks stay private.</p><p class="ph-sub" style="margin-top:16px">Results soon. Eyes on the board.</p></div></div>`, '', '5 / 5 judged');
+    return;
+  }
+  // results
+  const m = myScore(), rank = judges().findIndex((r) => r.c === GM.me) + 1;
+  const myRank = GM.class.map((c) => S.theta[c]).sort((x, y) => y - x).indexOf(MY_THETA) + 1;
+  phoneShell(`<div class="bt-wait" style="flex:none;padding-top:8px"><div><span class="ph-sub">Your judging score</span><div class="big">${S.mine.length ? Math.round((m.agree / S.mine.length) * 100) : 0}%</div><p class="ph-sub">You agreed with the class on <b>${m.agree} of ${S.mine.length}</b> battles</p></div></div>
+    <div class="bt-list">${S.mine.map((x, k) => `<div><span>Battle ${k + 1}</span><span class="${x.agree ? 'ok' : 'no'}">${x.agree ? 'Agreed' : 'The class went the other way'}</span></div>`).join('') || '<div><span>No battles judged</span></div>'}
+      <div style="border-top:1px solid rgba(23,55,94,.12);padding-top:8px"><span>Judging points</span><b>${m.pts}</b></div><div><span>Your place</span><b>${rank} of ${GM.class.length}</b></div></div>
+    <div class="bt-third"><b>${myRank <= 8 ? 'Top' : myRank <= 16 ? 'Middle' : 'Lower'} third</b><span>Where your own answer landed on the class scale.</span></div>`, '', `${m.pts} pts`);
+  GM.toast(phone, `+${m.pts} judging points<small>Close calls you got right count most.</small>`, 'good');
+}
+phone.addEventListener('click', async (e) => {
+  const t = e.target.closest('button'); if (!t || t.disabled) return;
+  if (t.dataset.p === 'sample') { S.myText = SAMPLE; S.words[GM.me] = wc(SAMPLE); tileUpdate(GM.me, true); renderPhone(); }
+  if (t.dataset.p === 'hand') { S.handed[GM.me] = true; S.words[GM.me] = wc(S.myText); tileUpdate(GM.me); pulse(board.querySelector(`.bt-tile[data-c="${GM.me}"]`), 1.06); GM.sound.lock(); renderPhone(); }
+  if (t.dataset.p === 'edit') { delete S.handed[GM.me]; tileUpdate(GM.me); renderPhone(); }
+  if (t.dataset.pick != null) { S.pick = +t.dataset.pick; GM.sound.click(); renderPhone(); }
+  if (t.dataset.chip) { const c = t.dataset.chip; S.chips = S.chips.includes(c) ? S.chips.filter((x) => x !== c) : [...S.chips, c]; t.setAttribute('aria-pressed', String(S.chips.includes(c))); }
+  if (t.dataset.p === 'lock') {
+    GM.sound.lock(); t.disabled = true;
+    const pair = phone.querySelector('.bt-pair'), chosen = pair.children[S.pick];
+    if (!GM.calm()) { chosen.animate([{ transform: 'scale(1.01)' }, { transform: 'scale(1.04)' }, { transform: 'scale(1.01)' }], { duration: 300 }); await GM.sleep(300); pair.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateX(-110%)', opacity: 0 }], { duration: 280, easing: 'cubic-bezier(.5,0,.75,0)', fill: 'forwards' }); await GM.sleep(280); }
+    lockJudgement(); S.round++; S.pick = null; S.chips = []; renderPhone();
+    const np = phone.querySelector('.bt-pair') || phone.querySelector('.bt-wait');
+    np && np.animate([{ transform: 'translateX(110%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: D(420), easing: 'cubic-bezier(.22,1,.36,1)' });
+  }
+});
+
+fresh(); startWrite();
+</script>
+</body>
+</html>

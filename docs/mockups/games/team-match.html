@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team match — game mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="games.css">
+<style>
+/* Two more team tokens so 24 students make six teams of four (proposed for the kit) */
+:root { --tm-team-5: #3fa9a3; --tm-team-5-soft: #d6efec; --tm-team-6: #d0678e; --tm-team-6-soft: #f6dde6; }
+
+/* ── Board: lobby ─────────────────────────────── */
+.tm-title { position: absolute; left: 120px; right: 120px; top: 140px; text-align: center; }
+.tm-title h2 { margin: 0; font-size: 104px; font-weight: 800; letter-spacing: -.035em; line-height: 1; }
+.tm-title p { margin: 22px auto 0; max-width: 1200px; font-size: 32px; color: var(--stage-muted); text-wrap: balance; }
+.tm-teams { position: absolute; left: 120px; right: 120px; top: 440px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.tm-tcard { border-radius: 28px; padding: 24px 28px 28px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; gap: 20px; position: relative; overflow: hidden; }
+.tm-tcard::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 8px; background: var(--c); }
+.tm-tcard h3 { margin: 0; display: flex; align-items: center; gap: 16px; font-size: 36px; }
+.tm-badge { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: var(--c); color: #fff; font-weight: 800; font-size: 28px; flex: none; }
+.tm-mem { display: flex; gap: 12px; }
+.tm-mem .b-avatar { width: 62px; height: 62px; font-size: 22px; }
+
+/* ── Board: race ──────────────────────────────── */
+.tm-head { position: absolute; left: 120px; top: 128px; width: 1000px; }
+.tm-head .tm-h { margin: 0; font-size: 44px; font-weight: 700; letter-spacing: -.01em; line-height: 1.15; }
+.tm-feed { position: absolute; right: 120px; top: 120px; width: 620px; height: 170px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; overflow: hidden; }
+.tm-feed .b-pill { font-size: 24px; flex: none; }
+.tm-feed .b-pill i { width: 18px; height: 18px; border-radius: 6px; background: var(--c); }
+.tm-feed .b-pill.bad { box-shadow: inset 0 0 0 2px var(--game-wrong); }
+.tm-feed .b-pill.win { box-shadow: inset 0 0 0 2px var(--game-gold); }
+.tm-ends { position: absolute; left: 400px; width: 1000px; top: 296px; display: flex; justify-content: space-between; font-size: 22px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--stage-muted); }
+.tm-track { position: absolute; left: 120px; top: 336px; width: 1280px; display: grid; gap: 12px; }
+.tm-lane { display: grid; grid-template-columns: 260px 1fr; align-items: center; gap: 20px; height: 92px; }
+.tm-name { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.tm-name b { display: block; font-size: 30px; line-height: 1.1; }
+.tm-name small { display: block; font-size: 22px; color: var(--stage-muted); letter-spacing: .06em; white-space: nowrap; }
+.tm-road { position: relative; height: 92px; border-radius: 24px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; grid-template-columns: 64px repeat(12, 1fr) 64px; align-items: center; padding: 0 6px; transition: box-shadow .35s; }
+.tm-start { justify-self: center; width: 14px; height: 14px; border-radius: 50%; background: var(--stage-line); }
+.tm-cell { height: 46px; margin: 0 3px; border-radius: 12px; background: var(--stage-line); position: relative; overflow: hidden; }
+.tm-cell::after { content: ""; position: absolute; inset: 0; background: var(--c); opacity: 0; transform: scaleX(.2); transform-origin: left; transition: opacity .35s, transform .45s var(--ease); }
+.tm-cell.on::after { opacity: .6; transform: none; }
+.tm-cell:nth-child(5)::before, .tm-cell:nth-child(9)::before { content: ""; position: absolute; right: 6px; top: 50%; width: 6px; height: 6px; margin-top: -3px; border-radius: 50%; background: var(--stage-muted); opacity: .5; }
+.tm-flag { justify-self: center; color: var(--stage-muted); display: grid; }
+.tm-tok { position: absolute; left: 0; top: 14px; width: 64px; height: 64px; z-index: 2; transition: transform .75s var(--ease-spring); }
+.tm-tok-in { width: 100%; height: 100%; border-radius: 50%; background: var(--c); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 28px; box-shadow: 0 0 0 4px rgba(255,255,255,.9), 0 10px 24px rgba(0,0,0,.35); }
+.tm-tok.won .tm-tok-in { font-size: 22px; box-shadow: 0 0 0 5px var(--game-gold), 0 0 36px rgba(242,193,78,.6); }
+.tm-ghost { position: absolute; left: 0; top: 14px; width: 64px; height: 64px; border-radius: 50%; background: var(--c); opacity: 0; pointer-events: none; z-index: 1; }
+.tm-lane.crash .tm-road { box-shadow: 0 0 0 4px var(--game-wrong), 0 0 50px rgba(212,84,79,.5); }
+.tm-boom { position: absolute; top: -26px; left: 0; padding: 4px 16px; border-radius: 999px; background: var(--game-wrong); color: #fff; font-size: 22px; font-weight: 800; white-space: nowrap; z-index: 3; pointer-events: none; }
+.tm-stand-h { position: absolute; left: 1460px; top: 296px; font-size: 22px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--stage-muted); }
+.tm-stand { position: absolute; left: 1460px; right: 120px; top: 336px; display: grid; gap: 12px; }
+.tm-srow { height: 92px; display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 14px; padding: 0 22px 0 18px; border-radius: 24px; background: var(--stage-card); box-shadow: var(--stage-glow); font-size: 28px; font-weight: 700; }
+.tm-srow .rk { width: 52px; height: 52px; border-radius: 50%; background: var(--c); color: #fff; display: grid; place-items: center; font-size: 24px; font-weight: 800; }
+.tm-srow .st { font-variant-numeric: tabular-nums; color: var(--stage-muted); font-size: 26px; }
+.tm-srow.done { box-shadow: 0 0 0 3px var(--game-gold), var(--stage-glow); }
+.tm-srow.done .st { color: var(--game-gold); }
+[data-board-theme="light"] .tm-srow.done .st { color: var(--pastel-gold-ink); }
+.tm-set { position: absolute; left: 120px; bottom: 40px; z-index: 20; display: flex; align-items: center; gap: 14px; min-height: 60px; padding: 0 26px; border-radius: 999px; border: 2px dashed var(--stage-line); background: transparent; color: var(--stage-ink); font-size: 24px; font-weight: 600; }
+.tm-set span { font-size: 20px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--stage-muted); }
+.tm-set b { color: var(--high-sea); }
+.tm-set:hover { background: var(--stage-card); }
+.tm-cover { position: absolute; inset: 0; z-index: 16; display: grid; place-items: center; pointer-events: none; }
+.tm-cover.paused { background: rgba(10,21,54,.42); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); pointer-events: auto; }
+[data-board-theme="light"] .tm-cover.paused { background: rgba(251,248,242,.55); }
+.tm-cover b { font-size: 96px; font-weight: 800; letter-spacing: -.03em; }
+.tm-count { font-size: 300px; font-weight: 800; line-height: 1; letter-spacing: -.04em; text-shadow: 0 20px 60px rgba(0,0,0,.3); }
+
+/* Teacher insight */
+.tm-ins { position: absolute; left: 120px; right: 120px; top: 120px; }
+.tm-ins h2 { margin: 0 0 26px; font-size: 48px; letter-spacing: -.01em; }
+.tm-ins-grid { display: grid; grid-template-columns: 1fr 640px; gap: 48px; }
+.tm-pair { display: grid; gap: 8px; padding: 16px 26px; border-radius: 22px; background: var(--stage-card); box-shadow: var(--stage-glow); margin-bottom: 12px; }
+.tm-pair .ln { display: flex; align-items: baseline; gap: 14px; font-size: 28px; flex-wrap: wrap; }
+.tm-pair .ln em { font-style: normal; color: var(--stage-muted); font-size: 24px; }
+.tm-pair .meta { display: flex; align-items: center; gap: 18px; font-size: 24px; color: var(--stage-muted); }
+.tm-pair .bar { flex: 1; height: 14px; border-radius: 14px; background: var(--stage-line); overflow: hidden; }
+.tm-pair .bar i { display: block; height: 100%; border-radius: inherit; background: var(--game-wrong); transform-origin: left; }
+.tm-tbl { display: grid; gap: 6px; font-size: 26px; }
+.tm-tbl div { display: grid; grid-template-columns: 120px 1fr 1fr 1fr; align-items: center; gap: 10px; padding: 8px 18px; border-radius: 14px; font-variant-numeric: tabular-nums; }
+.tm-tbl div:not(.th):nth-child(even) { background: var(--stage-card); }
+.tm-tbl .th { font-size: 20px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--stage-muted); }
+.tm-tbl .hot { color: var(--game-wrong); font-weight: 700; }
+.tm-tbl .who { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.tm-tbl .who i { width: 14px; height: 14px; border-radius: 4px; background: var(--c); }
+.tm-foot { margin: 18px 0 0; font-size: 26px; line-height: 1.3; color: var(--stage-muted); max-width: 1040px; }
+.tm-anon { position: absolute; left: 160px; right: 160px; top: 160px; text-align: center; }
+.tm-anon h2 { margin: 0 0 40px; font-size: 56px; }
+.tm-anon .row { display: flex; justify-content: center; align-items: center; gap: 26px; margin: 0 0 24px; font-size: 44px; font-weight: 700; }
+.tm-anon .row span { padding: 14px 30px; border-radius: 22px; background: var(--stage-card); box-shadow: var(--stage-glow); }
+.tm-anon .row em { font-style: normal; font-size: 30px; color: var(--stage-muted); }
+
+/* ── Phone ────────────────────────────────────── */
+.tm-tag { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-size: 13px; font-weight: 700; background: var(--soft); color: var(--ink); }
+.tm-tag i { width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
+.tm-mini { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; }
+.tm-mini i { height: 8px; border-radius: 4px; background: rgba(23,55,94,.1); transition: background .3s; }
+.tm-mini i.on { background: var(--c); }
+.tm-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tm-mate { display: grid; justify-items: center; gap: 3px; padding: 8px 2px; border-radius: 16px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.08); font-size: 12px; color: var(--muted); transition: transform .3s var(--ease-spring), box-shadow .3s; }
+.tm-mate .av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+.tm-mate b { font-size: 13px; color: var(--ink); }
+.tm-mate.me { box-shadow: 0 0 0 2px var(--c); }
+.tm-mate.good { transform: translateY(-4px); box-shadow: 0 0 0 2px var(--game-right); background: #e3f4ea; }
+.tm-mate.bad { transform: translateY(-4px); box-shadow: 0 0 0 2px var(--game-wrong); background: #fbe7e6; }
+.tm-q { padding: 18px; border-radius: 22px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.08), 0 8px 24px rgba(20,35,70,.06); }
+.tm-q .eb { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: var(--high-sea-ink); }
+.tm-q p { margin: 8px 0 0; font-size: 20px; font-weight: 700; line-height: 1.3; color: var(--navy); }
+.tm-hint { margin: 0; font-size: 14px; color: var(--muted); text-align: center; }
+.tm-dock-l { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.tm-opt { justify-content: center; text-align: center; font-size: 18px; min-height: 60px; }
+.tm-flash { position: absolute; inset: 0; pointer-events: none; z-index: 25; opacity: 0; }
+.tm-flash.good { background: radial-gradient(circle at 50% 85%, rgba(63,174,115,.55), rgba(63,174,115,.12) 70%); }
+.tm-flash.bad { background: radial-gradient(circle at 50% 85%, rgba(212,84,79,.6), rgba(212,84,79,.14) 70%); }
+.tm-wait { flex: 1; display: grid; place-items: center; text-align: center; gap: 12px; }
+.tm-big { font-size: 56px; font-weight: 800; color: var(--navy); line-height: 1; letter-spacing: -.02em; }
+.tm-you { display: grid; justify-items: center; gap: 14px; padding: 28px 20px; border-radius: 28px; background: var(--soft); text-align: center; }
+.tm-you .tm-badge { width: 84px; height: 84px; border-radius: 24px; font-size: 40px; }
+.tm-bob { animation: tmBob 2.8s ease-in-out infinite; }
+@keyframes tmBob { 50% { transform: translateY(-8px); } }
+.tm-break { display: grid; gap: 8px; padding: 16px; border-radius: 20px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1); font-size: 15px; }
+.tm-break div { display: flex; justify-content: space-between; gap: 12px; }
+.tm-break div span:last-child { font-weight: 700; text-align: right; }
+.tm-paused { position: absolute; inset: 0; z-index: 28; display: grid; place-items: center; background: rgba(251,248,242,.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-size: 24px; font-weight: 700; color: var(--navy); }
+</style>
+</head>
+<body>
+<script src="games.js"></script>
+<script>
+const TEAMS = [...GM.teams,
+  { id: 't5', name: 'Wrens', colour: 'var(--tm-team-5)', soft: 'var(--tm-team-5-soft)' },
+  { id: 't6', name: 'Magpies', colour: 'var(--tm-team-6)', soft: 'var(--tm-team-6-soft)' }
+].map((t) => ({ ...t, mark: t.name[0] }));
+const T = (id) => TEAMS.find((t) => t.id === id);
+const MY = 't1', GOAL = 12;
+const PACE = { t2: 1.25, t3: 1, t4: .8, t5: 1.1, t6: .7 };
+const ITEMS = [
+  { p: '“The lamps guttered and sighed as Doctor Hask walked past.”', a: 'Personification', lures: ['Pathetic fallacy', 'Onomatopoeia'] },
+  { p: 'The storm breaks on the night Ellis disappears from the house.', a: 'Pathetic fallacy', lures: ['Foreshadowing', 'Personification'] },
+  { p: 'Mira swears she hides nothing, then keeps Ellis’s letter from us for three chapters.', a: 'Unreliable narrator', lures: ['Dramatic irony', 'Direct address'] },
+  { p: 'We know the cellar door is unlocked. Sister Agnes does not.', a: 'Dramatic irony', lures: ['Foreshadowing', 'Unreliable narrator'] },
+  { p: 'Old Tobin’s spade leans by the gate in chapter 1. In chapter 9, he digs.', a: 'Foreshadowing', lures: ['Symbolism', 'Analepsis'] },
+  { p: 'Mira counts twelve stairs every night. Tonight there are thirteen.', a: 'The uncanny', lures: ['Foreshadowing', 'Paradox'] },
+  { p: '“Silent, sullen, the stone stairs slept.” Which sound device leads?', a: 'Sibilance', lures: ['Onomatopoeia', 'Personification'] },
+  { p: '“A house full of light that keeps us all in the dark.”', a: 'Paradox', lures: ['Metaphor', 'Symbolism'] },
+  { p: '“Doctor Hask’s cure was a cage with softer bars.”', a: 'Metaphor', lures: ['Symbolism', 'Paradox'] },
+  { p: 'Mira’s lantern burns brightest whenever she thinks of escape.', a: 'Symbolism', lures: ['Metaphor', 'Pathetic fallacy'] },
+  { p: 'Chapter 6 drops us back into the night of the fire, years before.', a: 'Analepsis', lures: ['Foreshadowing', 'The uncanny'] },
+  { p: 'Ellis runs from the house. Mira stays to keep its lamps lit.', a: 'Foil', lures: ['Paradox', 'Symbolism'] },
+  { p: '“Reader, I should have run while the gate still opened.”', a: 'Direct address', lures: ['Unreliable narrator', 'Foreshadowing'] },
+  { p: '“Clack. The shutter. Clack again.” What are the words “clack” doing?', a: 'Onomatopoeia', lures: ['Sibilance', 'Personification'] }
+];
+const ANSWERS = ITEMS.map((i) => i.a);
+const FLAG = '<svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><path d="M5 3v18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M6 4h6v4H6zM12 8h6v4h-6z" fill="currentColor"/><path d="M12 4h6v4h-6zM6 8h6v4H6z" fill="currentColor" opacity=".35"/></svg>';
+const ORD = (n) => n + (['st', 'nd', 'rd'][n - 1] || 'th');
+
+let S;
+function fresh() {
+  if (S) { S.timers.forEach(clearTimeout); clearInterval(S.sim); }
+  S = { gen: (S ? S.gen : 0) + 1, phase: 'lobby', mode: 'back3', step: {}, places: [], busy: {}, members: {}, timers: [], paused: false, my: { round: 0, queue: GM.shuffle(ITEMS), log: [], cur: null } };
+  TEAMS.forEach((t) => { S.step[t.id] = 0; });
+  dealTeams();
+}
+// Timers that die on restart and wait while paused
+function later(fn, ms) {
+  const g = S.gen;
+  const run = () => { if (g !== S.gen) return; if (S.paused) { S.timers.push(setTimeout(run, 300)); return; } fn(); };
+  S.timers.push(setTimeout(run, ms));
+}
+function dealTeams() {
+  const others = GM.shuffle(GM.class.filter((c) => c !== GM.me));
+  TEAMS.forEach((t, i) => { S.members[t.id] = i === 0 ? [GM.me, ...others.slice(0, 3)] : others.slice(3 + (i - 1) * 4, 3 + i * 4); });
+}
+const backLabel = () => (S.mode === 'back3' ? 'Back 3' : 'Back to start');
+
+const { board, phone } = GM.scaffold({
+  title: '<b>Team match</b> · The Lantern House',
+  note: '<b>How to use:</b> you are JW on the Kestrels. Your team sees the same question; the 12 answers are split across four phones and you hold 3. If the answer is on your phone, tap it. If it isn’t, leave it: a teammate will tap theirs. A wrong tap by anyone sends the team back (the dashed teacher chip switches Back 3 / Back to start). The other five teams are simulated.',
+  onRestart: () => { fresh(); renderLobby(true); renderPhone('lobby'); }
+});
+
+// ── Board helpers ─────────────────────────────────
+const clear = () => board.querySelectorAll('.stage-x').forEach((n) => n.remove());
+function setControls(html) {
+  board.querySelector('.board-controls')?.remove();
+  if (html) board.insertAdjacentHTML('beforeend', `<div class="stage-x board-controls">${html}</div>`);
+}
+const chipHTML = () => `<button class="stage-x tm-set" data-a="mode" title="Teacher setting"><span>Teacher setting</span>Wrong tap: <b>${backLabel()}</b></button>`;
+function cover(html, cls = '') {
+  board.querySelector('.tm-cover')?.remove();
+  if (html != null) board.insertAdjacentHTML('beforeend', `<div class="stage-x tm-cover ${cls}">${html}</div>`);
+  return board.querySelector('.tm-cover');
+}
+function flipOrder(box, nodes) {
+  const s = (board.getBoundingClientRect().width / 1920) || 1;
+  const first = new Map(nodes.map((n) => [n, n.getBoundingClientRect().top]));
+  nodes.forEach((n) => box.appendChild(n));
+  if (GM.calm()) return;
+  nodes.forEach((n) => { const dy = (first.get(n) - n.getBoundingClientRect().top) / s; if (Math.abs(dy) > 1) n.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 650, easing: 'cubic-bezier(.22,1,.36,1)' }); });
+}
+
+// ── Lobby ─────────────────────────────────────────
+function renderLobby(anim) {
+  clear();
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x tm-title"><span class="b-eyebrow">Teams of four · race to ${GOAL}</span><h2>Team match</h2><p>Same question on every phone in your team. Only one phone holds the answer. Talk first, then tap.</p></div>
+    <div class="stage-x tm-teams">${TEAMS.map((t) => `<div class="tm-tcard" style="--c:${t.colour}"><h3><span class="tm-badge">${t.mark}</span>${t.name}</h3><div class="tm-mem">${S.members[t.id].map((c) => `<span class="b-avatar" style="${GM.avatarStyle(c)}">${c}</span>`).join('')}</div></div>`).join('')}</div>
+    ${chipHTML()}`);
+  setControls('<button class="bctl" data-a="shuffle">Shuffle teams</button><button class="bctl primary" data-a="start">Start race</button>');
+  if (anim && !GM.calm()) {
+    board.querySelector('.tm-title').animate([{ opacity: 0, transform: 'translateY(30px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 700, easing: 'cubic-bezier(.22,1,.36,1)' });
+    board.querySelectorAll('.tm-tcard').forEach((n, k) => n.animate([{ opacity: 0, transform: 'translateY(40px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: 150 + k * 80, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+    board.querySelectorAll('.tm-mem .b-avatar').forEach((n, k) => n.animate([{ opacity: 0, transform: 'translateY(-60px) scale(.4)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 400 + k * 45, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'backwards' }));
+  }
+}
+
+async function startRace() {
+  S.phase = 'count'; setControls(''); renderPhone('count');
+  const g = S.gen;
+  for (const n of ['3', '2', '1', 'Go']) {
+    if (g !== S.gen) return;
+    const c = cover(`<span class="tm-count">${n}</span>`);
+    if (!GM.calm()) c.firstElementChild.animate([{ opacity: 0, transform: 'scale(1.6)' }, { opacity: 1, transform: 'scale(1)', offset: .35 }, { opacity: 0, transform: 'scale(.85)' }], { duration: 760, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'forwards' });
+    n === 'Go' ? GM.sound.ding() : GM.sound.tick();
+    await GM.sleep(780);
+  }
+  if (g !== S.gen) return;
+  cover(null);
+  S.phase = 'race'; renderRace();
+  S.sim = setInterval(simTick, 1100);
+  nextRound();
+}
+
+// ── Race ──────────────────────────────────────────
+const laneEl = (id) => board.querySelector(`.tm-lane[data-t="${id}"]`);
+const laneHTML = (t) => `<div class="tm-lane" data-t="${t.id}" style="--c:${t.colour}">
+  <div class="tm-name"><span class="tm-badge">${t.mark}</span><span><b>${t.name}</b><small>${S.members[t.id].join(' ')}</small></span></div>
+  <div class="tm-road"><i class="tm-start"></i>${Array.from({ length: GOAL }, (_, k) => `<i class="tm-cell ${k < S.step[t.id] ? 'on' : ''}"></i>`).join('')}<i class="tm-flag">${FLAG}</i>
+  <div class="tm-tok"><div class="tm-tok-in">${t.mark}</div></div></div></div>`;
+function renderRace() {
+  S.view = 'race'; clear();
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x tm-head"><span class="b-eyebrow">Race to ${GOAL}</span><p class="tm-h">Talk first. Only one phone on each team holds the answer.</p></div>
+    <div class="stage-x tm-feed"></div>
+    <div class="stage-x tm-ends"><span>Start</span><span>Finish</span></div>
+    <div class="stage-x tm-track">${TEAMS.map(laneHTML).join('')}</div>
+    <div class="stage-x tm-stand-h">Standings</div>
+    <div class="stage-x tm-stand">${TEAMS.map((t) => `<div class="tm-srow" data-t="${t.id}" style="--c:${t.colour}"><span class="rk"></span><span>${t.name}</span><span class="st"></span></div>`).join('')}</div>
+    ${chipHTML()}`);
+  raceControls();
+  TEAMS.forEach((t) => place(t.id, true));
+  standings();
+  if (!GM.calm()) board.querySelectorAll('.tm-lane').forEach((n, k) => n.animate([{ opacity: 0, transform: 'translateX(-60px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: k * 70, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+}
+function raceControls() {
+  const done = S.places.length >= 3;
+  setControls(`<button class="bctl" data-a="pause">${S.paused ? 'Resume' : 'Pause'}</button><button class="bctl" data-a="insight">Teacher view</button><button class="bctl ${done ? 'primary' : ''}" data-a="end">${done ? 'Podium' : 'End race'}</button>`);
+}
+function cellX(lane, s) {
+  const road = lane.querySelector('.tm-road');
+  const c = road.children[s];
+  return c.offsetLeft + c.offsetWidth / 2 - 32;
+}
+function place(id, instant) {
+  const lane = laneEl(id); if (!lane) return;
+  const tok = lane.querySelector('.tm-tok'), done = S.places.includes(id);
+  if (instant) tok.style.transition = 'none';
+  tok.style.transform = `translateX(${cellX(lane, done ? GOAL + 1 : S.step[id])}px)`;
+  tok.classList.toggle('won', done);
+  tok.firstElementChild.textContent = done ? ORD(S.places.indexOf(id) + 1) : T(id).mark;
+  lane.querySelectorAll('.tm-cell').forEach((c, k) => c.classList.toggle('on', k < S.step[id]));
+  if (instant) { tok.getBoundingClientRect(); tok.style.transition = ''; }
+}
+function standings() {
+  const box = board.querySelector('.tm-stand'); if (!box) return;
+  const order = TEAMS.slice().sort((a, b) => {
+    const pa = S.places.indexOf(a.id), pb = S.places.indexOf(b.id);
+    if (pa > -1 || pb > -1) return (pa < 0 ? 99 : pa) - (pb < 0 ? 99 : pb);
+    return S.step[b.id] - S.step[a.id];
+  });
+  const nodes = order.map((t, i) => {
+    const n = box.querySelector(`[data-t="${t.id}"]`);
+    n.querySelector('.rk').textContent = i + 1;
+    n.querySelector('.st').textContent = S.places.includes(t.id) ? ORD(S.places.indexOf(t.id) + 1) : `${S.step[t.id]}/${GOAL}`;
+    n.classList.toggle('done', S.places.includes(t.id));
+    return n;
+  });
+  flipOrder(box, nodes);
+}
+function feed(t, html, kind = '') {
+  const box = board.querySelector('.tm-feed'); if (!box) return;
+  const n = GM.h(`<span class="b-pill ${kind}" style="--c:${t.colour}"><i></i>${html}</span>`);
+  box.prepend(n);
+  [...box.children].slice(3).forEach((x) => x.remove());
+  if (!GM.calm()) n.animate([{ opacity: 0, transform: 'translateX(40px)' }, { opacity: 1, transform: 'none' }], { duration: 450, easing: 'cubic-bezier(.22,1,.36,1)' });
+}
+
+function advance(id) {
+  if (S.phase !== 'race' || S.step[id] >= GOAL) return;
+  S.step[id]++; place(id);
+  const lane = laneEl(id);
+  if (lane && !GM.calm()) lane.querySelector('.tm-tok-in').animate([{ transform: 'none' }, { transform: 'translateY(-22px) scale(1.14)', offset: .4 }, { transform: 'none' }], { duration: 620, easing: 'cubic-bezier(.22,1,.36,1)' });
+  id === MY ? GM.sound.right() : GM.sound.click();
+  if (S.step[id] === GOAL) { S.busy[id] = true; later(() => finish(id), 650); }
+  standings();
+}
+async function crash(id) {
+  if (S.phase !== 'race') return;
+  const from = S.step[id], to = S.mode === 'back3' ? Math.max(0, from - 3) : 0;
+  S.busy[id] = true;
+  const lane = laneEl(id), t = T(id);
+  feed(t, `${t.name} wrong tap · <b>${S.mode === 'back3' ? 'back 3' : 'back to start'}</b>`, 'bad');
+  GM.sound.buzz();
+  if (lane) {
+    const road = lane.querySelector('.tm-road'), tok = lane.querySelector('.tm-tok'), inner = tok.firstElementChild;
+    lane.classList.add('crash');
+    const x = cellX(lane, from);
+    const boom = GM.h(`<span class="tm-boom" style="transform:translateX(${x - 14}px)">${S.mode === 'back3' ? 'Back 3' : 'Back to start'}</span>`);
+    road.appendChild(boom);
+    if (!GM.calm()) {
+      boom.animate([{ opacity: 0, translate: '0 16px', scale: .6 }, { opacity: 1, translate: '0 0', scale: 1.08, offset: .3 }, { opacity: 1, scale: 1, offset: .8 }, { opacity: 0 }], { duration: 1500, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'forwards' });
+      inner.animate([{ transform: 'none' }, { transform: 'translateX(-10px) rotate(-18deg)' }, { transform: 'translateX(12px) rotate(14deg)' }, { transform: 'translateX(-8px) rotate(-10deg)' }, { transform: 'translateX(5px) rotate(4deg)' }, { transform: 'none' }], { duration: 480, easing: 'ease-out' });
+    }
+    await GM.sleep(520);
+    // rewind: ghosts trail behind the token as it slides back
+    if (!GM.calm()) for (let s = from; s > to; s--) {
+      const g = GM.h(`<i class="tm-ghost" style="transform:translateX(${cellX(lane, s)}px)"></i>`); road.appendChild(g);
+      g.animate([{ opacity: 0 }, { opacity: .45, offset: .2 }, { opacity: 0 }], { duration: 700, delay: (from - s) * 70, fill: 'both' }).finished.then(() => g.remove());
+    }
+    S.step[id] = to;
+    if (id === MY) renderMini();
+    tok.style.transition = GM.calm() ? '' : `transform ${.35 + (from - to) * .09}s cubic-bezier(.6,0,.2,1)`;
+    place(id);
+    standings();
+    await GM.sleep(450 + (from - to) * 90);
+    tok.style.transition = ''; lane.classList.remove('crash'); boom.remove();
+  } else S.step[id] = to;
+  S.busy[id] = false;
+}
+function finish(id) {
+  S.places.push(id); S.busy[id] = false;
+  const t = T(id), n = S.places.length;
+  place(id); standings();
+  feed(t, `${t.name} finish <b>${ORD(n)}</b>`, 'win');
+  const lane = laneEl(id);
+  if (lane && !GM.calm()) lane.querySelector('.tm-tok-in').animate([{ transform: 'scale(1)' }, { transform: 'scale(1.35)', offset: .4 }, { transform: 'scale(1)' }], { duration: 700, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+  if (n === 1) { GM.sound.fanfare(); GM.confetti(board); } else GM.sound.ding();
+  if (id === MY) renderPhone('done');
+  if ((n === 3 || n === TEAMS.length) && S.view !== 'insight' && S.phase === 'race') raceControls();
+  if (n === TEAMS.length) clearInterval(S.sim);
+}
+function simTick() {
+  if (S.paused || S.phase !== 'race') return;
+  const open = TEAMS.filter((t) => t.id !== MY && !S.places.includes(t.id) && !S.busy[t.id] && S.step[t.id] < GOAL);
+  if (!open.length) return;
+  const w = open.map((t) => PACE[t.id]), sum = w.reduce((a, b) => a + b, 0);
+  let r = GM.rand() * sum, t = open[0];
+  for (let k = 0; k < open.length; k++) { r -= w[k]; if (r <= 0) { t = open[k]; break; } }
+  if (S.step[t.id] > 1 && GM.rand() < .16) crash(t.id);
+  else { advance(t.id); if (GM.rand() < .25) feed(t, `${t.name} <b>+1</b>`); }
+}
+
+// ── Your team's rounds (phone) ────────────────────
+function nextRound() {
+  if (S.phase !== 'race' || S.places.includes(MY)) return;
+  const it = S.my.queue[S.my.round % S.my.queue.length]; S.my.round++;
+  const fill = GM.shuffle(ANSWERS.filter((a) => a !== it.a && !it.lures.includes(a))).slice(0, 12 - 1 - it.lures.length);
+  const opts = GM.shuffle([it.a, ...it.lures, ...fill]);
+  const hands = [0, 1, 2, 3].map((k) => opts.slice(k * 3, k * 3 + 3));
+  let holder = hands.findIndex((h) => h.includes(it.a));
+  // When the answer is elsewhere, make sure a near-miss sits on your phone: that is the talk
+  if (holder !== 0 && !hands[0].some((o) => it.lures.includes(o))) {
+    const lure = it.lures[0], hi = hands.findIndex((h) => h.includes(lure)), j = hands[hi].indexOf(lure);
+    [hands[0][0], hands[hi][j]] = [hands[hi][j], hands[0][0]];
+    holder = hands.findIndex((h) => h.includes(it.a));
+  }
+  const cur = S.my.cur = { it, hands, holder, done: false };
+  renderPhone('play', true);
+  const mates = S.members[MY];
+  if (S.my.round === 4 && holder !== 0) {
+    // scripted: a teammate believes their own option is right
+    const k = [1, 2, 3].find((x) => x !== holder);
+    later(() => teamTap(k, hands[k].find((o) => it.lures.includes(o)) || hands[k][0]), 2300);
+  } else if (holder !== 0) later(() => teamTap(holder, it.a), 2600 + GM.rand() * 1800);
+  else later(() => { if (!cur.done && S.my.cur === cur) GM.toast(phone, `<span>${mates[1 + Math.floor(GM.rand() * 3)]}: “Not on mine. JW, check yours.”</span>`); }, 4200);
+}
+function teamTap(k, opt) {
+  const cur = S.my.cur;
+  if (!cur || cur.done || S.phase !== 'race' || S.paused) return;
+  cur.done = true;
+  const right = opt === cur.it.a, mates = S.members[MY], who = mates[k];
+  S.my.log.push({ who, holder: k === cur.holder, opt, right, ans: cur.it.a });
+  // mark the phone
+  phone.querySelectorAll('.tm-opt').forEach((b) => {
+    if (k === 0 && b.dataset.o === opt) b.classList.add(right ? 'right' : 'wrong');
+    else if (b.dataset.o === cur.it.a) b.classList.add('right');
+    else b.classList.add('dim');
+    b.disabled = true;
+  });
+  const mate = phone.querySelectorAll('.tm-mate')[k]; mate && mate.classList.add(right ? 'good' : 'bad');
+  flash(right ? 'good' : 'bad');
+  if (right) {
+    advance(MY);
+    GM.toast(phone, `<span>${k === 0 ? 'You found it' : `${who} found it`} · +1 step<small>${cur.it.a}</small></span>`, 'good');
+    later(nextRound, 1400);
+  } else {
+    crash(MY);
+    phone.querySelector('.ph-body')?.classList.add('fx-shake');
+    GM.toast(phone, `<span>${k === 0 ? 'You' : who} tapped ${opt}. ${backLabel()}.<small>It was ${cur.it.a}. ${mates[cur.holder] === GM.me ? 'You' : mates[cur.holder]} had it.</small></span>`, 'bad');
+    later(nextRound, 2600);
+  }
+  renderMini();
+}
+function flash(kind) {
+  const f = phone.querySelector('.tm-flash'); if (!f) return;
+  f.className = `tm-flash ${kind}`;
+  f.animate([{ opacity: 0 }, { opacity: 1, offset: .2 }, { opacity: 0 }], { duration: GM.calm() ? 300 : 900, easing: 'ease-out' });
+}
+
+// ── Phone ─────────────────────────────────────────
+function phoneShell(body, dock = '') {
+  const t = T(MY);
+  phone.innerHTML = `<div class="ph-top" style="--c:${t.colour};--soft:${t.soft}"><span class="ph-me"><span class="av" style="${GM.avatarStyle(GM.me)}">${GM.me}</span>JW</span><span class="tm-tag"><i></i>${t.name}</span><span class="ph-score"><span class="mystep">${S.step[MY]}</span> / ${GOAL}</span></div>
+    <div class="ph-body" style="--c:${t.colour};--soft:${t.soft}">${body}</div>${dock ? `<div class="ph-dock">${dock}</div>` : ''}<div class="tm-flash"></div>${S.paused ? '<div class="tm-paused">Paused · eyes on the board</div>' : ''}`;
+}
+const miniHTML = () => `<div class="tm-mini" aria-label="Team progress">${Array.from({ length: GOAL }, (_, k) => `<i class="${k < S.step[MY] ? 'on' : ''}"></i>`).join('')}</div>`;
+function renderMini() {
+  const m = phone.querySelector('.tm-mini'); if (m) m.outerHTML = miniHTML();
+  const s = phone.querySelector('.mystep'); if (s) s.textContent = S.step[MY];
+}
+function renderPhone(mode, anim) {
+  const t = T(MY), mates = S.members[MY];
+  if (mode === 'lobby' || mode === 'count') {
+    phoneShell(`<div class="tm-wait"><div class="tm-you ${mode === 'lobby' ? 'tm-bob' : ''}" style="--c:${t.colour};--soft:${t.soft}"><span class="tm-badge">${t.mark}</span><span class="ph-sub">${mode === 'lobby' ? 'You’re in. Your team:' : 'Get ready…'}</span><span class="tm-big" style="font-size:40px">${t.name}</span>
+      <div class="tm-strip" style="width:100%">${mates.map((c) => `<div class="tm-mate ${c === GM.me ? 'me' : ''}"><span class="av" style="${GM.avatarStyle(c)}">${c}</span><b>${c === GM.me ? 'You' : c}</b></div>`).join('')}</div></div></div>
+      <p class="tm-hint">Each of you gets 3 of the 12 answers. Only one phone has the right one. Talk before you tap.</p>`);
+  }
+  if (mode === 'play') {
+    const cur = S.my.cur;
+    phoneShell(`${miniHTML()}
+      <div class="tm-strip">${mates.map((c) => `<div class="tm-mate ${c === GM.me ? 'me' : ''}"><span class="av" style="${GM.avatarStyle(c)}">${c}</span><b>${c === GM.me ? 'You' : c}</b>3 answers</div>`).join('')}</div>
+      <div class="tm-q"><span class="eb">Name the technique</span><p>${cur.it.p}</p></div>
+      <p class="tm-hint">Not on your phone? Say so out loud. Wrong tap: ${backLabel().toLowerCase()}.</p>`,
+      `<span class="tm-dock-l">Your 3 answers</span>${cur.hands[0].map((o) => `<button class="pbtn tm-opt" data-o="${o}">${o}</button>`).join('')}`);
+    if (anim && !GM.calm()) {
+      phone.querySelector('.tm-q').animate([{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.22,1,.36,1)' });
+      phone.querySelectorAll('.tm-opt').forEach((b, k) => b.animate([{ opacity: 0, transform: 'translateY(24px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 420, delay: 80 + k * 60, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+    }
+  }
+  if (mode === 'done') {
+    const n = S.places.indexOf(MY) + 1;
+    phoneShell(`<div class="tm-wait"><div class="tm-you fx-pop" style="--c:${t.colour};--soft:${t.soft}"><span class="tm-badge">${t.mark}</span><span class="ph-sub">${t.name} finished</span><span class="tm-big">${ORD(n)}</span><span class="ph-sub">The race goes on for places. Eyes on the board.</span></div></div>`);
+    GM.toast(phone, `${t.name} crossed the line · ${ORD(n)}`, 'good');
+  }
+  if (mode === 'final') {
+    const order = finalOrder(), n = order.findIndex((x) => x.id === MY) + 1;
+    const mine = S.my.log.filter((l) => l.who === GM.me);
+    const held = mine.filter((l) => l.holder), falseT = mine.filter((l) => !l.holder);
+    phoneShell(`<div class="tm-wait"><div class="tm-you" style="--c:${t.colour};--soft:${t.soft}"><span class="tm-badge">${t.mark}</span><span class="ph-sub">${t.name} came</span><span class="tm-big">${ORD(n)}</span><span class="ph-sub">of ${TEAMS.length} teams</span></div></div>
+      <div class="tm-break"><div><span>You held the answer and tapped it</span><span>${held.filter((l) => l.right).length} of ${held.length}</span></div>
+      <div><span>False taps (a teammate held it)</span><span>${falseT.length}</span></div>
+      ${falseT.slice(0, 2).map((l) => `<div><span>You tapped ${l.opt}</span><span>It was ${l.ans}</span></div>`).join('')}</div>`);
+  }
+}
+phone.addEventListener('click', (e) => {
+  const b = e.target.closest('.tm-opt'); if (!b || b.disabled) return;
+  teamTap(0, b.dataset.o);
+});
+
+// ── End: podium and teacher view ──────────────────
+function finalOrder() {
+  return TEAMS.slice().sort((a, b) => {
+    const pa = S.places.indexOf(a.id), pb = S.places.indexOf(b.id);
+    if (pa > -1 || pb > -1) return (pa < 0 ? 99 : pa) - (pb < 0 ? 99 : pb);
+    return S.step[b.id] - S.step[a.id];
+  });
+}
+function podium() {
+  S.phase = 'end'; clearInterval(S.sim); S.paused = false; cover(null);
+  clear();
+  const [a, b, c] = finalOrder();
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x" style="position:absolute;left:0;right:0;top:150px;text-align:center"><span class="b-eyebrow">Final places</span><div style="font-size:30px;color:var(--stage-muted)">Holders tapped the right answer 93% of the time · most mixed up: <b style="color:var(--stage-ink)">Pathetic fallacy</b> and <b style="color:var(--stage-ink)">Personification</b></div></div>
+    <div class="stage-x podium">${[[b, 'p2', 2], [a, 'p1', 1], [c, 'p3', 3]].map(([t, cls, n]) => `<div class="pod ${cls}"><span class="b-avatar" style="background:${t.colour};color:#fff">${t.mark}</span><span class="name">${t.name}</span><span class="score">${S.members[t.id].join(' · ')}</span><div class="block">${n}</div></div>`).join('')}</div>`);
+  setControls('<button class="bctl" data-a="insight">Teacher: false taps</button><button class="bctl primary" data-a="again">Play again</button>');
+  board.querySelectorAll('.pod').forEach((p, k) => p.animate([{ transform: 'translateY(100%)' }, { transform: 'none' }], { duration: GM.calm() ? 1 : 900, delay: GM.calm() ? 0 : [500, 1200, 0][k], easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  setTimeout(() => { GM.sound.fanfare(); GM.confetti(board); }, GM.calm() ? 0 : 1400);
+  renderPhone('final');
+}
+function insightData() {
+  // invented class data, with JW's real taps from this game folded in
+  const pairs = [['Pathetic fallacy', 'Personification', 9, 6], ['Symbolism', 'Metaphor', 7, 5], ['Foreshadowing', 'Analepsis', 6, 4], ['Dramatic irony', 'Unreliable narrator', 4, 4], ['Onomatopoeia', 'Sibilance', 3, 3]].map(([tap, ans, n, who]) => ({ tap, ans, n, who }));
+  S.my.log.filter((l) => !l.right && !l.holder).forEach((l) => {
+    const p = pairs.find((x) => x.tap === l.opt && x.ans === l.ans);
+    if (p) { p.n++; p.who++; } else pairs.push({ tap: l.opt, ans: l.ans, n: 1, who: 1 });
+  });
+  pairs.sort((x, y) => y.n - x.n);
+  const team = (c) => TEAMS.find((t) => S.members[t.id].includes(c));
+  const studs = GM.class.filter((c) => c !== GM.me).slice(0, 9).map((c, i) => ({ c, held: 3 + (i % 3), right: 3 + (i % 3) - (i % 4 === 0 ? 1 : 0), ft: [3, 2, 2, 1, 1, 1, 0, 0, 0][i] }));
+  const mine = S.my.log.filter((l) => l.who === GM.me), held = mine.filter((l) => l.holder);
+  studs.push({ c: GM.me, held: held.length, right: held.filter((l) => l.right).length, ft: mine.filter((l) => !l.holder).length });
+  studs.sort((x, y) => y.ft - x.ft);
+  return { pairs: pairs.slice(0, 5), studs, team };
+}
+function insight() {
+  S.view = 'insight'; clear(); cover(null);
+  const { pairs, studs, team } = insightData(), max = Math.max(...pairs.map((p) => p.n));
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x tm-ins">
+    <span class="b-eyebrow">Teacher only · not for the projector</span>
+    <h2>False taps: what people believed was right</h2>
+    <div class="tm-ins-grid">
+      <div>${pairs.map((p) => `<div class="tm-pair"><div class="ln"><em>Tapped</em><b>${p.tap}</b><em>when the answer was</em><b>${p.ans}</b></div><div class="meta"><span class="bar"><i style="width:${(p.n / max) * 100}%"></i></span>${p.n} taps · ${p.who} students</div></div>`).join('')}</div>
+      <div class="tm-tbl"><div class="th"><span>Student</span><span>Held it</span><span>Tapped right</span><span>False taps</span></div>
+        ${studs.map((s) => `<div><span class="who" style="--c:${team(s.c)?.colour}"><i></i>${s.c}</span><span>${s.held}</span><span>${s.right}</span><span class="${s.ft >= 2 ? 'hot' : ''}">${s.ft}</span></div>`).join('')}</div>
+    </div>
+    <p class="tm-foot">A false tap is a student tapping their own option when a teammate held the answer: they believed it was right. Every tap is saved per student as team evidence (they talked first), so false taps tell you more than accuracy.</p></div>`);
+  setControls(`<button class="bctl" data-a="anon">Class version (no names)</button><button class="bctl primary" data-a="back">${S.phase === 'end' ? 'Back to podium' : 'Back to race'}</button>`);
+  if (!GM.calm()) board.querySelectorAll('.tm-pair .bar i').forEach((n, k) => n.animate([{ transform: 'scaleX(0)' }, { transform: 'none' }], { duration: 800, delay: k * 90, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+}
+function anon() {
+  clear();
+  const { pairs } = insightData();
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x tm-anon"><span class="b-eyebrow">Safe for the projector · no names</span><h2>Most mixed up today</h2>
+    ${pairs.slice(0, 3).map((p) => `<div class="row"><span>${p.tap}</span><em>picked for</em><span>${p.ans}</span></div>`).join('')}</div>`);
+  setControls(`<button class="bctl primary" data-a="insight">Back to teacher view</button>`);
+  if (!GM.calm()) board.querySelectorAll('.tm-anon .row').forEach((n, k) => n.animate([{ opacity: 0, transform: 'translateY(30px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: k * 150, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  GM.sound.reveal();
+}
+
+function togglePause() {
+  S.paused = !S.paused;
+  if (S.paused) cover('<b>Paused</b>', 'paused'); else cover(null);
+  raceControls();
+  const p = phone.querySelector('.tm-paused');
+  if (S.paused && !p) phone.insertAdjacentHTML('beforeend', '<div class="tm-paused">Paused · eyes on the board</div>');
+  if (!S.paused && p) p.remove();
+}
+board.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+  GM.sound.click();
+  if (a === 'shuffle') { dealTeams(); renderLobby(true); renderPhone('lobby'); GM.sound.whoosh(); }
+  if (a === 'start') startRace();
+  if (a === 'mode') {
+    S.mode = S.mode === 'back3' ? 'start' : 'back3';
+    board.querySelector('.tm-set b').textContent = backLabel();
+    const h = phone.querySelector('.tm-hint'); if (h && S.phase === 'race') h.textContent = `Not on your phone? Say so out loud. Wrong tap: ${backLabel().toLowerCase()}.`;
+  }
+  if (a === 'pause') togglePause();
+  if (a === 'end') podium();
+  if (a === 'insight') insight();
+  if (a === 'anon') anon();
+  if (a === 'back') { if (S.phase === 'end') podium(); else { S.view = 'race'; renderRace(); } }
+  if (a === 'again') { fresh(); renderLobby(true); renderPhone('lobby'); }
+});
+
+fresh(); renderLobby(true); renderPhone('lobby');
+</script>
+</body>
+</html>

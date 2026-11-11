@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crossword — game mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="games.css">
+<style>
+/* ── Phone: crossword ─────────────────────────────── */
+.phone { overflow-wrap: normal; word-break: normal; hyphens: manual; }
+.cw-row { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.cw-row .ph-sub { flex: 1; font-size: 14px; }
+.cw-zoom { min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.14); font-size: 14px; font-weight: 600; color: var(--navy); display: inline-flex; align-items: center; gap: 6px; }
+.cw-view { position: relative; flex: none; height: 330px; border-radius: 20px; background: var(--cotton); box-shadow: inset 0 0 0 1px rgba(23,55,94,.08); overflow: hidden; touch-action: manipulation; }
+.cw-grid { position: absolute; left: 0; top: 0; width: 572px; height: 572px; transform-origin: 0 0; transition: transform .5s var(--ease); will-change: transform; }
+.cw-cell { position: absolute; width: 42px; height: 42px; border: 0; padding: 0; border-radius: 9px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.2); display: grid; place-items: center; font-size: 22px; font-weight: 700; color: var(--ink); transition: background .2s, box-shadow .2s, color .2s; }
+.cw-cell .n { position: absolute; left: 4px; top: 3px; font-size: 10px; font-weight: 700; color: var(--muted); line-height: 1; }
+.cw-cell .l { display: block; line-height: 1; }
+.cw-cell .sw { position: absolute; inset: 0; border-radius: inherit; background: var(--game-right); opacity: 0; pointer-events: none; }
+.cw-cell .sh { position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.9) 50%, transparent 70%); opacity: 0; pointer-events: none; }
+.cw-cell.in { background: var(--pastel-blue); }
+.cw-cell.ok { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.cw-cell.shown { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
+.cw-cell.ok.in, .cw-cell.shown.in { box-shadow: 0 0 0 2px var(--wave); }
+.cw-cell.cur { background: var(--pastel-gold); box-shadow: 0 0 0 3px var(--navy); z-index: 2; }
+.cw-cell.given::after { content: ""; position: absolute; right: 3px; top: 3px; width: 0; height: 0; border-left: 8px solid transparent; border-top: 8px solid var(--high-sea); border-radius: 0 4px 0 0; }
+.cw-cell.bad { color: var(--danger); }
+.cw-bar { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 6px; padding: 8px 6px; border-radius: 18px; background: var(--navy); color: #fff; flex: none; }
+.cw-bar button { width: 44px; height: 44px; border: 0; border-radius: 12px; background: rgba(255,255,255,.12); color: #fff; font-size: 22px; font-weight: 600; }
+.cw-bar .t { font-size: 15px; line-height: 1.35; min-height: 44px; display: grid; align-content: center; }
+.cw-bar .t b { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; opacity: .78; font-weight: 700; }
+.cw-list { display: grid; gap: 2px; }
+.cw-list h3 { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 8px 0 2px 4px; }
+.cw-clue { width: 100%; min-height: 48px; display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: start; text-align: left; padding: 10px 12px; border: 0; border-radius: 14px; background: transparent; font-size: 15px; line-height: 1.38; color: var(--ink); }
+.cw-clue .num { font-weight: 700; color: var(--navy); }
+.cw-clue.act { background: var(--pastel-blue); }
+.cw-clue.done { color: var(--muted); }
+.cw-clue.done .num { color: var(--success); }
+.cw-clue .tick { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; color: #fff; background: var(--game-right); margin-top: 1px; }
+.cw-clue .tick.shown { background: var(--high-sea); }
+.cw-type { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--shore); color: var(--muted); margin-right: 4px; vertical-align: 1px; }
+.cw-type.ex { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.cw-acts { display: grid; grid-template-columns: 1fr 1.2fr; gap: 10px; }
+.cw-acts .pbtn { justify-content: center; text-align: center; }
+.cw-hint { flex-direction: column; gap: 4px !important; padding: 6px 10px !important; line-height: 1.2; }
+.cw-hint small { font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.cw-dots { display: inline-flex; gap: 5px; }
+.cw-dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(23,55,94,.18); }
+.cw-dots i.on { background: var(--high-sea); }
+.cw-key { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; pointer-events: none; }
+.cw-fin { flex: 1; display: grid; align-content: center; gap: 14px; text-align: center; }
+.cw-fin .big { font-size: 64px; font-weight: 700; color: var(--navy); line-height: 1; font-variant-numeric: tabular-nums; }
+.cw-break { display: grid; gap: 8px; padding: 16px; border-radius: 20px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1); font-size: 15px; text-align: left; }
+.cw-break div { display: flex; justify-content: space-between; gap: 12px; }
+.cw-break .tot { border-top: 1px solid rgba(23,55,94,.12); padding-top: 8px; font-weight: 700; }
+/* toast floats above the dock so it never blocks Check or Hint */
+.phone .ph-toast { bottom: 104px; pointer-events: none; }
+.phone .ph-toast > span { display: block; }
+.gx-pause { position: absolute; inset: 0; z-index: 35; display: grid; place-items: center; text-align: center; background: rgba(10,21,54,.42); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: #fff; font-weight: 700; }
+.gx-pause small { display: block; font-weight: 500; opacity: .8; }
+.board .gx-pause { font-size: 80px; z-index: 15; } /* under the board controls so Resume stays live */ .board .gx-pause small { font-size: 30px; }
+.phone .gx-pause { font-size: 30px; border-radius: 44px; } .phone .gx-pause small { font-size: 15px; }
+
+/* ── Board: race wall ─────────────────────────────── */
+.cw-head { position: absolute; left: 100px; right: 100px; top: 112px; display: flex; align-items: baseline; gap: 24px; font-size: 44px; font-weight: 700; }
+.cw-head span { font-size: 28px; font-weight: 500; color: var(--stage-muted); }
+.cw-clock { margin-left: auto; display: flex; align-items: baseline; gap: 12px; font-size: 56px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.cw-clock small { font-size: 24px; font-weight: 600; color: var(--stage-muted); letter-spacing: .1em; text-transform: uppercase; }
+.cw-race { position: absolute; left: 100px; right: 100px; top: 210px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 22px; }
+.cw-card { position: relative; border-radius: 24px; padding: 18px 20px 18px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; gap: 14px; transition: box-shadow .4s; }
+.cw-card.done { box-shadow: 0 0 0 3px var(--game-gold), 0 0 40px rgba(242,193,78,.32); }
+.cw-card.me { background: var(--stage-card-hi); }
+.cw-card .who { display: flex; align-items: center; gap: 14px; font-weight: 700; font-size: 32px; }
+.cw-card .who .b-avatar { width: 56px; height: 56px; font-size: 21px; }
+.cw-card .who .cnt { margin-left: auto; font-size: 26px; color: var(--stage-muted); font-variant-numeric: tabular-nums; }
+.cw-card .who .cnt b { color: var(--stage-ink); }
+.cw-card .fin { position: absolute; top: -14px; right: 16px; padding: 4px 14px; border-radius: 999px; background: var(--game-gold); color: var(--depth); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cw-segs { display: grid; grid-template-columns: repeat(11, 1fr); gap: 5px; }
+.cw-segs i { height: 26px; border-radius: 7px; background: var(--stage-line); transform-origin: left; }
+.cw-segs i.on { background: linear-gradient(180deg, #7fd3a4, var(--game-right)); }
+.cw-ticker { position: absolute; left: 100px; right: 100px; bottom: 124px; display: flex; gap: 16px; align-items: center; font-size: 26px; color: var(--stage-muted); overflow: hidden; white-space: nowrap; }
+.cw-ticker .lbl { font-weight: 700; letter-spacing: .12em; text-transform: uppercase; font-size: 22px; color: var(--high-sea); flex: none; }
+.cw-ticker .b-pill { color: var(--stage-ink); flex: none; font-size: 26px; }
+.cw-ticker .b-pill b { color: var(--game-gold); }
+[data-board-theme="light"] .cw-ticker .b-pill b { color: var(--high-sea-ink); }
+
+/* ── Board: end ───────────────────────────────────── */
+.cw-end-h { position: absolute; left: 0; right: 0; top: 140px; text-align: center; }
+.cw-end-h .sum { font-size: 30px; color: var(--stage-muted); }
+.cw-end-h .sum b { color: var(--stage-ink); }
+.cw-also { position: absolute; left: 100px; top: 470px; width: 300px; display: grid; gap: 14px; }
+.cw-also .lb-row { grid-template-columns: 40px 52px 1fr; font-size: 28px; padding: 12px 18px; gap: 14px; }
+.cw-also .lb-row .b-avatar { width: 52px; height: 52px; font-size: 19px; }
+.cw-also .lb-row small { grid-column: 3; font-size: 22px; color: var(--stage-muted); font-weight: 500; margin-top: -10px; }
+
+/* ── Board: teacher insight ───────────────────────── */
+.ti { position: absolute; left: 100px; right: 100px; top: 120px; bottom: 120px; display: grid; grid-template-columns: 1fr 640px; gap: 56px; }
+.ti-flag { display: inline-flex; align-items: center; gap: 12px; padding: 8px 20px; border-radius: 999px; background: var(--game-wrong); color: #fff; font-size: 22px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.ti h2 { font-size: 40px; margin: 16px 0 6px; letter-spacing: -.01em; }
+.ti .lede { font-size: 26px; color: var(--stage-muted); margin: 0 0 18px; }
+.ti-bars { display: grid; gap: 10px; }
+.ti-bar { display: grid; grid-template-columns: 300px 1fr 70px; align-items: center; gap: 18px; font-size: 26px; }
+.ti-bar .nm { font-weight: 600; white-space: nowrap; }
+.ti-bar .nm small { color: var(--stage-muted); font-weight: 500; margin-right: 8px; }
+.ti-bar .track { height: 34px; border-radius: 10px; overflow: hidden; display: flex; background: var(--stage-line); }
+.ti-bar .track i { height: 100%; transform-origin: left; }
+.ti-bar .pct { text-align: right; font-variant-numeric: tabular-nums; color: var(--stage-muted); }
+.c-clean { background: var(--game-right); } .c-hint { background: var(--game-gold); } .c-shown { background: var(--game-wrong); }
+.ti-key { display: flex; gap: 24px; margin-top: 18px; font-size: 22px; color: var(--stage-muted); }
+.ti-key span { display: flex; gap: 10px; align-items: center; } .ti-key i { width: 20px; height: 20px; border-radius: 6px; }
+.ti-side { display: grid; gap: 10px; align-content: start; }
+.ti-stu { display: grid; grid-template-columns: 52px 1fr; align-items: center; gap: 16px; padding: 10px 18px; border-radius: 18px; background: var(--stage-card); font-size: 26px; }
+.ti-stu .b-avatar { width: 52px; height: 52px; font-size: 19px; }
+.ti-stu .ladder { display: flex; gap: 8px; align-items: center; color: var(--stage-muted); font-size: 22px; }
+.ti-stu .ladder span { display: inline-flex; gap: 6px; align-items: center; padding: 4px 12px; border-radius: 999px; background: var(--stage-card-hi); color: var(--stage-ink); font-weight: 600; }
+.ti-note { padding: 16px 20px; border-radius: 18px; background: var(--stage-card); font-size: 24px; color: var(--stage-muted); }
+.ti-note b { color: var(--stage-ink); }
+.mk-demo { margin-left: 8px; font-size: 12px; border: 1px solid var(--navy); color: var(--navy); background: #fff; border-radius: 999px; padding: 3px 10px; min-height: 28px; }
+</style>
+</head>
+<body>
+<script src="games.js"></script>
+<script>
+// ── Content: invented clues for "The Lantern House" ──────────────
+// Layout from the seeded generator (13×13, 11 of 12 terms placed, 12 crossings). SIMILE did not fit and is reported to the teacher.
+const N = 13, P = 44;
+const ENTRIES = [
+  { a: 'SYMBOL', x: 4, y: 0, d: 'A', type: 'Example', clue: 'Sister Agnes keeps one candle burning in the window for Ellis. The candle works as a …', diff: .3 },
+  { a: 'OXYMORON', x: 8, y: 0, d: 'D', type: 'Example', clue: '“Doctor Hask smiled with a gentle cruelty.”', diff: .6 },
+  { a: 'SIBILANCE', x: 11, y: 0, d: 'D', type: 'Example', clue: '“The sea slid and seethed and sighed against the steps.”', diff: .55 },
+  { a: 'UNCANNY', x: 2, y: 2, d: 'A', type: 'Example', clue: 'Mira finds a letter in her own handwriting that she never wrote. The feeling is …', diff: .45 },
+  { a: 'NARRATOR', x: 6, y: 2, d: 'D', type: 'Definition', clue: 'The voice that tells the story. In The Lantern House, it is Mira.', diff: .1 },
+  { a: 'MOTIF', x: 8, y: 3, d: 'A', type: 'Definition', clue: 'An image or idea that keeps coming back and gathers meaning each time.', diff: .6 },
+  { a: 'IRONY', x: 1, y: 4, d: 'D', type: 'Example', clue: 'Mira lights every lamp in the village, yet cannot find her own way home.', diff: .35 },
+  { a: 'METAPHOR', x: 3, y: 5, d: 'D', type: 'Example', clue: '“The house is a ribcage, and we are what it keeps.”', diff: .25 },
+  { a: 'FORESHADOWING', x: 0, y: 6, d: 'A', type: 'Example', clue: 'Old Tobin taps the frozen pond: “That ice won’t hold till spring.”', diff: .4 },
+  { a: 'GOTHIC', x: 0, y: 10, d: 'A', type: 'Definition', clue: 'A genre of crumbling houses, buried secrets and creeping dread.', diff: .1 },
+  { a: 'REDHERRING', x: 3, y: 12, d: 'A', type: 'Example', clue: 'Every clue in chapter four points to Old Tobin, who turns out to be innocent.', en: '3, 7', diff: .4 }
+];
+const W = ENTRIES.length;
+const starts = [...new Set(ENTRIES.map((e) => e.y * N + e.x))].sort((a, b) => a - b);
+const AT = {};
+ENTRIES.forEach((e, i) => {
+  e.i = i; e.n = starts.indexOf(e.y * N + e.x) + 1;
+  e.cells = [...e.a].map((ch, k) => { const x = e.x + (e.d === 'A' ? k : 0), y = e.y + (e.d === 'D' ? k : 0), key = `${x},${y}`; (AT[key] ||= { x, y, ch })[e.d] = i; return key; });
+  e.label = `${e.n} ${e.d === 'A' ? 'Across' : 'Down'}`; e.short = `${e.n}${e.d === 'A' ? 'A' : 'D'}`;
+  e.len = `(${e.en || e.a.length})`;
+});
+ENTRIES.forEach((e) => { if (AT[e.cells[0]]) AT[e.cells[0]].n = e.n; });
+const ORDER = [...ENTRIES.filter((e) => e.d === 'A'), ...ENTRIES.filter((e) => e.d === 'D')].map((e) => e.i);
+const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+const toast = (html, kind) => GM.toast(phone, `<span>${html}</span>`, kind);
+const D = (ms) => (GM.calm() ? 1 : ms);
+const ord = (n) => n + (['st', 'nd', 'rd'][((n + 90) % 100 - 10) % 10 - 1] || 'th');
+
+let S;
+function fresh() {
+  S = { L: {}, given: {}, status: {}, hints: {}, tries: {}, act: ORDER[0], cx: ENTRIES[ORDER[0]].x, cy: ENTRIES[ORDER[0]].y, zoom: true, t: 0, paused: false, view: 'race', done: null, firsts: {}, feed: [], race: {} };
+  GM.class.forEach((c) => S.race[c] = { solved: [], hints: {}, done: null });
+}
+const { board, phone } = GM.scaffold({
+  title: '<b>Crossword race</b> · The Lantern House',
+  note: '<b>How to use:</b> you are JW on the phone. Tap a square or a clue, type with your keyboard (arrow keys move, Enter checks), then <b>Check word</b>. Hints climb a ladder: a letter, then the first letter of every crossing word, then the whole word. The board shows the class race; the other 23 students are simulated. Use <b>End race</b> on the board for the podium and the teacher view. <button class="mk-demo" id="demo">Demo: solve all but one</button>',
+  onRestart: start
+});
+
+// ── Phone ────────────────────────────────────────
+function cellStatus(k) {
+  const c = AT[k]; let st = '';
+  for (const d of ['A', 'D']) { const s = S.status[c[d]]; if (s === 'clean' || s === 'hint') return 'ok'; if (s === 'shown') st = 'shown'; }
+  return st;
+}
+const locked = (k) => !!cellStatus(k);
+function buildPhone() {
+  phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av">${GM.me}</span>JW</span><span class="ph-score"><b class="cw-n">0</b> / ${W} words</span></div>
+    <div class="ph-body">
+      <div class="cw-row"><p class="ph-sub cw-time">Tap a square or a clue</p><button class="cw-zoom" data-p="zoom"></button></div>
+      <div class="cw-view"><div class="cw-grid">${Object.entries(AT).map(([k, c]) => `<button class="cw-cell" data-k="${k}" style="left:${c.x * P + 1}px;top:${c.y * P + 1}px" aria-label="Row ${c.y + 1}, column ${c.x + 1}">${c.n ? `<span class="n">${c.n}</span>` : ''}<span class="l"></span><span class="sw"></span><span class="sh"></span></button>`).join('')}</div></div>
+      <div class="cw-bar"><button data-p="prev" aria-label="Previous clue">‹</button><div class="t"></div><button data-p="next" aria-label="Next clue">›</button></div>
+      <div class="cw-list"></div>
+    </div>
+    <div class="ph-dock"><div class="cw-acts"><button class="pbtn cw-hint" data-p="hint"></button><button class="pbtn cta orange" data-p="check">Check word</button></div></div>
+    <input class="cw-key" aria-label="Type a letter" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="done">`;
+  const key = GM.$('.cw-key', phone);
+  key.addEventListener('keydown', onKey);
+  key.addEventListener('input', () => { const v = key.value.replace(/[^a-z]/gi, ''); key.value = ''; [...v].forEach((ch) => type(ch)); });
+  paint(); frame();
+}
+const HINT_STEP = ['a letter', 'crossing starts', 'show the word'];
+function paint() {
+  const e = ENTRIES[S.act], inAct = new Set(e.cells), cur = `${S.cx},${S.cy}`;
+  GM.$$('.cw-cell', phone).forEach((c) => {
+    const k = c.dataset.k, st = cellStatus(k);
+    c.classList.toggle('in', inAct.has(k)); c.classList.toggle('cur', k === cur);
+    c.classList.toggle('ok', st === 'ok'); c.classList.toggle('shown', st === 'shown');
+    c.classList.toggle('given', !!S.given[k] && !st);
+    const l = c.querySelector('.l'), v = S.L[k] || ''; if (l.textContent !== v) l.textContent = v;
+  });
+  GM.$('.cw-bar .t', phone).innerHTML = `<b>${e.label} · ${e.type}</b><span>${e.clue} ${e.len}</span>`;
+  GM.$('.cw-list', phone).innerHTML = ['A', 'D'].map((d) => `<h3>${d === 'A' ? 'Across' : 'Down'}</h3>${ORDER.filter((i) => ENTRIES[i].d === d).map((i) => { const x = ENTRIES[i], st = S.status[i]; return `<button class="cw-clue ${i === S.act ? 'act' : ''} ${st ? 'done' : ''}" data-w="${i}"><span class="num">${x.n}</span><span><span class="cw-type ${x.type === 'Example' ? 'ex' : ''}">${x.type}</span>${x.clue} ${x.len}</span>${st ? `<span class="tick ${st === 'shown' ? 'shown' : ''}" aria-label="${st === 'clean' ? 'Solved' : 'Solved with hints'}">${st === 'shown' ? '•' : '✓'}</span>` : '<span></span>'}</button>`; }).join('')}`).join('');
+  const h = S.hints[S.act] || 0, solved = !!S.status[S.act];
+  const hb = GM.$('.cw-hint', phone);
+  hb.innerHTML = solved ? '<span>Solved</span><small>Pick another clue</small>' : `<span>Hint <span class="cw-dots">${[0, 1, 2].map((k) => `<i class="${k < h ? 'on' : ''}"></i>`).join('')}</span></span><small>Next: ${HINT_STEP[Math.min(h, 2)]}</small>`;
+  hb.disabled = solved; GM.$('[data-p="check"]', phone).disabled = solved;
+  GM.$('.cw-n', phone).textContent = Object.keys(S.status).length;
+  GM.$('.cw-zoom', phone).innerHTML = S.zoom ? '⤢ Whole grid' : '⤡ Zoom in';
+}
+function frame() {
+  const g = GM.$('.cw-grid', phone); if (!g) return;
+  const VW = 350, VH = 330, G = N * P;
+  if (!S.zoom) { const s = Math.min(VW, VH) / G; g.style.transform = `translate(${(VW - G * s) / 2}px, ${(VH - G * s) / 2}px) scale(${s})`; return; }
+  const e = ENTRIES[S.act], xs = e.cells.map((k) => AT[k].x), ys = e.cells.map((k) => AT[k].y);
+  const wpx = (Math.max(...xs) - Math.min(...xs) + 1) * P, hpx = (Math.max(...ys) - Math.min(...ys) + 1) * P;
+  const cx = wpx > VW - 20 ? S.cx * P + P / 2 : Math.min(...xs) * P + wpx / 2;
+  const cy = hpx > VH - 20 ? S.cy * P + P / 2 : Math.min(...ys) * P + hpx / 2;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  g.style.transform = `translate(${clamp(VW / 2 - cx, VW - G, 0)}px, ${clamp(VH / 2 - cy, VH - G, 0)}px) scale(1)`;
+}
+function focusKey() { GM.$('.cw-key', phone)?.focus({ preventScroll: true }); }
+function select(i, cellKey) {
+  S.act = i; const e = ENTRIES[i];
+  const k = cellKey && e.cells.includes(cellKey) ? cellKey : (e.cells.find((c) => !S.L[c] && !locked(c)) || e.cells[0]);
+  S.cx = AT[k].x; S.cy = AT[k].y; paint(); frame(); focusKey();
+}
+function tapCell(k) {
+  const c = AT[k], cur = `${S.cx},${S.cy}`, e = ENTRIES[S.act];
+  if (!S.zoom) { S.zoom = true; }
+  if (k === cur && c.A != null && c.D != null) { select(e.d === 'A' ? c.D : c.A, k); return; }
+  if (e.cells.includes(k)) { S.cx = c.x; S.cy = c.y; paint(); frame(); focusKey(); return; }
+  select(c[e.d] ?? c.A ?? c.D, k);
+}
+function step(dir) {
+  const e = ENTRIES[S.act], at = e.cells.indexOf(`${S.cx},${S.cy}`);
+  for (let j = at + dir; j >= 0 && j < e.cells.length; j += dir) { if (!locked(e.cells[j])) { const c = AT[e.cells[j]]; S.cx = c.x; S.cy = c.y; return true; } }
+  return false;
+}
+function type(ch) {
+  if (S.view !== 'race' || S.paused || S.done != null) return;
+  const k = `${S.cx},${S.cy}`;
+  if (locked(k)) { if (!step(1)) return; return type(ch); }
+  S.L[k] = ch.toUpperCase(); delete S.given[k];
+  paint();
+  const cell = GM.$(`.cw-cell[data-k="${k}"] .l`, phone);
+  cell && cell.animate([{ transform: 'translateY(-16px) scale(1.3)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: D(260), easing: 'cubic-bezier(.22,1,.36,1)' });
+  GM.sound.click();
+  step(1); paint(); frame();
+}
+function back() {
+  const k = `${S.cx},${S.cy}`;
+  if (S.L[k] && !locked(k)) { delete S.L[k]; delete S.given[k]; paint(); return; }
+  if (step(-1)) { const j = `${S.cx},${S.cy}`; delete S.L[j]; delete S.given[j]; paint(); frame(); }
+}
+function move(dx, dy) {
+  let x = S.cx, y = S.cy;
+  for (let n = 0; n < N; n++) { x += dx; y += dy; if (x < 0 || y < 0 || x >= N || y >= N) return; const c = AT[`${x},${y}`]; if (c) { const want = dx ? 'A' : 'D'; S.act = c[want] ?? c.A ?? c.D; S.cx = x; S.cy = y; paint(); frame(); return; } }
+}
+function onKey(ev) {
+  const k = ev.key;
+  if (/^[a-z]$/i.test(k) && !ev.metaKey && !ev.ctrlKey) { ev.preventDefault(); type(k); return; }
+  if (k === 'Backspace') { ev.preventDefault(); back(); }
+  else if (k === 'ArrowLeft') { ev.preventDefault(); move(-1, 0); }
+  else if (k === 'ArrowRight') { ev.preventDefault(); move(1, 0); }
+  else if (k === 'ArrowUp') { ev.preventDefault(); move(0, -1); }
+  else if (k === 'ArrowDown') { ev.preventDefault(); move(0, 1); }
+  else if (k === 'Enter') { ev.preventDefault(); check(); }
+  else if (k === 'Tab') { ev.preventDefault(); nextClue(ev.shiftKey ? -1 : 1); }
+}
+function nextClue(dir) {
+  const at = ORDER.indexOf(S.act);
+  for (let j = 1; j <= W; j++) { const i = ORDER[(at + dir * j + W * 2) % W]; if (!S.status[i] || j === W) { select(i); return; } }
+}
+const wordCells = (i) => ENTRIES[i].cells.map((k) => GM.$(`.cw-cell[data-k="${k}"]`, phone));
+
+async function check() {
+  if (S.view !== 'race' || S.paused || S.done != null) return;
+  const i = S.act, e = ENTRIES[i]; if (S.status[i]) return;
+  if (e.cells.some((k) => !S.L[k])) { toast('Fill every square first'); return; }
+  S.tries[i] = (S.tries[i] || 0) + 1;
+  if (e.cells.every((k) => S.L[k] === AT[k].ch)) { await solve(i, S.hints[i] ? 'hint' : 'clean'); return; }
+  GM.sound.wrong();
+  wordCells(i).forEach((c) => { c.classList.remove('fx-shake'); void c.offsetWidth; c.classList.add('fx-shake'); });
+  toast('Not quite<small>Change a letter, or climb the hint ladder.</small>', 'bad');
+}
+async function solve(i, how) {
+  S.status[i] = how; paint();
+  const cells = wordCells(i);
+  if (!GM.calm()) {
+    cells.forEach((c, k) => {
+      c.querySelector('.sw').animate([{ opacity: 0 }, { opacity: .55 }, { opacity: 0 }], { duration: 520, delay: k * 55, easing: 'ease-out' });
+      c.animate([{ transform: 'none' }, { transform: 'scale(1.14)' }, { transform: 'none' }], { duration: 420, delay: k * 55, easing: 'cubic-bezier(.22,1,.36,1)' });
+    });
+  }
+  how === 'shown' ? GM.sound.reveal() : GM.sound.right();
+  // crossings shimmer when both directions are solved
+  const both = ENTRIES[i].cells.filter((k) => AT[k].A != null && AT[k].D != null && S.status[AT[k].A] && S.status[AT[k].D]);
+  await GM.sleep(cells.length * 55 + 200);
+  both.forEach((k) => GM.$(`.cw-cell[data-k="${k}"] .sh`, phone).animate([{ opacity: 0, transform: 'translateX(-100%)' }, { opacity: 1, offset: .4 }, { opacity: 0, transform: 'translateX(100%)' }], { duration: D(700), easing: 'ease-in-out' }));
+  if (how !== 'shown') toast(`${ENTRIES[i].label} solved${how === 'clean' ? '<small>No hints. Clean solve.</small>' : `<small>With ${S.hints[i]} hint${S.hints[i] > 1 ? 's' : ''}.</small>`}`, 'good');
+  const r = S.race[GM.me]; r.solved.push(i); r.hints[i] = how === 'shown' ? 3 : (S.hints[i] || 0);
+  noteFirst(i, GM.me); updateRace(GM.me);
+  if (Object.keys(S.status).length === W) { S.done = S.t; r.done = S.t; updateRace(GM.me); await GM.sleep(700); finishPhone(); return; }
+  await GM.sleep(300); nextClue(1);
+}
+function hint() {
+  const i = S.act, e = ENTRIES[i]; if (S.status[i] || S.done != null) return;
+  const h = (S.hints[i] || 0) + 1; S.hints[i] = h; GM.sound.ding();
+  const reveal = (k) => { if (!locked(k)) { S.L[k] = AT[k].ch; S.given[k] = true; } };
+  if (h === 1) { const k = e.cells.find((c) => S.L[c] !== AT[c].ch) || e.cells[0]; reveal(k); paint(); popCells([k]); toast('One letter in<small>The orange corner marks a hint letter.</small>'); }
+  if (h === 2) {
+    const firsts = e.cells.map((k) => AT[k][e.d === 'A' ? 'D' : 'A']).filter((j) => j != null).map((j) => ENTRIES[j].cells[0]);
+    firsts.forEach(reveal); paint(); popCells(firsts);
+    toast(firsts.length ? `${firsts.length} crossing word${firsts.length > 1 ? 's' : ''} started<small>Their first letters are in. Look along them.</small>` : 'No crossing words here');
+  }
+  if (h === 3) { e.cells.forEach(reveal); solve(i, 'shown'); toast(`The word was ${e.a}<small>It counts as solved with hints.</small>`); }
+  if (h < 3) frame();
+}
+function popCells(keys) {
+  keys.forEach((k, n) => GM.$(`.cw-cell[data-k="${k}"] .l`, phone)?.animate([{ transform: 'translateY(-16px) scale(1.4)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: D(380), delay: D(n * 90), easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+}
+function stats() {
+  const v = Object.values(S.status);
+  return { clean: v.filter((s) => s === 'clean').length, hint: v.filter((s) => s === 'hint').length, shown: v.filter((s) => s === 'shown').length, hints: Object.values(S.hints).reduce((a, b) => a + b, 0) };
+}
+function finishPhone(timeUp) {
+  const st = stats(), fin = rankOf(GM.me);
+  const solved = st.clean + st.hint + st.shown;
+  phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av">${GM.me}</span>JW</span><span class="ph-score">${solved} / ${W} words</span></div>
+    <div class="ph-body"><div class="cw-fin">
+      <span class="ph-sub">${timeUp ? 'Time’s up' : 'Crossword done'}</span>
+      <div class="big">${timeUp ? `${solved} / ${W}` : fmt(S.done)}</div>
+      <p class="ph-sub">${timeUp ? 'words solved before the bell' : `You finished <b>${ord(fin)}</b> of ${GM.class.length}`}</p>
+      <div class="cw-break"><div><span>Solved clean</span><b>${st.clean}</b></div><div><span>Solved with a hint</span><b>${st.hint}</b></div><div><span>Shown in full</span><b>${st.shown}</b></div><div class="tot"><span>Hints used</span><span>${st.hints}</span></div></div>
+      <p class="ph-sub" style="font-size:13px">${st.shown ? 'Words that were shown in full come back in your organiser this week.' : 'Clean solves count as strong evidence in your organiser.'}</p>
+    </div></div>`;
+  phone.querySelector('.cw-fin').animate([{ opacity: 0, transform: 'translateY(24px)' }, { opacity: 1, transform: 'none' }], { duration: D(500), easing: 'cubic-bezier(.22,1,.36,1)' });
+  if (!timeUp) { GM.sound.fanfare(); GM.confetti(phone); }
+}
+phone.addEventListener('click', (e) => {
+  const cell = e.target.closest('.cw-cell'); if (cell) { if (!S.paused && S.done == null) tapCell(cell.dataset.k); return; }
+  const t = e.target.closest('button'); if (!t || S.paused) return;
+  if (t.dataset.w) { select(+t.dataset.w); GM.sound.click(); return; }
+  const p = t.dataset.p;
+  if (p === 'zoom') { S.zoom = !S.zoom; paint(); frame(); focusKey(); }
+  if (p === 'prev') nextClue(-1);
+  if (p === 'next') nextClue(1);
+  if (p === 'check') { check(); focusKey(); }
+  if (p === 'hint') { hint(); focusKey(); }
+});
+
+// ── Board: race wall ─────────────────────────────
+function noteFirst(i, c) {
+  if (S.firsts[i]) return; S.firsts[i] = c; S.feed.unshift(i);
+  const tk = GM.$('.cw-ticker', board); if (!tk) return;
+  renderTicker(true);
+}
+function renderTicker(fresh) {
+  const tk = GM.$('.cw-ticker', board); if (!tk) return;
+  tk.innerHTML = `<span class="lbl">First to solve</span>${S.feed.length ? S.feed.slice(0, 4).map((i) => `<span class="b-pill">${ENTRIES[i].label} <b>${S.firsts[i]}</b></span>`).join('') : '<span>Clue firsts appear here. Answers stay hidden.</span>'}`;
+  const p = tk.querySelector('.b-pill'); if (fresh && p) p.animate([{ opacity: 0, transform: 'translateX(-30px) scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: D(500), easing: 'cubic-bezier(.22,1,.36,1)' });
+}
+function renderRace() {
+  S.view = 'race';
+  clearStage();
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x cw-head">The race <span class="cw-sub"></span><span class="cw-clock"><small>Elapsed</small><b class="t">${fmt(S.t)}</b></span></div>
+    <div class="stage-x cw-race">${GM.class.map((c) => `<div class="cw-card ${c === GM.me ? 'me' : ''}" data-c="${c}"><div class="who"><span class="b-avatar" style="${GM.avatarStyle(c)}">${c}</span>${c}<span class="cnt"><b>0</b> / ${W}</span></div><div class="cw-segs">${ENTRIES.map(() => '<i></i>').join('')}</div></div>`).join('')}</div>
+    <div class="stage-x cw-ticker"></div>`);
+  setControls('<button class="bctl" data-a="pause">Pause</button><button class="bctl primary" data-a="end">End race</button>');
+  GM.class.forEach((c) => updateRace(c, true)); renderTicker(); subline();
+  GM.$$('.cw-card', board).forEach((n, k) => n.animate([{ opacity: 0, transform: 'translateY(30px) scale(.95)' }, { opacity: 1, transform: 'none' }], { duration: D(500), delay: D(k * 25), easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+}
+function subline() { const el = GM.$('.cw-sub', board); if (el) el.textContent = `${GM.class.filter((c) => S.race[c].done != null).length} of ${GM.class.length} finished · answers stay hidden`; }
+function updateRace(c, quiet) {
+  if (S.view !== 'race') return;
+  const card = GM.$(`.cw-card[data-c="${c}"]`, board); if (!card) return;
+  const r = S.race[c], n = r.solved.length;
+  card.querySelector('.cnt b').textContent = n;
+  card.querySelectorAll('.cw-segs i').forEach((s, k) => {
+    const was = s.classList.contains('on'); s.classList.toggle('on', k < n);
+    if (!quiet && !was && k < n) s.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: D(450), easing: 'cubic-bezier(.22,1,.36,1)' });
+  });
+  if (r.done != null && !card.classList.contains('done')) {
+    card.classList.add('done'); card.insertAdjacentHTML('beforeend', `<span class="fin">${fmt(r.done)}</span>`);
+    if (!quiet) { GM.sound.ding(); card.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.08)' }, { transform: 'scale(1)' }], { duration: D(600), easing: 'cubic-bezier(.22,1,.36,1)' }); }
+  } else if (!quiet) card.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.04)' }, { transform: 'scale(1)' }], { duration: D(420), easing: 'cubic-bezier(.22,1,.36,1)' });
+  subline();
+}
+function tickSim() {
+  GM.class.forEach((c) => {
+    if (c === GM.me) return; const r = S.race[c]; if (r.done != null || GM.rand() > .1) return;
+    const left = ENTRIES.filter((e) => !r.solved.includes(e.i));
+    const e = left.sort((a, b) => a.diff + GM.rand() * .5 - (b.diff + GM.rand() * .5))[0];
+    const roll = GM.rand(); const h = roll < e.diff * .18 ? 3 : roll < e.diff * .4 ? 2 : roll < e.diff * .75 ? 1 : 0;
+    r.solved.push(e.i); r.hints[e.i] = h; noteFirst(e.i, c);
+    if (r.solved.length === W) r.done = S.t;
+    updateRace(c);
+  });
+}
+
+// ── Board: end + teacher view ────────────────────
+function ranked() {
+  return GM.class.map((c) => ({ c, ...S.race[c] })).sort((a, b) => (a.done ?? 1e9) - (b.done ?? 1e9) || b.solved.length - a.solved.length);
+}
+const rankOf = (c) => ranked().findIndex((r) => r.c === c) + 1;
+const scoreLabel = (r) => (r.done != null ? fmt(r.done) : `${r.solved.length} / ${W} words`);
+function clueTotals() {
+  return ENTRIES.map((e) => { let clean = 0, hint = 0, shown = 0; GM.class.forEach((c) => { const r = S.race[c]; if (!r.solved.includes(e.i)) return; const h = r.hints[e.i]; h === 3 ? shown++ : h ? hint++ : clean++; }); return { e, clean, hint, shown, none: GM.class.length - clean - hint - shown }; });
+}
+function endRace() {
+  S.view = 'end'; clearStage();
+  const all = ranked(), [a, b, c] = all, tot = clueTotals();
+  const hardest = tot.slice().sort((x, y) => (x.clean - y.clean))[0];
+  const pct = Math.round(tot.reduce((s, t) => s + t.clean + t.hint + t.shown, 0) / (W * GM.class.length) * 100);
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x cw-end-h"><span class="b-eyebrow">Race over · fastest solvers</span><div class="sum">Class solved <b>${pct}%</b> of clues · fewest clean solves: <b>${hardest.e.label}, ${hardest.e.a.toLowerCase()}</b></div></div>
+    <div class="stage-x podium">${[[b, 'p2', 2], [a, 'p1', 1], [c, 'p3', 3]].map(([r, cls, n]) => `<div class="pod ${cls}"><span class="b-avatar" style="${GM.avatarStyle(r.c)}">${r.c}</span><span class="name">${r.c}</span><span class="score">${scoreLabel(r)}</span><div class="block">${n}</div></div>`).join('')}</div>
+    <div class="stage-x cw-also">${all.slice(3, 5).map((r, k) => `<div class="lb-row"><span class="rank">${k + 4}</span><span class="b-avatar" style="${GM.avatarStyle(r.c)}">${r.c}</span><span>${r.c}</span><small>${scoreLabel(r)}</small></div>`).join('')}</div>`);
+  setControls('<button class="bctl" data-a="teacher">Teacher view</button>');
+  GM.$$('.pod', board).forEach((p, k) => p.animate([{ transform: 'translateY(100%)' }, { transform: 'none' }], { duration: D(900), delay: D([400, 1100, 0][k]), easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  GM.$$('.cw-also .lb-row', board).forEach((p, k) => p.animate([{ opacity: 0, transform: 'translateX(-40px)' }, { opacity: 1, transform: 'none' }], { duration: D(500), delay: D(1700 + k * 150), easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  GM.sound.reveal();
+  setTimeout(() => { GM.sound.fanfare(); GM.confetti(board); }, GM.calm() ? 0 : 1300);
+  if (S.done == null) { S.done = S.t; finishPhone(true); }
+}
+function teacher() {
+  S.view = 'teacher'; clearStage();
+  const tot = clueTotals().sort((x, y) => (y.clean / GM.class.length) - (x.clean / GM.class.length));
+  const per = GM.class.map((c) => { const h = Object.values(S.race[c].hints); return { c, s1: h.filter((v) => v >= 1).length, s2: h.filter((v) => v >= 2).length, s3: h.filter((v) => v >= 3).length, total: h.reduce((a, b) => a + b, 0) }; }).sort((a, b) => b.total - a.total);
+  const clean = per.filter((p) => p.total === 0).map((p) => p.c);
+  const n = GM.class.length;
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x ti">
+    <div><span class="ti-flag">Teacher only · not for the projector</span><h2>Clean solves against hinted solves</h2><p class="lede">Per clue, sorted from most to fewest clean solves.</p>
+      <div class="ti-bars">${tot.map((t) => `<div class="ti-bar"><span class="nm"><small>${t.e.short}</small>${t.e.a.toLowerCase()}</span><span class="track"><i class="c-clean" style="width:${t.clean / n * 100}%"></i><i class="c-hint" style="width:${t.hint / n * 100}%"></i><i class="c-shown" style="width:${t.shown / n * 100}%"></i></span><span class="pct">${Math.round(t.clean / n * 100)}%</span></div>`).join('')}</div>
+      <div class="ti-key"><span><i class="c-clean"></i>Clean</span><span><i class="c-hint"></i>1–2 hints</span><span><i class="c-shown"></i>Shown in full</span><span><i style="background:var(--stage-line)"></i>Not solved</span></div>
+    </div>
+    <div class="ti-side"><h2 style="margin-top:58px">Hint ladder use</h2><p class="lede">Times each student reached each rung.</p>
+      ${per.slice(0, 6).map((p) => `<div class="ti-stu"><span class="b-avatar" style="${GM.avatarStyle(p.c)}">${p.c}</span><span class="ladder"><span>Letter ${p.s1}</span><span>Crossings ${p.s2}</span><span>Shown ${p.s3}</span></span></div>`).join('')}
+      <div class="ti-note"><b>No hints at all:</b> ${clean.length ? clean.join(', ') : 'nobody yet'}.<br><b>Did not fit the grid:</b> simile (regenerate to try a new seed).</div>
+    </div></div>`);
+  GM.$$('.ti-bar .track i', board).forEach((b, k) => b.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: D(700), delay: D(Math.floor(k / 3) * 60), easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  setControls('<button class="bctl" data-a="podium">Back to podium</button><button class="bctl primary" data-a="again">Play again</button>');
+}
+function clearStage() { board.querySelectorAll('.stage-x').forEach((n) => n.remove()); }
+function setControls(html) { board.querySelector('.board-controls')?.remove(); if (html) board.insertAdjacentHTML('beforeend', `<div class="stage-x board-controls">${html}</div>`); }
+function pause(on) {
+  S.paused = on;
+  [board, phone].forEach((h) => { h.querySelector('.gx-pause')?.remove(); if (on) { const o = GM.h(`<div class="gx-pause"><div>Paused<small>Eyes up here for a moment</small></div></div>`); h.appendChild(o); o.animate([{ opacity: 0 }, { opacity: 1 }], { duration: D(300) }); } });
+  const b = board.querySelector('[data-a="pause"]'); if (b) b.textContent = on ? 'Resume' : 'Pause';
+}
+board.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return; GM.sound.click();
+  if (a === 'pause') pause(!S.paused);
+  if (a === 'end') { pause(false); endRace(); }
+  if (a === 'teacher') teacher();
+  if (a === 'podium') endRace();
+  if (a === 'again') start();
+});
+document.addEventListener('click', (e) => {
+  if (e.target.id !== 'demo' || S.view !== 'race' || S.done != null) return;
+  ENTRIES.forEach((x) => { if (x.i === 5 || S.status[x.i]) return; x.cells.forEach((k) => S.L[k] = AT[k].ch); S.status[x.i] = x.i === 1 ? 'hint' : 'clean'; if (x.i === 1) S.hints[1] = 1; S.race[GM.me].solved.push(x.i); S.race[GM.me].hints[x.i] = S.hints[x.i] || 0; noteFirst(x.i, GM.me); });
+  ENTRIES[5].cells.forEach((k) => { if (!locked(k)) delete S.L[k]; });
+  updateRace(GM.me); select(5);
+});
+
+let clock;
+function start() {
+  clearInterval(clock); fresh(); buildPhone(); renderRace();
+  clock = setInterval(() => {
+    if (S.paused || S.view !== 'race') return;
+    S.t++; const t = GM.$('.cw-clock .t', board); if (t) t.textContent = fmt(S.t);
+    tickSim();
+  }, 1000);
+}
+start();
+</script>
+</body>
+</html>

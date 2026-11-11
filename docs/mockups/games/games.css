@@ -112,7 +112,7 @@ body[data-view="phone"] .mk-board-col { display: none; }
 .lb-row.first { background: linear-gradient(90deg, rgba(242,193,78,.28), var(--stage-card)); }
 
 /* Podium */
-.podium { position: absolute; left: 0; right: 0; bottom: 0; height: 640px; display: flex; justify-content: center; align-items: flex-end; gap: 28px; }
+.podium { position: absolute; left: 0; right: 280px; bottom: 0; height: 640px; display: flex; justify-content: center; align-items: flex-end; gap: 28px; }
 .pod { width: 320px; display: grid; justify-items: center; gap: 16px; }
 .pod .b-avatar { width: 110px; height: 110px; font-size: 40px; box-shadow: 0 0 0 6px rgba(255,255,255,.12); }
 .pod .name { font-size: 36px; font-weight: 700; }

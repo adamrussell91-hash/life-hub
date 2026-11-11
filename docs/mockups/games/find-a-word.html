@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Find-a-word — game mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="games.css">
+<style>
+/* ── Phone: find-a-word ───────────────────────────── */
+.phone { overflow-wrap: normal; word-break: normal; hyphens: manual; }
+.phone .ph-toast { bottom: 104px; pointer-events: none; }
+.phone .ph-toast > span { display: block; }
+.fw-card { flex: none; padding: 12px 14px; border-radius: 18px; background: var(--navy); color: #fff; display: grid; gap: 4px; min-height: 84px; align-content: center; }
+.fw-card b { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; opacity: .78; }
+.fw-card .q { font-size: 16px; line-height: 1.35; font-weight: 500; }
+.fw-card .hints { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.fw-card .hints span { font-size: 12.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.14); }
+.fw-card.all { background: var(--cotton); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(23,55,94,.1); }
+.fw-wrap { position: relative; flex: none; width: 350px; height: 350px; border-radius: 18px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1), 0 8px 24px rgba(20,35,70,.07); touch-action: none; user-select: none; -webkit-user-select: none; }
+.fw-grid { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(10, 1fr); }
+.fw-c { display: grid; place-items: center; font-size: 19px; font-weight: 700; color: var(--ink); transition: opacity .4s, color .3s, background .3s; border-radius: 8px; }
+.fw-c.line { background: rgba(246,134,32,.16); }
+.fw-c.anchor { background: var(--pastel-gold); box-shadow: inset 0 0 0 2px var(--high-sea); }
+.fw-wrap.reveal .fw-c { opacity: .18; }
+.fw-wrap.reveal .fw-c.left { opacity: 1; }
+.fw-c.glow { color: var(--high-sea-ink); background: var(--pastel-gold); }
+.fw-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.fw-wrap.reveal .fw-svg { opacity: .15; transition: opacity .5s; }
+.fw-band { position: absolute; left: 0; top: 0; border-radius: 999px; background: rgba(55,111,183,.22); box-shadow: inset 0 0 0 2.5px var(--wave); transform-origin: 15px 15px; pointer-events: none; opacity: 0; transition: width .08s linear, opacity .15s; }
+.fw-band.on { opacity: 1; }
+.fw-band.bad { background: rgba(212,84,79,.18); box-shadow: inset 0 0 0 2.5px var(--game-wrong); }
+.fw-band.miss { background: rgba(107,119,136,.18); box-shadow: inset 0 0 0 2px var(--muted); }
+.fw-list { display: grid; gap: 2px; }
+.fw-clue { width: 100%; min-height: 48px; display: grid; grid-template-columns: 24px 1fr auto; gap: 8px; align-items: start; text-align: left; padding: 10px 12px; border: 0; border-radius: 14px; background: transparent; font-size: 15px; line-height: 1.38; color: var(--ink); }
+.fw-clue .num { font-weight: 700; color: var(--navy); }
+.fw-clue.act { background: var(--pastel-blue); }
+.fw-clue.done { color: var(--muted); }
+.fw-clue .word { display: inline-block; margin-top: 4px; font-size: 13px; font-weight: 700; letter-spacing: .06em; padding: 2px 10px; border-radius: 999px; color: #fff; }
+.fw-clue .tick { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; color: #fff; background: var(--game-right); margin-top: 1px; }
+.fw-type { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--pastel-lilac); color: var(--pastel-lilac-ink); margin-right: 4px; vertical-align: 1px; }
+.fw-type.def { background: var(--shore); color: var(--muted); }
+.fw-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fw-acts .pbtn { justify-content: center; text-align: center; }
+.fw-hint { flex-direction: column; gap: 4px !important; padding: 6px 10px !important; line-height: 1.2; }
+.fw-hint small { font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.fw-dots { display: inline-flex; gap: 5px; }
+.fw-dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(23,55,94,.18); }
+.fw-dots i.on { background: var(--high-sea); }
+.fw-fly { position: absolute; left: 0; top: 0; width: 30px; height: 38px; display: grid; place-items: center; border-radius: 9px; background: var(--pastel-gold); color: var(--high-sea-ink); font-weight: 700; font-size: 19px; z-index: 30; pointer-events: none; box-shadow: 0 6px 16px rgba(108,88,31,.25); }
+.fw-msg { display: grid; gap: 6px; justify-items: center; padding: 18px 8px; border-radius: 22px; background: var(--depth); }
+.fw-msg .ln { display: flex; gap: 3px; }
+.fw-msg .sp { width: 12px; }
+.fw-msg .t { width: 30px; height: 38px; display: grid; place-items: center; border-radius: 9px; background: var(--pastel-gold); color: var(--high-sea-ink); font-weight: 700; font-size: 19px; }
+.fw-msg .t.wait { opacity: 0; }
+.fw-msg-lbl { text-align: center; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.fw-q { opacity: 1; display: grid; gap: 10px; }
+.fw-q.wait { opacity: 0; }
+.fw-why { font-size: 14px; color: var(--muted); padding: 12px 14px; border-radius: 14px; background: var(--cotton); }
+.fw-fin { flex: 1; display: grid; align-content: center; gap: 14px; text-align: center; }
+.fw-fin .big { font-size: 64px; font-weight: 700; color: var(--navy); line-height: 1; font-variant-numeric: tabular-nums; }
+.fw-break { display: grid; gap: 8px; padding: 16px; border-radius: 20px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1); font-size: 15px; text-align: left; }
+.fw-break div { display: flex; justify-content: space-between; gap: 12px; }
+.fw-break .tot { border-top: 1px solid rgba(23,55,94,.12); padding-top: 8px; font-weight: 700; }
+.gx-pause { position: absolute; inset: 0; z-index: 35; display: grid; place-items: center; text-align: center; background: rgba(10,21,54,.42); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: #fff; font-weight: 700; }
+.gx-pause small { display: block; font-weight: 500; opacity: .8; }
+.board .gx-pause { font-size: 80px; z-index: 15; } /* under the board controls so Resume stays live */ .board .gx-pause small { font-size: 30px; }
+.phone .gx-pause { font-size: 30px; border-radius: 44px; } .phone .gx-pause small { font-size: 15px; }
+
+/* ── Board: race ──────────────────────────────────── */
+.fw-head { position: absolute; left: 100px; right: 100px; top: 112px; display: flex; align-items: baseline; gap: 24px; font-size: 44px; font-weight: 700; }
+.fw-head span { font-size: 28px; font-weight: 500; color: var(--stage-muted); }
+.fw-head .decoys { margin-left: auto; align-self: center; display: inline-flex; gap: 12px; align-items: center; padding: 10px 22px; border-radius: 999px; background: var(--stage-card); box-shadow: var(--stage-glow); font-size: 26px; color: var(--stage-ink); font-weight: 600; }
+.fw-head .decoys b { color: var(--game-wrong); font-variant-numeric: tabular-nums; }
+.fw-clock { display: flex; align-items: baseline; gap: 12px; font-size: 56px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fw-clock small { font-size: 24px; font-weight: 600; color: var(--stage-muted); letter-spacing: .1em; text-transform: uppercase; }
+.fw-race { position: absolute; left: 100px; right: 100px; top: 210px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 22px; }
+.fw-rc { position: relative; border-radius: 24px; padding: 18px 20px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; gap: 14px; transition: box-shadow .4s; }
+.fw-rc.me { background: var(--stage-card-hi); }
+.fw-rc.done { box-shadow: 0 0 0 3px var(--game-gold), 0 0 40px rgba(242,193,78,.32); }
+.fw-rc .who { display: flex; align-items: center; gap: 14px; font-weight: 700; font-size: 32px; }
+.fw-rc .who .b-avatar { width: 56px; height: 56px; font-size: 21px; }
+.fw-rc .who .cnt { margin-left: auto; font-size: 26px; color: var(--stage-muted); font-variant-numeric: tabular-nums; }
+.fw-rc .who .cnt b { color: var(--stage-ink); }
+.fw-rc .bar { display: grid; grid-template-columns: repeat(9, 1fr) 34px; gap: 5px; align-items: center; }
+.fw-rc .bar i { height: 26px; border-radius: 7px; background: var(--stage-line); transform-origin: left; }
+.fw-rc .bar i.on { background: linear-gradient(180deg, #8fb8ef, var(--game-team-1)); }
+.fw-rc .bar .key { height: 26px; border-radius: 7px; display: grid; place-items: center; font-size: 18px; background: var(--stage-line); color: transparent; }
+.fw-rc .bar .key.on { background: var(--game-gold); color: var(--depth); }
+.fw-rc .fin { position: absolute; top: -14px; right: 16px; padding: 4px 14px; border-radius: 999px; background: var(--game-gold); color: var(--depth); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fw-ticker { position: absolute; left: 100px; right: 100px; bottom: 124px; display: flex; gap: 16px; align-items: center; font-size: 26px; color: var(--stage-muted); overflow: hidden; white-space: nowrap; }
+.fw-ticker .lbl { font-weight: 700; letter-spacing: .12em; text-transform: uppercase; font-size: 22px; color: var(--high-sea); flex: none; }
+.fw-ticker .b-pill { color: var(--stage-ink); flex: none; font-size: 26px; }
+.fw-ticker .b-pill b { color: var(--game-gold); }
+[data-board-theme="light"] .fw-ticker .b-pill b { color: var(--high-sea-ink); }
+.fw-legend { position: absolute; left: 100px; bottom: 50px; display: flex; gap: 26px; font-size: 22px; color: var(--stage-muted); }
+.fw-legend span { display: flex; gap: 10px; align-items: center; }
+.fw-legend i { width: 22px; height: 22px; border-radius: 6px; }
+
+/* ── Board: end ───────────────────────────────────── */
+.fw-end-h { position: absolute; left: 0; right: 0; top: 140px; text-align: center; }
+.fw-end-h .sum { font-size: 30px; color: var(--stage-muted); }
+.fw-end-h .sum b { color: var(--stage-ink); }
+.fw-end-msg { position: absolute; left: 0; right: 0; top: 268px; display: flex; justify-content: center; gap: 8px; }
+.fw-end-msg i { width: 46px; height: 58px; border-radius: 12px; display: grid; place-items: center; font-style: normal; font-size: 32px; font-weight: 700; background: var(--game-gold); color: var(--depth); }
+.fw-end-msg .sp { width: 22px; background: none; }
+.fw-also { position: absolute; left: 100px; top: 470px; width: 300px; display: grid; gap: 14px; }
+.fw-also .lb-row { grid-template-columns: 40px 52px 1fr; font-size: 28px; padding: 12px 18px; gap: 14px; }
+.fw-also .lb-row .b-avatar { width: 52px; height: 52px; font-size: 19px; }
+.fw-also .lb-row small { grid-column: 3; font-size: 22px; color: var(--stage-muted); font-weight: 500; margin-top: -10px; }
+
+/* ── Board: teacher insight ───────────────────────── */
+.ti { position: absolute; left: 100px; right: 100px; top: 120px; bottom: 120px; display: grid; grid-template-columns: 1fr 600px; gap: 56px; }
+.ti-flag { display: inline-flex; align-items: center; gap: 12px; padding: 8px 20px; border-radius: 999px; background: var(--game-wrong); color: #fff; font-size: 22px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.ti h2 { font-size: 40px; margin: 16px 0 6px; letter-spacing: -.01em; }
+.ti .lede { font-size: 26px; color: var(--stage-muted); margin: 0 0 18px; }
+.ti-pairs { display: grid; gap: 14px; }
+.ti-pair { display: grid; grid-template-columns: 220px 60px 220px 1fr; align-items: center; gap: 14px; padding: 14px 20px; border-radius: 20px; background: var(--stage-card); box-shadow: var(--stage-glow); font-size: 26px; }
+.ti-pair .tm { padding: 6px 14px; border-radius: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; text-align: center; font-size: 24px; }
+.ti-pair .tm.ok { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.ti-pair .tm.no { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
+.ti-pair .arr { text-align: center; color: var(--stage-muted); font-size: 22px; }
+.ti-pair .who { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; }
+.ti-pair .who .b-avatar { width: 44px; height: 44px; font-size: 16px; }
+.ti-pair .who b { margin-left: 8px; font-variant-numeric: tabular-nums; }
+.ti-bars { display: grid; gap: 10px; }
+.ti-bar { display: grid; grid-template-columns: 210px 1fr 60px; align-items: center; gap: 16px; font-size: 26px; }
+.ti-bar .nm { font-weight: 600; white-space: nowrap; }
+.ti-bar .track { height: 32px; border-radius: 10px; overflow: hidden; display: flex; background: var(--stage-line); }
+.ti-bar .track i { height: 100%; transform-origin: left; }
+.ti-bar .n { text-align: right; font-variant-numeric: tabular-nums; color: var(--stage-muted); }
+.h1c { background: #f2d37e; } .h2c { background: var(--game-gold); } .h3c { background: var(--high-sea); }
+.ti-key { display: flex; gap: 22px; margin-top: 14px; font-size: 22px; color: var(--stage-muted); }
+.ti-key span { display: flex; gap: 10px; align-items: center; } .ti-key i { width: 20px; height: 20px; border-radius: 6px; }
+.ti-note { margin-top: 18px; padding: 16px 20px; border-radius: 18px; background: var(--stage-card); font-size: 24px; color: var(--stage-muted); }
+.ti-note b { color: var(--stage-ink); }
+.mk-demo { margin-left: 8px; font-size: 12px; border: 1px solid var(--navy); color: var(--navy); background: #fff; border-radius: 999px; padding: 3px 10px; min-height: 28px; }
+</style>
+</head>
+<body>
+<script src="games.js"></script>
+<script>
+// ── Content: invented clues for "The Lantern House" ──────────────
+// Grid from the seeded generator: 10×10, 8 directions, 9 answers + 3 decoys,
+// leftover letters spell the hidden message exactly, every term appears once.
+const N = 10;
+const ROWS = ['PLMETAPHOR', 'AROTHFSEHE', 'ROOBIIUOLC', 'ASETMRXOEI', 'DMOIAYBEMH', 'OMLEMRSBET', 'XENOERRSEO', 'VORPERYAHG', 'TOYNORIANN', 'NHYNNACNUD'];
+const PLACE = [
+  { w: 'HYPERBOLE', x: 1, y: 9, dx: 1, dy: -1 }, { w: 'NARRATOR', x: 8, y: 8, dx: -1, dy: -1 }, { w: 'OXYMORON', x: 7, y: 2, dx: -1, dy: 1 },
+  { w: 'METAPHOR', x: 2, y: 0, dx: 1, dy: 0, decoy: true }, { w: 'UNCANNY', x: 8, y: 9, dx: -1, dy: 0 }, { w: 'PARADOX', x: 0, y: 0, dx: 0, dy: 1, decoy: true },
+  { w: 'GOTHIC', x: 9, y: 7, dx: 0, dy: -1 }, { w: 'SIMILE', x: 6, y: 1, dx: -1, dy: 1 }, { w: 'SYMBOL', x: 6, y: 5, dx: -1, dy: -1, decoy: true },
+  { w: 'IRONY', x: 6, y: 8, dx: -1, dy: 0 }, { w: 'MOTIF', x: 1, y: 5, dx: 1, dy: -1 }, { w: 'TONE', x: 0, y: 8, dx: 1, dy: -1 }
+];
+PLACE.forEach((p) => { p.cells = [...p.w].map((_, i) => (p.y + p.dy * i) * N + p.x + p.dx * i); });
+const CLUES = [
+  { a: 'SIMILE', type: 'Example', q: '“The fog crept in like a slow grey tide.”', decoy: 'METAPHOR', diff: .3 },
+  { a: 'HYPERBOLE', type: 'Example', q: 'Tobin swore the frost had sat on that roof for a thousand years.', diff: .3 },
+  { a: 'OXYMORON', type: 'Example', q: '“Doctor Hask smiled with a gentle cruelty.”', decoy: 'PARADOX', diff: .5 },
+  { a: 'MOTIF', type: 'Example', q: 'Moths gather at the glass in every chapter, always just before someone lies.', decoy: 'SYMBOL', diff: .55 },
+  { a: 'UNCANNY', type: 'Example', q: 'Mira finds a letter in her own handwriting that she never wrote.', diff: .45 },
+  { a: 'IRONY', type: 'Example', q: 'Mira lights every lamp in the village, yet cannot find her own way home.', diff: .35 },
+  { a: 'NARRATOR', type: 'Example', q: '“I should tell you now that I did not see it myself.” The one speaking is the …', diff: .15 },
+  { a: 'GOTHIC', type: 'Example', q: 'A locked wing, a stair that groans at night, a secret no one names. The genre is …', diff: .1 },
+  { a: 'TONE', type: 'Definition', q: 'The attitude a writer takes, carried by word choice. Here: quiet dread.', diff: .4 }
+];
+CLUES.forEach((c, i) => { c.i = i; c.p = PLACE.find((p) => p.w === c.a); });
+const MSG = ['THE HOUSE', 'REMEMBERS', 'EVERY HAND'];
+const USED = new Set(PLACE.flatMap((p) => p.cells));
+const LEFT = [...Array(N * N).keys()].filter((k) => !USED.has(k));
+const FINAL = { q: 'Which technique is this line using?', opts: ['Personification', 'Metaphor', 'Pathetic fallacy', 'Symbolism'], right: 0, why: 'The house is given a human power: it remembers. That is personification. It is not pathetic fallacy, which ties weather or nature to a mood.' };
+const INK = ['#376fb7', '#3d9a6a', '#d27a36', '#8c6bc0', '#c0504c', '#2f8f8f', '#b8862b', '#5b8fd6', '#a0527e'];
+const KEYS = ['k1', 'k2', 'k3', 'k4'], LET = ['A', 'B', 'C', 'D'];
+const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+const D = (ms) => (GM.calm() ? 1 : ms);
+const ord = (n) => n + (['st', 'nd', 'rd'][((n + 90) % 100 - 10) % 10 - 1] || 'th');
+const toast = (html, kind) => GM.toast(phone, `<span>${html}</span>`, kind);
+
+let S;
+function fresh() {
+  S = { found: {}, hints: {}, decoyHits: [], act: 0, anchor: null, t: 0, paused: false, view: 'race', stage: 'play', done: null, final: null, firsts: {}, feed: [], race: {} };
+  GM.class.forEach((c) => S.race[c] = { found: [], hints: {}, decoys: [], msg: null, done: null });
+}
+const { board, phone } = GM.scaffold({
+  title: '<b>Find-a-word race</b> · The Lantern House',
+  note: '<b>How to use:</b> you are JW on the phone. There is no word list: read a clue, then drag across the letters (mouse or touch; or tap the first and last letter). Some real terms in the grid are <b>decoys</b>. Find all nine and the leftover letters spell a hidden line, then answer one last question. The board shows the class race; the other 23 are simulated. <b>End race</b> on the board gives the podium and the teacher view. <button class="mk-demo" id="demo">Demo: find all but one</button>',
+  onRestart: start
+});
+
+// ── Phone: play ──────────────────────────────────
+function buildPhone() {
+  phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av">${GM.me}</span>JW</span><span class="ph-score"><b class="fw-n">0</b> / ${CLUES.length} found</span></div>
+    <div class="ph-body">
+      <div class="fw-card"></div>
+      <div class="fw-wrap"><div class="fw-grid">${ROWS.join('').split('').map((ch, k) => `<span class="fw-c ${LEFT.includes(k) ? 'left' : ''}" data-k="${k}">${ch}</span>`).join('')}</div><svg class="fw-svg" viewBox="0 0 350 350" aria-hidden="true"></svg><div class="fw-band"></div></div>
+      <div class="fw-list"></div>
+    </div>
+    <div class="ph-dock"><div class="fw-acts"><button class="pbtn" data-p="all">Any clue</button><button class="pbtn fw-hint" data-p="hint"></button></div></div>`;
+  bindDrag(GM.$('.fw-wrap', phone));
+  PLACE.forEach((p) => { const c = CLUES.find((x) => x.a === p.w); if (c && S.found[c.i]) loop(p, INK[c.i], true); });
+  paint();
+}
+function paint() {
+  const c = S.act != null ? CLUES[S.act] : null, h = c ? S.hints[c.i] || 0 : 0;
+  const card = GM.$('.fw-card', phone);
+  card.classList.toggle('all', !c);
+  card.innerHTML = c ? `<b>Clue ${c.i + 1} · ${c.type}</b><span class="q">${c.q}</span>${h ? `<span class="hints"><span>Starts with ${c.a[0]}</span>${h > 1 ? `<span>${c.a.length} letters</span>` : ''}${h > 2 ? '<span>It sits in the orange line</span>' : ''}</span>` : ''}`
+    : '<b style="color:var(--muted)">Any clue</b><span class="q">Drag across any term you can see. It is checked against every clue you have left.</span>';
+  GM.$$('.fw-c', phone).forEach((n) => n.classList.remove('line'));
+  if (c && h > 2) lineCells(c.p).forEach((k) => GM.$(`.fw-c[data-k="${k}"]`, phone).classList.add('line'));
+  GM.$('.fw-list', phone).innerHTML = CLUES.map((x) => { const f = S.found[x.i]; return `<button class="fw-clue ${x.i === S.act ? 'act' : ''} ${f ? 'done' : ''}" data-c="${x.i}"><span class="num">${x.i + 1}</span><span><span class="fw-type ${x.type === 'Definition' ? 'def' : ''}">${x.type}</span>${x.q}${f ? `<br><span class="word" style="background:${INK[x.i]}">${x.a}</span>` : ''}</span>${f ? '<span class="tick" aria-label="Found">✓</span>' : '<span></span>'}</button>`; }).join('');
+  const hb = GM.$('.fw-hint', phone);
+  hb.innerHTML = !c ? '<span>Hint</span><small>Pick a clue first</small>' : `<span>Hint <span class="fw-dots">${[0, 1, 2].map((k) => `<i class="${k < h ? 'on' : ''}"></i>`).join('')}</span></span><small>${h >= 3 ? 'No more hints' : `Next: ${['first letter', 'length', 'its line'][h]}`}</small>`;
+  hb.disabled = !c || h >= 3;
+  GM.$('[data-p="all"]', phone).setAttribute('aria-pressed', String(S.act == null));
+  GM.$('[data-p="all"]', phone).classList.toggle('sel', S.act == null);
+  GM.$('.fw-n', phone).textContent = Object.keys(S.found).length;
+}
+function lineCells(p) {
+  // the whole row, column or diagonal the word sits in
+  let x = p.x, y = p.y; while (x - p.dx >= 0 && x - p.dx < N && y - p.dy >= 0 && y - p.dy < N) { x -= p.dx; y -= p.dy; }
+  const out = []; while (x >= 0 && x < N && y >= 0 && y < N) { out.push(y * N + x); x += p.dx; y += p.dy; }
+  return out;
+}
+
+// Drag to select: pointer events, snaps to 8 directions, rubber-bands under the finger
+const PITCH = 35;
+function bindDrag(wrap) {
+  const band = wrap.querySelector('.fw-band');
+  let st = null;
+  const cellAt = (ev) => { const r = wrap.getBoundingClientRect(), s = r.width / 350; return { x: Math.max(0, Math.min(N - 1, Math.floor((ev.clientX - r.left) / s / PITCH))), y: Math.max(0, Math.min(N - 1, Math.floor((ev.clientY - r.top) / s / PITCH))) }; };
+  const snap = (a, b) => {
+    const dx = b.x - a.x, dy = b.y - a.y; if (!dx && !dy) return { dx: 0, dy: 0, len: 0 };
+    const ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)), ux = Math.round(Math.cos(ang * Math.PI / 4)), uy = Math.round(Math.sin(ang * Math.PI / 4));
+    let len = Math.max(Math.abs(dx), Math.abs(dy));
+    while (len > 0 && (a.x + ux * len < 0 || a.x + ux * len >= N || a.y + uy * len < 0 || a.y + uy * len >= N)) len--;
+    return { dx: ux, dy: uy, len };
+  };
+  const draw = (a, sn) => {
+    const h = 30, L = sn.len * PITCH * (sn.dx && sn.dy ? Math.SQRT2 : 1);
+    band.style.width = `${L + h}px`; band.style.height = `${h}px`;
+    band.style.transform = `translate(${a.x * PITCH + PITCH / 2 - h / 2}px, ${a.y * PITCH + PITCH / 2 - h / 2}px) rotate(${Math.atan2(sn.dy, sn.dx)}rad)`;
+  };
+  wrap.addEventListener('pointerdown', (ev) => {
+    if (S.paused || S.stage !== 'play') return;
+    ev.preventDefault(); wrap.setPointerCapture(ev.pointerId);
+    const a = cellAt(ev); st = { a, sn: { dx: 0, dy: 0, len: 0 }, moved: false };
+    band.className = 'fw-band on'; draw(a, st.sn);
+  });
+  wrap.addEventListener('pointermove', (ev) => {
+    if (!st) return; const sn = snap(st.a, cellAt(ev));
+    if (sn.len !== st.sn.len || sn.dx !== st.sn.dx || sn.dy !== st.sn.dy) { if (sn.len) GM.sound.click(); st.sn = sn; st.moved = st.moved || sn.len > 0; draw(st.a, sn); }
+  });
+  const up = () => {
+    if (!st) return; const { a, sn, moved } = st; st = null;
+    if (!moved || !sn.len) {
+      // tap-tap selection: first tap anchors, second tap finishes
+      const k = a.y * N + a.x;
+      if (S.anchor == null) { S.anchor = k; band.className = 'fw-band'; GM.$(`.fw-c[data-k="${k}"]`, phone).classList.add('anchor'); return; }
+      const b = { x: S.anchor % N, y: Math.floor(S.anchor / N) };
+      GM.$$('.fw-c.anchor', phone).forEach((n) => n.classList.remove('anchor'));
+      S.anchor = null; const s2 = snap(b, a);
+      if (!s2.len) { band.className = 'fw-band'; return; }
+      draw(b, s2); band.className = 'fw-band on'; judge(b, s2, band); return;
+    }
+    GM.$$('.fw-c.anchor', phone).forEach((n) => n.classList.remove('anchor')); S.anchor = null;
+    judge(a, sn, band);
+  };
+  wrap.addEventListener('pointerup', up); wrap.addEventListener('pointercancel', up);
+}
+async function judge(a, sn, band) {
+  const cells = Array.from({ length: sn.len + 1 }, (_, i) => (a.y + sn.dy * i) * N + a.x + sn.dx * i);
+  const same = (p) => p.cells.length === cells.length && (p.cells.every((k, i) => k === cells[i]) || p.cells.every((k, i) => k === cells[cells.length - 1 - i]));
+  const p = PLACE.find(same);
+  const fade = () => band.animate([{ opacity: 1 }, { opacity: 0 }], { duration: D(260), fill: 'forwards' }).finished.then(() => { band.className = 'fw-band'; band.getAnimations().forEach((x) => x.cancel()); });
+  const shake = () => { band.classList.add('bad'); band.animate([{ translate: '0 0' }, { translate: '-6px 0' }, { translate: '7px 0' }, { translate: '-4px 0' }, { translate: '0 0' }], { duration: D(420) }); GM.sound.wrong(); };
+  if (!p) { band.classList.add('miss'); await GM.sleep(220); fade(); return; }
+  const act = S.act != null ? CLUES[S.act] : null;
+  const clueFor = CLUES.find((c) => c.a === p.w);
+  if (clueFor && S.found[clueFor.i]) { toast('Already found'); fade(); return; }
+  if (act && act.a === p.w || !act && clueFor) { band.className = 'fw-band'; await found(clueFor); return; }
+  // a real term in the grid, but the wrong one for this clue: a decoy hit
+  shake();
+  S.decoyHits.push({ clue: act ? act.i : null, picked: p.w });
+  S.race[GM.me].decoys.push({ clue: act ? act.i : CLUES.findIndex((c) => c.decoy === p.w), picked: p.w }); bumpDecoys();
+  toast(act ? `That’s a real word in here, but not this one<small>${p.w} is in the grid. Read the clue again.</small>` : `That’s a real word in here, but no clue wants it<small>${p.w} is a decoy.</small>`, 'bad');
+  await GM.sleep(500); fade();
+}
+function loop(p, colour, instant) {
+  const svg = GM.$('.fw-svg', phone); if (!svg) return;
+  const c0 = p.cells[0], c1 = p.cells[p.cells.length - 1];
+  const sx = (c0 % N) * PITCH + PITCH / 2, sy = Math.floor(c0 / N) * PITCH + PITCH / 2, ex = (c1 % N) * PITCH + PITCH / 2, ey = Math.floor(c1 / N) * PITCH + PITCH / 2;
+  const L = Math.hypot(ex - sx, ey - sy), r = 15, deg = Math.atan2(ey - sy, ex - sx) * 180 / Math.PI;
+  // a capsule drawn like a pen loop: starts a little off, overshoots where it began
+  const d = `M ${-r * .4} ${-r - 1} L ${L} ${-r + 1.5} A ${r} ${r} 0 0 1 ${L + .5} ${r} L -1 ${r - 1} A ${r} ${r} 0 0 1 ${-r * .2} ${-r - 2.5} L ${r * 1.4} ${-r - 2}`;
+  svg.insertAdjacentHTML('beforeend', `<g transform="translate(${sx} ${sy}) rotate(${deg})" style="color:${colour}"><path class="fill" d="${d}" fill="currentColor" fill-opacity=".16" stroke="none"/><path class="pen" d="${d}" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${instant ? 0 : 1}"/></g>`);
+  if (instant) return;
+  const g = svg.lastElementChild;
+  g.querySelector('.pen').animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: D(620), easing: 'cubic-bezier(.5,0,.3,1)', fill: 'forwards' });
+  g.querySelector('.fill').animate([{ opacity: 0 }, { opacity: 1 }], { duration: D(400), delay: D(400), fill: 'backwards' });
+}
+async function found(c) {
+  S.found[c.i] = { t: S.t, hints: S.hints[c.i] || 0 };
+  loop(c.p, INK[c.i]); GM.sound.right();
+  c.p.cells.forEach((k, n) => GM.$(`.fw-c[data-k="${k}"]`, phone).animate([{ transform: 'none' }, { transform: 'scale(1.3)' }, { transform: 'none' }], { duration: D(380), delay: D(n * 45), easing: 'cubic-bezier(.22,1,.36,1)' }));
+  toast(`${c.a} · clue ${c.i + 1}<small>${S.hints[c.i] ? `Found with ${S.hints[c.i]} hint${S.hints[c.i] > 1 ? 's' : ''}.` : 'Found with no hints.'}</small>`, 'good');
+  const r = S.race[GM.me]; r.found.push(c.i); r.hints[c.i] = S.hints[c.i] || 0; noteFirst(c.i, GM.me); updateRace(GM.me);
+  const next = CLUES.find((x) => !S.found[x.i] && x.i > c.i) || CLUES.find((x) => !S.found[x.i]);
+  S.act = next ? next.i : null; paint();
+  if (!next) { await GM.sleep(900); reveal(); }
+}
+function hint() {
+  const c = CLUES[S.act]; if (!c) return; const h = (S.hints[c.i] || 0) + 1; if (h > 3) return;
+  S.hints[c.i] = h; GM.sound.ding(); paint();
+  if (h === 3) GM.$$('.fw-c.line', phone).forEach((n, k) => n.animate([{ opacity: .2 }, { opacity: 1 }], { duration: D(300), delay: D(k * 35), fill: 'backwards' }));
+  const pill = GM.$('.fw-card .hints span:last-child', phone);
+  pill && pill.animate([{ transform: 'scale(.6)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: D(380), easing: 'cubic-bezier(.22,1,.36,1)' });
+}
+
+// ── Phone: hidden message ────────────────────────
+async function reveal() {
+  S.stage = 'reveal';
+  const wrap = GM.$('.fw-wrap', phone); wrap.classList.add('reveal');
+  GM.sound.reveal();
+  const nodes = LEFT.map((k) => GM.$(`.fw-c[data-k="${k}"]`, phone));
+  for (const n of nodes) { n.classList.add('glow'); n.animate([{ transform: 'scale(1.5)' }, { transform: 'none' }], { duration: D(300), easing: 'cubic-bezier(.22,1,.36,1)' }); GM.sound.click(); await GM.sleep(60); }
+  await GM.sleep(500);
+  // remember where each leftover letter sits, then build the message screen and fly them in
+  const pr = phone.getBoundingClientRect(), sc = pr.width / 390;
+  const from = nodes.map((n) => { const r = n.getBoundingClientRect(); return { x: (r.left - pr.left) / sc + (r.width / sc - 30) / 2, y: (r.top - pr.top) / sc + (r.height / sc - 38) / 2, ch: n.textContent }; });
+  renderMessage(true);
+  const slots = GM.$$('.fw-msg .t', phone);
+  const flights = from.map((f, i) => {
+    const t = slots[i], r = t.getBoundingClientRect(), to = { x: (r.left - pr.left) / sc, y: (r.top - pr.top) / sc };
+    if (GM.calm()) { t.classList.remove('wait'); return Promise.resolve(); }
+    const fly = GM.h(`<span class="fw-fly">${f.ch}</span>`); phone.appendChild(fly);
+    return GM.sleep(i * 45).then(() => fly.animate([
+      { transform: `translate(${f.x}px, ${f.y}px) scale(1)` },
+      { transform: `translate(${(f.x + to.x) / 2}px, ${Math.min(f.y, to.y) - 60}px) scale(1.25) rotate(${(i % 2 ? 1 : -1) * 12}deg)`, offset: .5 },
+      { transform: `translate(${to.x}px, ${to.y}px) scale(1)` }
+    ], { duration: 820, easing: 'cubic-bezier(.5,0,.3,1)', fill: 'forwards' }).finished).then(() => { t.classList.remove('wait'); fly.remove(); if (i % 3 === 0) GM.sound.click(); });
+  });
+  await Promise.all(flights);
+  GM.sound.ding();
+  const q = GM.$('.fw-q', phone); q.classList.remove('wait'); q.animate([{ opacity: 0, transform: 'translateY(20px)' }, { opacity: 1, transform: 'none' }], { duration: D(500), easing: 'cubic-bezier(.22,1,.36,1)' });
+  GM.$('.ph-dock', phone)?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: D(400) });
+  S.stage = 'question';
+}
+function renderMessage(pending) {
+  let k = 0;
+  const msg = MSG.map((ln) => `<div class="ln">${[...ln].map((ch) => ch === ' ' ? '<span class="sp"></span>' : `<span class="t ${pending ? 'wait' : ''}">${MSG.join('').replace(/ /g, '')[k++]}</span>`).join('')}</div>`).join('');
+  const ans = S.final;
+  phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av">${GM.me}</span>JW</span><span class="ph-score">${CLUES.length} / ${CLUES.length} found</span></div>
+    <div class="ph-body"><span class="fw-msg-lbl">The hidden message</span><div class="fw-msg">${msg}</div>
+      <div class="fw-q ${pending ? 'wait' : ''}"><p class="ph-h" style="font-size:19px">${FINAL.q}</p>
+        ${FINAL.opts.map((o, i) => `<button class="pbtn ${S.pick === i ? 'sel' : ''} ${ans ? (i === FINAL.right ? 'right' : i === S.pick ? 'wrong' : 'dim') : ''}" data-o="${i}" ${ans ? 'disabled' : ''}><span class="key ${KEYS[i]}">${LET[i]}</span>${o}</button>`).join('')}
+        ${ans ? `<p class="fw-why">${FINAL.why}</p>` : ''}
+      </div></div>
+    <div class="ph-dock">${ans ? '<button class="pbtn cta" data-p="finish">See my results</button>' : `<button class="pbtn cta orange" data-p="lock" ${S.pick == null ? 'disabled' : ''}>Lock in</button>`}</div>`;
+}
+function lockFinal() {
+  const right = S.pick === FINAL.right; S.final = right ? 'right' : 'wrong';
+  S.done = S.t; const r = S.race[GM.me]; r.msg = right; r.done = S.t; updateRace(GM.me);
+  renderMessage(false);
+  right ? GM.sound.right() : GM.sound.wrong();
+  toast(right ? 'Right · personification' : 'Not this one<small>The answer is personification.</small>', right ? 'good' : 'bad');
+  if (!right) GM.$$('.pbtn.wrong', phone).forEach((n) => n.classList.add('fx-shake'));
+}
+function finishPhone(timeUp) {
+  const f = Object.values(S.found), hints = Object.values(S.hints).reduce((a, b) => a + b, 0);
+  const rank = ranked().findIndex((r) => r.c === GM.me) + 1;
+  phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av">${GM.me}</span>JW</span><span class="ph-score">${f.length} / ${CLUES.length} found</span></div>
+    <div class="ph-body"><div class="fw-fin">
+      <span class="ph-sub">${timeUp ? 'Time’s up' : 'Find-a-word done'}</span>
+      <div class="big">${timeUp ? `${f.length} / ${CLUES.length}` : fmt(S.done)}</div>
+      <p class="ph-sub">${timeUp ? 'terms found before the bell' : `You finished <b>${ord(rank)}</b> of ${GM.class.length}`}</p>
+      <div class="fw-break"><div><span>Found with no hints</span><b>${f.filter((x) => !x.hints).length}</b></div><div><span>Hints used</span><b>${hints}</b></div><div><span>Decoys circled</span><b>${S.decoyHits.length}</b></div><div class="tot"><span>Hidden message question</span><span>${S.final === 'right' ? 'Right' : S.final === 'wrong' ? 'Missed' : 'Not reached'}</span></div></div>
+      ${S.decoyHits.length ? `<p class="ph-sub" style="font-size:13px">You circled ${[...new Set(S.decoyHits.map((d) => d.picked.toLowerCase()))].join(' and ')}. Those clues come back in your organiser this week.</p>` : '<p class="ph-sub" style="font-size:13px">No decoys caught you. Nice reading of the clues.</p>'}
+    </div></div>`;
+  phone.querySelector('.fw-fin').animate([{ opacity: 0, transform: 'translateY(24px)' }, { opacity: 1, transform: 'none' }], { duration: D(500), easing: 'cubic-bezier(.22,1,.36,1)' });
+  if (!timeUp) { GM.sound.fanfare(); GM.confetti(phone); }
+}
+phone.addEventListener('click', (e) => {
+  const t = e.target.closest('button'); if (!t || S.paused) return;
+  if (t.dataset.c != null && S.stage === 'play') { S.act = +t.dataset.c; GM.sound.click(); paint(); GM.$('.fw-card', phone).animate([{ transform: 'scale(.97)' }, { transform: 'none' }], { duration: D(260), easing: 'cubic-bezier(.22,1,.36,1)' }); return; }
+  if (t.dataset.o != null && S.stage === 'question' && !S.final) { S.pick = +t.dataset.o; GM.sound.click(); renderMessage(false); return; }
+  const p = t.dataset.p;
+  if (p === 'all') { S.act = null; GM.sound.click(); paint(); }
+  if (p === 'hint') hint();
+  if (p === 'lock') lockFinal();
+  if (p === 'finish') finishPhone();
+});
+
+// ── Board: race ──────────────────────────────────
+function noteFirst(i, c) { if (S.firsts[i]) return; S.firsts[i] = c; S.feed.unshift(i); renderTicker(true); }
+function renderTicker(fresh) {
+  const tk = GM.$('.fw-ticker', board); if (!tk) return;
+  tk.innerHTML = `<span class="lbl">First to find</span>${S.feed.length ? S.feed.slice(0, 5).map((i) => `<span class="b-pill">Clue ${i + 1} <b>${S.firsts[i]}</b></span>`).join('') : '<span>Firsts appear here. Words stay hidden.</span>'}`;
+  const p = tk.querySelector('.b-pill'); if (fresh && p) p.animate([{ opacity: 0, transform: 'translateX(-30px) scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: D(500), easing: 'cubic-bezier(.22,1,.36,1)' });
+}
+const totalDecoys = () => GM.class.reduce((a, c) => a + S.race[c].decoys.length, 0);
+function bumpDecoys() {
+  const el = GM.$('.fw-head .decoys b', board); if (!el) return;
+  const was = +el.textContent.replace(/\D/g, '') || 0, now = totalDecoys(); if (was === now) return;
+  GM.countUp(el, was, now, 400);
+  el.parentElement.animate([{ transform: 'none' }, { transform: 'scale(1.08)' }, { transform: 'none' }], { duration: D(380) });
+}
+function renderRace() {
+  S.view = 'race'; clearStage();
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x fw-head">The race <span class="fw-sub"></span><span class="decoys">Decoys circled <b>${totalDecoys()}</b></span><span class="fw-clock"><small>Elapsed</small><b class="t">${fmt(S.t)}</b></span></div>
+    <div class="stage-x fw-race">${GM.class.map((c) => `<div class="fw-rc ${c === GM.me ? 'me' : ''}" data-c="${c}"><div class="who"><span class="b-avatar" style="${GM.avatarStyle(c)}">${c}</span>${c}<span class="cnt"><b>0</b> / ${CLUES.length}</span></div><div class="bar">${CLUES.map(() => '<i></i>').join('')}<span class="key" title="Hidden message">✦</span></div></div>`).join('')}</div>
+    <div class="stage-x fw-ticker"></div>
+    <div class="stage-x fw-legend"><span><i style="background:var(--game-team-1)"></i>Terms found</span><span><i style="background:var(--game-gold)"></i>Hidden message cracked</span></div>`);
+  setControls('<button class="bctl" data-a="pause">Pause</button><button class="bctl primary" data-a="end">End race</button>');
+  GM.class.forEach((c) => updateRace(c, true)); renderTicker(); subline();
+  GM.$$('.fw-rc', board).forEach((n, k) => n.animate([{ opacity: 0, transform: 'translateY(30px) scale(.95)' }, { opacity: 1, transform: 'none' }], { duration: D(500), delay: D(k * 25), easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+}
+function subline() { const el = GM.$('.fw-sub', board); if (el) el.textContent = `${GM.class.filter((c) => S.race[c].done != null).length} of ${GM.class.length} finished`; }
+function updateRace(c, quiet) {
+  if (S.view !== 'race') return;
+  const card = GM.$(`.fw-rc[data-c="${c}"]`, board); if (!card) return;
+  const r = S.race[c], n = r.found.length;
+  card.querySelector('.cnt b').textContent = n;
+  card.querySelectorAll('.bar i').forEach((s, k) => { const was = s.classList.contains('on'); s.classList.toggle('on', k < n); if (!quiet && !was && k < n) s.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: D(450), easing: 'cubic-bezier(.22,1,.36,1)' }); });
+  const key = card.querySelector('.key'), had = key.classList.contains('on'); key.classList.toggle('on', r.done != null);
+  if (r.done != null && !had) {
+    card.classList.add('done'); card.insertAdjacentHTML('beforeend', `<span class="fin">${fmt(r.done)}</span>`);
+    if (!quiet) { GM.sound.ding(); key.animate([{ transform: 'scale(0) rotate(-90deg)' }, { transform: 'scale(1.3)' }, { transform: 'none' }], { duration: D(600), easing: 'cubic-bezier(.22,1,.36,1)' }); card.animate([{ transform: 'none' }, { transform: 'scale(1.08)' }, { transform: 'none' }], { duration: D(600) }); }
+  } else if (!quiet) card.animate([{ transform: 'none' }, { transform: 'scale(1.04)' }, { transform: 'none' }], { duration: D(420), easing: 'cubic-bezier(.22,1,.36,1)' });
+  subline(); bumpDecoys();
+}
+const CONFUSE = { SIMILE: ['METAPHOR', .45], MOTIF: ['SYMBOL', .38], OXYMORON: ['PARADOX', .3], IRONY: ['UNCANNY', .12], TONE: ['GOTHIC', .1] };
+function tickSim() {
+  GM.class.forEach((c) => {
+    if (c === GM.me) return; const r = S.race[c]; if (r.done != null || GM.rand() > .11) return;
+    if (r.found.length === CLUES.length) { r.msg = GM.rand() < .72; r.done = S.t; updateRace(c); return; }
+    const left = CLUES.filter((x) => !r.found.includes(x.i)).sort((a, b) => a.diff + GM.rand() * .5 - (b.diff + GM.rand() * .5));
+    const x = left[0], cf = CONFUSE[x.a];
+    if (cf && !r.decoys.some((d) => d.clue === x.i) && GM.rand() < cf[1]) { r.decoys.push({ clue: x.i, picked: cf[0] }); bumpDecoys(); return; }
+    const roll = GM.rand(); r.hints[x.i] = roll < x.diff * .15 ? 3 : roll < x.diff * .35 ? 2 : roll < x.diff * .7 ? 1 : 0;
+    r.found.push(x.i); noteFirst(x.i, c); updateRace(c);
+  });
+}
+
+// ── Board: end + teacher view ────────────────────
+function ranked() { return GM.class.map((c) => ({ c, ...S.race[c] })).sort((a, b) => (a.done ?? 1e9) - (b.done ?? 1e9) || b.found.length - a.found.length); }
+const scoreLabel = (r) => (r.done != null ? fmt(r.done) : `${r.found.length} / ${CLUES.length} found`);
+function pairs() {
+  const m = {};
+  GM.class.forEach((c) => S.race[c].decoys.forEach((d) => { if (d.clue < 0 || d.clue == null) return; const k = `${d.clue}|${d.picked}`; (m[k] ||= { clue: CLUES[d.clue], picked: d.picked, who: new Set() }).who.add(c); }));
+  return Object.values(m).sort((a, b) => b.who.size - a.who.size);
+}
+function endRace() {
+  S.view = 'end'; clearStage();
+  const all = ranked(), [a, b, c] = all, top = pairs()[0];
+  const cracked = GM.class.filter((x) => S.race[x].done != null).length;
+  let k = 0; const letters = MSG.join('').replace(/ /g, '');
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x fw-end-h"><span class="b-eyebrow">Race over · fastest finders</span><div class="sum"><b>${cracked}</b> of ${GM.class.length} cracked the message${top ? ` · most mixed up: <b>${top.clue.a.toLowerCase()}</b> and <b>${top.picked.toLowerCase()}</b>` : ''}</div></div>
+    <div class="stage-x fw-end-msg">${MSG.map((ln, j) => [...ln].map((ch) => ch === ' ' ? '<i class="sp"></i>' : `<i>${letters[k++]}</i>`).join('') + (j < MSG.length - 1 ? '<i class="sp"></i>' : '')).join('')}</div>
+    <div class="stage-x podium" style="height:560px">${[[b, 'p2', 2], [a, 'p1', 1], [c, 'p3', 3]].map(([r, cls, n]) => `<div class="pod ${cls}"><span class="b-avatar" style="${GM.avatarStyle(r.c)}">${r.c}</span><span class="name">${r.c}</span><span class="score">${scoreLabel(r)}</span><div class="block">${n}</div></div>`).join('')}</div>
+    <div class="stage-x fw-also">${all.slice(3, 5).map((r, j) => `<div class="lb-row"><span class="rank">${j + 4}</span><span class="b-avatar" style="${GM.avatarStyle(r.c)}">${r.c}</span><span>${r.c}</span><small>${scoreLabel(r)}</small></div>`).join('')}</div>`);
+  setControls('<button class="bctl" data-a="teacher">Teacher view</button>');
+  GM.$$('.fw-end-msg i', board).forEach((n, j) => n.animate([{ opacity: 0, transform: 'translateY(-40px) rotate(-12deg)' }, { opacity: 1, transform: 'none' }], { duration: D(500), delay: D(j * 35), easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  GM.$$('.pod', board).forEach((p, j) => p.animate([{ transform: 'translateY(100%)' }, { transform: 'none' }], { duration: D(900), delay: D([1400, 2100, 1000][j]), easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  GM.$$('.fw-also .lb-row', board).forEach((p, j) => p.animate([{ opacity: 0, transform: 'translateX(-40px)' }, { opacity: 1, transform: 'none' }], { duration: D(500), delay: D(2600 + j * 150), easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  GM.sound.reveal();
+  setTimeout(() => { GM.sound.fanfare(); GM.confetti(board); }, GM.calm() ? 0 : 2300);
+  if (S.done == null && S.stage !== 'done') { S.stage = 'done'; finishPhone(true); }
+}
+function teacher() {
+  S.view = 'teacher'; clearStage();
+  const ps = pairs().slice(0, 5), n = GM.class.length;
+  const hints = CLUES.map((c) => { let h1 = 0, h2 = 0, h3 = 0; GM.class.forEach((s) => { const h = S.race[s].hints[c.i]; if (h === 1) h1++; if (h === 2) h2++; if (h === 3) h3++; }); return { c, h1, h2, h3, all: h1 + h2 + h3 }; }).sort((a, b) => b.all - a.all);
+  const max = Math.max(1, ...hints.map((h) => h.all));
+  const msgRight = GM.class.filter((c) => S.race[c].msg === true).length, msgDone = GM.class.filter((c) => S.race[c].msg != null).length;
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x ti">
+    <div><span class="ti-flag">Teacher only · not for the projector</span><h2>Decoy hits: confusion pairs</h2><p class="lede">The clue they were on, the term they circled instead, and who.</p>
+      <div class="ti-pairs">${ps.length ? ps.map((p) => `<div class="ti-pair"><span class="tm ok">${p.clue.a}</span><span class="arr">→</span><span class="tm no">${p.picked}</span><span class="who">${[...p.who].slice(0, 6).map((c) => `<span class="b-avatar" style="${GM.avatarStyle(c)}">${c}</span>`).join('')}${p.who.size > 6 ? `<span style="color:var(--stage-muted)">+${p.who.size - 6}</span>` : ''}<b>${p.who.size}</b></span></div>`).join('') : '<div class="ti-note">No decoy hits yet.</div>'}</div>
+      <div class="ti-note"><b>Projector version:</b> “Most mixed up: ${ps[0] ? `${ps[0].clue.a.toLowerCase()} and ${ps[0].picked.toLowerCase()}` : 'nothing yet'}.” No names.<br><b>Hidden message:</b> ${msgRight} of ${msgDone} named personification.</div>
+    </div>
+    <div><h2 style="margin-top:58px">Hints per clue</h2><p class="lede">Students who used each rung.</p>
+      <div class="ti-bars">${hints.map((h) => `<div class="ti-bar"><span class="nm">${h.c.a.toLowerCase()}</span><span class="track"><i class="h1c" style="width:${h.h1 / max * 100}%"></i><i class="h2c" style="width:${h.h2 / max * 100}%"></i><i class="h3c" style="width:${h.h3 / max * 100}%"></i></span><span class="n">${h.all}</span></div>`).join('')}</div>
+      <div class="ti-key"><span><i class="h1c"></i>First letter</span><span><i class="h2c"></i>Length</span><span><i class="h3c"></i>Line</span></div>
+    </div></div>`);
+  GM.$$('.ti-bar .track i', board).forEach((b, k) => b.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: D(700), delay: D(Math.floor(k / 3) * 60), easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  GM.$$('.ti-pair', board).forEach((p, k) => p.animate([{ opacity: 0, transform: 'translateX(-30px)' }, { opacity: 1, transform: 'none' }], { duration: D(450), delay: D(k * 90), easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  setControls('<button class="bctl" data-a="podium">Back to podium</button><button class="bctl primary" data-a="again">Play again</button>');
+}
+function clearStage() { board.querySelectorAll('.stage-x').forEach((n) => n.remove()); }
+function setControls(html) { board.querySelector('.board-controls')?.remove(); if (html) board.insertAdjacentHTML('beforeend', `<div class="stage-x board-controls">${html}</div>`); }
+function pause(on) {
+  S.paused = on;
+  [board, phone].forEach((h) => { h.querySelector('.gx-pause')?.remove(); if (on) { const o = GM.h('<div class="gx-pause"><div>Paused<small>Eyes up here for a moment</small></div></div>'); h.appendChild(o); o.animate([{ opacity: 0 }, { opacity: 1 }], { duration: D(300) }); } });
+  const b = board.querySelector('[data-a="pause"]'); if (b) b.textContent = on ? 'Resume' : 'Pause';
+}
+board.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return; GM.sound.click();
+  if (a === 'pause') pause(!S.paused);
+  if (a === 'end') { pause(false); endRace(); }
+  if (a === 'teacher') teacher();
+  if (a === 'podium') endRace();
+  if (a === 'again') start();
+});
+document.addEventListener('click', (e) => {
+  if (e.target.id !== 'demo' || S.view !== 'race' || S.stage !== 'play') return;
+  CLUES.forEach((c) => { if (c.i === 3 || S.found[c.i]) return; S.found[c.i] = { t: S.t, hints: S.hints[c.i] || 0 }; S.race[GM.me].found.push(c.i); S.race[GM.me].hints[c.i] = S.hints[c.i] || 0; noteFirst(c.i, GM.me); loop(c.p, INK[c.i]); });
+  S.act = 3; updateRace(GM.me); paint();
+});
+
+let clock;
+function start() {
+  clearInterval(clock); fresh(); buildPhone(); renderRace();
+  clock = setInterval(() => {
+    if (S.paused || S.view !== 'race') return;
+    S.t++; const t = GM.$('.fw-clock .t', board); if (t) t.textContent = fmt(S.t);
+    tickSim();
+  }, 1000);
+}
+start();
+</script>
+</body>
+</html>

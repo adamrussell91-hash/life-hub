@@ -14,7 +14,7 @@
   --cx-4: var(--pastel-lilac); --cx-4-ink: var(--pastel-lilac-ink);
 }
 /* Phone wall */
-.cx-wall { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.cx-wall { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .cx-tile { aspect-ratio: 1 / .92; border: 0; border-radius: 14px; background: var(--shore); color: var(--ink); font-size: var(--fs, 13px); font-weight: 700; letter-spacing: 0; text-transform: uppercase; display: grid; place-items: center; text-align: center; padding: 3px; line-height: 1.1; transition: transform .22s var(--ease-spring), background .2s, color .2s; overflow-wrap: normal; }
 .cx-tile.sel { background: var(--orca, #424860); color: #fff; transform: scale(.94); }
 .cx-row { grid-column: 1 / -1; border-radius: 14px; padding: 12px 10px; text-align: center; display: grid; gap: 2px; }
@@ -94,7 +94,7 @@ function renderPhone(flash) {
   phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av">${GM.me}</span>JW</span><span class="ph-score">${S.solved.length} / 4 groups</span></div>
     <div class="ph-body">
       ${done ? '' : '<p class="ph-sub" style="text-align:center">Make four groups of four</p>'}
-      <div class="cx-wall">${rows}${done ? '' : left.map((t) => `<button class="cx-tile ${S.sel.includes(t) ? 'sel' : ''}" data-t="${t}" style="--fs:${t.length > 10 ? 10.5 : t.length > 8 ? 11.5 : 13}px">${t}</button>`).join('')}</div>
+      <div class="cx-wall">${rows}${done ? '' : left.map((t) => `<button class="cx-tile ${S.sel.includes(t) ? 'sel' : ''}" data-t="${t}" style="--fs:${t.length > 11 ? 9.5 : t.length > 9 ? 10.5 : t.length > 7 ? 11.5 : 13}px">${t}</button>`).join('')}</div>
       ${done ? endCard() : `<div class="cx-left">Mistakes left ${[0, 1, 2, 3].map((k) => `<i class="${k >= S.miss ? 'gone' : ''}"></i>`).join('')}</div>`}
     </div>
     ${done ? '' : `<div class="ph-dock"><div class="cx-acts"><button data-p="shuffle">Shuffle</button><button data-p="clear" ${S.sel.length ? '' : 'disabled'}>Deselect</button><button class="go" data-p="submit" ${S.sel.length === 4 ? '' : 'disabled'}>Submit</button></div></div>`}`;

@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wheel — game mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="games.css">
+<style>
+/* Board: wheel */
+.wf-wheel { position: absolute; left: 80px; top: 170px; width: 640px; height: 640px; transition: opacity .45s, transform .6s var(--ease); }
+.wf-wheel svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 24px 50px rgba(0,0,0,.35)); }
+.board.wf-dim .wf-wheel { opacity: .04; transform: scale(.92); }
+.wf-ptr { transform-box: fill-box; transform-origin: 50% 0; }
+.wf-hl { animation: wfHl 1s ease-in-out 3; }
+@keyframes wfHl { 50% { opacity: .55; } }
+.wf-stamp { position: absolute; left: 50%; top: 50%; padding: 18px 36px; border-radius: 22px; background: var(--depth); color: #fff; font-size: 64px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; box-shadow: 0 0 0 6px var(--game-wrong), 0 30px 60px rgba(0,0,0,.4); transform: translate(-50%, -50%) rotate(-8deg); opacity: 0; pointer-events: none; }
+
+/* Board: side panel (letter question, solved card, explain) */
+.wf-panel { position: absolute; left: 80px; top: 140px; width: 640px; height: 690px; border-radius: 32px; padding: 30px 32px; background: var(--stage-card-hi); box-shadow: var(--stage-glow); display: none; flex-direction: column; gap: 16px; z-index: 3; }
+.wf-panel.show { display: flex; }
+.wf-panel .ring { position: absolute; right: 24px; top: 22px; width: 96px; height: 96px; }
+.wf-panel .ring span { font-size: 34px; }
+.wf-panel .ring { transition: opacity .4s; }
+.wf-panel.closed .ring { opacity: .25; }
+.wf-panel .eb { font-size: 22px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--high-sea); padding-right: 110px; display: flex; align-items: center; gap: 10px; }
+.wf-panel .eb i { width: 18px; height: 18px; border-radius: 50%; background: var(--tc); flex: none; }
+.wf-panel .q { margin: 0; font-size: 32px; font-weight: 700; line-height: 1.2; padding-right: 100px; text-wrap: balance; }
+.wf-opts { display: grid; gap: 12px; }
+.wf-opt { display: grid; grid-template-columns: 48px 1fr auto; gap: 16px; align-items: center; min-height: 72px; padding: 10px 18px; border-radius: 20px; background: var(--stage-card); box-shadow: inset 0 0 0 1px var(--stage-line); transition: transform .6s var(--ease-spring), opacity .5s, box-shadow .5s, background .5s; }
+.wf-opt .key { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-size: 24px; font-weight: 700; color: #fff; }
+.wf-opt .txt { font-size: 26px; font-weight: 600; line-height: 1.2; }
+.wf-opt .n { font-size: 24px; font-weight: 700; color: var(--stage-muted); opacity: 0; transition: opacity .4s; }
+.wf-panel.revealed .wf-opt .n { opacity: 1; }
+.wf-opt.is-right { transform: scale(1.03); background: rgba(63,174,115,.26); box-shadow: 0 0 0 4px var(--game-right), 0 0 50px rgba(63,174,115,.4); }
+.wf-opt.is-wrong { opacity: .35; transform: scale(.97); }
+.wf-dots { margin-top: auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 24px; color: var(--stage-muted); }
+.wf-dots i { width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--stage-line); transition: background .3s, transform .4s var(--ease-spring); }
+.wf-dots i.on { background: var(--tc, var(--game-gold)); box-shadow: none; transform: scale(1.15); }
+.wf-dots b { color: var(--stage-ink); margin-left: 8px; }
+.wf-split { margin-top: auto; display: grid; gap: 12px; }
+.wf-split div { display: grid; grid-template-columns: 300px 1fr 80px; gap: 14px; align-items: center; font-size: 22px; color: var(--stage-muted); }
+.wf-split div b { color: var(--stage-ink); font-size: 26px; text-align: right; font-variant-numeric: tabular-nums; }
+.wf-split .bar { height: 16px; border-radius: 16px; background: var(--stage-line); overflow: hidden; }
+.wf-split .bar i { display: block; height: 100%; border-radius: inherit; background: var(--game-right); transform-origin: left; }
+.wf-solved { flex: 1; display: grid; place-content: center; justify-items: center; text-align: center; gap: 12px; }
+.wf-solved .big { font-size: 110px; font-weight: 700; line-height: 1; letter-spacing: -.03em; color: var(--game-gold); }
+[data-board-theme="light"] .wf-solved .big { color: var(--high-sea-ink); }
+.wf-solved .who { font-size: 34px; font-weight: 700; display: flex; align-items: center; gap: 12px; }
+.wf-solved .who i { width: 24px; height: 24px; border-radius: 50%; background: var(--tc); }
+.wf-solved .bank { font-size: 60px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.wf-solved p { margin: 0; font-size: 26px; color: var(--stage-muted); max-width: 520px; }
+.wf-solved .ring { position: static; }
+
+/* Board: puzzle */
+.wf-frame { position: absolute; left: 760px; top: 150px; width: 1080px; height: 416px; padding: 20px 26px; border-radius: 28px; background: linear-gradient(160deg, #1d4a86, #10295a); box-shadow: 0 0 0 4px rgba(242,193,78,.55), 0 30px 70px rgba(0,0,0,.35); overflow: hidden; }
+[data-board-theme="light"] .wf-frame { box-shadow: 0 0 0 4px var(--game-gold), 0 20px 50px rgba(20,35,70,.18); }
+.wf-grid { display: grid; grid-template-columns: repeat(14, 66px); grid-auto-rows: 88px; gap: 8px; }
+.wf-cell { perspective: 700px; }
+.wf-cell.e { border-radius: 8px; background: rgba(255,255,255,.06); }
+.wf-cell .in { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform .7s var(--ease-spring); }
+.wf-cell .f, .wf-cell .b { position: absolute; inset: 0; border-radius: 8px; display: grid; place-items: center; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.wf-cell .f { background: #eef3fb; box-shadow: inset 0 -5px 0 rgba(10,21,54,.14); transition: background .25s, box-shadow .25s; }
+.wf-cell .b { background: #fff; color: var(--ink); font-size: 56px; font-weight: 700; transform: rotateY(180deg); box-shadow: inset 0 -5px 0 rgba(10,21,54,.1); }
+.wf-cell.lit .f { background: var(--wave); box-shadow: 0 0 30px rgba(91,143,214,.9); }
+.wf-cell.on .in { transform: rotateY(180deg); }
+.wf-sweep { position: absolute; top: -20px; bottom: -20px; left: -360px; width: 300px; background: linear-gradient(100deg, transparent, rgba(255,240,200,.55), transparent); pointer-events: none; opacity: 0; }
+.wf-cat { position: absolute; left: 760px; width: 1080px; top: 590px; display: flex; justify-content: center; }
+.wf-cat span { padding: 10px 28px; border-radius: 999px; background: var(--stage-card-hi); box-shadow: var(--stage-glow); font-size: 28px; font-weight: 700; }
+.wf-used { position: absolute; left: 760px; width: 1080px; top: 662px; display: flex; justify-content: center; gap: 3px; }
+.wf-used span { width: 37px; height: 48px; border-radius: 8px; display: grid; place-items: center; font-size: 26px; font-weight: 700; color: var(--stage-ink); background: var(--stage-card); transition: opacity .3s, background .3s; }
+.wf-used span.v { box-shadow: inset 0 -3px 0 var(--game-gold); }
+.wf-used span.hit { background: var(--game-gold); color: var(--depth); }
+.wf-used span.miss { opacity: .25; text-decoration: line-through; }
+.wf-status { position: absolute; left: 760px; width: 1080px; top: 736px; text-align: center; font-size: 30px; color: var(--stage-muted); }
+.wf-status b { color: var(--stage-ink); }
+.wf-slog { position: absolute; left: 760px; width: 1080px; top: 786px; text-align: center; font-size: 24px; color: var(--stage-muted); }
+.wf-slog b { color: var(--stage-ink); }
+
+/* Board: teams */
+.wf-teams { position: absolute; left: 80px; top: 856px; width: 1340px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+.wf-team { position: relative; padding: 14px 20px 14px 28px; border-radius: 22px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 10px; transition: box-shadow .4s, transform .4s var(--ease); }
+.wf-team::before { content: ""; position: absolute; left: 0; top: 16px; bottom: 16px; width: 7px; border-radius: 0 7px 7px 0; background: var(--tc); }
+.wf-team .nm { font-size: 28px; font-weight: 700; }
+.wf-team .cap { display: flex; align-items: center; gap: 8px; font-size: 20px; color: var(--stage-muted); }
+.wf-team .cap span { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; box-shadow: 0 0 0 3px var(--game-gold); }
+.wf-team .rd { font-size: 44px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.wf-team .bk { font-size: 22px; color: var(--stage-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.wf-team.turn { box-shadow: 0 0 0 4px var(--tc), 0 0 40px color-mix(in srgb, var(--tc) 50%, transparent); transform: translateY(-6px); }
+
+/* Board: totals, podium, insight */
+.wf-lb { position: absolute; left: 420px; right: 420px; top: 220px; }
+.wf-lb h2 { text-align: center; font-size: 44px; margin: 0 0 28px; }
+.wf-lb .lb-row { grid-template-columns: 56px 28px 1fr auto auto; }
+.wf-lb .sw { width: 28px; height: 28px; border-radius: 50%; background: var(--tc); }
+.wf-sum { position: absolute; left: 0; right: 0; top: 150px; text-align: center; font-size: 30px; color: var(--stage-muted); }
+.wf-sum b { color: var(--stage-ink); }
+.pod .b-avatar.tm { color: #fff; font-size: 48px; }
+.wf-ins { position: absolute; left: 100px; right: 100px; top: 120px; }
+.wf-ins h2 { margin: 0 0 4px; font-size: 44px; letter-spacing: -.01em; }
+.wf-ins .lede { margin: 0; font-size: 26px; color: var(--stage-muted); max-width: 1200px; }
+.wf-heat { position: absolute; left: 0; top: 196px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 44px; width: 900px; }
+.wf-heat .row { display: grid; grid-template-columns: 40px repeat(3, 1fr); gap: 8px; align-items: center; height: 46px; }
+.wf-heat .row .b-avatar { width: 38px; height: 38px; font-size: 14px; }
+.wf-heat .row i { height: 38px; border-radius: 9px; display: grid; place-items: center; font-style: normal; font-size: 21px; font-weight: 700; color: var(--depth); font-variant-numeric: tabular-nums; position: relative; }
+.wf-heat .row i.no { background: repeating-linear-gradient(135deg, var(--stage-line) 0 6px, transparent 6px 12px); color: var(--stage-muted); }
+.wf-heat .row i.out { outline: 3px dashed var(--game-wrong); outline-offset: -3px; background: var(--stage-card-hi); color: var(--stage-ink); }
+.wf-heat .row i.sample::after { content: ""; position: absolute; right: 6px; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: rgba(10,21,54,.45); }
+.wf-heat .row.hd i { background: none; height: 30px; color: var(--stage-muted); font-size: 20px; }
+.wf-side { position: absolute; left: 960px; right: 0; top: 196px; display: grid; gap: 14px; }
+.wf-side h3 { margin: 0; font-size: 28px; }
+.wf-side .card { padding: 18px 22px; border-radius: 22px; background: var(--stage-card); box-shadow: var(--stage-glow); font-size: 24px; color: var(--stage-muted); display: grid; gap: 10px; }
+.wf-side .card b { color: var(--stage-ink); }
+.wf-side .pair { display: grid; grid-template-columns: 110px 1fr 70px; gap: 12px; align-items: center; font-size: 22px; }
+.wf-side .pair .bar { height: 14px; border-radius: 14px; background: var(--stage-line); overflow: hidden; }
+.wf-side .pair .bar i { display: block; height: 100%; border-radius: inherit; }
+.wf-legend { position: absolute; left: 0; top: 800px; display: flex; gap: 18px; flex-wrap: wrap; font-size: 20px; color: var(--stage-muted); }
+.wf-legend span { display: flex; align-items: center; gap: 8px; }
+.wf-legend i { width: 22px; height: 22px; border-radius: 6px; }
+
+/* Phone */
+.wf-tp { display: inline-flex; align-items: center; gap: 8px; }
+.wf-tp i { width: 12px; height: 12px; border-radius: 50%; background: var(--tc); }
+.wf-minibox { background: linear-gradient(160deg, #1d4a86, #10295a); border-radius: 18px; padding: 12px 8px 10px; display: grid; gap: 8px; justify-items: center; }
+.wf-minibox > span { color: rgba(255,255,255,.8); font-size: 13px; font-weight: 600; }
+.wf-mini { display: grid; gap: 3px; justify-items: center; }
+.wf-mini .r { display: flex; gap: 2px; }
+.wf-mini i { width: 21px; height: 28px; border-radius: 4px; background: #c9d6ea; font-style: normal; font-weight: 700; font-size: 15px; display: grid; place-items: center; color: var(--ink); }
+.wf-mini i.sp { background: none; width: 9px; }
+.wf-mini i.on { background: #fff; }
+.wf-mini i.new { animation: wfNew .7s var(--ease-spring); }
+@keyframes wfNew { from { transform: rotateY(90deg); background: var(--wave); } }
+.wf-solve { justify-content: center; text-align: center; color: var(--navy); }
+.wf-mysolve { min-height: 48px; display: flex; align-items: center; justify-content: center; text-align: center; border-radius: 16px; background: #e3f4ea; color: var(--success); font-weight: 600; font-size: 15px; padding: 8px 14px; }
+.wf-wait { flex: 1; display: grid; place-items: center; text-align: center; gap: 8px; color: var(--muted); padding: 8px 0; }
+.wf-wait .big { font-size: 52px; font-weight: 700; color: var(--navy); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.wf-wait .mid { font-size: 22px; font-weight: 700; color: var(--navy); line-height: 1.25; }
+.wf-hold { position: relative; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; min-height: 64px; font-size: 18px; }
+.wf-hold .pw { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: rgba(10,21,54,.18); transform-origin: left; transform: scaleX(0); }
+.wf-hold span { position: relative; }
+.wf-keys { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.wf-keys button { min-height: 46px; border-radius: 12px; border: 0; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.14); font-size: 18px; font-weight: 700; color: var(--navy); }
+.wf-keys button.sel { background: var(--navy); color: #fff; }
+.wf-keys button[disabled] { opacity: .3; }
+.wf-keys.vw { grid-template-columns: repeat(5, 1fr); }
+.wf-keys.vw button { background: var(--pastel-gold); color: var(--pastel-gold-ink); box-shadow: none; }
+.wf-keys.vw button.sel { background: var(--navy); color: #fff; }
+.wf-lbl { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.wf-break { display: grid; gap: 8px; padding: 16px; border-radius: 20px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1); font-size: 15px; }
+.wf-break div { display: flex; justify-content: space-between; gap: 12px; }
+.wf-break .tot { border-top: 1px solid rgba(23,55,94,.12); padding-top: 8px; font-weight: 700; font-size: 17px; }
+.wf-meter { height: 10px; border-radius: 10px; background: rgba(23,55,94,.1); overflow: hidden; }
+.wf-meter i { display: block; height: 100%; border-radius: inherit; background: var(--success); }
+</style>
+</head>
+<body>
+<script src="games.js"></script>
+<script>
+const PUZ = [
+  { text: 'EVERY LAMP I LIT WAS A DOOR I COULD NOT CLOSE', cat: 'Quote · Mira, chapter 2', line: 'Every lamp I lit was a door I could not close.', short: 'Q1 Mira',
+    explain: { q: '“Every lamp I lit was a door I could not close.” Which technique carries the line?', opts: ['Metaphor', 'Paradox', 'Personification', 'Simile'], right: 0, lure: 1 } },
+  { text: 'THE DEAD DO NOT WANDER, CHILD. THEY WAIT.', cat: 'Quote · Old Tobin, chapter 5', line: 'The dead do not wander, child. They wait.', short: 'Q2 Tobin',
+    explain: { q: 'What does Old Tobin’s line most suggest about him?', opts: ['He is trying to comfort Mira', 'He knows more about the house than he says', 'He does not believe in ghosts', 'He is threatening Mira'], right: 1, lure: 0 } },
+  { text: 'A MIND KEPT IN THE DARK GROWS ITS OWN LIGHT', cat: 'Quote · Doctor Hask, chapter 8', line: 'A mind kept in the dark grows its own light.', short: 'Q3 Hask',
+    explain: { q: 'Why is Doctor Hask’s line unsettling in context?', opts: ['It promises his patients will recover', 'It hints that Ellis will escape', 'It dresses up keeping patients in the dark as a gift', 'It shows Hask is losing his sight'], right: 2, lure: 0 } }
+];
+const BANK = [
+  { q: '“The corridor swallowed the lamplight.” Which technique?', opts: ['Hyperbole', 'Personification', 'Simile', 'Onomatopoeia'], right: 1, lure: 0 },
+  { q: 'Mira hears the stairs creak behind her but sees no one. What does this build?', opts: ['Dramatic irony', 'Suspense', 'Comic relief', 'Resolution'], right: 1, lure: 0 },
+  { q: '“Cold as a chapel floor.” Which technique?', opts: ['Metaphor', 'Imagery', 'Simile', 'Personification'], right: 2, lure: 0 },
+  { q: 'The lanterns keep returning, dimmer each chapter. What are they?', opts: ['A symbol only once', 'A motif', 'An allegory', 'A red herring'], right: 1, lure: 2 },
+  { q: 'Mira says she fears nothing, then cannot open the cellar door. What kind of narrator does this suggest?', opts: ['Naive', 'Omniscient', 'Unreliable', 'Intrusive'], right: 2, lure: 0 },
+  { q: '“The house held its breath.” Which technique?', opts: ['Pathetic fallacy', 'Personification', 'Metaphor', 'Hyperbole'], right: 1, lure: 0 },
+  { q: 'Mira’s winter story sits inside the story of her old age. What is this?', opts: ['Flashback', 'Subplot', 'Frame narrative', 'Prologue'], right: 2, lure: 0 },
+  { q: 'Who warns Mira away from the east wing?', opts: ['Sister Agnes', 'Old Tobin', 'Doctor Hask', 'Ellis Crane'], right: 1, lure: 0 }
+];
+const SEGS = [300, 700, 400, 'B', 500, 900, 200, 600, 'L', 350, 800, 250, 1000, 450, 150, 550];
+const SEGC = ['var(--game-team-1)', 'var(--game-gold)', 'var(--game-team-2)', 'var(--depth)', 'var(--game-team-3)', 'var(--game-team-4)', 'var(--game-team-1)', 'var(--game-team-2)', 'var(--warm-white)', 'var(--game-gold)', 'var(--game-team-3)', 'var(--game-team-4)', 'var(--game-gold)', 'var(--game-team-1)', 'var(--game-team-2)', 'var(--game-team-3)'];
+const KEYS = ['k1', 'k2', 'k3', 'k4'], LET = ['A', 'B', 'C', 'D'];
+const OFFLINE = ['XN'], ORDER = [1, 2, 3, 0];
+const SA = 22.5, R = 300, DT = 1 / 120, FC = 55, FK = .6;
+const VOW = 'AEIOU', ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', VOWEL_COST = 250, SOLVE_BONUS = 500, LOCK_MS = 20000;
+const fmt = (n) => (n < 0 ? '−' : '') + Math.abs(n).toLocaleString();
+const lettersOf = (s) => [...s].filter((ch) => /[A-Z]/.test(ch));
+const normSolve = (s) => String(s || '').toUpperCase().replace(/[^A-Z]/g, '');
+const skill = Object.fromEntries(GM.class.map((c) => [c, .45 + GM.rand() * .5]));
+let S;
+
+function fresh() {
+  if (S) { S.gen++; S.cur?.timer?.stop(); S.solvedRing?.stop(); }
+  S = { gen: (S?.gen || 0) + 1, tok: 0, p: 0, theta: 0, turn: 0, simSpins: 0, bankI: 0, firstJWSpin: true, hist: [],
+    teams: GM.teams.map((t, i) => ({ ...t, members: GM.class.filter((_, k) => k % 4 === i), round: 0, total: 0, prevTotal: 0, capN: 0 })) };
+  newPuzzle();
+}
+function newPuzzle() {
+  Object.assign(S, { shown: new Set(), used: new Set(), solves: {}, locks: {}, first: null, wrong: 0, ex: {}, me: {}, solveOpen: false, pendingSolve: false, cur: null, phase: 'turn' });
+  S.teams.forEach((t) => { t.round = 0; });
+}
+const P = () => PUZ[S.p];
+const total = () => lettersOf(P().text).length;
+const shownCount = () => lettersOf(P().text).filter((ch) => S.shown.has(ch)).length;
+const allShown = () => shownCount() === total();
+const teamOf = (c) => S.teams.find((t) => t.members.includes(c));
+const myTeam = () => teamOf(GM.me);
+const spinTeam = () => S.teams[ORDER[S.turn % 4]];
+const live = (t) => t.members.filter((m) => !OFFLINE.includes(m));
+// Mockup: JW captains the Otters every turn so you can try spinning and calling; other teams rotate.
+const captainOf = (t) => t.id === 't2' ? GM.me : live(t)[t.capN % live(t).length];
+const lockLeft = (c = GM.me) => Math.max(0, Math.ceil(((S.locks[c] || 0) - Date.now()) / 1000));
+const solvePhase = () => ['turn', 'spinning', 'question', 'qclosed', 'letter', 'revealing', 'solved'].includes(S.phase);
+
+const { board, phone } = GM.scaffold({
+  title: '<b>Wheel</b> · The Lantern House',
+  note: '<b>How to use:</b> you are JW, captain of the Otters. Hold and release <b>Spin</b> on the phone, answer the letter question with your team, then call a letter. Tap <b>Solve the quote</b> on the phone at any time: a wrong guess locks it for 20 s, and the letters showing when you get it are recorded. Other teams play themselves; the board buttons are the teacher’s.',
+  onRestart: restart
+});
+
+// ── Wheel SVG ─────────────────────────────────────
+const pt = (a, r) => `${(r * Math.sin(a * Math.PI / 180)).toFixed(1)} ${(-r * Math.cos(a * Math.PI / 180)).toFixed(1)}`;
+function wheelSvg() {
+  const segs = SEGS.map((v, i) => {
+    const a0 = i * SA, a1 = a0 + SA, mid = a0 + SA / 2;
+    const ink = v === 'B' ? '#fff' : 'var(--depth)';
+    const label = v === 'B' ? 'BANKRUPT' : v === 'L' ? 'LOSE A TURN' : v;
+    const fs = typeof v === 'number' ? 40 : 22;
+    return `<path d="M0 0 L${pt(a0, R)} A${R} ${R} 0 0 1 ${pt(a1, R)} Z" fill="${SEGC[i]}" stroke="rgba(10,21,54,.35)" stroke-width="2"/>
+      <text transform="rotate(${mid}) translate(0 ${-R * .6}) rotate(-90)" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-weight="700" letter-spacing="${typeof v === 'number' ? -1 : 1}" fill="${ink}">${label}</text>`;
+  }).join('');
+  const pegs = SEGS.map((_, i) => `<circle cx="${pt(i * SA, R - 10).split(' ')[0]}" cy="${pt(i * SA, R - 10).split(' ')[1]}" r="7" fill="#fff" stroke="rgba(10,21,54,.4)" stroke-width="2"/>`).join('');
+  return `<svg viewBox="-330 -340 660 670" role="img" aria-label="Prize wheel">
+    <circle r="${R + 16}" fill="var(--depth)" stroke="var(--game-gold)" stroke-width="8"/>
+    <g class="wf-rot" transform="rotate(${S.theta})">${segs}${pegs}<g class="wf-hlg"></g></g>
+    <circle r="58" fill="var(--depth)" stroke="var(--game-gold)" stroke-width="7"/><circle r="20" fill="var(--game-gold)"/>
+    <g class="wf-ptr"><path d="M-26 ${-R - 34} L26 ${-R - 34} L0 ${-R + 22} Z" fill="var(--game-gold)" stroke="var(--depth)" stroke-width="4" stroke-linejoin="round"/></g>
+  </svg><div class="wf-stamp"></div>`;
+}
+const setRot = () => board.querySelector('.wf-rot')?.setAttribute('transform', `rotate(${S.theta.toFixed(3)})`);
+const idxAt = (theta) => Math.floor((((-theta) % 360) + 360) % 360 / SA) % 16;
+function travel(w) { let d = 0; while (w > 3) { d += w * DT; w -= (FC + FK * w) * DT; } return d; }
+// The angular speed that lands on a chosen segment, near a natural speed
+function omegaFor(target, wNear) {
+  const want = target * SA + SA / 2 + (GM.rand() - .5) * 14;
+  const base = (((-want - S.theta) % 360) + 360) % 360;
+  let d = base + 360 * Math.round((travel(wNear) - base) / 360); if (d < 500) d += 360;
+  let lo = 80, hi = 4000;
+  for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (travel(m) < d) lo = m; else hi = m; }
+  return (lo + hi) / 2;
+}
+function runSpin(w) {
+  return new Promise((done) => {
+    if (GM.calm()) { S.theta += travel(w); setRot(); done(idxAt(S.theta)); return; }
+    const ptr = board.querySelector('.wf-ptr');
+    let last = performance.now(), acc = 0, peg = Math.floor(S.theta / SA), gen = S.gen;
+    (function f(t) {
+      if (gen !== S.gen) return;
+      acc += Math.min(.05, (t - last) / 1000); last = t;
+      while (acc >= DT && w > 3) { S.theta += w * DT; w -= (FC + FK * w) * DT; acc -= DT; }
+      setRot();
+      const p = Math.floor(S.theta / SA);
+      if (p !== peg) { peg = p; GM.sound.click(); ptr.animate([{ transform: 'rotate(0)' }, { transform: `rotate(${Math.min(28, 10 + w / 60)}deg)` }, { transform: 'rotate(0)' }], { duration: Math.max(70, Math.min(240, 16000 / w)), easing: 'ease-out' }); }
+      if (w > 3) requestAnimationFrame(f); else done(idxAt(S.theta));
+    })(last);
+  });
+}
+
+// ── Board: stage ──────────────────────────────────
+function puzzleRows(text) {
+  const rows = []; let row = '';
+  text.split(' ').forEach((w) => { if (!row) row = w; else if ((row + ' ' + w).length <= 14) row += ' ' + w; else { rows.push(row); row = w; } });
+  rows.push(row); return rows;
+}
+function gridHtml() {
+  const rows = puzzleRows(P().text), start = rows.length <= 2 ? 1 : 0, cells = [];
+  for (let r = 0; r < 4; r++) {
+    const row = rows[r - start] || '', off = Math.floor((14 - row.length) / 2);
+    for (let c = 0; c < 14; c++) {
+      const ch = row[c - off];
+      if (!ch || ch === ' ') cells.push('<div class="wf-cell e"></div>');
+      else if (/[A-Z]/.test(ch)) cells.push(`<div class="wf-cell l ${S.shown.has(ch) ? 'on' : ''}" data-ch="${ch}"><div class="in"><span class="f"></span><span class="b">${ch}</span></div></div>`);
+      else cells.push(`<div class="wf-cell p on"><div class="in"><span class="f"></span><span class="b">${ch}</span></div></div>`);
+    }
+  }
+  return cells.join('');
+}
+function renderStage(intro) {
+  board.querySelectorAll('.stage-x').forEach((n) => n.remove());
+  board.classList.remove('wf-dim');
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x wf-wheel">${wheelSvg()}</div>
+    <div class="stage-x wf-panel"></div>
+    <div class="stage-x wf-frame"><div class="wf-grid">${gridHtml()}</div><div class="wf-sweep"></div></div>
+    <div class="stage-x wf-cat"><span>${P().cat}</span></div>
+    <div class="stage-x wf-used"></div><div class="stage-x wf-status"></div><div class="stage-x wf-slog"></div>
+    <div class="stage-x wf-teams"></div>`);
+  renderUsed(); renderTeams(); slog();
+  if (intro) {
+    const calm = GM.calm();
+    board.querySelector('.wf-wheel').animate([{ opacity: 0, transform: 'rotate(-120deg) scale(.6)' }, { opacity: 1, transform: 'none' }], { duration: calm ? 1 : 1100, easing: 'cubic-bezier(.22,1,.36,1)' });
+    board.querySelectorAll('.wf-cell').forEach((n, k) => n.animate([{ opacity: 0, transform: 'translateY(-30px) rotateX(70deg)' }, { opacity: 1, transform: 'none' }], { duration: calm ? 1 : 500, delay: calm ? 0 : 200 + (k % 14) * 30 + Math.floor(k / 14) * 90, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+    board.querySelectorAll('.wf-team').forEach((n, k) => n.animate([{ opacity: 0, transform: 'translateY(40px)' }, { opacity: 1, transform: 'none' }], { duration: calm ? 1 : 600, delay: calm ? 0 : 600 + k * 100, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+    if (!calm) GM.sound.whoosh();
+  }
+}
+function renderUsed() {
+  const el = board.querySelector('.wf-used'); if (!el) return;
+  const inP = new Set(lettersOf(P().text));
+  el.innerHTML = [...ALPHA].map((L) => `<span class="${VOW.includes(L) ? 'v' : ''} ${S.used.has(L) ? (inP.has(L) ? 'hit' : 'miss') : ''}">${L}</span>`).join('');
+}
+function renderTeams() {
+  const el = board.querySelector('.wf-teams'); if (!el) return;
+  const st = spinTeam(), playing = solvePhase() && S.phase !== 'solved';
+  el.innerHTML = S.teams.map((t) => `<div class="wf-team ${playing && t === st ? 'turn' : ''}" data-t="${t.id}" style="--tc:${t.colour}">
+    <span class="nm">${t.name}</span><span class="rd">${fmt(t.round)}</span>
+    <span class="cap"><span style="${GM.avatarStyle(captainOf(t))}">${captainOf(t)}</span>captain</span><span class="bk">Bank ${fmt(t.total)}</span></div>`).join('');
+}
+const status = (html) => { const el = board.querySelector('.wf-status'); if (el) el.innerHTML = html; };
+function slog() {
+  const el = board.querySelector('.wf-slog'); if (!el) return;
+  const n = Object.keys(S.solves).length, locked = Object.keys(S.locks).filter((c) => lockLeft(c) > 0).length;
+  el.innerHTML = `Private solves: <b>${n}</b> solved · <b>${S.wrong}</b> wrong guess${S.wrong === 1 ? '' : 'es'}${locked ? ` · ${locked} locked for 20 s` : ''}`;
+}
+function stamp(text) {
+  const el = board.querySelector('.wf-stamp'); if (!el) return;
+  el.textContent = text;
+  el.animate([{ opacity: 0, transform: 'translate(-50%,-50%) rotate(-8deg) scale(2.2)' }, { opacity: 1, transform: 'translate(-50%,-50%) rotate(-8deg) scale(1)', offset: .18 }, { opacity: 1, transform: 'translate(-50%,-50%) rotate(-8deg) scale(1)', offset: .8 }, { opacity: 0, transform: 'translate(-50%,-50%) rotate(-8deg) scale(.9)' }], { duration: GM.calm() ? 1600 : 2000, easing: 'cubic-bezier(.22,1,.36,1)' });
+  const card = board.querySelector(`.wf-team[data-t="${spinTeam().id}"]`); card && card.classList.add('fx-shake');
+}
+function highlight(idx) {
+  const g = board.querySelector('.wf-hlg'); if (!g) return;
+  g.innerHTML = `<path class="wf-hl" d="M0 0 L${pt(idx * SA, R)} A${R} ${R} 0 0 1 ${pt(idx * SA + SA, R)} Z" fill="#fff" opacity="0"/>`;
+}
+function sweep() {
+  const s = board.querySelector('.wf-sweep'); if (!s || GM.calm()) return;
+  s.animate([{ opacity: 1, transform: 'translateX(0)' }, { opacity: 1, transform: 'translateX(1500px)' }], { duration: 1100, easing: 'cubic-bezier(.5,0,.3,1)' });
+}
+function panel(html, cls = '') {
+  const p = board.querySelector('.wf-panel');
+  p.className = `stage-x wf-panel show ${cls}`; p.innerHTML = html;
+  board.classList.add('wf-dim');
+  p.animate([{ opacity: 0, transform: 'translateX(-40px) scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: GM.calm() ? 150 : 520, easing: 'cubic-bezier(.22,1,.36,1)' });
+  return p;
+}
+function hidePanel() { const p = board.querySelector('.wf-panel'); if (p) { p.className = 'stage-x wf-panel'; p.innerHTML = ''; } board.classList.remove('wf-dim'); }
+function setControls(html) {
+  board.querySelector('.board-controls')?.remove();
+  if (html) board.insertAdjacentHTML('beforeend', `<div class="stage-x board-controls">${html}</div>`);
+}
+
+// ── Turn flow ─────────────────────────────────────
+function startTurn() {
+  if (S.pendingSolve) { S.pendingSolve = false; return solvedMoment(); }
+  S.phase = 'turn'; S.cur = null; const tok = ++S.tok, t = spinTeam(), cap = captainOf(t);
+  hidePanel(); renderTeams();
+  status(`<b>${t.name}</b> to spin · captain <b>${cap}</b> ${cap === GM.me ? 'holds and releases on their phone' : 'is about to spin'}`);
+  setControls(`<button class="bctl" data-a="end">Final scores</button><button class="bctl primary" data-a="spin">Spin</button>`);
+  renderPhone();
+  if (cap !== GM.me) setTimeout(() => { if (tok === S.tok && S.phase === 'turn') simSpin(); }, GM.calm() ? 500 : 1900);
+}
+function nextTurn() { spinTeam().capN++; S.turn++; startTurn(); }
+const PLAN = ['v', 'v', 'L', 'v', 'B', 'v', 'v', 'v', 'B', 'v', 'L', 'v'];
+function simSpin() {
+  let o = PLAN[S.simSpins++ % PLAN.length];
+  if (o === 'B' && spinTeam().round === 0) o = 'v';
+  const target = o === 'B' ? 3 : o === 'L' ? 8 : GM.pick(SEGS.map((v, i) => typeof v === 'number' ? i : -1).filter((i) => i >= 0));
+  doSpin(omegaFor(target, 900 + GM.rand() * 500));
+}
+function jwSpin(power) {
+  if (S.phase !== 'turn' || captainOf(spinTeam()) !== GM.me) return;
+  let w = 700 + power * 800;
+  const nat = idxAt(S.theta + travel(w));
+  if (S.firstJWSpin && typeof SEGS[nat] !== 'number') w = omegaFor((nat + 1) % 16, w);
+  S.firstJWSpin = false;
+  doSpin(w);
+}
+async function doSpin(w) {
+  const t = spinTeam(), gen = S.gen; S.tok++;
+  S.phase = 'spinning'; setControls(''); hidePanel();
+  board.querySelector('.wf-hlg').innerHTML = '';
+  status(`<b>${t.name}</b> are spinning…`); renderPhone(); GM.sound.whoosh();
+  const idx = await runSpin(w); if (gen !== S.gen) return;
+  landed(idx);
+}
+async function landed(idx) {
+  const t = spinTeam(), seg = SEGS[idx], gen = S.gen;
+  highlight(idx);
+  if (seg === 'B' || seg === 'L') {
+    GM.sound.buzz();
+    if (seg === 'B') { const lost = t.round; t.round = 0; stamp('Bankrupt'); status(`<b>${t.name}</b> lose ${fmt(lost)} round points`); }
+    else { stamp('Lose a turn'); status(`<b>${t.name}</b> lose their turn`); }
+    S.phase = 'revealing'; renderTeams(); renderPhone();
+    await GM.sleep(2100); if (gen !== S.gen) return;
+    if (S.pendingSolve) { S.pendingSolve = false; return solvedMoment(); }
+    return nextTurn();
+  }
+  S.val = seg; GM.sound.ding();
+  status(`<b>${seg}</b> a letter · ${t.name} answer to earn it`);
+  await GM.sleep(1200); if (gen !== S.gen) return;
+  if (S.pendingSolve) { S.pendingSolve = false; return solvedMoment(); }
+  askLetterQ();
+}
+
+// Earn the letter: a question for the spinning team
+function askLetterQ() {
+  const t = spinTeam(), q = BANK[S.bankI++ % BANK.length], gen = S.gen, tok = ++S.tok;
+  S.cur = { kind: 'letter', q, answers: {}, team: t };
+  S.phase = 'question'; S.me = {};
+  const p = panel(`<span class="eb" style="--tc:${t.colour}"><i></i>Earn the letter · ${t.name} answer</span><div class="ring-slot"></div>
+    <p class="q">${q.q}</p>
+    <div class="wf-opts">${q.opts.map((o, k) => `<div class="wf-opt"><span class="key ${KEYS[k]}">${LET[k]}</span><span class="txt">${o}</span><span class="n"></span></div>`).join('')}</div>
+    <div class="wf-dots" style="--tc:${t.colour}">${live(t).map((m) => `<i data-c="${m}"></i>`).join('')}<span>Half right earns a ${S.val} letter</span></div>`);
+  fadeIn(p.querySelectorAll('.wf-opt'));
+  S.cur.timer = GM.ring(p.querySelector('.ring-slot'), 15, { onEnd: closeQ, bar: () => phone.querySelector('.ph-timer i') });
+  setControls(`<button class="bctl primary" data-a="closeq">Close answers</button>`);
+  renderTeams(); renderPhone();
+  live(t).filter((m) => m !== GM.me).forEach((m) => setTimeout(() => {
+    if (gen !== S.gen || tok !== S.tok || S.phase !== 'question') return;
+    const right = GM.rand() < skill[m] + .05;
+    qAnswered(m, right ? q.right : GM.rand() < .7 ? q.lure : GM.pick([0, 1, 2, 3].filter((k) => k !== q.right)));
+  }, GM.calm() ? 200 + GM.rand() * 600 : 1200 + GM.rand() * 5000));
+}
+function fadeIn(nodes) { nodes.forEach((n, k) => n.animate([{ opacity: 0, transform: 'translateY(20px)' }, { opacity: 1, transform: 'none' }], { duration: GM.calm() ? 1 : 480, delay: GM.calm() ? 0 : 80 * k, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' })); }
+function qAnswered(c, ans) {
+  const cur = S.cur; if (!cur || cur.answers[c] != null) return;
+  cur.answers[c] = ans;
+  board.querySelector(`.wf-dots i[data-c="${c}"]`)?.classList.add('on');
+  const pool = cur.kind === 'letter' ? live(cur.team) : GM.class.filter((m) => !OFFLINE.includes(m));
+  const cnt = board.querySelector('.wf-dots b'); if (cnt) cnt.textContent = `${Object.keys(cur.answers).length} of ${pool.length}`;
+  if (pool.every((m) => cur.answers[m] != null)) setTimeout(() => { if (S.cur === cur) (cur.kind === 'letter' ? closeQ : closeExplain)(); }, 600);
+}
+function markOpts(q, answers) {
+  const p = board.querySelector('.wf-panel'); p.classList.add('revealed');
+  const counts = [0, 0, 0, 0]; Object.values(answers).forEach((a) => { if (a >= 0) counts[a]++; });
+  p.querySelectorAll('.wf-opt').forEach((n, k) => { n.classList.add(k === q.right ? 'is-right' : 'is-wrong'); n.querySelector('.n').textContent = counts[k]; });
+}
+async function closeQ() {
+  const cur = S.cur, gen = S.gen; if (!cur || S.phase !== 'question') return;
+  S.phase = 'qclosed'; cur.timer.stop(); setControls('');
+  board.querySelector('.wf-panel')?.classList.add('closed');
+  const t = cur.team, n = live(t).length, r = live(t).filter((m) => cur.answers[m] === cur.q.right).length;
+  markOpts(cur.q, cur.answers);
+  cur.ok = r >= n / 2; cur.r = r; cur.n = n;
+  (cur.ok ? GM.sound.right : GM.sound.wrong)();
+  status(cur.ok ? `<b>${r} of ${n}</b> right · ${t.name} earn a letter` : `Only <b>${r} of ${n}</b> right · no letter this time`);
+  renderPhone();
+  await GM.sleep(1700); if (gen !== S.gen || S.cur !== cur) return;
+  if (S.pendingSolve) { S.pendingSolve = false; return solvedMoment(); }
+  if (cur.ok) askLetter(); else nextTurn();
+}
+function askLetter() {
+  const t = spinTeam(), cap = captainOf(t), tok = ++S.tok;
+  S.phase = 'letter'; S.me.letter = null; hidePanel();
+  status(`<b>${t.name}</b> earned it · captain <b>${cap}</b> is calling a letter`);
+  renderPhone();
+  if (cap !== GM.me) setTimeout(() => { if (tok === S.tok && S.phase === 'letter') callLetter(simLetter(t)); }, GM.calm() ? 400 : 1600);
+}
+function simLetter(t) {
+  const inP = lettersOf(P().text).filter((ch) => !S.used.has(ch));
+  const cons = inP.filter((ch) => !VOW.includes(ch)), vows = inP.filter((ch) => VOW.includes(ch));
+  if (vows.length && t.round >= VOWEL_COST && GM.rand() < .3) return GM.pick(vows);
+  if (cons.length && GM.rand() < .78) return GM.pick(cons);
+  return GM.pick([...ALPHA].filter((L) => !VOW.includes(L) && !S.used.has(L)));
+}
+async function callLetter(L) {
+  if (S.phase !== 'letter' || !L || S.used.has(L)) return;
+  const t = spinTeam(), gen = S.gen, vowel = VOW.includes(L);
+  S.phase = 'revealing'; S.used.add(L); S.shown.add(L);
+  if (vowel) t.round -= VOWEL_COST;
+  renderUsed(); renderTeams();
+  const cells = [...board.querySelectorAll(`.wf-cell.l[data-ch="${L}"]:not(.on)`)];
+  status(`${vowel ? 'Bought' : 'Called'} <b>${L}</b> · ${cells.length ? `${cells.length} on the board` : 'not in this quote'}`);
+  renderPhone();
+  if (!cells.length) {
+    GM.sound.buzz(); await GM.sleep(1500); if (gen !== S.gen) return;
+    if (S.pendingSolve) { S.pendingSolve = false; return solvedMoment(); }
+    return nextTurn();
+  }
+  for (const c of cells) {
+    c.classList.add('lit'); GM.sound.ding();
+    await GM.sleep(380); if (gen !== S.gen) return;
+    c.classList.add('on'); c.classList.remove('lit');
+  }
+  if (!vowel) { const won = cells.length * S.val; t.round += won; status(`<b>${L}</b> × ${cells.length} · ${t.name} +${fmt(won)}`); GM.sound.coin(); }
+  renderTeams(); renderPhone();
+  await GM.sleep(1300); if (gen !== S.gen) return;
+  if (S.pendingSolve) { S.pendingSolve = false; return solvedMoment(); }
+  if (allShown()) { S.phase = 'solved'; return revealPuzzle(); }
+  startTurn(); // a letter on the board: same team spins again
+}
+
+// ── Solving ───────────────────────────────────────
+function recordSolve(c) {
+  if (S.solves[c] || !solvePhase()) return;
+  S.solves[c] = { shown: shownCount(), total: total() };
+  slog();
+  if (!S.first) {
+    S.first = c;
+    if (['spinning', 'revealing', 'qclosed'].includes(S.phase)) S.pendingSolve = true; else solvedMoment();
+  }
+}
+function solvedMoment() {
+  const t = teamOf(S.first), bank = Math.max(0, t.round) + SOLVE_BONUS;
+  S.tok++; S.cur?.timer?.stop(); S.cur = null;
+  S.phase = 'solved'; S.bank = { t, bank };
+  t.total += bank; S.teams.forEach((x) => { x.round = 0; });
+  renderTeams(); sweep(); GM.sound.fanfare();
+  const p = panel(`<div class="wf-solved" style="--tc:${t.colour}"><span class="big">Solved</span>
+    <span class="who"><i></i>by ${/^[AEIOU]/.test(t.name) ? 'an' : 'a'} ${t.name} player</span>
+    <span class="bank">+<span class="bv">0</span> banked</span>
+    <p>Round points plus ${SOLVE_BONUS} for the solve. Everyone else has 10 s to solve it for their own record.</p><div class="ring-slot"></div></div>`);
+  GM.countUp(p.querySelector('.bv'), 0, bank, 1000);
+  p.querySelector('.big').animate([{ transform: 'scale(.5)', opacity: 0 }, { transform: 'scale(1.08)', opacity: 1, offset: .6 }, { transform: 'none' }], { duration: GM.calm() ? 1 : 700, easing: 'cubic-bezier(.22,1,.36,1)' });
+  S.solvedRing = GM.ring(p.querySelector('.ring-slot'), 10, { onEnd: revealPuzzle, bar: () => phone.querySelector('.ph-timer i') });
+  status(`The quote stays hidden until the reveal`);
+  setControls(`<button class="bctl primary" data-a="revealp">Reveal now</button>`);
+  renderPhone();
+  // a wave of classmates solving in the last seconds
+  const gen = S.gen;
+  GM.shuffle(GM.class.filter((c) => c !== GM.me && !OFFLINE.includes(c) && !S.solves[c])).slice(0, 9).forEach((c, k) => setTimeout(() => {
+    if (gen !== S.gen || S.phase !== 'solved') return;
+    if (GM.rand() < Math.min(.9, (shownCount() / total() + .25) * (skill[c] + .2))) recordSolve(c); else { S.locks[c] = Date.now() + LOCK_MS; S.wrong++; slog(); }
+  }, GM.calm() ? 100 + k * 80 : 900 + k * 900));
+}
+async function revealPuzzle() {
+  if (S.phase !== 'solved') return;
+  S.phase = 'revealed'; S.solvedRing?.stop(); setControls('');
+  const gen = S.gen;
+  lettersOf(P().text).forEach((ch) => S.shown.add(ch));
+  sweep(); GM.sound.reveal();
+  const cells = [...board.querySelectorAll('.wf-cell.l:not(.on)')];
+  cells.forEach((c, k) => setTimeout(() => c.classList.add('on'), GM.calm() ? 0 : k * 45));
+  status(`“${P().line}” · ${P().cat.replace('Quote · ', '')}`);
+  renderPhone();
+  await GM.sleep(900 + cells.length * 45); if (gen !== S.gen) return;
+  hidePanel();
+  setControls(`<button class="bctl primary" data-a="explain">Explain question</button>`);
+}
+
+// ── Explain: everyone answers ─────────────────────
+function askExplain() {
+  const q = P().explain, gen = S.gen, all = GM.class.filter((m) => !OFFLINE.includes(m));
+  S.cur = { kind: 'explain', q, answers: {} };
+  S.phase = 'explain'; S.me = {};
+  const p = panel(`<span class="eb">Explain · everyone answers</span><div class="ring-slot"></div>
+    <p class="q">${q.q}</p>
+    <div class="wf-opts">${q.opts.map((o, k) => `<div class="wf-opt"><span class="key ${KEYS[k]}">${LET[k]}</span><span class="txt">${o}</span><span class="n"></span></div>`).join('')}</div>
+    <div class="wf-dots">${all.map((m) => `<i data-c="${m}"></i>`).join('')}<b>0 of ${all.length}</b></div>`);
+  fadeIn(p.querySelectorAll('.wf-opt'));
+  S.cur.timer = GM.ring(p.querySelector('.ring-slot'), 20, { onEnd: closeExplain, bar: () => phone.querySelector('.ph-timer i') });
+  setControls(`<button class="bctl primary" data-a="closeex">Close answers</button>`);
+  status('Answer on your phone');
+  renderPhone();
+  all.filter((m) => m !== GM.me).forEach((m) => setTimeout(() => {
+    if (gen !== S.gen || S.phase !== 'explain') return;
+    const sv = S.solves[m], early = sv && sv.shown / sv.total < .5;
+    const right = GM.rand() < (early ? .84 : sv ? .66 : .48);
+    qAnswered(m, right ? q.right : GM.rand() < .7 ? q.lure : GM.pick([0, 1, 2, 3].filter((k) => k !== q.right)));
+  }, GM.calm() ? 150 + GM.rand() * 700 : 1500 + GM.rand() * 9000));
+}
+function closeExplain() {
+  const cur = S.cur; if (!cur || S.phase !== 'explain') return;
+  S.phase = 'exClosed'; cur.timer.stop(); GM.sound.lock();
+  board.querySelector('.wf-panel')?.classList.add('closed');
+  setControls(`<button class="bctl primary" data-a="revealex">Reveal</button>`);
+  renderPhone();
+}
+function splitStats(solves, answers, right) {
+  const all = GM.class.filter((m) => !OFFLINE.includes(m));
+  const early = all.filter((m) => solves[m] && solves[m].shown / solves[m].total < .5), late = all.filter((m) => !early.includes(m));
+  const acc = (xs) => xs.length ? xs.filter((m) => answers[m] === right).length / xs.length : 0;
+  return { early, late, ea: acc(early), la: acc(late) };
+}
+function revealExplain() {
+  const cur = S.cur; if (S.phase !== 'exClosed') return;
+  S.phase = 'exRevealed'; GM.sound.reveal();
+  markOpts(cur.q, cur.answers);
+  const st = splitStats(S.solves, cur.answers, cur.q.right);
+  S.hist[S.p] = { solves: { ...S.solves }, answers: { ...cur.answers }, right: cur.q.right };
+  const dots = board.querySelector('.wf-dots');
+  dots.outerHTML = `<div class="wf-split">
+    <div>Solved, under half showing <span class="bar"><i style="transform:scaleX(${st.ea})"></i></span><b>${Math.round(st.ea * 100)}%</b></div>
+    <div>Needed more, or not solved <span class="bar"><i style="transform:scaleX(${st.la})"></i></span><b>${Math.round(st.la * 100)}%</b></div></div>`;
+  board.querySelectorAll('.wf-split .bar i').forEach((n) => n.animate([{ transform: 'scaleX(0)' }, { transform: n.style.transform }], { duration: GM.calm() ? 1 : 900, easing: 'cubic-bezier(.22,1,.36,1)' }));
+  status(`Right answer: <b>${cur.q.opts[cur.q.right]}</b>`);
+  setTimeout(() => (cur.answers[GM.me] === cur.q.right ? GM.sound.right : GM.sound.wrong)(), 250);
+  setControls(`<button class="bctl primary" data-a="totals">Team totals</button>`);
+  renderPhone();
+}
+
+// ── Totals, podium, teacher view ──────────────────
+function totals() {
+  S.phase = 'totals';
+  board.querySelectorAll('.stage-x').forEach((n) => n.remove()); board.classList.remove('wf-dim');
+  const before = S.teams.slice().sort((a, b) => b.prevTotal - a.prevTotal), after = S.teams.slice().sort((a, b) => b.total - a.total);
+  const last = S.p === PUZ.length - 1;
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x wf-lb"><h2>Team totals · after quote ${S.p + 1} of ${PUZ.length}</h2><div class="lb"></div></div>`);
+  const lb = board.querySelector('.lb');
+  const nodes = Object.fromEntries(S.teams.map((t) => [t.id, GM.h(`<div class="lb-row" data-t="${t.id}" style="--tc:${t.colour}"><span class="rank"></span><span class="sw"></span><span>${t.name}</span><span class="pts">${fmt(t.prevTotal)}</span><span class="move"></span></div>`)]));
+  before.forEach((t, i) => { nodes[t.id].querySelector('.rank').textContent = i + 1; lb.appendChild(nodes[t.id]); });
+  setTimeout(() => {
+    GM.flip(lb, () => after.forEach((t) => lb.appendChild(nodes[t.id])));
+    after.forEach((t, i) => {
+      const n = nodes[t.id]; n.classList.toggle('first', i === 0); n.querySelector('.rank').textContent = i + 1;
+      GM.countUp(n.querySelector('.pts'), t.prevTotal, t.total, 900);
+      if (i < before.indexOf(t)) n.querySelector('.move').textContent = '▲';
+      t.prevTotal = t.total;
+    });
+    GM.sound.whoosh();
+  }, GM.calm() ? 50 : 700);
+  setControls(last ? `<button class="bctl primary" data-a="end">Final scores</button>` : `<button class="bctl primary" data-a="next">Next quote</button>`);
+  renderPhone();
+}
+function endGame() {
+  S.phase = 'end'; S.tok++; S.cur?.timer?.stop(); S.solvedRing?.stop();
+  board.querySelectorAll('.stage-x').forEach((n) => n.remove()); board.classList.remove('wf-dim');
+  const sorted = S.teams.slice().sort((a, b) => b.total - a.total), [a, b, c] = sorted;
+  const played = S.hist.filter(Boolean);
+  const pcts = played.flatMap((h) => Object.values(h.solves).map((s) => s.shown / s.total)).sort((x, y) => x - y);
+  const med = pcts.length ? Math.round(pcts[Math.floor(pcts.length / 2)] * 100) : null;
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x wf-sum"><span class="b-eyebrow">Final scores</span>${played.length} quote${played.length === 1 ? '' : 's'} played${med != null ? ` · the class needed <b>${med}%</b> of the letters (median)` : ''}</div>
+    <div class="stage-x podium">${[[b, 'p2', 2], [a, 'p1', 1], [c, 'p3', 3]].map(([t, cls, n]) => `<div class="pod ${cls}"><span class="b-avatar tm" style="background:${t.colour}">${t.name[0]}</span><span class="name">${t.name}</span><span class="score">${fmt(t.total)}</span><div class="block">${n}</div></div>`).join('')}</div>`);
+  board.querySelectorAll('.pod').forEach((p, k) => p.animate([{ transform: 'translateY(100%)' }, { transform: 'none' }], { duration: GM.calm() ? 1 : 900, delay: GM.calm() ? 0 : [400, 1100, 0][k], easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  setTimeout(() => { GM.sound.fanfare(); GM.confetti(board); }, GM.calm() ? 0 : 1300);
+  setControls(`<button class="bctl" data-a="insight">Teacher: letters needed</button><button class="bctl primary" data-a="restart">Play again</button>`);
+  renderPhone();
+}
+function insight() {
+  board.querySelectorAll('.stage-x').forEach((n) => n.remove());
+  // Played quotes use this game's solves; unplayed quotes get sample data so the view reads full.
+  const data = PUZ.map((pz, p) => {
+    const h = S.hist[p]; if (h) return { solves: h.solves, answers: h.answers, right: h.right, sample: false };
+    const solves = {}, answers = {}, tot = lettersOf(pz.text).length;
+    GM.class.filter((c) => !OFFLINE.includes(c)).forEach((c) => {
+      if (GM.rand() < skill[c] + .15) solves[c] = { shown: Math.round(tot * Math.min(.92, Math.max(.12, 1.05 - skill[c] - GM.rand() * .25))), total: tot };
+      const early = solves[c] && solves[c].shown / tot < .5; answers[c] = GM.rand() < (early ? .84 : .5) ? pz.explain.right : -1;
+    });
+    if (p === 1) solves.DN = { shown: 0, total: tot, outlier: true };
+    return { solves, answers, right: pz.explain.right, sample: true };
+  });
+  const col = (pct) => pct < .5 ? `color-mix(in srgb, var(--game-right) ${Math.round((1 - pct * 2) * 100)}%, var(--game-gold))` : `color-mix(in srgb, var(--game-gold) ${Math.round((1 - (pct - .5) * 2) * 100)}%, var(--game-wrong))`;
+  const cell = (d, c) => {
+    if (OFFLINE.includes(c)) return '<i class="no">off</i>';
+    const s = d.solves[c]; if (!s) return `<i class="no ${d.sample ? 'sample' : ''}">–</i>`;
+    if (s.outlier) return `<i class="out" title="0 letters in under 3 s: left out of the score">0% !</i>`;
+    const pct = s.shown / s.total; return `<i class="${d.sample ? 'sample' : ''}" style="background:${col(pct)}">${Math.round(pct * 100)}%</i>`;
+  };
+  const half = Math.ceil(GM.class.length / 2);
+  const hdr = `<div class="row hd"><span></span>${PUZ.map((p) => `<i>${p.short}</i>`).join('')}</div>`;
+  const rows = (list) => hdr + list.map((c) => `<div class="row"><span class="b-avatar" style="${GM.avatarStyle(c)}">${c}</span>${data.map((d) => cell(d, c)).join('')}</div>`).join('');
+  const fast = GM.class.filter((c) => data.every((d) => d.solves[c] && !d.solves[c].outlier && d.solves[c].shown / d.solves[c].total < .45)).slice(0, 5);
+  const slow = GM.class.filter((c) => !OFFLINE.includes(c) && data.filter((d) => !d.solves[c] || d.solves[c].shown / d.solves[c].total > .7).length >= 2).slice(0, 5);
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x wf-ins">
+    <span class="b-eyebrow">Teacher only · not for the projector</span>
+    <h2>Letters needed to solve</h2>
+    <p class="lede">Share of the quote showing at each student’s first right solve. Lower means they know the line better. Dotted cells are sample data in the mockup.</p>
+    <div class="wf-heat"><div>${rows(GM.class.slice(0, half))}</div><div>${rows(GM.class.slice(half))}</div></div>
+    <div class="wf-legend"><span><i style="background:${col(.1)}"></i>Few letters</span><span><i style="background:${col(.5)}"></i>Half</span><span><i style="background:${col(.9)}"></i>Most</span><span><i style="background:repeating-linear-gradient(135deg, var(--stage-line) 0 4px, transparent 4px 8px)"></i>Not solved</span><span><i style="outline:3px dashed var(--game-wrong);outline-offset:-3px"></i>Left out of the score</span></div>
+    <div class="wf-side">
+      <div class="card"><h3>Explain question by solve speed</h3>
+        ${data.map((d, p) => { const st = splitStats(d.solves, d.answers, d.right); return `<div style="display:grid;gap:6px"><b>${PUZ[p].short}</b>
+          <div class="pair"><span>Early</span><span class="bar"><i style="width:${st.ea * 100}%;background:var(--game-right)"></i></span><b>${Math.round(st.ea * 100)}%</b></div>
+          <div class="pair"><span>Late / not</span><span class="bar"><i style="width:${st.la * 100}%;background:var(--game-gold)"></i></span><b>${Math.round(st.la * 100)}%</b></div></div>`; }).join('')}</div>
+      <div class="card"><span><b>Knew the lines early:</b> ${fast.join(', ') || 'nobody on every quote'}.</span><span><b>Needed most letters on two or more:</b> ${slow.join(', ') || 'nobody'}. Worth a quote-recall starter.</span><span><b>Left out:</b> DN solved Q2 at 0 letters in under 3 s (likely had the text open).</span></div>
+    </div></div>`);
+  board.querySelectorAll('.wf-heat .row:not(.hd) i').forEach((n, k) => n.animate([{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'none' }], { duration: GM.calm() ? 1 : 380, delay: GM.calm() ? 0 : (k % 39) * 18, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'backwards' }));
+  setControls(`<button class="bctl" data-a="podium">Back to podium</button><button class="bctl primary" data-a="restart">Play again</button>`);
+}
+
+board.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+  GM.sound.click();
+  if (a === 'spin' && S.phase === 'turn') { if (captainOf(spinTeam()) === GM.me) jwSpin(.6); else simSpin(); }
+  if (a === 'closeq') closeQ();
+  if (a === 'revealp') revealPuzzle();
+  if (a === 'explain') askExplain();
+  if (a === 'closeex') closeExplain();
+  if (a === 'revealex') revealExplain();
+  if (a === 'totals') totals();
+  if (a === 'next') { S.p++; spinTeam().capN++; S.turn++; newPuzzle(); renderStage(true); startTurn(); }
+  if (a === 'end' || a === 'podium') endGame();
+  if (a === 'insight') insight();
+  if (a === 'restart') restart();
+});
+
+// ── Simulated classmates solving privately ────────
+setInterval(() => {
+  if (!S || !solvePhase() || S.phase === 'solved') return;
+  const f = shownCount() / total();
+  const pool = GM.class.filter((c) => c !== GM.me && !OFFLINE.includes(c) && !S.solves[c] && lockLeft(c) === 0);
+  if (!pool.length || f < .2) return;
+  const c = GM.pick(pool);
+  if (GM.rand() > (f - .15) * 1.4) return;
+  if (f >= .4 && GM.rand() < .2 + f * skill[c] * .6) recordSolve(c);
+  else { S.locks[c] = Date.now() + LOCK_MS; S.wrong++; slog(); }
+}, 1500);
+setInterval(() => {
+  if (!S) return; slog();
+  const b = phone.querySelector('.wf-solve[data-p="solve"]');
+  if (b && b.disabled) { const left = lockLeft(); if (left > 0) b.textContent = `Solve locked · ${left} s`; else renderPhone(); }
+}, 1000);
+
+// ── Phone ─────────────────────────────────────────
+function phoneShell(body, dock = '', timer = false) {
+  const t = myTeam();
+  phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av">${GM.me}</span>JW</span><span class="ph-score wf-tp" style="--tc:${t.colour}"><i></i>${t.name} · ${fmt(t.round)}</span></div>
+    ${timer ? '<div class="ph-timer"><i></i></div>' : ''}<div class="ph-body">${body}</div>${dock ? `<div class="ph-dock">${dock}</div>` : ''}`;
+}
+let lastMini = new Set();
+function miniHtml() {
+  const rows = puzzleRows(P().text);
+  const html = `<div class="wf-mini" aria-label="Puzzle so far">${rows.map((r) => `<div class="r">${[...r].map((ch) => ch === ' ' ? '<i class="sp"></i>' : /[A-Z]/.test(ch) ? (S.shown.has(ch) ? `<i class="on ${lastMini.has(ch) ? '' : 'new'}">${ch}</i>` : '<i></i>') : `<i class="on">${ch}</i>`).join('')}</div>`).join('')}</div>`;
+  lastMini = new Set(S.shown);
+  return html;
+}
+const miniBox = () => `<div class="wf-minibox">${miniHtml()}<span>${P().cat}</span></div>`;
+function solveBtn() {
+  if (!solvePhase()) return '';
+  const mine = S.solves[GM.me];
+  if (mine) return `<div class="wf-mysolve">Solved privately with ${mine.shown} of ${mine.total} letters showing</div>`;
+  const left = lockLeft();
+  return left > 0 ? `<button class="pbtn wf-solve" data-p="solve" disabled>Solve locked · ${left} s</button>` : `<button class="pbtn wf-solve" data-p="solve">Solve the quote</button>`;
+}
+function optsHtml(q) { return q.opts.map((o, k) => `<button class="pbtn ${S.me.ans === k ? 'sel' : ''}" data-ans="${k}"><span class="key ${KEYS[k]}">${LET[k]}</span>${o}</button>`).join(''); }
+function wait(top, mid, sub = '') { return `<div class="wf-wait"><div><p class="ph-sub">${top}</p><div class="mid">${mid}</div>${sub ? `<p class="ph-sub" style="margin-top:8px">${sub}</p>` : ''}</div></div>`; }
+function renderPhone() {
+  if (!S) return;
+  if (S.solveOpen && solvePhase() && !S.solves[GM.me]) {
+    const m = phone.querySelector('.wf-mini'); if (m) { m.outerHTML = miniHtml(); return; }
+  } else S.solveOpen = false;
+  if (S.solveOpen) return;
+  const ph = S.phase, t = spinTeam(), cap = captainOf(t), mine = t === myTeam();
+  if (ph === 'turn' && cap === GM.me) {
+    phoneShell(`${miniBox()}${wait('Your turn', 'Spin the wheel for the Otters', 'Hold the button to build power, then let go.')}`,
+      `<button class="pbtn cta orange wf-hold" data-p="spin"><span class="pw"></span><span>Hold to spin</span></button>${solveBtn()}`);
+    return;
+  }
+  if (ph === 'turn' || ph === 'spinning') { phoneShell(`${miniBox()}${wait(ph === 'turn' ? `${t.name} are up` : 'Spinning', ph === 'turn' ? `Captain ${cap} is about to spin` : `${t.name} are spinning the wheel`, 'You can solve privately at any time.')}`, solveBtn()); return; }
+  if (ph === 'question' && mine && S.cur.answers[GM.me] == null) {
+    phoneShell(`<span class="wf-lbl">Earn the letter · ${S.val} each</span><p class="ph-h" style="font-size:18px">${S.cur.q.q}</p>${optsHtml(S.cur.q)}<p class="ph-sub" style="font-size:13px">If half the Otters get it, you call a letter.</p>`,
+      `<button class="pbtn cta orange" data-p="lockq" ${S.me.ans == null ? 'disabled' : ''}>Lock in</button>${solveBtn()}`, true);
+    return;
+  }
+  if (ph === 'question' || ph === 'qclosed') {
+    const cur = S.cur, done = live(cur.team).filter((m) => cur.answers[m] != null).length;
+    const sub = ph === 'qclosed' ? (cur.ok ? `${cur.r} of ${cur.n} right: letter earned` : `${cur.r} of ${cur.n} right: no letter`) : `${done} of ${live(cur.team).length} answered`;
+    phoneShell(`${miniBox()}${wait(mine ? 'Locked in' : `${t.name} are earning a letter`, mine && cur.answers[GM.me] != null ? `${LET[cur.answers[GM.me]]} · ${cur.q.opts[cur.answers[GM.me]]}` : 'Eyes on the board', sub)}`, solveBtn(), ph === 'question');
+    return;
+  }
+  if (ph === 'letter' && cap === GM.me) {
+    const canVowel = t.round >= VOWEL_COST, sel = S.me.letter;
+    phoneShell(`${miniBox()}<span class="wf-lbl">Call a consonant · ${S.val} each</span>
+      <div class="wf-keys">${[...ALPHA].filter((L) => !VOW.includes(L)).map((L) => `<button data-l="${L}" class="${sel === L ? 'sel' : ''}" ${S.used.has(L) ? 'disabled' : ''} aria-label="Letter ${L}">${L}</button>`).join('')}</div>
+      <span class="wf-lbl">Or buy a vowel · ${VOWEL_COST} ${canVowel ? '' : '(not enough round points)'}</span>
+      <div class="wf-keys vw">${[...VOW].map((L) => `<button data-l="${L}" class="${sel === L ? 'sel' : ''}" ${S.used.has(L) || !canVowel ? 'disabled' : ''} aria-label="Vowel ${L}">${L}</button>`).join('')}</div>`,
+      `<button class="pbtn cta orange" data-p="call" ${sel ? '' : 'disabled'}>${sel ? `${VOW.includes(sel) ? 'Buy' : 'Call'} ${sel}` : 'Choose a letter'}</button>${solveBtn()}`);
+    return;
+  }
+  if (ph === 'letter' || ph === 'revealing') { phoneShell(`${miniBox()}${wait(ph === 'letter' ? `${t.name} earned a letter` : 'On the board', ph === 'letter' ? `Captain ${cap} is calling it` : 'Letters turning over')}`, solveBtn()); return; }
+  if (ph === 'solved') {
+    const b = S.bank, mineS = S.solves[GM.me];
+    const firstMe = S.first === GM.me;
+    phoneShell(`${miniBox()}${firstMe ? wait('First in the room', 'You solved it', `Otters bank ${fmt(b.bank)}. The board reveals it soon.`) : wait(`Solved by ${/^[AEIOU]/.test(b.t.name) ? 'an' : 'a'} ${b.t.name} player`, mineS ? 'You got it too' : 'Still time to solve it for your record', mineS ? `You needed ${mineS.shown} of ${mineS.total} letters.` : 'It counts for you, not for points.')}`, solveBtn(), true);
+    return;
+  }
+  if (ph === 'revealed') { phoneShell(`${miniBox()}${wait('The quote', P().cat.replace('Quote · ', ''), 'An explain question is coming.')}${lettersCard()}`); return; }
+  if (ph === 'explain' && S.cur.answers[GM.me] == null) {
+    phoneShell(`<span class="wf-lbl">Explain · everyone</span><p class="ph-h" style="font-size:18px">${S.cur.q.q}</p>${optsHtml(S.cur.q)}`, `<button class="pbtn cta orange" data-p="lockex" ${S.me.ans == null ? 'disabled' : ''}>Lock in</button>`, true);
+    return;
+  }
+  if (ph === 'explain' || ph === 'exClosed') { const a = S.cur.answers[GM.me]; phoneShell(wait(ph === 'explain' ? 'Locked in' : 'Answers closed', a != null ? `${LET[a]} · ${S.cur.q.opts[a]}` : 'No answer', 'Eyes on the board.'), '', ph === 'explain'); return; }
+  if (ph === 'exRevealed') {
+    const q = S.cur.q, ok = S.cur.answers[GM.me] === q.right;
+    phoneShell(`<div class="wf-wait"><div><p class="ph-sub">${ok ? 'You got it' : 'Not this time'}</p><div class="big" style="color:${ok ? 'var(--success)' : 'var(--danger)'}">${ok ? 'Right' : 'Missed'}</div>${ok ? '' : `<p class="ph-sub">The answer: <b>${q.opts[q.right]}</b></p>`}</div></div>${lettersCard()}`);
+    GM.toast(phone, ok ? 'Right<small>You explained the line, not just found it.</small>' : `Missed · ${q.opts[q.right]}<small>Worth a second look at the line.</small>`, ok ? 'good' : 'bad');
+    return;
+  }
+  if (ph === 'totals' || ph === 'end') {
+    const sorted = S.teams.slice().sort((a, b) => b.total - a.total), place = sorted.indexOf(myTeam()) + 1;
+    phoneShell(`<div class="wf-wait"><div><p class="ph-sub">${ph === 'end' ? 'Otters finished' : 'Otters are'}</p><div class="big">${place}${['st', 'nd', 'rd'][place - 1] || 'th'}</div><p class="ph-sub">Bank ${fmt(myTeam().total)}</p></div></div>
+      <div class="wf-break"><div><b>Letters you needed</b></div>${PUZ.map((pz, p) => { const h = p === S.p && ph === 'totals' ? S.solves : S.hist[p]?.solves; const s = h && h[GM.me]; return `<div><span>${pz.short}</span><b>${!h ? '–' : s ? `${Math.round(s.shown / s.total * 100)}%` : 'Not solved'}</b></div>`; }).join('')}</div>`);
+  }
+}
+function lettersCard() {
+  const s = S.solves[GM.me];
+  if (!s) return `<div class="wf-break"><div><span>Your solve</span><b>Not solved</b></div><p class="ph-sub" style="font-size:13px;margin:0">Next quote, try Solve as soon as you think you know it.</p></div>`;
+  const pct = s.shown / s.total;
+  return `<div class="wf-break"><div><span>Letters showing when you solved</span><b>${s.shown} of ${s.total}</b></div><div class="wf-meter"><i style="width:${pct * 100}%"></i></div><div class="tot"><span>Letters needed</span><span>${Math.round(pct * 100)}%</span></div></div>`;
+}
+function openSolve() {
+  S.solveOpen = true;
+  phoneShell(`<p class="ph-h">Solve privately</p>${miniBox()}
+    <input class="pinput" id="wf-guess" placeholder="Type the whole line" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="Your solve">
+    <p class="ph-sub" style="font-size:13px">Only you see this. A wrong guess locks Solve for 20 s. Punctuation doesn’t matter.</p>`,
+    `<button class="pbtn cta orange" data-p="submit">Submit solve</button><button class="pbtn wf-solve" data-p="cancel">Back to the game</button>`);
+  const inp = phone.querySelector('#wf-guess');
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitSolve(); });
+}
+function submitSolve() {
+  const inp = phone.querySelector('#wf-guess'); if (!inp || !inp.value.trim()) return;
+  if (!solvePhase()) { S.solveOpen = false; return renderPhone(); }
+  if (normSolve(inp.value) === normSolve(P().text)) {
+    recordSolve(GM.me); S.solveOpen = false; GM.sound.right();
+    const s = S.solves[GM.me]; renderPhone();
+    GM.toast(phone, `Solved with ${s.shown} of ${s.total} letters showing<small>${S.first === GM.me ? 'First in the room: the Otters bank the round.' : 'It counts for your record.'}</small>`, 'good');
+  } else {
+    S.locks[GM.me] = Date.now() + LOCK_MS; S.wrong++; slog(); GM.sound.wrong();
+    inp.classList.add('fx-shake');
+    setTimeout(() => { S.solveOpen = false; renderPhone(); GM.toast(phone, 'Not quite<small>Solve is locked for 20 s. Keep watching the board.</small>', 'bad'); }, 450);
+  }
+}
+// Hold to spin: power ping-pongs while held
+let hold = null;
+phone.addEventListener('pointerdown', (e) => {
+  const b = e.target.closest('[data-p="spin"]'); if (!b || S.phase !== 'turn') return;
+  b.setPointerCapture?.(e.pointerId);
+  hold = { t0: performance.now(), b, p: 0 };
+  (function f(t) { if (!hold) return; const k = ((t - hold.t0) / 1100) % 2; hold.p = k < 1 ? k : 2 - k; const pw = hold.b.querySelector('.pw'); if (pw) pw.style.transform = `scaleX(${hold.p})`; requestAnimationFrame(f); })(hold.t0);
+});
+const release = () => { if (!hold) return; const p = Math.max(.15, hold.p); hold = null; jwSpin(p); };
+phone.addEventListener('pointerup', release);
+phone.addEventListener('pointercancel', () => { hold = null; renderPhone(); });
+phone.addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  const p = b.dataset.p;
+  if (p === 'spin' && S.phase === 'turn' && !hold) jwSpin(.6); // keyboard or plain click
+  if (p === 'solve') openSolve();
+  if (p === 'cancel') { S.solveOpen = false; renderPhone(); }
+  if (p === 'submit') submitSolve();
+  if (b.dataset.ans != null) { S.me.ans = +b.dataset.ans; GM.sound.click(); renderPhone(); }
+  if (p === 'lockq' && S.phase === 'question' && S.me.ans != null) { GM.sound.lock(); qAnswered(GM.me, S.me.ans); renderPhone(); }
+  if (p === 'lockex' && S.phase === 'explain' && S.me.ans != null) { GM.sound.lock(); qAnswered(GM.me, S.me.ans); renderPhone(); }
+  if (b.dataset.l && S.phase === 'letter') { S.me.letter = b.dataset.l; GM.sound.click(); renderPhone(); }
+  if (p === 'call' && S.me.letter) callLetter(S.me.letter);
+});
+
+function restart() { fresh(); renderStage(true); startTurn(); }
+restart();
+</script>
+</body>
+</html>

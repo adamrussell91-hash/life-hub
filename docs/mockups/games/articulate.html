@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Articulate — game mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="games.css">
+<style>
+/* Board: team panel */
+.ar-team { position: absolute; left: 100px; top: 130px; width: 460px; bottom: 140px; border-radius: 32px; padding: 34px 34px 30px; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; align-content: start; gap: 14px; overflow: hidden; }
+.ar-team::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 10px; background: var(--tc); }
+.ar-team h2 { margin: 0 0 8px; font-size: 60px; line-height: 1; letter-spacing: -.02em; display: flex; align-items: center; gap: 18px; }
+.ar-team h2 i { width: 30px; height: 30px; border-radius: 9px; background: var(--tc); }
+.ar-team .lbl { font-size: 24px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--stage-muted); margin-top: 10px; }
+.ar-desc { display: flex; align-items: center; gap: 22px; font-size: 44px; font-weight: 700; }
+.ar-desc .b-avatar { width: 104px; height: 104px; font-size: 38px; box-shadow: 0 0 0 6px var(--tc); }
+.ar-guess { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px 10px; }
+.ar-guess div { display: grid; justify-items: center; gap: 6px; font-size: 26px; font-weight: 600; }
+.ar-guess .b-avatar { position: relative; }
+.ar-guess .b-avatar.talk::after { content: ""; position: absolute; inset: -7px; border-radius: 50%; border: 4px solid var(--tc); animation: arTalk .9s var(--ease) infinite; }
+@keyframes arTalk { from { transform: scale(.9); opacity: 1; } to { transform: scale(1.35); opacity: 0; } }
+
+/* Board: header row */
+.ar-got { position: absolute; left: 620px; top: 130px; width: 360px; height: 190px; display: grid; align-content: center; }
+.ar-got .num { font-size: 150px; font-weight: 700; line-height: .9; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.ar-got .lbl { font-size: 28px; color: var(--stage-muted); }
+.ar-msg { position: absolute; left: 620px; right: 380px; top: 140px; height: 180px; display: grid; align-content: center; gap: 8px; }
+.ar-msg h3 { margin: 0; font-size: 56px; line-height: 1.05; letter-spacing: -.02em; }
+.ar-msg p { margin: 0; font-size: 28px; color: var(--stage-muted); }
+.ar-play { position: absolute; left: 1010px; top: 140px; width: 360px; height: 180px; perspective: 1200px; }
+.ar-ring { position: absolute; right: 120px; top: 150px; transform: scale(1.2); transform-origin: top right; }
+
+/* Cards */
+.ar-cd { position: absolute; inset: 0; border-radius: 24px; display: grid; place-items: center; text-align: center; padding: 14px 18px; font-size: 30px; font-weight: 700; line-height: 1.12; box-shadow: var(--stage-glow); overflow-wrap: normal; word-break: normal; hyphens: manual; }
+.ar-cd.back { background: repeating-linear-gradient(135deg, var(--tc) 0 18px, color-mix(in srgb, var(--tc) 80%, #000) 18px 36px); color: var(--depth); }
+.ar-cd.back b { display: grid; place-items: center; width: 96px; height: 96px; border-radius: 50%; background: var(--warm-white); font-size: 54px; color: var(--depth); box-shadow: 0 8px 20px rgba(0,0,0,.25); }
+.ar-cd.back small { position: absolute; left: 0; right: 0; bottom: 12px; font-size: 22px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--depth); }
+.ar-field { position: absolute; left: 620px; right: 100px; top: 360px; display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 170px; gap: 20px; }
+.ar-slot { position: relative; border-radius: 24px; border: 3px dashed var(--stage-line); }
+.ar-slot.has { border: 0; }
+.ar-land { background: var(--warm-white); color: var(--ink); }
+.ar-land .st { position: absolute; left: 16px; top: 12px; font-size: 22px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.ar-land.got { box-shadow: 0 0 0 4px var(--game-right), var(--stage-glow); }
+.ar-land.got .st { color: var(--success); }
+.ar-land.pass { background: var(--stage-card-hi); color: var(--stage-muted); box-shadow: none; }
+.ar-land.buzz { background: #f6dcda; color: #6e1f1c; }
+.ar-stamp { position: absolute; left: 50%; top: 50%; padding: 6px 18px; border: 5px solid var(--game-wrong); border-radius: 12px; color: var(--game-wrong); font-size: 36px; font-weight: 900; letter-spacing: .1em; transform: translate(-50%, -50%) rotate(-12deg); background: rgba(255,255,255,.82); pointer-events: none; }
+.ar-land .ar-stamp { font-size: 26px; padding: 4px 12px; border-width: 4px; top: auto; bottom: -6px; left: auto; right: -8px; transform: rotate(-10deg); }
+.ar-flash { position: absolute; inset: 0; background: radial-gradient(circle at 50% 40%, rgba(212,84,79,.55), rgba(212,84,79,.18)); pointer-events: none; z-index: 25; opacity: 0; }
+
+/* Strip of team scores */
+.ar-strip { position: absolute; left: 100px; bottom: 34px; display: flex; gap: 14px; }
+.ar-ts { display: flex; align-items: center; gap: 14px; height: 72px; padding: 0 24px 0 14px; border-radius: 999px; background: var(--stage-card); box-shadow: var(--stage-glow); font-size: 26px; font-weight: 600; transition: transform .4s var(--ease-spring), box-shadow .3s; }
+.ar-ts i { width: 44px; height: 44px; border-radius: 50%; background: var(--tc); display: grid; place-items: center; font-style: normal; font-weight: 800; color: var(--depth); font-size: 20px; }
+.ar-ts b { font-size: 34px; font-variant-numeric: tabular-nums; }
+.ar-ts.now { box-shadow: 0 0 0 3px var(--tc), var(--stage-glow); transform: translateY(-4px); }
+.bctl.buzz { background: var(--game-wrong); color: #fff; min-width: 220px; font-size: 30px; letter-spacing: .04em; }
+.bctl.buzz:hover { background: #e2615c; }
+
+/* Board: quick check */
+.ar-qh { position: absolute; left: 100px; right: 100px; top: 126px; display: flex; align-items: flex-end; gap: 24px; }
+.ar-qh h2 { margin: 0; font-size: 52px; letter-spacing: -.015em; }
+.ar-qh .b-pill { margin-left: auto; }
+.ar-qrows { position: absolute; left: 100px; right: 100px; top: 290px; display: grid; gap: 22px; }
+.ar-qrow { display: grid; grid-template-columns: 420px 1fr 340px; align-items: center; gap: 32px; height: 132px; padding: 0 34px; border-radius: 28px; background: var(--stage-card); box-shadow: var(--stage-glow); }
+.ar-qrow .t { display: grid; gap: 4px; }
+.ar-qrow .t b { font-size: 36px; line-height: 1.1; }
+.ar-qrow .t span { font-size: 24px; color: var(--stage-muted); }
+.ar-qrow .bar { height: 26px; border-radius: 26px; background: var(--stage-line); overflow: hidden; }
+.ar-qrow .bar i { display: block; height: 100%; border-radius: inherit; background: var(--wave); transform-origin: left; transform: scaleX(0); transition: transform .5s var(--ease), background .4s; }
+.ar-qrow .n { justify-self: end; white-space: nowrap; font-size: 30px; color: var(--stage-muted); font-variant-numeric: tabular-nums; }
+.ar-qrow .n b { font-size: 48px; color: var(--stage-ink); }
+.ar-qrow.hard { box-shadow: 0 0 0 3px var(--game-wrong), var(--stage-glow); }
+.ar-qrow .hardtag { margin-left: 12px; padding: 2px 12px; border-radius: 999px; background: var(--game-wrong); color: #fff; font-size: 20px; font-weight: 700; vertical-align: middle; }
+
+/* Board: final */
+.ar-fh { position: absolute; left: 0; right: 0; top: 140px; text-align: center; }
+.ar-fh h2 { margin: 0; font-size: 56px; letter-spacing: -.015em; }
+.ar-fh p { margin: 10px 0 0; font-size: 28px; color: var(--stage-muted); }
+.ar-fh p b { color: var(--stage-ink); }
+.pod .ar-badge { width: 110px; height: 110px; border-radius: 50%; display: grid; place-items: center; font-size: 46px; font-weight: 800; color: var(--depth); box-shadow: 0 0 0 6px rgba(255,255,255,.12); }
+
+/* Board: teacher view */
+.ar-tv { position: absolute; left: 100px; right: 100px; top: 124px; bottom: 120px; display: grid; align-content: start; gap: 12px; }
+.ar-tv h3 { margin: 0; font-size: 30px; }
+.ar-tbl { display: grid; gap: 8px; }
+.ar-tr { display: grid; grid-template-columns: 250px 110px 110px 110px 160px 1fr; align-items: center; gap: 16px; min-height: 60px; padding: 6px 22px; border-radius: 18px; background: var(--stage-card); font-size: 26px; font-weight: 600; }
+.ar-tr.hd { background: none; min-height: 36px; font-size: 22px; letter-spacing: .08em; text-transform: uppercase; color: var(--stage-muted); }
+.ar-tr .who { display: flex; align-items: center; gap: 12px; }
+.ar-tr .who .b-avatar { width: 44px; height: 44px; font-size: 17px; }
+.ar-tr .who small { font-size: 22px; color: var(--stage-muted); font-weight: 500; }
+.ar-tr .num { font-variant-numeric: tabular-nums; text-align: center; }
+.ar-terms { display: flex; flex-wrap: wrap; gap: 6px; }
+.ar-terms span { padding: 2px 12px; border-radius: 999px; font-size: 20px; font-weight: 700; white-space: nowrap; }
+.ar-terms .got { background: rgba(63,174,115,.22); color: var(--game-right); }
+.ar-terms .pass { background: var(--stage-card-hi); color: var(--stage-muted); }
+.ar-terms .buzz { background: rgba(212,84,79,.22); color: var(--game-wrong); }
+.ar-grid { display: grid; grid-template-columns: 260px repeat(24, 1fr); gap: 6px; align-items: center; font-size: 22px; }
+.ar-grid .h { text-align: center; font-weight: 700; color: var(--stage-muted); }
+.ar-grid .h.me { color: var(--high-sea); }
+.ar-grid .term { font-size: 26px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ar-grid .c { height: 38px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; font-size: 22px; }
+.ar-grid .c.y { background: rgba(63,174,115,.25); color: var(--game-right); }
+.ar-grid .c.n { background: rgba(212,84,79,.25); color: var(--game-wrong); }
+.ar-note { margin: 0; max-width: 1220px; font-size: 26px; color: var(--stage-muted); }
+.ar-note b { color: var(--stage-ink); }
+
+/* Phone */
+.phone { overflow-wrap: normal; word-break: normal; hyphens: manual; }
+.ar-pcard { position: relative; border-radius: 26px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1), 0 14px 34px rgba(20,35,70,.14); padding: 26px 22px 22px; display: grid; gap: 16px; overflow: hidden; }
+.ar-pcard::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 8px; background: var(--tc); }
+.ar-pcard .kind { font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.ar-pcard .term { font-size: var(--fs, 36px); font-weight: 800; line-height: 1.08; color: var(--navy); letter-spacing: -.02em; }
+.ar-ban { display: grid; gap: 8px; padding: 14px; border-radius: 18px; background: #fbe7e6; }
+.ar-ban span { font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--danger); }
+.ar-ban ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.ar-ban li { padding: 6px 12px; border-radius: 999px; background: #fff; color: #6e1f1c; font-weight: 700; font-size: 16px; box-shadow: inset 0 0 0 1px rgba(155,44,44,.25); }
+.ar-meta { display: flex; justify-content: space-between; align-items: center; font-size: 15px; color: var(--muted); }
+.ar-meta .dots { display: flex; gap: 6px; }
+.ar-meta .dots i { width: 14px; height: 14px; border-radius: 50%; background: var(--navy); }
+.ar-meta .dots i.used { background: rgba(23,55,94,.15); }
+.ar-acts { display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; }
+.ar-acts button { min-height: 64px; border-radius: 20px; border: 0; font-size: 18px; font-weight: 700; }
+.ar-acts .pass { background: #fff; box-shadow: inset 0 0 0 1.5px rgba(23,55,94,.25); color: var(--ink); }
+.ar-acts .got { background: var(--success); color: #fff; }
+.ar-acts button[disabled] { opacity: .4; }
+.ar-pbuzz { min-height: 72px; width: 100%; border: 0; border-radius: 22px; background: var(--danger); color: #fff; font-size: 20px; font-weight: 800; letter-spacing: .02em; }
+.ar-wait { flex: 1; display: grid; place-items: center; text-align: center; gap: 10px; color: var(--muted); }
+.ar-wait .big { font-size: 60px; font-weight: 700; color: var(--navy); line-height: 1; font-variant-numeric: tabular-nums; }
+.ar-tc { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: var(--tcs); color: var(--ink); font-weight: 700; font-size: 15px; }
+.ar-tc i { width: 12px; height: 12px; border-radius: 50%; background: var(--tc); }
+.ar-list { display: grid; gap: 8px; padding: 14px 16px; border-radius: 20px; background: #fff; box-shadow: 0 0 0 1px rgba(23,55,94,.1); font-size: 15px; }
+.ar-list div { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.ar-list .ok { color: var(--success); font-weight: 700; }
+.ar-list .no { color: var(--danger); font-weight: 700; }
+.ar-list .mu { color: var(--muted); font-weight: 600; }
+.ar-qbtn { font-size: 16px; line-height: 1.35; }
+.ar-why { padding: 12px 14px; border-radius: 16px; background: var(--cotton); font-size: 14px; color: var(--ink); }
+</style>
+</head>
+<body>
+<script src="games.js"></script>
+<script>
+// ── Content (invented: The Lantern House) ─────────────────────
+const DECK = [
+  { term: 'Pathetic fallacy', kind: 'Technique', ban: ['weather', 'mood', 'emotion', 'storm', 'nature'] },
+  { term: 'Foreshadowing', kind: 'Narrative term', ban: ['hint', 'future', 'later', 'warning', 'clue'] },
+  { term: 'Unreliable narrator', kind: 'Narrative term', ban: ['trust', 'lie', 'storyteller', 'believe', 'voice'] },
+  { term: 'Personification', kind: 'Technique', ban: ['human', 'person', 'alive', 'object', 'give'] },
+  { term: 'Dramatic irony', kind: 'Narrative term', ban: ['audience', 'know', 'reader', 'secret', 'character'] },
+  { term: 'Symbolism', kind: 'Technique', ban: ['represents', 'stands', 'meaning', 'sign', 'object'] },
+  { term: 'Motif', kind: 'Narrative term', ban: ['repeat', 'recurring', 'theme', 'pattern', 'again'] },
+  { term: 'Juxtaposition', kind: 'Technique', ban: ['contrast', 'side', 'opposite', 'next', 'compare'] },
+  { term: 'Sibilance', kind: 'Technique', ban: ['hissing', 'sound', 'letter', 'snake', 'repeated'] },
+  { term: 'The uncanny', kind: 'Gothic idea', ban: ['strange', 'familiar', 'creepy', 'weird', 'eerie'] },
+  { term: 'Epistolary', kind: 'Form', ban: ['letters', 'diary', 'written', 'documents', 'form'] },
+  { term: 'Frame narrative', kind: 'Form', ban: ['story', 'within', 'outer', 'nested', 'border'] },
+  { term: 'Hyperbole', kind: 'Technique', ban: ['exaggerate', 'extreme', 'over', 'big', 'claim'] },
+  { term: 'Oxymoron', kind: 'Technique', ban: ['opposite', 'contradict', 'two', 'words', 'together'] },
+  { term: 'First-person narrator', kind: 'Narrative term', ban: ['me', 'my', 'myself', 'tells', 'inside'] },
+  { term: 'Allegory', kind: 'Form', ban: ['hidden', 'moral', 'story', 'represents', 'lesson'] }
+];
+const DEF = 'Pick the right definition', EX = 'Which example shows it?';
+const CHECK = {
+  'Pathetic fallacy': [EX, ['“The rain came in sideways the night Ellis left, as if the sky had given up too.”', '“The lamp-glass sighed when I lifted it from its hook.”', '“Grey stone, grey sky, grey Doctor Hask.”', '“I knew the gate was locked. Ellis did not.”'], 0, 'The weather mirrors Mira’s loss. A sighing lamp is personification.'],
+  'Foreshadowing': [DEF, ['An early detail that prepares the reader for a later event', 'A scene that jumps back to an earlier time', 'An image that keeps returning across the text', 'When the reader knows something a character does not'], 0, 'The others are flashback, motif and dramatic irony.'],
+  'Unreliable narrator': [EX, ['“I never went near the east wing that winter, though my boots were muddy every morning.”', '“Across the village, everyone slept except Doctor Hask.”', '“You climb the stairs, and you count them, and there are thirteen.”', '“Sister Agnes, who saw everything, said nothing at all.”'], 0, 'Mira’s claim and the muddy boots don’t match, so we doubt her.'],
+  'Personification': [EX, ['“The lamp-glass sighed when I lifted it from its hook.”', '“The fog was a grey wool blanket over the yard.”', '“The hall was as cold as a cellar in June.”', '“The gate clanged and clanged in the wind.”'], 0, 'Sighing is a human action. The fog line is a metaphor.'],
+  'Dramatic irony': [DEF, ['The reader knows something a character does not', 'A character says the opposite of what they mean', 'Events turn out the opposite of what was expected', 'A hint early on about what will happen later'], 0, 'The others are verbal irony, situational irony and foreshadowing.'],
+  'Symbolism': [DEF, ['An object or image that carries a meaning beyond itself', 'An object that appears again and again in a text', 'Giving human qualities to an object', 'A comparison that says one thing is another'], 0, 'Appearing again and again makes a motif, not a symbol.'],
+  'Motif': [DEF, ['An image or idea that recurs and builds meaning across a text', 'A single object that stands for an idea', 'The central message of the whole text', 'A repeated sound at the start of nearby words'], 0, 'A single object standing for an idea is a symbol.'],
+  'Juxtaposition': [EX, ['“Tobin’s warm kitchen sat one wall away from the room where they kept the dead.”', '“It was a cruel kindness, the doctor’s.”', '“The house leaned toward the sea, listening.”', '“The wind howled like a dog left out.”'], 0, 'Two contrasting places side by side. “Cruel kindness” is an oxymoron.'],
+  'Sibilance': [EX, ['“Soft sea-mist slid past the silent stairs.”', '“Mira’s mind moved more slowly than the moon.”', '“Bang went the gate, and bang again.”', '“Lamp after lamp after lamp went dark.”'], 0, 'Repeated s sounds. The m line is alliteration, not sibilance.'],
+  'The uncanny': [DEF, ['Something familiar made strange, so it unsettles us', 'A ghost or other supernatural being', 'A sudden shock that makes the reader jump', 'A setting cut off from the outside world'], 0, 'Mira’s thirteenth stair is uncanny: a known staircase made strange.'],
+  'Epistolary': [DEF, ['A story told through letters, diaries or documents', 'A story set inside another story', 'A story told out of time order', 'A story told directly to “you”'], 0, 'A story inside a story is a frame narrative.'],
+  'Frame narrative': [DEF, ['A story set inside another story', 'A story told through letters and diaries', 'The opening scene that sets up the setting', 'A story told from more than one point of view'], 0, 'Letters and diaries make an epistolary form.'],
+  'Hyperbole': [EX, ['“I lit a thousand lamps that night and still the dark won.”', '“It was a little dark, I suppose.”', '“The dark was a sea and I was drowning in it.”', '“Doctor Hask smiled the way a cat watches.”'], 0, '“A little dark” is understatement, the opposite move.'],
+  'Oxymoron': [EX, ['“It was a cruel kindness, the doctor’s.”', '“Tobin’s warm kitchen sat beside the cold room.”', '“The lantern was a small sun in my hand.”', '“The bells rang loud and long.”'], 0, 'Two clashing words together. The kitchen line is juxtaposition.'],
+  'First-person narrator': [DEF, ['A character tells the story, using “I”', 'An outside voice that knows every character’s thoughts', 'The story speaks to the reader as “you”', 'The story follows one character closely, using “she”'], 0, 'The others are omniscient, second person and third person limited.'],
+  'Allegory': [DEF, ['A whole story whose characters and events stand for bigger ideas', 'A single object that carries a deeper meaning', 'A short story with talking animals', 'A story that states its lesson at the end'], 0, 'A single object with meaning is a symbol.']
+};
+const KEYS = ['k1', 'k2', 'k3', 'k4'], LET = ['A', 'B', 'C', 'D'];
+const TURN_S = 45, MAX_PASS = 2;
+const TEAMS = GM.teams.map((t, i) => ({ ...t, members: GM.class.filter((_, k) => k % 4 === i) }));
+const ORDER = [1, 2, 3, 0];
+const ME_TEAM = TEAMS.findIndex((t) => t.members.includes(GM.me));
+
+let S, timers = [];
+function fresh() {
+  timers.forEach((t) => { clearTimeout(t); clearInterval(t); }); timers = [];
+  S && S.ring && S.ring.stop();
+  GM.rand();
+  S = {
+    turn: 0, phase: 'ready', deck: GM.shuffle(DECK.map((_, i) => i)), cur: null, cards: [], passes: 0, t0: 0,
+    score: TEAMS.map(() => 0), prev: TEAMS.map(() => 0), log: [], seen: [],
+    check: null
+  };
+}
+const team = () => TEAMS[ORDER[S.turn]];
+const describer = () => (ORDER[S.turn] === ME_TEAM ? GM.me : team().members[0]);
+const meDescribing = () => describer() === GM.me;
+const { board, phone } = GM.scaffold({
+  title: '<b>Articulate</b> · The Lantern House terms',
+  note: '<b>How to use:</b> you are JW, describing first for the Otters. Press <b>Start turn</b> on the board, then use <b>Got it</b> and <b>Pass</b> on the phone (your team guesses aloud). Press <b>Buzz</b> on the board when someone says a banned word. On other teams’ turns you are the Otters’ captain: your phone shows their card and a Buzz button. After the round, every phone gets the quick check.',
+  onRestart: () => { fresh(); boardTurn(); renderPhone(); }
+});
+
+// ── Helpers ───────────────────────────────────────────────────
+const D = (ms) => (GM.calm() ? 1 : ms);
+const later = (fn, ms) => { const h = setTimeout(fn, ms); timers.push(h); return h; };
+function clearStage() { board.querySelectorAll('.stage-x').forEach((n) => n.remove()); }
+function setControls(html) { board.querySelector('.board-controls')?.remove(); if (html) board.insertAdjacentHTML('beforeend', `<div class="stage-x board-controls">${html}</div>`); }
+function enter(nodes, { y = 30, step = 90, delay = 0 } = {}) {
+  [...nodes].forEach((n, k) => n.animate([{ opacity: 0, transform: `translateY(${y}px) scale(.97)` }, { opacity: 1, transform: 'none' }], { duration: D(600), delay: GM.calm() ? 0 : delay + k * step, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+}
+function pulse(n, s = 1.08) { if (n && !GM.calm()) n.animate([{ transform: 'scale(1)' }, { transform: `scale(${s})` }, { transform: 'scale(1)' }], { duration: 420, easing: 'cubic-bezier(.22,1,.36,1)' }); }
+const ordinal = (n) => `${n}${['st', 'nd', 'rd'][n - 1] || 'th'}`;
+const fsFor = (t) => (t.length > 16 ? 28 : t.length > 12 ? 32 : 38);
+
+// ── Board: a team's turn ──────────────────────────────────────
+function strip() {
+  return `<div class="stage-x ar-strip">${TEAMS.map((t, i) => `<span class="ar-ts ${i === ORDER[S.turn] && ['ready', 'turn', 'end'].includes(S.phase) ? 'now' : ''}" style="--tc:${t.colour}" data-t="${i}"><i>${t.name[0]}</i>${t.name}<b>${S.score[i]}</b></span>`).join('')}</div>`;
+}
+function boardTurn() {
+  clearStage();
+  const t = team(), d = describer();
+  board.insertAdjacentHTML('beforeend', `
+    <div class="stage-x ar-team" style="--tc:${t.colour}"><span class="b-eyebrow">Round 1 · turn ${S.turn + 1} of 4</span><h2><i></i>${t.name}</h2>
+      <span class="lbl">Describing</span><div class="ar-desc"><span class="b-avatar" style="${GM.avatarStyle(d)}">${d}</span>${d}</div>
+      <span class="lbl">Guessing aloud</span><div class="ar-guess">${t.members.filter((c) => c !== d).map((c) => `<div><span class="b-avatar" data-g="${c}" style="${GM.avatarStyle(c)}">${c}</span>${c}</div>`).join('')}</div></div>
+    <div class="stage-x ar-msg"><h3>${t.name}, you’re up</h3><p>${d} describes. No banned words, no “sounds like”, no pointing at the board. ${TURN_S} seconds.</p></div>
+    <div class="stage-x ar-field">${Array.from({ length: 12 }, () => '<div class="ar-slot"></div>').join('')}</div>
+    ${strip()}
+    <div class="stage-x ar-flash"></div>`);
+  enter(board.querySelectorAll('.ar-team, .ar-msg'), { step: 120 });
+  enter(board.querySelectorAll('.ar-slot'), { y: 16, step: 30, delay: 200 });
+  setControls(`${S.turn > 0 ? '<button class="bctl" data-a="skip">Skip to quick check</button>' : ''}<button class="bctl primary" data-a="start">Start turn</button>`);
+}
+function startTurn() {
+  S.phase = 'turn'; S.cards = []; S.passes = 0; S.t0 = performance.now();
+  board.querySelector('.ar-msg')?.remove();
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x ar-got"><span class="num">0</span><span class="lbl">cards got this turn</span></div><div class="stage-x ar-play" style="--tc:${team().colour}"></div><div class="stage-x ar-ring"></div>`);
+  setControls('<button class="bctl" data-a="end">End turn</button><button class="bctl buzz" data-a="buzz">Buzz</button>');
+  S.ring = GM.ring(board.querySelector('.ar-ring'), TURN_S, { onEnd: () => endTurn('time'), bar: () => phone.querySelector('.ph-timer i') });
+  GM.sound.whoosh();
+  draw();
+  if (!meDescribing()) simStep();
+  talkLoop();
+}
+function draw() {
+  S.cur = S.deck.shift();
+  if (S.cur == null) { endTurn('deck'); return; }
+  S.cardT = performance.now();
+  const p = board.querySelector('.ar-play');
+  if (p) {
+    p.innerHTML = `<div class="ar-cd back"><b>?</b><small>Card ${S.cards.length + 1} · ${describer()}</small></div>`;
+    if (!GM.calm()) p.firstChild.animate([{ transform: 'translateY(-60px) rotateX(50deg)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 450, easing: 'cubic-bezier(.22,1,.36,1)' });
+  }
+  renderPhone('in');
+}
+function talkLoop() {
+  if (S.phase !== 'turn') return;
+  const g = [...board.querySelectorAll('.ar-guess .b-avatar')];
+  g.forEach((n) => n.classList.remove('talk'));
+  GM.shuffle(g).slice(0, 1 + Math.floor(GM.rand() * 2)).forEach((n) => n.classList.add('talk'));
+  later(talkLoop, 1100);
+}
+async function resolve(st) {
+  if (S.phase !== 'turn' || S.cur == null) return;
+  const i = S.cur, secs = Math.round((performance.now() - S.cardT) / 1000);
+  S.cards.push({ i, st, secs }); S.cur = null;
+  if (st === 'pass') { S.passes++; S.deck.push(i); }
+  if (!S.seen.includes(DECK[i].term)) S.seen.push(DECK[i].term);
+  const slots = board.querySelectorAll('.ar-slot'), slot = slots[Math.min(S.cards.length - 1, slots.length - 1)];
+  const play = board.querySelector('.ar-play');
+  if (st === 'buzz') {
+    GM.sound.buzz();
+    const f = board.querySelector('.ar-flash');
+    f && f.animate([{ opacity: 0 }, { opacity: 1, offset: .2 }, { opacity: 0 }], { duration: D(700) });
+    if (play) {
+      play.innerHTML = `<div class="ar-cd ar-land buzz">${DECK[i].term}<span class="ar-stamp">BUZZED</span></div>`;
+      const sp = play.querySelector('.ar-stamp');
+      if (!GM.calm()) { play.firstChild.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-14px)' }, { transform: 'translateX(12px)' }, { transform: 'translateX(-6px)' }, { transform: 'none' }], { duration: 420 }); sp.animate([{ transform: 'translate(-50%,-50%) rotate(-12deg) scale(2.6)', opacity: 0 }, { transform: 'translate(-50%,-50%) rotate(-12deg) scale(1)', opacity: 1 }], { duration: 300, easing: 'cubic-bezier(.5,0,.5,1.4)' }); }
+    }
+    const pc = phone.querySelector('.ar-pcard');
+    if (pc) { pc.insertAdjacentHTML('beforeend', '<span class="ar-stamp" style="font-size:30px">BUZZED</span>'); phone.querySelectorAll('.ar-acts button, .ar-pbuzz').forEach((x) => { x.disabled = true; }); }
+    await GM.sleep(900);
+  } else if (st === 'got') GM.sound.right(); else GM.sound.whoosh();
+  if (slot) {
+    slot.classList.add('has');
+    slot.innerHTML = `<div class="ar-cd ar-land ${st}"><span class="st">${st === 'got' ? '✓ Got it' : st === 'pass' ? 'Passed' : ''}</span>${DECK[i].term}${st === 'buzz' ? '<span class="ar-stamp">BUZZED</span>' : ''}</div>`;
+    if (!GM.calm()) {
+      const c = slot.firstChild;
+      if (st === 'got') c.animate([{ transform: 'translateY(-420px) rotate(-10deg) scale(1.25)', opacity: 0 }, { transform: 'translateY(8px) rotate(1deg) scale(1)', opacity: 1, offset: .75 }, { transform: 'none', opacity: 1 }], { duration: 700, easing: 'cubic-bezier(.22,1,.36,1)' });
+      else c.animate([{ transform: 'scale(.85)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 400, easing: 'cubic-bezier(.22,1,.36,1)' });
+    }
+  }
+  const got = S.cards.filter((c) => c.st === 'got').length, num = board.querySelector('.ar-got .num');
+  if (num && st === 'got') { GM.countUp(num, got - 1, got, 300); pulse(num, 1.12); }
+  if (S.phase !== 'turn') return;
+  draw();
+  if (st === 'buzz') GM.toast(phone, meDescribing() ? 'Buzzed: a banned word<small>That card is out. Here’s the next one.</small>' : 'Buzzed<small>That card is out for them.</small>', 'bad');
+}
+function simStep() {
+  if (S.phase !== 'turn' || meDescribing()) return;
+  later(() => {
+    if (S.phase !== 'turn' || S.paused) { simStep(); return; }
+    const r = GM.rand();
+    if (r < .72) resolve('got'); else if (r < .9 && S.passes < MAX_PASS) resolve('pass');
+    simStep();
+  }, D(2600 + GM.rand() * 2400));
+}
+function endTurn(why) {
+  if (S.phase !== 'turn') return;
+  S.phase = 'end'; S.ring && S.ring.stop();
+  if (S.cur != null) { S.deck.unshift(S.cur); S.cur = null; }
+  const ti = ORDER[S.turn], got = S.cards.filter((c) => c.st === 'got').length;
+  S.prev = S.score.slice(); S.score[ti] += got;
+  S.log.push({ team: ti, d: describer(), cards: S.cards.slice() });
+  board.querySelectorAll('.ar-guess .b-avatar').forEach((n) => n.classList.remove('talk'));
+  board.querySelector('.ar-play')?.remove(); board.querySelector('.ar-ring')?.remove();
+  board.querySelector('.ar-got .lbl').textContent = why === 'deck' ? 'cards got · deck empty' : why === 'time' ? 'cards got · time!' : 'cards got · turn ended';
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x ar-msg" style="left:1010px"><h3>${got ? `${team().name} +${got}` : 'No cards this time'}</h3><p>${S.cards.filter((c) => c.st === 'pass').length} passed · ${S.cards.filter((c) => c.st === 'buzz').length} buzzed</p></div>`);
+  enter(board.querySelectorAll('.ar-msg'), { y: 16 });
+  const chip = board.querySelector(`.ar-ts[data-t="${ti}"] b`); if (chip) { GM.countUp(chip, S.prev[ti], S.score[ti], 800); pulse(chip.parentElement, 1.08); }
+  GM.sound.ding();
+  const last = S.turn === ORDER.length - 1;
+  setControls(last ? '<button class="bctl primary" data-a="check">Quick check</button>' : `<button class="bctl" data-a="skip">Skip to quick check</button><button class="bctl primary" data-a="next">Next: ${TEAMS[ORDER[S.turn + 1]].name}</button>`);
+  renderPhone();
+}
+function skipRest(from) {
+  // simulate the remaining teams' turns instantly
+  for (let k = from; k < ORDER.length; k++) {
+    const ti = ORDER[k], cards = [], n = 3 + Math.floor(GM.rand() * 4);
+    for (let j = 0; j < n + 2; j++) {
+      const i = S.deck.shift(); if (i == null) break;
+      const r = GM.rand(), st = j > n ? 'pass' : r < .14 ? 'pass' : r < .24 ? 'buzz' : 'got';
+      cards.push({ i, st, secs: 4 + Math.floor(GM.rand() * 8) });
+      if (st === 'pass') S.deck.push(i);
+      if (!S.seen.includes(DECK[i].term)) S.seen.push(DECK[i].term);
+    }
+    S.score[ti] += cards.filter((c) => c.st === 'got').length;
+    S.log.push({ team: ti, d: TEAMS[ti].members[0], cards });
+  }
+  S.turn = ORDER.length - 1;
+}
+
+// ── Quick check ───────────────────────────────────────────────
+function startCheck() {
+  S.phase = 'check';
+  const mine = (S.log.find((l) => l.team === ME_TEAM)?.cards || []).map((c) => DECK[c.i].term);
+  const pickTerms = [...new Set([...mine.slice(0, 2), ...S.seen, ...DECK.map((d) => d.term)])].slice(0, 4);
+  const p = [.86, .71, .5, .79];
+  S.check = { terms: pickTerms, p, idx: 0, mine: [], chosen: null, prog: Object.fromEntries(GM.class.map((c) => [c, 0])), res: Object.fromEntries(GM.class.map((c) => [c, []])), revealed: false };
+  clearStage();
+  board.insertAdjacentHTML('beforeend', `
+    <div class="stage-x ar-qh"><div><span class="b-eyebrow">After the round · on every phone</span><h2>Quick check: this round’s terms</h2></div><span class="b-pill">Everyone answers on their own</span></div>
+    <div class="stage-x ar-qrows">${pickTerms.map((t, k) => `<div class="ar-qrow" data-k="${k}"><span class="t"><b>${t}</b><span>${CHECK[t][0]}</span></span><span class="bar"><i></i></span><span class="n"><b>0</b> / ${GM.class.length} answered</span></div>`).join('')}</div>
+    ${strip()}`);
+  enter(board.querySelectorAll('.ar-qrow'), { step: 110 });
+  setControls('<button class="bctl primary" data-a="reveal">Reveal results</button>');
+  GM.sound.reveal();
+  timers.push(setInterval(simCheck, 260));
+  renderPhone();
+}
+function simCheck() {
+  if (S.paused || !S.check || S.check.revealed) return;
+  const busy = GM.class.filter((c) => c !== GM.me && S.check.prog[c] < 4);
+  if (!busy.length) return;
+  const c = GM.pick(busy), k = S.check.prog[c]++;
+  S.check.res[c][k] = GM.rand() < S.check.p[k];
+  updateCheckRow(k);
+}
+function updateCheckRow(k) {
+  const row = board.querySelector(`.ar-qrow[data-k="${k}"]`); if (!row || S.check.revealed) return;
+  const n = GM.class.filter((c) => S.check.prog[c] > k).length;
+  row.querySelector('.n b').textContent = n;
+  row.querySelector('.bar i').style.transform = `scaleX(${n / GM.class.length})`;
+}
+function revealCheck() {
+  const C = S.check; C.revealed = true;
+  GM.class.forEach((c) => { if (c === GM.me) return; while (C.prog[c] < 4) { const k = C.prog[c]++; C.res[c][k] = GM.rand() < C.p[k]; } });
+  const pct = C.terms.map((_, k) => { const done = GM.class.filter((c) => C.res[c][k] != null); return Math.round((done.filter((c) => C.res[c][k]).length / Math.max(1, done.length)) * 100); });
+  const hard = pct.indexOf(Math.min(...pct));
+  GM.sound.reveal();
+  board.querySelectorAll('.ar-qrow').forEach((row, k) => {
+    later(() => {
+      const i = row.querySelector('.bar i'); i.style.background = pct[k] >= 70 ? 'var(--game-right)' : pct[k] >= 55 ? 'var(--game-gold)' : 'var(--game-wrong)';
+      i.style.transform = `scaleX(${pct[k] / 100})`;
+      row.querySelector('.n').innerHTML = `<b>${pct[k]}%</b> right`;
+      if (k === hard) { row.classList.add('hard'); row.querySelector('.t b').insertAdjacentHTML('beforeend', '<span class="hardtag">Hardest</span>'); }
+      GM.sound.click();
+    }, D(250 + k * 300));
+  });
+  const avg = Math.round(pct.reduce((a, b) => a + b, 0) / pct.length);
+  C.avg = avg; C.hard = C.terms[hard];
+  board.querySelector('.ar-qh .b-pill').textContent = `Class got ${avg}%`;
+  setControls('<button class="bctl primary" data-a="final">Final scores</button>');
+}
+
+// ── Final + teacher ───────────────────────────────────────────
+function final() {
+  S.phase = 'final'; clearStage();
+  const ranked = TEAMS.map((t, i) => ({ t, i, s: S.score[i] })).sort((a, b) => b.s - a.s);
+  ranked.forEach((r) => { r.place = 1 + ranked.filter((x) => x.s > r.s).length; });
+  const [a, b, c, d] = ranked, tops = ranked.filter((r) => r.place === 1);
+  const head = tops.length > 1 ? `Tie at the top: ${tops.map((r) => r.t.name).join(' and ')}` : `${a.t.name} win the round`;
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x ar-fh"><span class="b-eyebrow">Round 1 · final scores</span><h2>${head}</h2><p>Quick check: class got <b>${S.check?.avg ?? 0}%</b> · hardest: <b>${S.check?.hard ?? '–'}</b> · ${ordinal(d.place)}: <b>${d.t.name} ${d.s}</b></p></div>
+    <div class="stage-x podium">${[[b, 'p2', 2], [a, 'p1', 1], [c, 'p3', 3]].map(([r, cls, n]) => `<div class="pod ${cls}"><span class="ar-badge" style="background:${r.t.colour}">${r.t.name[0]}</span><span class="name">${r.t.name}</span><span class="score">${r.s} cards</span><div class="block">${r.place}</div></div>`).join('')}</div>`);
+  setControls('<button class="bctl primary" data-a="teacher">Teacher view</button>');
+  board.querySelectorAll('.pod').forEach((p, k) => p.animate([{ transform: 'translateY(100%)' }, { transform: 'none' }], { duration: D(900), delay: GM.calm() ? 0 : [400, 1100, 0][k], easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' }));
+  later(() => { GM.sound.fanfare(); GM.confetti(board); }, GM.calm() ? 0 : 1300);
+  renderPhone();
+}
+function teacher() {
+  clearStage();
+  const C = S.check;
+  const rows = S.log.map((l) => {
+    const n = (st) => l.cards.filter((c) => c.st === st).length;
+    const secs = l.cards.length ? Math.round(l.cards.reduce((a, c) => a + c.secs, 0) / l.cards.length) : 0;
+    return `<div class="ar-tr"><span class="who"><span class="b-avatar" style="${GM.avatarStyle(l.d)}">${l.d}</span>${l.d} <small>${TEAMS[l.team].name}</small></span><span class="num">${n('got')}</span><span class="num">${n('pass')}</span><span class="num">${n('buzz')}</span><span class="num">${secs} s</span><span class="ar-terms">${l.cards.map((c) => `<span class="${c.st}">${DECK[c.i].term}</span>`).join('')}</span></div>`;
+  }).join('');
+  const missed = C ? GM.class.filter((c) => C.res[c].some((v) => v === false)) : [];
+  const descGot = S.log.find((l) => l.team === ME_TEAM);
+  board.insertAdjacentHTML('beforeend', `<div class="stage-x ar-tv">
+    <span class="b-eyebrow" style="margin:0">Teacher only · not for the projector</span>
+    <h3>Per describer</h3>
+    <div class="ar-tbl"><div class="ar-tr hd"><span>Describer</span><span class="num">Got</span><span class="num">Passed</span><span class="num">Buzzed</span><span class="num">Per card</span><span>Terms</span></div>${rows}</div>
+    <h3 style="margin-top:6px">Quick check, per student</h3>
+    ${C ? `<div class="ar-grid"><span></span>${GM.class.map((c) => `<span class="h ${c === GM.me ? 'me' : ''}">${c}</span>`).join('')}
+      ${C.terms.map((t, k) => `<span class="term">${t}</span>${GM.class.map((c) => { const v = C.res[c][k]; return `<span class="c ${v == null ? '' : v ? 'y' : 'n'}">${v == null ? '·' : v ? '✓' : '✗'}</span>`; }).join('')}`).join('')}</div>
+      <p class="ar-note"><b>Talked well, missed in the check:</b> ${missed.slice(0, 4).join(', ') || 'nobody'}. Guessing aloud counts as team evidence; the check is each student’s own. ${descGot ? `<b>${descGot.d}</b> described ${descGot.cards.filter((c) => c.st === 'got').length} terms for the ${TEAMS[ME_TEAM].name}.` : ''}</p>` : '<p class="ar-note">Quick check not run this round.</p>'}
+  </div>`);
+  setControls('<button class="bctl" data-a="final">Back to scores</button><button class="bctl primary" data-a="restart">Play again</button>');
+  enter(board.querySelectorAll('.ar-tr'), { y: 12, step: 70 });
+}
+
+// ── Board controls ────────────────────────────────────────────
+board.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+  if (a !== 'buzz') GM.sound.click();
+  if (a === 'start') startTurn();
+  if (a === 'buzz') resolve('buzz');
+  if (a === 'end') endTurn('ended');
+  if (a === 'next') { S.turn++; S.phase = 'ready'; boardTurn(); renderPhone(); }
+  if (a === 'skip') { const from = S.phase === 'ready' ? S.turn : S.turn + 1; if (S.phase === 'turn') endTurn('ended'); skipRest(from); startCheck(); }
+  if (a === 'check') startCheck();
+  if (a === 'reveal') revealCheck();
+  if (a === 'final') final();
+  if (a === 'teacher') teacher();
+  if (a === 'restart') { fresh(); boardTurn(); renderPhone(); }
+});
+
+// ── Phone ─────────────────────────────────────────────────────
+function shell(body, dock = '', badge = '') {
+  const t = TEAMS[ME_TEAM];
+  phone.innerHTML = `<div class="ph-top"><span class="ph-me"><span class="av">${GM.me}</span>JW</span><span class="ph-score" style="display:inline-flex;align-items:center;gap:8px"><i style="width:12px;height:12px;border-radius:50%;background:${t.colour}"></i>${badge || t.name}</span></div>
+    <div class="ph-timer"><i></i></div><div class="ph-body">${body}</div>${dock ? `<div class="ph-dock">${dock}</div>` : ''}`;
+}
+function cardHtml(i, tc) {
+  const d = DECK[i];
+  return `<div class="ar-pcard" style="--tc:${tc}"><span class="kind">${d.kind}</span><span class="term" style="--fs:${fsFor(d.term)}px">${d.term}</span><div class="ar-ban"><span>Don’t say</span><ul>${d.ban.map((b) => `<li>${b}</li>`).join('')}</ul></div></div>`;
+}
+function renderPhone(anim) {
+  const t = team(), mt = TEAMS[ME_TEAM];
+  if (S.phase === 'ready') {
+    if (meDescribing()) shell(`<div class="ar-wait"><div><span class="ar-tc" style="--tc:${mt.colour};--tcs:${mt.soft}"><i></i>${mt.name}</span><div class="big" style="margin-top:18px">You’re describing</div><p class="ph-sub" style="margin-top:14px">Hold your phone so your team can’t see it. Your first card appears when the teacher starts the turn.</p></div></div>`);
+    else shell(`<div class="ar-wait"><div><span class="ar-tc" style="--tc:${t.colour};--tcs:${t.soft}"><i></i>${t.name} are up next</span><p class="ph-sub" style="margin-top:14px">You’re the ${mt.name}’ captain. When their turn starts you’ll see their card, so you can buzz a banned word.</p></div></div>`);
+    return;
+  }
+  if (S.phase === 'turn') {
+    if (S.cur == null) return;
+    if (meDescribing()) {
+      const got = S.cards.filter((c) => c.st === 'got').length, left = MAX_PASS - S.passes;
+      shell(`${cardHtml(S.cur, mt.colour)}
+        <div class="ar-meta"><span>Got <b style="color:var(--navy);font-size:17px">${got}</b> this turn</span><span style="display:flex;align-items:center;gap:8px">Passes <span class="dots">${Array.from({ length: MAX_PASS }, (_, k) => `<i class="${k < S.passes ? 'used' : ''}"></i>`).join('')}</span></span></div>`,
+      `<div class="ar-acts"><button class="pass" data-p="pass" ${left ? '' : 'disabled'}>${left ? `Pass (${left} left)` : 'No passes left'}</button><button class="got" data-p="got">Got it</button></div>`, `Got ${got}`);
+    } else {
+      shell(`<p class="ph-sub"><b style="color:var(--ink)">${t.name}</b> are describing · ${describer()} has the card</p>${cardHtml(S.cur, t.colour)}<p class="ph-sub" style="font-size:14px">Captain: buzz the moment you hear a banned word.</p>`,
+        '<button class="ar-pbuzz" data-p="buzz">Buzz · banned word said</button>', 'Captain');
+    }
+    const c = phone.querySelector('.ar-pcard');
+    if (c && anim === 'in' && !GM.calm()) c.animate([{ transform: 'translateY(60px) scale(.94)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 420, easing: 'cubic-bezier(.22,1,.36,1)' });
+    return;
+  }
+  if (S.phase === 'end') {
+    const l = S.log[S.log.length - 1], got = l.cards.filter((c) => c.st === 'got').length;
+    const mine = l.d === GM.me;
+    shell(`<div class="ar-wait" style="flex:none;padding-top:20px"><div><span class="ph-sub">${mine ? 'Time! You described' : `${TEAMS[l.team].name} got`}</span><div class="big">${got}</div><p class="ph-sub">${mine ? `for the ${mt.name}` : 'cards'}</p></div></div>
+      <div class="ar-list">${l.cards.map((c) => `<div><span>${DECK[c.i].term}</span><span class="${c.st === 'got' ? 'ok' : c.st === 'buzz' ? 'no' : 'mu'}">${c.st === 'got' ? 'Got it' : c.st === 'buzz' ? 'Buzzed' : 'Passed'}</span></div>`).join('') || '<div><span>No cards this turn</span></div>'}</div>
+      <p class="ph-sub" style="text-align:center">A quick check on these terms comes after the round.</p>`, '', mine ? `Got ${got}` : '');
+    return;
+  }
+  if (S.phase === 'check') {
+    const C = S.check;
+    if (C.idx >= C.terms.length) {
+      const right = C.mine.filter(Boolean).length;
+      shell(`<div class="ar-wait"><div><span class="ph-sub">Quick check done</span><div class="big">${right} of ${C.terms.length}</div><p class="ph-sub">Eyes on the board for the class results.</p></div></div>
+        <div class="ar-list">${C.terms.map((t, k) => `<div><span>${t}</span><span class="${C.mine[k] ? 'ok' : 'no'}">${C.mine[k] ? 'Right' : 'Back to box 1'}</span></div>`).join('')}</div>`, '', `${right} / ${C.terms.length}`);
+      return;
+    }
+    const term = C.terms[C.idx], [kind, opts, right, why] = CHECK[term];
+    if (!C.order || C.order.term !== term) C.order = { term, o: GM.shuffle([0, 1, 2, 3]) };
+    const answered = C.chosen != null;
+    shell(`<div style="display:flex;justify-content:space-between;align-items:center"><p class="ph-sub">Quick check ${C.idx + 1} of ${C.terms.length}</p><span class="ph-sub" style="font-size:13px">On your own</span></div>
+      <p class="ph-sub" style="font-size:14px;font-weight:600">${kind}</p><p class="ph-h" style="font-size:26px">${term}</p>
+      ${C.order.o.map((oi, k) => `<button class="pbtn ar-qbtn ${answered ? (oi === right ? 'right' : oi === C.chosen ? 'wrong' : 'dim') : ''}" data-q="${oi}" ${answered ? 'disabled style="opacity:1"' : ''}><span class="key ${KEYS[k]}">${LET[k]}</span><span>${opts[oi]}</span></button>`).join('')}
+      ${answered ? `<div class="ar-why">${why}</div>` : ''}`,
+    answered ? `<button class="pbtn cta" data-p="qnext">${C.idx === C.terms.length - 1 ? 'Finish' : 'Next question'}</button>` : '', `${C.mine.filter(Boolean).length} right`);
+    return;
+  }
+  if (S.phase === 'final') {
+    const place = 1 + S.score.filter((x) => x > S.score[ME_TEAM]).length, tied = S.score.filter((x) => x === S.score[ME_TEAM]).length > 1;
+    const right = S.check ? S.check.mine.filter(Boolean).length : 0, mineLog = S.log.find((l) => l.team === ME_TEAM);
+    shell(`<div class="ar-wait" style="flex:none;padding-top:20px"><div><span class="ar-tc" style="--tc:${mt.colour};--tcs:${mt.soft}"><i></i>${mt.name}</span><div class="big" style="margin-top:14px">${tied ? '=' : ''}${ordinal(place)}</div><p class="ph-sub">${S.score[ME_TEAM]} cards this round</p></div></div>
+      <div class="ar-list"><div><span>You described</span><b>${mineLog ? mineLog.cards.filter((c) => c.st === 'got').length : 0} got</b></div><div><span>Your quick check</span><b>${right} of ${S.check ? S.check.terms.length : 0}</b></div></div>
+      <p class="ph-sub" style="text-align:center">Missed terms go back to box 1 in your organiser.</p>`, '', 'Round over');
+  }
+}
+phone.addEventListener('click', async (e) => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  const p = b.dataset.p;
+  if ((p === 'got' || p === 'pass') && S.phase === 'turn') {
+    const c = phone.querySelector('.ar-pcard');
+    phone.querySelectorAll('.ar-acts button').forEach((x) => { x.disabled = true; });
+    if (c && !GM.calm()) c.animate(p === 'got' ? [{ transform: 'none', opacity: 1 }, { transform: 'translateY(-140%) rotate(-5deg) scale(.9)', opacity: 0 }] : [{ transform: 'none', opacity: 1 }, { transform: 'translateX(-120%) rotate(-4deg)', opacity: 0 }], { duration: 320, easing: 'cubic-bezier(.5,0,.75,0)', fill: 'forwards' });
+    await GM.sleep(320);
+    resolve(p);
+  }
+  if (p === 'buzz' && S.phase === 'turn') resolve('buzz');
+  if (b.dataset.q != null && S.phase === 'check') {
+    const C = S.check, ok = +b.dataset.q === CHECK[C.terms[C.idx]][2];
+    C.chosen = +b.dataset.q; C.mine[C.idx] = ok; C.res[GM.me][C.idx] = ok; C.prog[GM.me] = C.idx + 1; updateCheckRow(C.idx);
+    ok ? GM.sound.right() : GM.sound.wrong();
+    renderPhone();
+    if (!ok) phone.querySelector('.pbtn.wrong')?.classList.add('fx-shake');
+  }
+  if (p === 'qnext') { S.check.idx++; S.check.chosen = null; renderPhone(); const body = phone.querySelector('.ph-body'); body && body.animate([{ transform: 'translateX(40px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: D(350), easing: 'cubic-bezier(.22,1,.36,1)' }); }
+});
+
+fresh(); boardTurn(); renderPhone();
+</script>
+</body>
+</html>
