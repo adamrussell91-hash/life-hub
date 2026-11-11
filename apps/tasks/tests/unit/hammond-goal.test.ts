@@ -36,6 +36,15 @@ describe('goal reads domain', () => {
   it('describes each ghost kind for a confirm card', () => {
     expect(describeGhost(READ.ghosts[0]!)).toMatchObject({ kind: 'Task · split into steps', title: 'Split “Write up 6.3” into 3 steps' });
     expect(describeGhost(READ.ghosts[1]!).diff?.after[0]).toContain('16/11/26');
+    const grid = describeGhost({
+      id: 'goal-g1-mandala-x', agent: 'hammond', kind: 'goal_mandala', goalId: 'g1',
+      additions: [
+        { type: 'pillar', slot: 0, label: 'Training block', project_id: 'pr1' },
+        { type: 'action', pillar: 0, pillar_label: 'Training block', project_id: 'pr1', slot: 0, label: 'Long run', task_id: 't1' }
+      ]
+    });
+    expect(grid).toMatchObject({ kind: 'Goal · grid', title: 'Add 2 cells to the grid' });
+    expect(grid.diff?.after).toEqual(['+ Pillar: Training block', '+ Long run (Training block)']);
   });
 
   it('orders the strip coldest first and builds the runway overlay', () => {

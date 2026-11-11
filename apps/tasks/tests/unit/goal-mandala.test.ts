@@ -155,4 +155,24 @@ describe('Mandala structure', () => {
     expect(mandalaHasContent(mandalaGoal())).toBe(true);
     expect(mandalaHasContent(goal({ id: 'x', title: 'x' }))).toBe(false);
   });
+
+  it('offers the if-then and hands the action over without saving', () => {
+    const onPatch = vi.fn();
+    const onPromoteIfThen = vi.fn();
+    const node = renderGoalFrame(mandalaGoal(), onPatch, { onPromoteIfThen });
+    node.querySelector<HTMLButtonElement>('[data-action="open-pillar"]')!.click();
+    const select = node.querySelector<HTMLSelectElement>('[data-action="promote"]')!;
+    expect([...select.options].map((o) => o.value)).toContain('if_then');
+    commit(select, 'if_then');
+    expect(onPromoteIfThen).toHaveBeenCalledWith('Three easy runs a week');
+    expect(onPatch).not.toHaveBeenCalled();
+  });
+
+  it('shows the If-then label while the trigger runs this action', () => {
+    const g = mandalaGoal({ if_then: { cue: 'After school Tuesday', action: 'Three easy runs a week', obstacle: '' } });
+    const node = renderGoalFrame(g, vi.fn());
+    node.querySelector<HTMLButtonElement>('[data-action="open-pillar"]')!.click();
+    expect(node.querySelector('.mandala__chip--ifthen')!.textContent).toBe('If-then');
+    expect(node.querySelector('[data-action="promote"]')).toBeNull();
+  });
 });

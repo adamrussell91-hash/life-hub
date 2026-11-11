@@ -3,7 +3,7 @@ import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 export type GoalGhost = {
   id: string;
   agent: 'hammond';
-  kind: 'create_task' | 'split_task' | 'goal_rest_weeks' | 'move_task' | 'protect_block';
+  kind: 'create_task' | 'split_task' | 'goal_rest_weeks' | 'goal_mandala' | 'move_task' | 'protect_block';
   title?: string;
   reason?: string;
   due?: string;
@@ -17,7 +17,12 @@ export type GoalGhost = {
   date?: string;
   start?: string;
   end?: string;
+  additions?: MandalaAddition[];
 };
+
+export type MandalaAddition =
+  | { type: 'pillar'; slot: number; label: string; project_id: string }
+  | { type: 'action'; pillar: number; pillar_label?: string; project_id?: string; slot: number; label: string; task_id: string };
 
 export type GoalRead = {
   goal_id: string;
@@ -63,6 +68,18 @@ export function describeGhost(ghost: GoalGhost): GhostCard {
         why,
         diff: { before: 'Every week counts', after: [`Rest: ${(ghost.weeks ?? []).map((w) => formatDisplayDate(w)).join(', ')}`] }
       };
+    case 'goal_mandala': {
+      const adds = ghost.additions ?? [];
+      return {
+        kind: 'Goal · grid',
+        title: `Add ${adds.length} cell${adds.length === 1 ? '' : 's'} to the grid`,
+        why,
+        diff: {
+          before: null,
+          after: adds.map((a) => (a.type === 'pillar' ? `+ Pillar: ${a.label}` : `+ ${a.label} (${a.pillar_label || 'pillar'})`))
+        }
+      };
+    }
     case 'move_task':
       return {
         kind: 'Task · new date',

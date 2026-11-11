@@ -10,7 +10,9 @@ import { isClosedTask } from './task-liveness.mjs';
 export const SPHERE_DOMAIN = Object.freeze({ life: 'life', work: 'teaching', professional: 'other' });
 const MAX_GHOSTS = 3;
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
-const GHOST_ID = /^goal-(.+?)-(?:start|split-.+|rest-.+|move-.+|block-.+)$/;
+const GHOST_ID = /^goal-(.+?)-(?:start|split-.+|rest-.+|move-.+|block-.+|mandala-.+)$/;
+const MANDALA_SIZE = 8;
+const MANDALA_MAX_ADDITIONS = 8;
 
 export function goalIdFromGhostId(id) {
   const match = typeof id === 'string' ? GHOST_ID.exec(id) : null;
@@ -45,6 +47,104 @@ function median(values) {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+/** Eight pillars of eight actions, blanks kept, so an index is a grid position. */
+function padMandala(goal) {
+  const stored = Array.isArray(goal?.frame?.mandala?.pillars) ? goal.frame.mandala.pillars : [];
+  return Array.from({ length: MANDALA_SIZE }, (_, i) => {
+    const p = stored[i] ?? {};
+    const id = typeof p.id === 'string' && p.id ? p.id : `p${i + 1}`;
+    const actions = Array.isArray(p.actions) ? p.actions : [];
+    return {
+      id,
+      label: typeof p.label === 'string' ? p.label : '',
+      project_id: typeof p.project_id === 'string' && p.project_id ? p.project_id : null,
+      actions: Array.from({ length: MANDALA_SIZE }, (_, j) => {
+        const a = actions[j] ?? {};
+        return {
+          id: typeof a.id === 'string' && a.id ? a.id : `${id}a${j + 1}`,
+          label: typeof a.label === 'string' ? a.label : '',
+          promoted: a.promoted && typeof a.promoted === 'object' ? a.promoted : null
+        };
+      })
+    };
+  });
+}
+
+function shortHash(text) {
+  let h = 5381;
+  for (let i = 0; i < text.length; i += 1) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+/**
+ * Hosted work that is not on the Mandala yet. Each unlinked project becomes a pillar in an
+ * empty slot, linked to it; each open task in a linked project becomes an action under that
+ * pillar, marked as that task. Only for goals on the Mandala structure.
+ */
+export function mandalaAdditions({ goal, hostedProjects, hostedTasks }) {
+  if (goal?.structure !== 'mandala') return [];
+  const pillars = padMandala(goal);
+  const additions = [];
+  const linked = new Set(pillars.map(p => p.project_id).filter(Boolean));
+  const onGrid = new Set(pillars.flatMap(p => p.actions.map(a => a.promoted?.task_id).filter(Boolean)));
+  const freeSlots = pillars.map((p, i) => (p.label.trim() ? null : i)).filter(i => i !== null);
+  const pillarOf = new Map(pillars.flatMap((p, i) => (p.project_id && p.label.trim() ? [[p.project_id, i]] : [])));
+  const names = pillars.map(p => p.label.trim());
+  for (const project of hostedProjects) {
+    if (linked.has(project.id) || !freeSlots.length || !String(project.title ?? '').trim()) continue;
+    const slot = freeSlots.shift();
+    additions.push({ type: 'pillar', slot, label: String(project.title).trim(), project_id: project.id });
+    pillarOf.set(project.id, slot);
+    names[slot] = String(project.title).trim();
+  }
+  const freeActions = new Map(pillars.map((p, i) => [i, p.actions.map((a, j) => (a.label.trim() ? null : j)).filter(j => j !== null)]));
+  for (const task of hostedTasks) {
+    if (additions.length >= MANDALA_MAX_ADDITIONS) break;
+    if (isClosedTask(task) || task.kind === 'step' || onGrid.has(task.id)) continue;
+    const slot = pillarOf.get(task.parent_project_id);
+    const free = slot === undefined ? null : freeActions.get(slot);
+    if (!free?.length || !String(task.title ?? '').trim()) continue;
+    additions.push({
+      type: 'action', pillar: slot, pillar_label: names[slot], project_id: task.parent_project_id,
+      slot: free.shift(), label: String(task.title).trim(), task_id: task.id
+    });
+  }
+  return additions.slice(0, MANDALA_MAX_ADDITIONS);
+}
+
+/** Apply additions to the goal's Mandala as it is now. Cells filled since the read are skipped. */
+export function applyMandalaAdditions(goal, additions = []) {
+  const pillars = padMandala(goal);
+  let applied = 0;
+  for (const add of additions) {
+    if (add?.type === 'pillar') {
+      const p = pillars[add.slot];
+      if (!p || p.label.trim()) continue;
+      pillars[add.slot] = { ...p, label: String(add.label).slice(0, 120), project_id: add.project_id ?? null };
+      applied += 1;
+    } else if (add?.type === 'action') {
+      const p = pillars[add.pillar];
+      const a = p?.actions[add.slot];
+      // The pillar must still be the one linked to this task's project, not one typed over it since.
+      if (!a || a.label.trim() || !p.label.trim() || (add.project_id && p.project_id !== add.project_id)) continue;
+      p.actions[add.slot] = { ...a, label: String(add.label).slice(0, 160), promoted: add.task_id ? { kind: 'task', task_id: add.task_id } : null };
+      applied += 1;
+    }
+  }
+  return { frame: { ...(goal.frame ?? {}), mandala: { pillars } }, applied };
+}
+
+function mandalaProposal({ goal, hostedProjects, hostedTasks, prefix }) {
+  const additions = mandalaAdditions({ goal, hostedProjects, hostedTasks });
+  if (!additions.length) return null;
+  const key = additions.map(a => (a.type === 'pillar' ? `p:${a.project_id}` : `a:${a.task_id}`)).join('|');
+  return {
+    id: `${prefix}mandala-${shortHash(key)}`, agent: 'hammond', kind: 'goal_mandala',
+    goalId: goal.id, title: goal.title, additions,
+    reason: 'This work already serves the goal but is not on the grid yet'
+  };
 }
 
 export function hostedOf(goal, projects = [], tasks = []) {
@@ -317,6 +417,9 @@ export function buildGoalRead({
   if (stuck && !skip.has(stuck.id) && !cooledKinds.has(stuck.kind)) {
     ghosts = [stuck, ...ghosts.filter(g => g.id !== stuck.id)];
   }
+  // On the Mandala structure, filling the grid from existing work comes first.
+  const mandala = mandalaProposal({ goal, hostedProjects, hostedTasks, prefix: `goal-${goal.id}-` });
+  if (mandala && !skip.has(mandala.id) && !cooledKinds.has(mandala.kind)) ghosts = [mandala, ...ghosts];
   ghosts = ghosts.slice(0, MAX_GHOSTS);
 
   let verdict = verdictFor({ days, temperature, count, perWeek, crunch });

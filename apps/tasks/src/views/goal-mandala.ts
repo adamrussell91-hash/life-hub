@@ -15,6 +15,8 @@ export type MandalaContext = {
   tasks?: Array<{ id: string; status: string }>;
   /** Create a task titled `label` on this goal, then save `patchFor(taskId)`. */
   onPromoteTask?: (label: string, patchFor: (taskId: string) => MandalaPatch) => void;
+  /** Fill the if-then's action with `label` and ask for the cue. */
+  onPromoteIfThen?: (label: string) => void;
   confirm?: (message: string) => boolean;
 };
 
@@ -70,13 +72,16 @@ export function promotionState(
   goal: Goal,
   action: GoalMandalaAction,
   ctx: MandalaContext
-): 'lead' | 'task' | 'task-done' | null {
+): 'lead' | 'task' | 'task-done' | 'if_then' | null {
   const p = action.promoted;
-  if (!p) return null;
-  if (p.kind === 'lead') return goal.lead_measure?.label === action.label ? 'lead' : null;
+  const label = action.label.trim();
+  // The if-then is never stored on the cell: it holds while the trigger's action is this text.
+  const trigger = label && goal.if_then?.action.trim() === label ? 'if_then' : null;
+  if (!p) return trigger;
+  if (p.kind === 'lead') return goal.lead_measure?.label === action.label ? 'lead' : trigger;
   if (!ctx.tasks) return 'task';
   const task = ctx.tasks.find((t) => t.id === p.task_id);
-  if (!task) return null;
+  if (!task) return trigger;
   return task.status === 'done' ? 'task-done' : 'task';
 }
 
@@ -178,6 +183,7 @@ function promoteControl(
   select.setAttribute('aria-label', `Use "${action.label}" as`);
   const options: Array<[string, string]> = [['', 'Use as… ▾'], ['lead', 'Lead measure']];
   if (ctx.onPromoteTask) options.push(['task', 'Task on this goal']);
+  if (ctx.onPromoteIfThen) options.push(['if_then', 'If-then trigger']);
   for (const [value, label] of options) {
     const opt = el('option', '', label);
     opt.value = value;
@@ -197,6 +203,8 @@ function promoteControl(
       }));
       const marked = withPillar(cleared, index, withAction(cleared[index]!, j, { ...action, promoted: { kind: 'lead', task_id: null } }));
       onPatch({ ...framePatch(goal, marked), lead_measure: { label: action.label, per_week: goal.lead_measure?.per_week ?? 1 } });
+    } else if (kind === 'if_then' && ctx.onPromoteIfThen) {
+      ctx.onPromoteIfThen(action.label);
     } else if (kind === 'task' && ctx.onPromoteTask) {
       ctx.onPromoteTask(action.label, (taskId) =>
         framePatch(goal, withPillar(pillars, index, withAction(pillar, j, { ...action, promoted: { kind: 'task', task_id: taskId } })))
@@ -261,6 +269,7 @@ function pillarView(goal: Goal, pillars: GoalMandalaPillar[], index: number, onP
       if (state === 'lead') foot.append(chip('Lead measure', 'mandala__chip--lead'));
       else if (state === 'task') foot.append(chip('Task', 'mandala__chip--task'));
       else if (state === 'task-done') foot.append(chip('Task · done', 'mandala__chip--task'));
+      else if (state === 'if_then') foot.append(chip('If-then', 'mandala__chip--ifthen'));
       else foot.append(promoteControl(goal, pillars, index, slot, onPatch, ctx));
       cell.append(foot);
     }

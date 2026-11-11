@@ -134,3 +134,33 @@ test('a proposal that no longer applies is a 404', async () => {
   assert.equal((await handler(post({ id: 'goal-g1-move-t1', decision: 'accept' }))).status, 404);
   assert.equal((await handler(post({ id: 'goal-nope-start', decision: 'accept' }))).status, 404);
 });
+
+test('accepting a Mandala proposal fills the grid as it is now', async () => {
+  const { handler, store } = harness();
+  const goal = store.data.get('goals/g1');
+  // Since the read, a pillar was typed into slot 1; slot 0 is still free.
+  store.data.set('goals/g1', {
+    ...goal, structure: 'mandala',
+    frame: { mandala: { pillars: [{ id: 'p1', label: '', actions: [] }, { id: 'p2', label: 'Sleep', actions: [] }] } }
+  });
+  store.data.set(goalReadKey('g1'), {
+    read: { ghosts: [{
+      id: 'goal-g1-mandala-x1', agent: 'hammond', kind: 'goal_mandala', goalId: 'g1', title: 'HA evidence',
+      additions: [
+        { type: 'pillar', slot: 0, label: 'Portfolio', project_id: 'pr1' },
+        { type: 'pillar', slot: 1, label: 'Referees', project_id: 'pr2' },
+        { type: 'action', pillar: 0, pillar_label: 'Portfolio', project_id: 'pr1', slot: 0, label: 'Write up 6.3', task_id: 't1' }
+      ]
+    }] },
+    dismissed: []
+  });
+  const response = await handler(post({ id: 'goal-g1-mandala-x1', decision: 'accept' }));
+  assert.equal(response.status, 200);
+  assert.match((await response.json()).receipt, /added 2 cells to the grid/);
+  const pillars = store.data.get('goals/g1').frame.mandala.pillars;
+  assert.equal(pillars[0].label, 'Portfolio');
+  assert.equal(pillars[0].project_id, 'pr1');
+  assert.deepEqual(pillars[0].actions[0].promoted, { kind: 'task', task_id: 't1' });
+  assert.equal(pillars[1].label, 'Sleep');
+  assert.equal(store.data.get(goalReadKey('g1'))?.read ?? null, null);
+});

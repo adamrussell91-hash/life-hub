@@ -41,7 +41,7 @@ export const GHOST_AGENTS = Object.freeze({
 });
 
 export const GHOST_KINDS = Object.freeze([
-  'skip_workout', 'bedtime', 'protect_block', 'move_task', 'create_task', 'draft_message', 'split_task', 'goal_rest_weeks', 'book_comm',
+  'skip_workout', 'bedtime', 'protect_block', 'move_task', 'create_task', 'draft_message', 'split_task', 'goal_rest_weeks', 'goal_mandala', 'book_comm',
   'outing', 'meal_block', 'schedule_workout', 'reschedule_block', 'cancel_block', 'log_comm',
   'pro_meeting', 'pro_event', 'move_block', 'task_block'
 ]);
@@ -96,7 +96,7 @@ export function validateGhost(ghost) {
   if (typeof ghost.id !== 'string' || !ghost.id) throw new TypeError('Ghost needs an id');
   if (!(ghost.agent in GHOST_AGENTS)) throw new TypeError(`Unknown agent: ${ghost.agent}`);
   if (!GHOST_KINDS.includes(ghost.kind)) throw new TypeError(`Unknown ghost kind: ${ghost.kind}`);
-  const dated = !['move_task', 'create_task', 'draft_message', 'split_task', 'goal_rest_weeks'].includes(ghost.kind);
+  const dated = !['move_task', 'create_task', 'draft_message', 'split_task', 'goal_rest_weeks', 'goal_mandala'].includes(ghost.kind);
   if (dated && !DATE_KEY.test(ghost.date ?? '')) throw new TypeError('Ghost needs a date (YYYY-MM-DD)');
   if (ghost.kind === 'create_task') {
     if (!oneLine(ghost.title)) throw new TypeError('create_task needs a title');
@@ -195,6 +195,11 @@ export function validateGhost(ghost) {
     if (!Array.isArray(ghost.steps) || ghost.steps.length < 1 || ghost.steps.length > 6 || ghost.steps.some(step => !oneLine(step))) {
       throw new TypeError('split_task needs 1–6 step titles');
     }
+  }
+  if (ghost.kind === 'goal_mandala') {
+    if (typeof ghost.goalId !== 'string' || !ghost.goalId) throw new TypeError('goal_mandala needs goalId');
+    if (!Array.isArray(ghost.frame?.mandala?.pillars)) throw new TypeError('goal_mandala needs frame.mandala.pillars');
+    if (!Number.isInteger(ghost.applied) || ghost.applied < 1) throw new TypeError('goal_mandala has nothing left to add');
   }
   if (ghost.kind === 'goal_rest_weeks') {
     if (typeof ghost.goalId !== 'string' || !ghost.goalId) throw new TypeError('goal_rest_weeks needs goalId');
@@ -376,6 +381,14 @@ export function acceptPlan(ghost, { today = null } = {}) {
       });
       steps.push(recentAction(actedOn, who, `split “${parent}” into ${ghost.steps.length} steps`));
       receipt = `${who} → Tasks: “${parent}” now has ${ghost.steps.length} steps.`;
+      break;
+    }
+    case 'goal_mandala': {
+      const title = oneLine(ghost.title) || ghost.goalId;
+      const cells = `${ghost.applied} cell${ghost.applied === 1 ? '' : 's'}`;
+      steps.push({ target: 'tasks', collection: 'goals', method: 'PATCH', id: ghost.goalId, body: { frame: ghost.frame } });
+      steps.push(recentAction(actedOn, who, `added ${cells} to the grid for “${title}”`));
+      receipt = `${who} → Goals: added ${cells} to the grid for “${title}”.`;
       break;
     }
     case 'goal_rest_weeks': {
