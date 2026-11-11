@@ -128,6 +128,10 @@
 .ps-back { width: fit-content; color: var(--muted); text-decoration: none; font-size: var(--text-sm); }
 .ps-back:hover { color: var(--ink); }
 .ps-session__title { margin: 0; max-width: 40ch; font: var(--weight-bold) var(--text-xl) / var(--leading-tight) var(--font-display); letter-spacing: var(--tracking-tight); color: var(--ink); text-wrap: balance; overflow-wrap: anywhere; }
+/* The title is what the person first typed, up to 120 characters: three lines at most,
+   and a headline size that does not swallow a phone screen. */
+.ps-session__title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+@media (max-width: 720px) { .ps-session__title { font-size: var(--text-lg); } }
 
 /* Process track */
 .ps-track { overflow-x: auto; padding-block: var(--space-2); }

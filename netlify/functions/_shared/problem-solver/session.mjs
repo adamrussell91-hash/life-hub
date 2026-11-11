@@ -140,6 +140,16 @@ export function cleanThreadDetour(raw) {
 /** True for a session sent out from a thread to answer one question (it skips Review and writes no page record). */
 export const isThreadDetour = (session) => Boolean(session?.threadDetour);
 
+/** A title cut to TITLE_MAX ends on a whole word with an ellipsis, never mid-word. */
+function clipTitle(value) {
+  const one = value.replace(/\s+/g, ' ');
+  if (one.length <= TITLE_MAX) return one;
+  const room = one.slice(0, TITLE_MAX - 1);
+  const space = room.lastIndexOf(' ');
+  const cut = space > TITLE_MAX / 2 ? room.slice(0, space) : room;
+  return `${cut.replace(/[\s.,;:!?-]+$/u, '')}…`;
+}
+
 export function createSession({ title = '', text, links = [], kind = 'full', startModel = null, threadId = null, threadDetour = null }, deps) {
   if (!KIND_FRAMES[kind]) throw fail(400, 'validation_error', `Unknown session kind: ${kind}`);
   const at = deps.now();
@@ -148,7 +158,7 @@ export function createSession({ title = '', text, links = [], kind = 'full', sta
   checkLength(clean);
   return {
     id: deps.newId(),
-    title: (String(title).trim() || clean).slice(0, TITLE_MAX),
+    title: clipTitle(String(title).trim() || clean),
     revision: 0,
     kind,
     status: 'active',
