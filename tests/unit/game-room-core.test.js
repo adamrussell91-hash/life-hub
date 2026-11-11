@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ROOM_LIMITS, classWall, foldPayload, initialState, nextAlarm, publicView, reduce, signBody, signTicket, ticketFromAuthorization, verifyBody, verifyTicket, viewDelta
+  ROOM_LIMITS, classWall, foldPayload, initialState, nextAlarm, publicView, reduce, seatRestore, signBody, signTicket, ticketFromAuthorization, verifyBody, verifyTicket, viewDelta
 } from '../../netlify/functions/_shared/game-room-core.mjs';
 import { gameStudentAction, prepareGamePublish, storeGameKeys } from '../../netlify/functions/_shared/games.mjs';
 import { classKey, draftLessonKey, publishedLessonKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
@@ -270,6 +270,108 @@ test('race Connections marks exactly as solo: group, one away, mistakes, out-of-
   assert.deepEqual(publicView(d.state, 'board', 'board').class_wall, wall);
   assert.equal(publicView(d.state, 'board', 'board').board_view, 'class_wall');
   assert.equal(publicView(d.state, 'student', 'own_1').class_wall, undefined);
+});
+
+// ─────────────────────────────────────────────────────────────── restore after a reload
+
+/** The snapshot a seat gets when it connects again (a reloaded phone). */
+const reconnectView = (d, n, conn) => d.join(n, conn).find((f) => f.kind === 'send' && f.conn === conn && f.msg.t === 'snapshot').msg.view;
+
+test('restore (crossword): a reconnecting seat gets only its own solved words, letters and hints; no keys, not in deltas', () => {
+  const d = driver(room('g_cross'));
+  d.teacher();
+  d.join(1);
+  d.join(2);
+  d.play();
+  const at = T0 + 4000;
+  d.move(1, { item: 't1', move: 'answer', response: { text: 'SIMILE' } }, at);
+  d.move(1, { item: 't2', move: 'answer', response: { text: 'metaphor' } }, at);
+  d.move(1, { item: 't3', move: 'hint', response: { letters: '' } }, at);
+  d.move(1, { item: 't5', move: 'hint', response: { letters: '' } }, at);
+  d.move(1, { item: 't5', move: 'hint', response: { letters: '' } }, at);
+  d.move(1, { item: 't5', move: 'hint', response: { letters: '' } }, at);
+  d.move(1, { item: 't5', move: 'answer', response: { text: 'HYPERBOLE' }, extra: { hints: 3 } }, at);
+  d.move(2, { item: 't4', move: 'answer', response: { text: 'SIBILANCE' } }, at);
+  const view = reconnectView(d, 1, 'c1r');
+  assert.deepEqual(view.you.restore, {
+    solved: [{ item: 't1', hints: 0, text: 'SIMILE' }, { item: 't5', hints: 3, text: 'HYPERBOLE' }],
+    hints: { t3: { step: 1 } }
+  });
+  const text = JSON.stringify(view.you.restore);
+  for (const word of ['SIBILANCE', 'Sibilance', 'ALLITERATION', 'Alliteration', 'PATHETIC', 'Oxymoron', 'OXYMORON']) assert.ok(!text.includes(word), `${word} isn’t this seat’s`);
+  assert.ok(!text.includes('t4'), 'another seat’s word stays out');
+  assert.deepEqual(reconnectView(d, 2, 'c2r').you.restore, { solved: [{ item: 't4', hints: 0, text: 'SIBILANCE' }] });
+  // Only in the connect (and hello) snapshot: broadcast views and the board never carry it.
+  assert.equal(publicView(d.state, 'student', 'own_1').you.restore, undefined);
+  assert.equal(publicView(d.state, 'board', 'board').you.restore, undefined);
+  const hello = d.run({ type: 'msg', owner: 'own_1', role: 'student', conn: 'c1r', msg: { t: 'hello' } });
+  assert.deepEqual(hello.find((f) => f.msg?.t === 'snapshot').msg.view.you.restore, view.you.restore);
+  // A seat with no moves yet, and paced games, restore nothing.
+  assert.equal(reconnectView(d, 3, 'c3r').you.restore, undefined);
+  const p = driver(room('g_who'));
+  p.join(1);
+  p.play();
+  p.move(1, { item: p.state.item.item, move: 'answer', response: { speaker: 'c_keeper' } }, T0 + 4000);
+  assert.equal(seatRestore(p.state, 'own_1'), undefined);
+});
+
+test('restore (find-a-word): own found lines and the hints they showed; the message only once every word is found', () => {
+  const grid = keysOf('g_find').grid;
+  const place = (word) => grid.placements.find((p) => p.word === word && !p.decoy);
+  const ends = (p) => ({ from: [p.x, p.y], to: [p.x + p.dx * (p.word.length - 1), p.y + p.dy * (p.word.length - 1)] });
+  const d = driver(room('g_find'));
+  d.join(1);
+  d.join(2);
+  d.play();
+  const at = T0 + 4000;
+  d.move(1, { item: 'f1', move: 'answer', response: ends(place('SIMILE')) }, at);
+  d.move(1, { item: 'f2', move: 'hint' }, at);
+  d.move(1, { item: 'f2', move: 'hint' }, at);
+  d.move(1, { item: 'f3', move: 'answer', response: ends(grid.placements.find((p) => p.word === 'PARADOX')) }, at);
+  d.move(2, { item: 'f4', move: 'answer', response: ends(place('MOTIF')) }, at);
+  const r = reconnectView(d, 1, 'c1r').you.restore;
+  assert.deepEqual(r.solved, [{ item: 'f1', hints: 0, text: 'SIMILE', ...ends(place('SIMILE')) }]);
+  const hp = place('HYPERBOLE');
+  assert.deepEqual(r.hints, { f2: { step: 2, first: 'H', length: hp.word.length } }, 'the hints this seat used, no line before step 3');
+  assert.equal(r.message, undefined);
+  assert.ok(!JSON.stringify(r).includes('MOTIF') && !JSON.stringify(r).includes('OXYMORON'));
+  // Every word found: the hidden message came back with the last one, so it comes back on reload too.
+  for (const [id, w] of [['f2', 'HYPERBOLE'], ['f3', 'OXYMORON'], ['f4', 'MOTIF'], ['f5', 'IRONY'], ['f6', 'GOTHIC']]) d.move(1, { item: id, move: 'answer', response: ends(place(w)) }, at);
+  const all = seatRestore(d.state, 'own_1');
+  assert.equal(all.solved.length, 6);
+  assert.deepEqual(all.message, grid.message ?? undefined);
+});
+
+test('restore (Connections): own groups found, guesses and mistakes; the rest only once out of mistakes', () => {
+  const game = publicGame('g_wall');
+  const tiles = Object.fromEntries(game.walls[0].tiles.map((t) => [t.text, t.id]));
+  const guess = (words) => ({ item: 'w1', move: 'guess', response: { tiles: words.map((w) => tiles[w]) } });
+  const d = driver(room('g_wall'));
+  d.join(1);
+  d.join(2);
+  d.play();
+  const at = T0 + 4000;
+  d.move(1, guess(['Persona', 'Tone', 'Register', 'Dialect']), at);
+  d.move(1, guess(['Sibilance', 'Assonance', 'Onomatopoeia', 'Simile']), at);
+  d.move(2, guess(['Enjambment', 'Caesura', 'Volta', 'Refrain']), at);
+  const r = reconnectView(d, 1, 'c1r').you.restore;
+  assert.deepEqual(r, {
+    walls: [{
+      wall: 'w1',
+      groups: [{ id: 'grp_voice', label: 'Voice', why: 'They are all voice.', difficulty: 4, tiles: keysOf('g_wall').items.w1.groups.find((x) => x.id === 'grp_voice').tiles, found: true }],
+      guesses: [{ tiles: ['Persona', 'Tone', 'Register', 'Dialect'].map((w) => tiles[w]), correct: true }, { tiles: ['Sibilance', 'Assonance', 'Onomatopoeia', 'Simile'].map((w) => tiles[w]), correct: false }],
+      mistakes: 1,
+      out: false
+    }]
+  });
+  const text = JSON.stringify(r);
+  for (const label of ['Structure', 'Sound devices', 'Comparisons']) assert.ok(!text.includes(label), `${label} isn’t found yet`);
+  // Out of mistakes: the groups not found come back, as the pass shows them.
+  for (const w of [['Simile', 'Metaphor', 'Enjambment', 'Caesura'], ['Volta', 'Refrain', 'Analogy', 'Plosives'], ['Simile', 'Metaphor', 'Analogy', 'Volta']]) d.move(1, guess(w), at);
+  const out = seatRestore(d.state, 'own_1').walls[0];
+  assert.equal(out.out, true);
+  assert.equal(out.mistakes, 4);
+  assert.deepEqual(out.groups.map((g) => [g.id, g.found]), [['grp_voice', true], ['grp_sound', false], ['grp_comp', false], ['grp_struct', false]]);
 });
 
 // ─────────────────────────────────────────────────────────────── race board

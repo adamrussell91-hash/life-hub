@@ -1,6 +1,7 @@
 import type { EventResult, SoloEvent } from '../api';
 import type { Game, GameKind, PublicGame } from '../core/schema';
 import type { Sfx } from '../sound/sfx';
+import type { SeatRestore } from '../core/room-protocol';
 
 /**
  * Game kinds → their solo player and their print renderer. Phase 3 adds a
@@ -37,6 +38,12 @@ export type PlayerContext = {
   calm(): boolean;
   /** Sound effects; silent on phones unless the student turned sound on. */
   sfx: Sfx;
+  /**
+   * Live only: this seat's progress so far, from the room, when the phone
+   * reopened mid-race (a reload). The player starts from it instead of blank.
+   * Solo play never sets it.
+   */
+  restore?: SeatRestore;
 };
 
 export type MountedPlayer = {

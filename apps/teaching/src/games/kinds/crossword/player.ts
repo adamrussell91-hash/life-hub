@@ -519,6 +519,33 @@ export function mountCrossword(host: HTMLElement, ctx: PlayerContext): MountedPl
   const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(() => frame()) : null;
   resize?.observe(view);
 
+  // Live, reopened mid-race: this seat's solved words (its own letters) and hints come back from the room.
+  if (ctx.restore) {
+    for (const r of ctx.restore.solved ?? []) {
+      const e = entries.find((x) => x.item === r.item);
+      if (!e) continue;
+      const letters = (r.text ?? '').toUpperCase();
+      e.cells.forEach((k, n) => {
+        const ch = letters[n];
+        if (ch && /^[A-Z]$/.test(ch)) L.set(k, ch);
+      });
+      hints.set(e.i, r.hints);
+      status.set(e.i, r.hints >= 3 ? 'shown' : r.hints > 0 ? 'hint' : 'clean');
+    }
+    for (const [item, h] of Object.entries(ctx.restore.hints ?? {})) {
+      const e = entries.find((x) => x.item === item);
+      if (e && !status.has(e.i)) hints.set(e.i, h.step);
+    }
+    const open = ORDER.find((i) => !status.has(i));
+    if (status.has(act) && open !== undefined) {
+      // The first clue still open, without select(): that would raise a phone's keyboard unasked.
+      act = open;
+      const e = entries[open] as Entry;
+      const c = AT.get(e.cells.find((k) => !L.get(k) && !locked(k)) ?? (e.cells[0] as string)) as Cell;
+      cx = c.x;
+      cy = c.y;
+    }
+  }
   paint();
   frame();
   void enter(root);

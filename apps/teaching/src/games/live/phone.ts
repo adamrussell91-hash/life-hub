@@ -385,6 +385,9 @@ export function openLivePhone(options: LivePhoneOptions): LivePhone {
       calm,
       sfx
     };
+    // Reopened mid-race (a reload, or back on this phone): the player starts from this seat's own progress.
+    const restore = c.view()?.you?.restore;
+    if (restore) ctx.restore = restore;
     stage.replaceChildren();
     setDock([]);
     try {

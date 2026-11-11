@@ -1,7 +1,7 @@
 import type { EventResult, SoloEvent } from '../api';
 import { GAME_MOVES, PLAY_EVENTS_MAX, type GameEvent } from './events';
 import { markMove, quotePoints, revealFor } from './mark';
-import { gameTotal, type GameKeys, type QuoteKey, type WallKey } from './model';
+import { gameTotal, wordHint, type GameKeys, type QuoteKey, type WallKey } from './model';
 import { FAKE_SPEAKER } from './schema';
 import {
   ROOM_LIMITS,
@@ -15,8 +15,10 @@ import {
   type RoomEffect,
   type RoomReducer,
   type RoomState,
+  type RestoreGroup,
   type RoomView,
   type Seat,
+  type SeatRestore,
   type ServerMsg
 } from './room-protocol';
 
@@ -194,6 +196,69 @@ export function classWall(s: RoomState): NonNullable<RoomView['class_wall']> {
   return [...counts.values()].sort((x, y) => y.count - x.count || x.a.localeCompare(y.a)).slice(0, CLASS_WALL_MAX);
 }
 
+/**
+ * What a race seat's player needs to pick up where it was after a reload:
+ * its own solved words (with its own letters or line), hints it used, and
+ * its Connections walls. Only from this seat's own history; groups and hint
+ * letters only where the room already sent them to this seat.
+ */
+export function seatRestore(s: RoomState, owner: string): SeatRestore | undefined {
+  if (s.config.style !== 'race') return undefined;
+  const keys = keysOf(s);
+  const events = s.history[owner] ?? [];
+  if (!events.length) return undefined;
+  if (keys.kind === 'connections') {
+    const limit = mistakesAllowed(s);
+    const walls: NonNullable<SeatRestore['walls']> = [];
+    for (const [id, w] of wallsOf(keys)) {
+      const mine = events.filter((e) => e.item === id && e.move === 'guess');
+      if (!mine.length) continue;
+      const found = new Set<string>();
+      const guesses = mine.map((e) => {
+        if (e.correct === true && typeof e.extra?.group === 'string') found.add(e.extra.group);
+        const tiles = ((e.response as { tiles?: unknown } | undefined)?.tiles as string[] | undefined) ?? [];
+        return { tiles: tiles.filter((t) => typeof t === 'string'), correct: e.correct === true };
+      });
+      const mistakes = guesses.filter((g) => !g.correct).length;
+      const out = mistakes >= limit && found.size < w.groups.length;
+      const group = (g: WallKey['groups'][number], isFound: boolean): RestoreGroup => ({ id: g.id, label: g.label, why: g.why, difficulty: g.difficulty, tiles: [...g.tiles], found: isFound });
+      // Found groups in the order found; once out of mistakes, the rest as the pass shows them.
+      const groups = [...found].map((gid) => w.groups.find((g) => g.id === gid)).filter((g): g is WallKey['groups'][number] => !!g).map((g) => group(g, true));
+      if (out) groups.push(...w.groups.filter((g) => !found.has(g.id)).sort((a, b) => a.difficulty - b.difficulty).map((g) => group(g, false)));
+      walls.push({ wall: id, groups, guesses, mistakes, out });
+    }
+    return walls.length ? { walls } : undefined;
+  }
+  const grid = keys.grid ?? null;
+  const solved: NonNullable<SeatRestore['solved']> = [];
+  const done = new Set<string>();
+  const hintCount = new Map<string, number>();
+  for (const e of events) {
+    if (e.move === 'hint') hintCount.set(e.item, (hintCount.get(e.item) ?? 0) + 1);
+    if (e.correct !== true || done.has(e.item) || keys.items[e.item]?.shape !== 'term') continue;
+    done.add(e.item);
+    const r = (e.response ?? {}) as { text?: unknown; from?: unknown; to?: unknown };
+    const hints = Math.min(3, Number(e.extra?.hints) || hintCount.get(e.item) || 0);
+    const point = (p: unknown): [number, number] | undefined => (Array.isArray(p) && p.length === 2 && p.every((n) => Number.isInteger(n)) ? [p[0] as number, p[1] as number] : undefined);
+    const from = point(r.from);
+    const to = point(r.to);
+    solved.push({ item: e.item, hints, ...(typeof r.text === 'string' ? { text: r.text.slice(0, 40) } : {}), ...(from && to ? { from, to } : {}) });
+  }
+  const hints: NonNullable<SeatRestore['hints']> = {};
+  for (const [item, n] of hintCount) {
+    if (done.has(item)) continue;
+    const step = Math.min(3, n);
+    hints[item] = { step, ...(grid?.kind === 'wordsearch' && grid.hints !== false ? wordHint(grid, item, step) : {}) };
+  }
+  const out: SeatRestore = {};
+  if (solved.length) out.solved = solved;
+  if (Object.keys(hints).length) out.hints = hints;
+  // Every word found: the hidden message came back with the last one.
+  const terms = Object.entries(keys.items).filter(([, x]) => x.shape === 'term').map(([id]) => id);
+  if (grid?.kind === 'wordsearch' && grid.message && terms.length && terms.every((id) => done.has(id))) out.message = grid.message;
+  return Object.keys(out).length ? out : undefined;
+}
+
 function pacedItemView(s: RoomState): PacedItem | undefined {
   if (!s.item) return undefined;
   const { choices: _choices, ...item } = s.item;
@@ -218,7 +283,7 @@ function sharedOf(s: RoomState): Shared {
   return shared;
 }
 
-export function publicView(state: RoomState, role: Role, owner: string, now: number = state.at ?? 0): RoomView {
+export function publicView(state: RoomState, role: Role, owner: string, now: number = state.at ?? 0, opts: { restore?: boolean } = {}): RoomView {
   const s = state;
   const shared = sharedOf(s);
   const { all, rank } = shared;
@@ -243,7 +308,8 @@ export function publicView(state: RoomState, role: Role, owner: string, now: num
   if (isStudent(role)) {
     const seat = s.seats[owner];
     const last = s.last?.[owner];
-    view.you = { owner, ...(seat ? { seat: { ...seat } } : {}), ...(last ? { last } : {}), ...(seat ? { rank: rank.get(owner) ?? 0 } : {}) };
+    const restore = opts.restore && seat ? seatRestore(s, owner) : undefined;
+    view.you = { owner, ...(seat ? { seat: { ...seat } } : {}), ...(last ? { last } : {}), ...(seat ? { rank: rank.get(owner) ?? 0 } : {}), ...(restore ? { restore } : {}) };
   } else {
     view.you = { owner };
     if (s.config.game.kind === 'connections' && (role === 'teacher' || s.board_view === 'class_wall' || s.phase === 'ended' || s.phase === 'folded')) view.class_wall = (shared.wall ??= classWall(s));
@@ -390,7 +456,8 @@ function onConnect(s: RoomState, a: Extract<RoomAction, { type: 'connect' }>, no
   // Newest wins: the older device is told and closed.
   if (old && conn && old !== conn) fx.push({ kind: 'close', owner, conn: old, msg: { t: 'replaced' } });
   if (conn) conns[owner] = conn;
-  fx.push({ kind: 'send', owner, ...(conn ? { conn } : {}), msg: { t: 'snapshot', view: publicView(s, role, owner, now) } });
+  // The connect snapshot carries the seat's own progress, so a reloaded phone restores its player.
+  fx.push({ kind: 'send', owner, ...(conn ? { conn } : {}), msg: { t: 'snapshot', view: publicView(s, role, owner, now, { restore: true }) } });
   return changed;
 }
 
@@ -599,7 +666,7 @@ function onMsg(s: RoomState, a: Extract<RoomAction, { type: 'msg' }>, now: numbe
   }
   switch (msg.t) {
     case 'hello':
-      fx.push({ kind: 'send', owner, ...(conn ? { conn } : {}), msg: { t: 'snapshot', view: publicView(s, role, owner, now) } });
+      fx.push({ kind: 'send', owner, ...(conn ? { conn } : {}), msg: { t: 'snapshot', view: publicView(s, role, owner, now, { restore: true }) } });
       return false;
     case 'move':
       if (!isStudent(role)) return fail(fx, owner, conn, rid, 'not_a_player', 'Only players make moves.'), false;

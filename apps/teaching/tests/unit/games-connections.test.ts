@@ -35,7 +35,7 @@ function serverEmit(revealAll: boolean) {
   });
 }
 
-function setup(opts: { walls?: string[]; mistakes?: number; revealAll?: boolean } = {}) {
+function setup(opts: { walls?: string[]; mistakes?: number; revealAll?: boolean; restore?: PlayerContext['restore'] } = {}) {
   const host = document.createElement('div');
   const dock = document.createElement('div');
   document.body.append(host, dock);
@@ -50,7 +50,8 @@ function setup(opts: { walls?: string[]; mistakes?: number; revealAll?: boolean 
     toast: vi.fn(),
     elapsedMs: () => 1000,
     calm: () => true,
-    sfx: { tick: vi.fn(), lock: vi.fn(), right: vi.fn(), wrong: vi.fn(), reveal: vi.fn(), fanfare: vi.fn(), whoosh: vi.fn(), click: vi.fn(), ding: vi.fn(), buzz: vi.fn(), coin: vi.fn() } as unknown as PlayerContext['sfx']
+    sfx: { tick: vi.fn(), lock: vi.fn(), right: vi.fn(), wrong: vi.fn(), reveal: vi.fn(), fanfare: vi.fn(), whoosh: vi.fn(), click: vi.fn(), ding: vi.fn(), buzz: vi.fn(), coin: vi.fn() } as unknown as PlayerContext['sfx'],
+    ...(opts.restore ? { restore: opts.restore } : {})
   };
   const player = playerFor('connections')!.mount(host, ctx);
   const tile = (id: string) => host.querySelector<HTMLButtonElement>(`.cx-tile[data-id="${id}"]`)!;
@@ -173,6 +174,36 @@ describe('Connections player', () => {
     expect(host.querySelectorAll('.cx-wall .cx-tile')).toHaveLength(16);
     expect(host.querySelector('.cx-tile')!.getAttribute('data-id')!.startsWith('w2')).toBe(true);
     expect(host.querySelector('.cx-done')).toBeNull();
+  });
+
+  it('live restore: found groups, mistakes and guesses come back; the wall plays on from there', async () => {
+    const group = (w: string, gi: number, found: boolean) => ({ id: GROUPS[gi].id, label: GROUPS[gi].label, why: GROUPS[gi].why, difficulty: GROUPS[gi].difficulty, tiles: groupIds(w, gi), found });
+    const wrong = [groupIds('w1', 1)[0], ...groupIds('w1', 2).slice(0, 3)];
+    const { host, dock, emit, pick, dockButton } = setup({
+      restore: { walls: [{ wall: 'w1', groups: [group('w1', 0, true)], guesses: [{ tiles: groupIds('w1', 0), correct: true }, { tiles: wrong, correct: false }], mistakes: 1, out: false }] }
+    });
+    expect(host.querySelectorAll('.cx-row')).toHaveLength(1);
+    expect(host.querySelector('.cx-row b')!.textContent).toBe('Sound devices');
+    expect(host.querySelectorAll('.cx-wall .cx-tile')).toHaveLength(12);
+    expect(host.querySelectorAll('.cx-left i.is-gone')).toHaveLength(1);
+    // A guess already made says so, without sending.
+    pick(wrong);
+    dockButton('Submit').click();
+    await flush();
+    expect(emit).not.toHaveBeenCalled();
+    expect(dock.textContent).toContain('Submit');
+  });
+
+  it('live restore: walls already over move on to the next; all over shows the last wall’s card', () => {
+    const group = (w: string, gi: number, found: boolean) => ({ id: GROUPS[gi].id, label: GROUPS[gi].label, why: GROUPS[gi].why, difficulty: GROUPS[gi].difficulty, tiles: groupIds(w, gi), found });
+    const out = { wall: 'w1', groups: [0, 1, 2, 3].map((gi) => group('w1', gi, gi === 0)), guesses: [], mistakes: 4, out: true };
+    const next = setup({ walls: ['w1', 'w2'], restore: { walls: [out] } });
+    expect(next.ctx.setStatus).toHaveBeenLastCalledWith('Wall 2 of 2 · 0 of 4 groups');
+    expect(next.host.querySelectorAll('.cx-wall .cx-tile')).toHaveLength(16);
+    document.body.replaceChildren();
+    const done = setup({ restore: { walls: [out] } });
+    expect(done.host.querySelector('.cx-done')!.textContent).toContain('Out of mistakes');
+    expect(done.dockButton('See my score')).toBeTruthy();
   });
 
   it('plays from the keyboard: arrows move, Space picks, Enter submits', async () => {

@@ -386,11 +386,34 @@ export function mountConnections(host: HTMLElement, ctx: PlayerContext): Mounted
     next.focus({ preventScroll: true });
   }
 
-  if (!walls.length || !walls.some((w) => w.order.length)) {
+  // Live, reopened mid-race: this seat's walls come back from the room (groups found, guesses, mistakes).
+  for (const r of ctx.restore?.walls ?? []) {
+    const w = walls.find((x) => x.id === r.wall);
+    if (!w) continue;
+    w.groups = r.groups.map((g) => ({ ...g, tiles: g.tiles.filter((id) => w.text.has(id)) }));
+    const placed = new Set(w.groups.flatMap((g) => g.tiles));
+    w.order = w.order.filter((t) => !placed.has(t.id));
+    w.guesses = r.guesses.map((g) => ({ tiles: [...g.tiles], correct: g.correct }));
+    w.mistakes = Math.min(allowed, r.mistakes);
+    if (r.out) {
+      w.unrevealed = w.order;
+      w.order = [];
+      w.done = 'out';
+    } else if (w.groups.filter((g) => g.found).length >= 4 || !w.order.length) w.done = 'solved';
+  }
+  if (ctx.restore?.walls?.length) {
+    const open = walls.findIndex((w) => !w.done);
+    at = open >= 0 ? open : walls.length - 1;
+  }
+
+  if (!walls.length || !walls.some((w) => w.order.length || w.done)) {
     root.replaceChildren(el('p', 'gm-solo__state', 'This wall has no tiles yet.'));
     ctx.setActions([act('Back', 'btn--secondary', () => ctx.finish())]);
   } else {
     startWall();
+    // Every wall was already played before the reload: back to the last wall's card.
+    const w = wall();
+    if (w?.done) endWall(w, w.done);
   }
 
   const onResize = () => fitTiles();

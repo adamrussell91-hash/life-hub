@@ -121,8 +121,8 @@ export type RoomView = {
   item?: PacedItem;
   /** Top 5 for individual games; teams for team games. Teacher and board get every rank in `seats`. */
   leaderboard: Array<{ initials: string; score: number; rank: number }>;
-  /** Only in the viewer's own copy. */
-  you?: { owner: string; seat?: Seat; last?: EventResult; rank?: number };
+  /** Only in the viewer's own copy. `restore` comes only in the snapshot a seat gets when it connects (race games). */
+  you?: { owner: string; seat?: Seat; last?: EventResult; rank?: number; restore?: SeatRestore };
   /** Board's Class wall for Connections: anonymous confusion pairs (tile text pair → count). */
   class_wall?: Array<{ a: string; b: string; count: number }>;
   /** What the teacher has put on the board (race games): the race wall or the Class wall. */
@@ -130,6 +130,26 @@ export type RoomView = {
   /** While paused: time that was left on the countdown or item (ends_at is left out while paused). */
   paused_left_ms?: number;
   seq: number;
+};
+
+/** A Connections group as a student may see it once found (or shown after the last mistake). */
+export type RestoreGroup = { id: string; label: string; why: string; difficulty: number; tiles: string[]; found: boolean };
+
+/**
+ * A race seat's own progress so far, so a phone that reloads mid-race picks
+ * up where it was (`you.restore`, in the connect snapshot only). Built from
+ * this seat's stored moves: only what the room already told this seat, never
+ * another seat's moves and never an answer it hasn't found.
+ */
+export type SeatRestore = {
+  /** Crossword: words solved, with the letters typed. Find-a-word: words found, with the line dragged. `hints` 3 = shown. */
+  solved?: Array<{ item: string; hints: number; text?: string; from?: [number, number]; to?: [number, number] }>;
+  /** Hints used on words not solved yet (find-a-word: what those hints showed). */
+  hints?: Record<string, { step: number; first?: string; length?: number; line?: { x: number; y: number; dx: number; dy: number } }>;
+  /** Connections: each wall played so far. `out`: out of mistakes, so the groups not found are shown. */
+  walls?: Array<{ wall: string; groups: RestoreGroup[]; guesses: Array<{ tiles: string[]; correct: boolean }>; mistakes: number; out: boolean }>;
+  /** Find-a-word: the hidden message, once every word is found. */
+  message?: { text: string; display: string; cells: Array<[number, number]> };
 };
 
 // ─────────────────────────────────────────────────────────────── messages

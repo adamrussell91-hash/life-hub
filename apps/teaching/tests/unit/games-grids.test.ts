@@ -5,6 +5,7 @@ import { GameSchema, type Game, type PublicGame } from '@/games/core/schema';
 import { checkAnswer, checkSelection, crosswordHint, splitGame, wordHint, type GameKeys } from '@/games/core/model';
 import type { EventResult, SoloEvent } from '@/games/api';
 import type { PlayerContext } from '@/games/solo/registry';
+import type { SeatRestore } from '@/games/core/room-protocol';
 import { mountCrossword } from '@/games/kinds/crossword/player';
 import { mountFindAWord } from '@/games/kinds/find-a-word/player';
 import { renderCrosswordPrint } from '@/games/kinds/crossword/print';
@@ -169,12 +170,13 @@ beforeEach(() => {
 afterEach(() => document.body.replaceChildren());
 
 describe('crossword player', () => {
-  function mount() {
+  function mount(restore?: (keys: GameKeys) => SeatRestore) {
     const game = GameSchema.parse(crossword()) as Game;
     const split = splitGame(game, seededRandom(3));
     const host = document.createElement('div');
     document.body.append(host);
     const ctx = fakeCtx(split.public, split.keys);
+    if (restore) ctx.restore = restore(split.keys);
     const player = mountCrossword(host, ctx);
     // The shell hands keys on from its root: do the same here.
     host.addEventListener('keydown', (e) => {
@@ -238,6 +240,28 @@ describe('crossword player', () => {
     expect(host.querySelector(`.cw-clue[data-w="${index}"] .tick.shown`)).toBeTruthy();
   });
 
+  it('live restore: a reloaded phone shows its solved words with their letters, ticks and hints, and starts on an open clue', () => {
+    const { host, ctx, keys } = mount(() => ({ solved: [{ item: 't1', hints: 0, text: 'SIMILE' }, { item: 't3', hints: 3, text: 'ALLITERATION' }], hints: { t4: { step: 2 } } }));
+    const grid = keys.grid as Extract<GameKeys['grid'], { kind: 'crossword' }>;
+    const idx = (id: string) => grid.entries.findIndex((x) => x.id === id);
+    const cellsOf = (id: string) => {
+      const e = grid.entries[idx(id)]!;
+      return Array.from(e.word, (_, k) => host.querySelector(`.cw-cell[data-k="${e.dir === 'across' ? e.x + k : e.x},${e.dir === 'down' ? e.y + k : e.y}"]`)!);
+    };
+    expect(cellsOf('t1').map((c) => c.querySelector('.l')!.textContent).join('')).toBe('SIMILE');
+    expect(cellsOf('t1').every((c) => c.classList.contains('ok'))).toBe(true);
+    expect(host.querySelector(`.cw-clue[data-w="${idx('t1')}"] .tick`)!.getAttribute('aria-label')).toBe('Solved');
+    expect(host.querySelector(`.cw-clue[data-w="${idx('t3')}"] .tick.shown`)).toBeTruthy();
+    // Words not solved stay empty (crossings aside), and the active clue is one still open.
+    expect(host.querySelectorAll('.cw-clue.done')).toHaveLength(2);
+    const act = Number(host.querySelector<HTMLElement>('.cw-clue.act')!.dataset.w);
+    expect(['t1', 't3']).not.toContain(grid.entries[act]!.id);
+    // The hint ladder remembers where it was for an open word.
+    host.querySelector<HTMLButtonElement>(`.cw-clue[data-w="${idx('t4')}"]`)!.click();
+    expect(ctx.dock.querySelectorAll('.cw-hint .cw-dots i.on')).toHaveLength(2);
+    expect(ctx.sent).toEqual([]);
+  });
+
   it('Finish now ends the play', () => {
     const { host, ctx } = mount();
     host.querySelector<HTMLButtonElement>('.cw-finish')!.click();
@@ -271,11 +295,12 @@ describe('find-a-word player', () => {
       message: { text: 'Every hand', question: { id: 'message_q', kind: 'multiple_choice', prompt: 'Which technique?', marks: 1, options: [{ id: 'o1', text: 'Personification' }, { id: 'o2', text: 'Simile' }], correct: ['o1'], explanation: 'The house remembers.' } },
       settings: { seed: 3 }
     }) as Game;
-  function mount() {
+  function mount(restore?: (grid: Extract<GameKeys['grid'], { kind: 'wordsearch' }>) => SeatRestore) {
     const split = splitGame(game(), seededRandom(4));
     const host = document.createElement('div');
     document.body.append(host);
     const ctx = fakeCtx(split.public, split.keys);
+    if (restore) ctx.restore = restore(split.keys.grid as Extract<GameKeys['grid'], { kind: 'wordsearch' }>);
     const player = mountFindAWord(host, ctx);
     return { host, ctx, player, grid: split.keys.grid as Extract<GameKeys['grid'], { kind: 'wordsearch' }> };
   }
@@ -355,6 +380,36 @@ describe('find-a-word player', () => {
     expect(host.querySelector('.fw-why')!.textContent).toContain('remembers');
     ctx.dock.querySelector<HTMLButtonElement>('button')!.click();
     expect(ctx.finished).toBe(1);
+  });
+
+  it('live restore: found words come back looped and ticked, hints keep their pills, play goes on from the next clue', () => {
+    const place = (g: Extract<GameKeys['grid'], { kind: 'wordsearch' }>, w: string) => g.placements.find((p) => p.word === w && !p.decoy)!;
+    const { host, ctx } = mount((g) => {
+      const [from, to] = ends(place(g, 'SIMILE'));
+      const [f2, t2] = ends(place(g, 'MOTIF'));
+      return { solved: [{ item: 'f1', hints: 0, text: 'SIMILE', from, to }, { item: 'f4', hints: 1, text: 'MOTIF', from: f2, to: t2 }], hints: { f2: { step: 2, first: 'H', length: 9 } } };
+    });
+    expect(host.querySelectorAll('.fw-svg g')).toHaveLength(2);
+    expect(host.querySelector('.fw-clue[data-c="0"]')!.classList.contains('done')).toBe(true);
+    expect(host.querySelector('.fw-clue[data-c="3"]')!.textContent).toContain('MOTIF');
+    expect(host.querySelector('.fw-clue.act')!.getAttribute('data-c')).toBe('1');
+    expect(host.querySelector('.fw-card')!.textContent).toContain('Starts with H');
+    expect(host.querySelector('.fw-card')!.textContent).toContain('9 letters');
+    expect(ctx.sent).toEqual([]);
+  });
+
+  it('live restore with every word found goes straight to the hidden message and its question', async () => {
+    const { host } = mount((g) => ({
+      solved: g.placements.filter((p) => !p.decoy).map((p) => {
+        const [from, to] = ends(p);
+        return { item: p.id, hints: 0, text: p.word, from, to };
+      }),
+      message: g.message!
+    }));
+    await new Promise((r) => setTimeout(r, 150));
+    await flush();
+    expect(host.querySelector('.fw-msg')!.getAttribute('aria-label')).toBe('Every hand');
+    expect(host.querySelectorAll('.fw-opt').length).toBeGreaterThan(0);
   });
 
   it('prints clues and blanks, with the key on its own page', () => {

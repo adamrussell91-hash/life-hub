@@ -588,8 +588,31 @@ export function mountFindAWord(host: HTMLElement, ctx: PlayerContext): MountedPl
   });
   hintBtn.addEventListener('click', () => void hint());
 
+  // Live, reopened mid-race: this seat's found words (its own lines) and hints come back from the room.
+  if (ctx.restore) {
+    for (const r of ctx.restore.solved ?? []) {
+      const c = clues.find((x) => x.id === r.item);
+      if (!c || !r.from || !r.to || found.has(c.i)) continue;
+      const a = { x: r.from[0], y: r.from[1] };
+      const b = { x: r.to[0], y: r.to[1] };
+      found.set(c.i, { from: a, to: b, word: r.text || letters(a, b), hints: r.hints });
+      loop(a, b, c.i, true);
+    }
+    for (const [item, h] of Object.entries(ctx.restore.hints ?? {})) {
+      const c = clues.find((x) => x.id === item);
+      if (c && !found.has(c.i)) hints.set(c.i, h);
+    }
+    if (ctx.restore.message) message = ctx.restore.message;
+    if (act !== null && found.has(act)) act = clues.find((x) => !found.has(x.i))?.i ?? null;
+  }
   paint();
   void enter(root);
+  // Every word was already found: on to the hidden message and its question.
+  if (clues.length && found.size === clues.length && message?.cells.length) {
+    stage = 'reveal';
+    paint();
+    void reveal();
+  }
 
   return {
     onKey(ev: KeyboardEvent): boolean {

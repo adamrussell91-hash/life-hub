@@ -1272,6 +1272,60 @@ function classWall(s) {
   }
   return [...counts.values()].sort((x, y) => y.count - x.count || x.a.localeCompare(y.a)).slice(0, CLASS_WALL_MAX);
 }
+function seatRestore(s, owner) {
+  if (s.config.style !== "race") return void 0;
+  const keys = keysOf(s);
+  const events = s.history[owner] ?? [];
+  if (!events.length) return void 0;
+  if (keys.kind === "connections") {
+    const limit = mistakesAllowed(s);
+    const walls = [];
+    for (const [id, w] of wallsOf(keys)) {
+      const mine = events.filter((e) => e.item === id && e.move === "guess");
+      if (!mine.length) continue;
+      const found = /* @__PURE__ */ new Set();
+      const guesses = mine.map((e) => {
+        if (e.correct === true && typeof e.extra?.group === "string") found.add(e.extra.group);
+        const tiles = e.response?.tiles ?? [];
+        return { tiles: tiles.filter((t) => typeof t === "string"), correct: e.correct === true };
+      });
+      const mistakes = guesses.filter((g) => !g.correct).length;
+      const out2 = mistakes >= limit && found.size < w.groups.length;
+      const group = (g, isFound) => ({ id: g.id, label: g.label, why: g.why, difficulty: g.difficulty, tiles: [...g.tiles], found: isFound });
+      const groups = [...found].map((gid) => w.groups.find((g) => g.id === gid)).filter((g) => !!g).map((g) => group(g, true));
+      if (out2) groups.push(...w.groups.filter((g) => !found.has(g.id)).sort((a, b) => a.difficulty - b.difficulty).map((g) => group(g, false)));
+      walls.push({ wall: id, groups, guesses, mistakes, out: out2 });
+    }
+    return walls.length ? { walls } : void 0;
+  }
+  const grid = keys.grid ?? null;
+  const solved = [];
+  const done = /* @__PURE__ */ new Set();
+  const hintCount = /* @__PURE__ */ new Map();
+  for (const e of events) {
+    if (e.move === "hint") hintCount.set(e.item, (hintCount.get(e.item) ?? 0) + 1);
+    if (e.correct !== true || done.has(e.item) || keys.items[e.item]?.shape !== "term") continue;
+    done.add(e.item);
+    const r = e.response ?? {};
+    const hints2 = Math.min(3, Number(e.extra?.hints) || hintCount.get(e.item) || 0);
+    const point2 = (p) => Array.isArray(p) && p.length === 2 && p.every((n) => Number.isInteger(n)) ? [p[0], p[1]] : void 0;
+    const from = point2(r.from);
+    const to = point2(r.to);
+    solved.push({ item: e.item, hints: hints2, ...typeof r.text === "string" ? { text: r.text.slice(0, 40) } : {}, ...from && to ? { from, to } : {} });
+  }
+  const hints = {};
+  for (const [item, n] of hintCount) {
+    if (done.has(item)) continue;
+    const step = Math.min(3, n);
+    hints[item] = { step, ...grid?.kind === "wordsearch" && grid.hints !== false ? wordHint(grid, item, step) : {} };
+  }
+  const out = {};
+  if (solved.length) out.solved = solved;
+  if (Object.keys(hints).length) out.hints = hints;
+  const terms = Object.entries(keys.items).filter(([, x]) => x.shape === "term").map(([id]) => id);
+  if (grid?.kind === "wordsearch" && grid.message && terms.length && terms.every((id) => done.has(id))) out.message = grid.message;
+  return Object.keys(out).length ? out : void 0;
+}
 function pacedItemView(s) {
   if (!s.item) return void 0;
   const { choices: _choices, ...item } = s.item;
@@ -1287,7 +1341,7 @@ function sharedOf(s) {
   sharedCache.set(s, shared);
   return shared;
 }
-function publicView(state, role, owner, now = state.at ?? 0) {
+function publicView(state, role, owner, now = state.at ?? 0, opts = {}) {
   const s = state;
   const shared = sharedOf(s);
   const { all, rank } = shared;
@@ -1312,7 +1366,8 @@ function publicView(state, role, owner, now = state.at ?? 0) {
   if (isStudent(role)) {
     const seat = s.seats[owner];
     const last = s.last?.[owner];
-    view.you = { owner, ...seat ? { seat: { ...seat } } : {}, ...last ? { last } : {}, ...seat ? { rank: rank.get(owner) ?? 0 } : {} };
+    const restore = opts.restore && seat ? seatRestore(s, owner) : void 0;
+    view.you = { owner, ...seat ? { seat: { ...seat } } : {}, ...last ? { last } : {}, ...seat ? { rank: rank.get(owner) ?? 0 } : {}, ...restore ? { restore } : {} };
   } else {
     view.you = { owner };
     if (s.config.game.kind === "connections" && (role === "teacher" || s.board_view === "class_wall" || s.phase === "ended" || s.phase === "folded")) view.class_wall = shared.wall ??= classWall(s);
@@ -1435,7 +1490,7 @@ function onConnect(s, a, now, fx) {
   const old = conns[owner];
   if (old && conn && old !== conn) fx.push({ kind: "close", owner, conn: old, msg: { t: "replaced" } });
   if (conn) conns[owner] = conn;
-  fx.push({ kind: "send", owner, ...conn ? { conn } : {}, msg: { t: "snapshot", view: publicView(s, role, owner, now) } });
+  fx.push({ kind: "send", owner, ...conn ? { conn } : {}, msg: { t: "snapshot", view: publicView(s, role, owner, now, { restore: true }) } });
   return changed;
 }
 function onDisconnect(s, a) {
@@ -1629,7 +1684,7 @@ function onMsg(s, a, now, fx) {
   }
   switch (msg.t) {
     case "hello":
-      fx.push({ kind: "send", owner, ...conn ? { conn } : {}, msg: { t: "snapshot", view: publicView(s, role, owner, now) } });
+      fx.push({ kind: "send", owner, ...conn ? { conn } : {}, msg: { t: "snapshot", view: publicView(s, role, owner, now, { restore: true }) } });
       return false;
     case "move":
       if (!isStudent(role)) return fail(fx, owner, conn, rid, "not_a_player", "Only players make moves."), false;
@@ -1799,6 +1854,7 @@ export {
   quotePoints,
   reduce,
   roomStyle,
+  seatRestore,
   signBody,
   signTicket,
   ticketFromAuthorization,
