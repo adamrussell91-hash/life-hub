@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { GameSchema, type Game } from '@/games/core/schema';
-import { articulateRules, type ArticulateBoardView, type ArticulatePhoneView, type ArticulateState } from '@/games/kinds/articulate/rules';
+import { articulateBot, articulateRules, type ArticulateBoardView, type ArticulatePhoneView, type ArticulateState } from '@/games/kinds/articulate/rules';
 import { leaks, rulesHarness } from './games-rules-harness';
 import { fakeApi, kindRoomView, textOf } from './games-kind-api';
 
@@ -209,6 +211,29 @@ describe('Articulate rules', () => {
     expect(board(h).why).toBe('deck');
     expect(h.teamScores[0]).toBe(TERMS.length);
   });
+
+  it('the next team still gets cards after a team clears the deck (walk: Start turn did nothing)', () => {
+    const h = setup();
+    h.control('start_turn');
+    // Team 0 gets every card but one, which is buzzed out.
+    for (let i = 0; i < TERMS.length - 1; i++) h.move('AA', { item: phone(h, 'AA').card!.item, move: 'describe', response: { result: 'got' } });
+    const missed = phone(h, 'AA').card!.item;
+    expect(h.control('buzz')).toBeUndefined();
+    expect(board(h).why).toBe('deck');
+    h.control('next_turn');
+    expect(board(h).team).toBe(1);
+    expect(h.control('start_turn')).toBeUndefined();
+    expect(board(h).phase).toBe('turn');
+    // First the card nobody got this round; then, with every card got, the whole deck again.
+    expect(phone(h, 'BB').card!.item).toBe(missed);
+    h.move('BB', { item: missed, move: 'describe', response: { result: 'got' } });
+    expect(board(h).why).toBe('deck');
+    h.control('check');
+    h.control('reveal_check');
+    h.control('next_round');
+    expect(h.control('start_turn')).toBeUndefined();
+    expect(k(h).deck.length + 1).toBe(TERMS.length);
+  });
 });
 
 describe('Articulate board and phone', () => {
@@ -286,5 +311,44 @@ describe('Articulate board and phone', () => {
     v.dispose();
     v2.dispose();
     v3.dispose();
+  });
+});
+
+describe('Articulate dev bot (Simulate class)', () => {
+  it('describes its own card, buzzes as another captain, answers the quick check, and stays quiet otherwise', () => {
+    const h = setup();
+    expect(articulateBot(h.ctx, k(h), 'o_AA')).toBeNull();
+    h.control('start_turn');
+    const card = phone(h, 'AA').card!.item;
+    // A beat before the describer acts; a teammate never acts.
+    expect(articulateBot(h.ctx, k(h), 'o_AA')).toBeNull();
+    h.advance(3000);
+    const turn = articulateBot(h.ctx, k(h), 'o_AA');
+    expect(turn).toMatchObject({ move: { item: card } });
+    expect(h.move('AA', (turn as { move: never }).move)).toEqual({ item: card });
+    expect(articulateBot(h.ctx, k(h), 'o_CC')).toBeNull();
+    // Team 1's captain (BB) sometimes buzzes the card in play; nobody else on team 1 does.
+    h.advance(2000);
+    const buzzes = Array.from({ length: 200 }, () => articulateBot(h.ctx, k(h), 'o_BB')).filter(Boolean);
+    expect(buzzes.length).toBeGreaterThan(0);
+    expect(buzzes[0]).toEqual({ control: { name: 'buzz', data: { item: k(h).current } } });
+    expect(Array.from({ length: 50 }, () => articulateBot(h.ctx, k(h), 'o_DD')).filter(Boolean)).toEqual([]);
+    h.control('check');
+    let n = 0;
+    for (let move = articulateBot(h.ctx, k(h), 'o_DD'); move && n < 10; move = articulateBot(h.ctx, k(h), 'o_DD'), n++) {
+      expect(h.move('DD', (move as { move: never }).move)).not.toHaveProperty('error');
+    }
+    expect(n).toBe(k(h).check!.questions.length);
+    expect(Object.keys(k(h).check!.answers.o_DD!)).toHaveLength(n);
+  });
+});
+
+describe('Articulate board team name (walk: "Kestrel / s" at 1024)', () => {
+  it('shrinks the team name with its panel instead of breaking it mid-word', () => {
+    const css = readFileSync(join(__dirname, '../../src/games/kinds/articulate/articulate.css'), 'utf8');
+    const h2 = css.match(/\.ar-team h2 \{([^}]*)\}/)?.[1] ?? '';
+    expect(h2).not.toContain('anywhere');
+    expect(h2).toMatch(/font-size: min\(2\.1em, [\d.]+cqi\)/);
+    expect(css).toMatch(/\.ar-team \{[^}]*container-type: inline-size/);
   });
 });

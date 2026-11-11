@@ -5,9 +5,10 @@
 /* ── Board: a team's turn ────────────────────────────────────────── */
 .ar-board { position: relative; min-height: 0; min-width: 0; display: grid; gap: 0.8em 1.2em; }
 .ar-board--turn { grid-template-columns: minmax(10em, 16.5em) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: 'team head' 'team field' 'strip strip'; }
-.ar-team { grid-area: team; position: relative; border-radius: 1.15em; padding: 1.2em 1.2em 1.1em; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; align-content: start; gap: 0.5em; overflow: hidden; min-height: 0; }
+.ar-team { grid-area: team; position: relative; border-radius: 1.15em; padding: 1.2em 1.2em 1.1em; background: var(--stage-card); box-shadow: var(--stage-glow); display: grid; align-content: start; gap: 0.5em; overflow: hidden; min-height: 0; container-type: inline-size; }
 .ar-team::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 0.36em; background: var(--tc); }
-.ar-team h2 { margin: 0 0 0.15em; font-size: 2.1em; line-height: 1; letter-spacing: -0.02em; display: flex; align-items: center; gap: 0.3em; overflow-wrap: anywhere; }
+/* The name shrinks with the panel rather than breaking mid-word ("Kestrel / s" at 1024). */
+.ar-team h2 { margin: 0 0 0.15em; font-size: min(2.1em, 12.5cqi); line-height: 1; letter-spacing: -0.02em; display: flex; align-items: center; gap: 0.3em; overflow-wrap: normal; word-break: normal; }
 .ar-team h2 i { width: 0.5em; height: 0.5em; border-radius: 0.15em; background: var(--tc); flex: none; }
 .ar-lbl { font-size: 0.85em; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--stage-muted); margin-top: 0.35em; }
 .ar-desc { display: flex; align-items: center; gap: 0.5em; font-size: 1.55em; font-weight: 700; }

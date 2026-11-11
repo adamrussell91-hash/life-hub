@@ -169,11 +169,22 @@ function startTurn(ctx: RulesCtx, k: ArticulateState): void | RulesError {
   const team = k.order[k.at] ?? 0;
   const describer = nextDescriber(ctx, k, team);
   if (!describer) return err('no_describer', 'This team has nobody to describe.');
+  // A team that clears the deck mustn't leave the next team with nothing: deal the
+  // cards nobody got this round again (all of them, if every card was got).
+  if (!k.deck.length) k.deck = refill(ctx, k);
   if (!k.deck.length) return err('deck_empty', 'The deck is empty.');
   k.phase = 'turn';
   k.turn = { team, describer, cards: [], passes: 0 };
   ctx.setTimer(ctx.now + articulateSettings(ctx.game.settings).seconds * 1000);
   draw(ctx, k);
+}
+
+/** A fresh deck: the cards not got this round, shuffled; every card when all were got. */
+function refill(ctx: RulesCtx, k: ArticulateState): string[] {
+  const all = cardsOf(ctx.keys).map((c) => c.id);
+  const got = new Set(k.log.filter((t) => t.round === k.round).flatMap((t) => t.cards.filter((c) => c.result === 'got').map((c) => c.item)));
+  const left = all.filter((id) => !got.has(id));
+  return shuffle(left.length ? left : all, ctx.random);
 }
 
 /** Resolves the card on the describer's phone. */
@@ -366,8 +377,36 @@ export const articulateRules: RoomRules<ArticulateState> = {
   },
   view(ctx, k, role, owner) {
     return articulateView(ctx, k, role, owner);
+  },
+  bot(ctx, k, owner) {
+    return articulateBot(ctx, k, owner);
   }
 };
+
+/**
+ * Dev preview only: a simulated classmate. Describers get most cards and pass
+ * now and then; other teams' captains buzz the odd card; everyone answers the
+ * quick check (mostly right).
+ */
+export function articulateBot(ctx: RulesCtx, k: ArticulateState, owner: string): { move: SoloEvent } | { control: KindControl } | null {
+  const r = ctx.random();
+  if (k.phase === 'check' && k.check) {
+    const mine = k.check.answers[owner] ?? {};
+    const q = k.check.questions.find((_, n) => !mine[n]);
+    if (!q) return null;
+    const wrong = q.options.find((o) => o.id !== q.right)?.id ?? q.right;
+    return { move: { item: q.item, move: 'answer', response: { option: r < 0.7 ? q.right : wrong }, time_ms: 2000 + Math.round(ctx.random() * 6000) } };
+  }
+  if (k.phase !== 'turn' || !k.turn || !k.current) return null;
+  if (k.turn.describer === owner) {
+    // A card takes a few seconds to describe.
+    if (ctx.now - k.card_at < 2500) return null;
+    const pass = k.turn.passes < articulateSettings(ctx.game.settings).passes && r < 0.2;
+    return { move: { item: k.current, move: pass ? 'pass' : 'describe', response: { result: pass ? 'pass' : 'got' } } };
+  }
+  if (isCaptainAgainst(ctx, k, owner) && ctx.now - k.card_at > 1500 && r < 0.06) return { control: { name: 'buzz', data: { item: k.current } } };
+  return null;
+}
 
 function buzz(ctx: RulesCtx, k: ArticulateState, from: { owner: string; role: Role }, item?: string): RulesError | null {
   const staff = from.role === 'teacher' || from.role === 'board';
