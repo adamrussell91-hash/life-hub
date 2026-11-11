@@ -4,9 +4,12 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 vi.mock('@excalidraw/excalidraw', () => ({}));
 vi.mock('@excalidraw/excalidraw/index.css', () => ({}));
 vi.mock('react-dom/client', () => ({ createRoot: () => ({ render: () => {}, unmount: () => {} }) }));
+// The confirm card says yes.
+vi.mock('@/teacher/confirm-dialog', () => ({ askConfirmCard: vi.fn(async () => true) }));
 import { mountExplainerRecorder } from '@/blocks/explainer/recorder';
 import { inView, wrapForBoard } from '@/blocks/explainer/board-runtime';
 import { sampleExplainer } from '@/dev/explainer-sample';
+import { createBlockEditor } from '@/blocks/editors';
 
 const noop = () => {};
 const mount = (layout: 'text' | 'both') => {
@@ -70,5 +73,21 @@ describe('send to board', () => {
     expect(inView(s, { x: 20, y: 500, width: 100, height: 30 })).toBe(false);
     // Scrolled down 300 and zoomed out: the visible scene runs to y = 300 + 800.
     expect(inView({ ...s, scrollY: -300, zoom: { value: 0.5 } }, { x: 20, y: 900, width: 100, height: 30 })).toBe(true);
+  });
+});
+
+describe('delete recording', () => {
+  it('drops the recording, keeps the text and tray, and offers Record again', async () => {
+    const changed = vi.fn();
+    const block = sampleExplainer({ status: 'draft' });
+    const editor = createBlockEditor(block, changed);
+    editor.querySelector<HTMLButtonElement>('.block-explainer-editor__delete-recording')!.click();
+    await vi.waitFor(() => expect(changed).toHaveBeenCalled());
+    const content = changed.mock.calls.at(-1)![0].content;
+    expect('recording' in content).toBe(false);
+    expect(content.text).toEqual(block.content.text);
+    expect(content.tray).toEqual(block.content.tray);
+    expect(editor.querySelector('.block-explainer-editor__record')).not.toBeNull();
+    expect(editor.querySelector('.block-explainer__player')).toBeNull();
   });
 });
