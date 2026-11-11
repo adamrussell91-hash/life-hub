@@ -93,6 +93,8 @@ test('the teacher can ask a progress read where its time went; without asking, n
     assert.equal(typeof timed.timing.phases[phase], 'number', phase);
   }
   assert.ok(timed.timing.blobs.get > 0);
+  assert.ok(timed.timing.kinds['get lessons'] >= 1, 'reads are counted by kind');
+  assert.equal(Object.values(timed.timing.kinds).reduce((a, b) => a + b, 0), timed.timing.blobs.get + timed.timing.blobs.list);
   assert.equal(typeof timed.timing.total_ms, 'number');
   const { timing, ...rest } = timed;
   assert.deepEqual(rest, plain, 'the page itself is the same');
