@@ -5,7 +5,9 @@ import { seededRandom } from '@/games/generators/random';
 import { createFakeRoom, fakeTicket, FakeSocket, FAKE_WS_BASE } from '@/games/live/fake-room';
 import { openLiveBoard } from '@/games/live/board';
 import { openLivePhone } from '@/games/live/phone';
-import type { LiveJoin, LiveOpen } from '@/games/api';
+import { gameTeacherApi, type Arcade, type LiveJoin, type LiveOpen } from '@/games/api';
+import { apiPost } from '@/api/client';
+import { deviceToken } from '@/quiz/dom';
 import '@/games/kinds';
 import { FIND_A_WORD } from '../../scripts/mock-grid-games';
 
@@ -15,7 +17,16 @@ import { FIND_A_WORD } from '../../scripts/mock-grid-games';
  *   /games.html?view=live-phone&game=g_who&seat=AB   a phone (open several tabs, one per seat)
  * Code 482913. Use "Simulate class" on the board for invented classmates.
  * Everything is invented (the novella "The Lantern House", as in the mockups).
+ *
+ * With `&real=1` both sides use the real path instead: the mock API's open / join (the Netlify
+ * module) and the local game-rooms Worker (`cd workers/game-rooms && npm run dev`, port 8788), on
+ * the seeded lesson_game_harbour and its class (roster AB, CD, EF). Each phone tab gets its own
+ * device token per seat, so several phones can share one browser.
+ *   /games.html?view=live-board&real=1&game=g_cross
+ *   /games.html?view=live-phone&real=1&game=g_cross&seat=CD[&code=123456]
  */
+const REAL_LESSON = 'lesson_game_harbour';
+const REAL_CLASS = 'class_2026_09eng';
 
 const CODE = '482913';
 const tagless = { pieces: [], outcomes: [], skills: [], tech: [] };
@@ -64,6 +75,10 @@ const LESSON = GameLessonSchema.parse({
 
 export function mountLivePreview(mount: HTMLElement, view: string): void {
   const params = new URLSearchParams(location.search);
+  if (params.get('real') === '1') {
+    void mountReal(mount, view, params);
+    return;
+  }
   const gameId = params.get('game') ?? 'g_who';
   const draft = LESSON.games.find((g: Game) => g.id === gameId) ?? LESSON.games[3];
   // Seeded, so every tab gets the same tile ids and grids.
@@ -127,4 +142,45 @@ export function mountLivePreview(mount: HTMLElement, view: string): void {
   again.addEventListener('click', go);
   mount.append(again, el('p', 'gm-note', `Code ${CODE}. The board tab must be open (it hosts the fake room).`));
   go();
+}
+
+/** The real path: mock API (Netlify module) + local Worker. */
+async function mountReal(mount: HTMLElement, view: string, params: URLSearchParams): Promise<void> {
+  const gameId = params.get('game') ?? 'g_who';
+  const note = el('p', 'gm-note', 'Real room: the local game-rooms Worker on :8788 must be running.');
+  mount.append(note);
+  if (view === 'live-board') {
+    const open = el('button', 'btn btn--primary', 'Open live game');
+    open.type = 'button';
+    const go = async () => {
+      try {
+        const reply = await gameTeacherApi(REAL_LESSON).open!(gameId, REAL_CLASS);
+        note.textContent = `Room ${reply.room} · code ${reply.code}. Phones: ?view=live-phone&real=1&game=${gameId}&seat=AB&code=${reply.code}`;
+        if (!reply.game) throw new Error('The room came back without its game.');
+        openLiveBoard({ open: reply, game: reply.game });
+      } catch (e) {
+        note.textContent = e instanceof Error ? e.message : 'The room didn’t open.';
+      }
+    };
+    open.addEventListener('click', () => void go());
+    mount.append(open);
+    return;
+  }
+  const seat = (params.get('seat') ?? 'AB').toUpperCase().slice(0, 4);
+  const endpoint = `/api/published/game/${REAL_LESSON}`;
+  const token = deviceToken(`class:${REAL_CLASS}:dev-${seat}`);
+  const call = <T>(action: string, extra: Record<string, unknown> = {}) => apiPost<T>(endpoint, { action, class_id: REAL_CLASS, ...(token ? { class_token: token } : {}), ...extra });
+  try {
+    const arcade = await call<Arcade>('claim', { initials: seat });
+    const game = arcade.games.find((g) => g.id === gameId);
+    if (!game) throw new Error(`No game ${gameId} in the seeded lesson.`);
+    const go = () => openLivePhone({ game, join: (id, code) => call<LiveJoin>('join', { game_id: id, code }), code: params.get('code') ?? undefined });
+    const again = el('button', 'btn btn--primary', `Join as ${seat}`);
+    again.type = 'button';
+    again.addEventListener('click', go);
+    mount.append(again);
+    go();
+  } catch (e) {
+    note.textContent = e instanceof Error ? e.message : 'Couldn’t claim the seat.';
+  }
 }

@@ -67,6 +67,9 @@ test('open: a signed room config with the published game, its keys and initials 
   assert.deepEqual(config.game, pub.snapshot.games[0]);
   assert.equal(config.style, 'race');
   assert.equal(config.fold_url, 'https://hub.example.test/api/games/fold');
+  // The board gets the published game (no keys), not the editor's draft.
+  assert.deepEqual(opened.game, pub.snapshot.games[0]);
+  assert.ok(!JSON.stringify(opened).includes('"answers"'), 'no keys in the teacher reply');
   const t = await verifyTicket(SECRET, opened.teacher_ticket, NOW + 5 * 3600_000, { room: opened.room, roles: ['teacher'] });
   assert.equal(t.ok, true);
   assert.equal((await verifyTicket(SECRET, opened.board_ticket, NOW, { room: opened.room, roles: ['board'] })).ok, true);
@@ -102,6 +105,7 @@ test('rooms: the open ones with fresh tickets, newest first; folded and 6-hour-o
   const listed = await listRooms(store, 'gl1', { env: ENV, now: NOW + 2000 });
   assert.deepEqual(listed.rooms.map((r) => [r.room, r.code, r.game_id]), [[b.room, b.code, 'g_wall'], [a.room, a.code, 'g_cross']]);
   assert.equal((await verifyTicket(SECRET, listed.rooms[0].teacher_ticket, NOW + 2000, { room: b.room, roles: ['teacher'] })).ok, true);
+  assert.deepEqual(listed.rooms.map((r) => r.game?.id), ['g_wall', 'g_cross'], 'a reopened board gets the published game too');
   assert.deepEqual((await listRooms(store, 'gl1', { env: ENV, now: NOW + 6 * 3600_000 + 1000 })).rooms, []);
 });
 

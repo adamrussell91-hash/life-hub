@@ -120,6 +120,7 @@ import { createPublishedRotationHandler } from '../../../netlify/functions/publi
 import { createRotationHandler } from '../../../netlify/functions/rotation.mjs';
 import { createGamesHandler } from '../../../netlify/functions/games.mjs';
 import { createPublishedGamesHandler } from '../../../netlify/functions/published-games.mjs';
+import { createGameFoldHandler } from '../../../netlify/functions/games-fold.mjs';
 import { createAnthologyKnowledgeHandler } from '../../../netlify/functions/anthology-knowledge.mjs';
 import { createPublishedAnthologyKnowledgeHandler } from '../../../netlify/functions/published-anthology-knowledge.mjs';
 import { createOrganiserHandler } from '../../../netlify/functions/organiser.mjs';
@@ -4304,7 +4305,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     body: unknown
   ): Promise<MockResponse> {
     const deps = {
-      env: { LIFE_HUB_PASSPHRASE_HASH: 'mock', SESSION_SECRET: 'mock-session-secret-0123456789abcdef' },
+      env: { LIFE_HUB_PASSPHRASE_HASH: 'mock', SESSION_SECRET: 'mock-session-secret-0123456789abcdef', ...gameRoomEnv() },
       getContentStore: async () => functionBlobStore(),
       verifySessionToken: () => ({ valid: getSession(cookie).authenticated })
     };
@@ -5179,6 +5180,43 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     return handle(method.toUpperCase(), path, requestOptions.cookie, requestOptions.body);
   }
 
+  /**
+   * Live game rooms against the local Worker (`cd workers/game-rooms && npm run dev`, port 8788):
+   * open / rooms / join call the real Netlify module with these, and the Worker folds back into this
+   * mock store through /api/games/fold. The secret is the Worker's local .dev.vars (or its example).
+   * Override with GAME_ROOMS_URL / GAME_FOLD_URL / GAME_ROOM_SECRET in the dev server's environment.
+   */
+  function gameRoomEnv(): Record<string, string> {
+    if (process.env.VITEST) return {};
+    let secret = process.env.GAME_ROOM_SECRET ?? '';
+    for (const name of ['.dev.vars', '.dev.vars.example']) {
+      if (secret) break;
+      try {
+        const text = readFileSync(new URL(`../../../workers/game-rooms/${name}`, import.meta.url), 'utf-8');
+        secret = /^GAME_ROOM_SECRET=(.+)$/m.exec(text)?.[1]?.trim() ?? '';
+      } catch {
+        // No Worker checkout: live games say they aren't set up.
+      }
+    }
+    return {
+      ...(secret ? { GAME_ROOM_SECRET: secret } : {}),
+      GAME_ROOMS_URL: process.env.GAME_ROOMS_URL ?? 'http://localhost:8788/g',
+      GAME_FOLD_URL: process.env.GAME_FOLD_URL ?? 'http://localhost:5191/api/games/fold'
+    };
+  }
+
+  async function handleGameFold(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(chunk as Buffer);
+    const headers = new Headers();
+    for (const [k, v] of Object.entries(req.headers)) if (typeof v === 'string') headers.set(k, v);
+    const handler = createGameFoldHandler({ env: gameRoomEnv(), getContentStore: async () => functionBlobStore() });
+    const response: Response = await handler(new Request('http://mock.local/api/games/fold', { method: 'POST', headers, body: Buffer.concat(chunks).toString('utf-8') }));
+    res.statusCode = response.status;
+    res.setHeader('content-type', 'application/json');
+    res.end(await response.text());
+  }
+
   async function readNodeRequestBody(req: IncomingMessage): Promise<unknown> {
     const contentType = req.headers['content-type'] ?? '';
     const chunks: Buffer[] = [];
@@ -5210,6 +5248,12 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const method = (req.method ?? 'GET').toUpperCase();
     const url = req.url ?? '/';
     const cookie = req.headers.cookie ?? null;
+
+    // The local game-rooms Worker posts its fold here, signed over the raw body: run the real fold Function.
+    if (method === 'POST' && url.split('?')[0] === '/api/games/fold') {
+      await handleGameFold(req, res);
+      return;
+    }
 
     let body: unknown;
     if (method === 'PUT' || method === 'POST' || method === 'PATCH') {
