@@ -1,6 +1,6 @@
 import type { CurriculumLinesV2Content, LessonRouteRole, NetworkLine } from '@/schemas/block';
 import { lineColour } from '../colour';
-import { buildFlow, hangSides } from '../flow';
+import { buildFlow, dropDateJumps, hangSides, type DateJump } from '../flow';
 import { orderStations, placeByDate, withAutoDepths, type NetLesson } from '../model';
 
 /**
@@ -60,6 +60,8 @@ export type CoverageMap = {
   rows: MapRow[];
   groups: MapGroup[];
   coverage: Map<string, ItemCoverage>;
+  /** "Next" links set aside because they jumped past dated lessons. */
+  dateJumps: DateJump[];
 };
 
 /** The focus area's dot points, when the subject is in the syllabus alignment. */
@@ -118,10 +120,6 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
   const byId = new Map(lessons.map((l) => [l.id, l]));
   const hidden = new Set(content.hidden_lessons ?? []);
   const ordered = placeByDate(orderStations(lessons, content.station_order), dates);
-  const flow = buildFlow(ordered.map((l) => ({ id: l.id, ...(l.after ? { after: l.after } : {}) })), {
-    hidden,
-    title: (id) => byId.get(id)?.title || 'Untitled lesson'
-  });
   // Support, extension or optional: the lesson's own role, else a light-rail stop that names it.
   const railRole = new Map<string, LessonRouteRole>();
   const railSkip = new Map<string, string>();
@@ -135,6 +133,17 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     railLines.set(stop.lesson_id, [...(railLines.get(stop.lesson_id) ?? []), stop.line_id]);
     if (stop.skip_rule?.trim()) railSkip.set(stop.lesson_id, stop.skip_rule.trim());
   }
+  const roleOf = (id: string): MapLane | undefined => {
+    const role = byId.get(id)?.role ?? railRole.get(id);
+    return role === 'core' ? undefined : role === 'optional' ? 'option' : role;
+  };
+  // A "next" link that jumps past dated core lessons is set aside: the dates set the order.
+  const { lessons: linked, jumps: dateJumps } = dropDateJumps(
+    ordered.map((l) => ({ id: l.id, ...(l.after ? { after: l.after } : {}) })),
+    dates,
+    (id) => hidden.has(id) || roleOf(id) !== undefined
+  );
+  const flow = buildFlow(linked, { hidden, title: (id) => byId.get(id)?.title || 'Untitled lesson' });
   // A support or extension stop's lesson shows even when the old map left it off its stations,
   // straight after the lesson the stop follows.
   const order = [...flow.order];
@@ -145,10 +154,6 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     while (i < order.length && railAfter.has(order[i]!)) i++;
     order.splice(i, 0, id);
   }
-  const roleOf = (id: string): MapLane | undefined => {
-    const role = byId.get(id)?.role ?? railRole.get(id);
-    return role === 'core' ? undefined : role === 'optional' ? 'option' : role;
-  };
   // Side lessons sit under the core lesson they branch off.
   // With no pick and no rail stop, a dated side lesson hangs off the core lesson dated just before it:
   // explicit "after" links can walk the core route out of date order, and the date is what the teacher set.
@@ -263,5 +268,5 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     });
     coverage.set(id, { core, optional, thin: core <= limit, first });
   }
-  return { rows, groups, coverage };
+  return { rows, groups, coverage, dateJumps };
 }
