@@ -75,3 +75,25 @@ test('the progress page reads no blob twice', async () => {
   const twice = [...raw.gets].filter(([, n]) => n > 1).map(([key]) => key);
   assert.deepEqual(twice, [], `read more than once: ${twice.join(', ')}`);
 });
+
+test('the teacher can ask a progress read where its time went; without asking, nothing is added', async () => {
+  const raw = countingStore([
+    ['classes/class1', { id: 'class1', type: 'class', status: 'active', title: '9 English', current_unit_id: 'unit1', students: [{ name: 'Ana Ames' }], homepage: { announcements: [] } }],
+    ['units/unit1', { id: 'unit1', title: 'Poetry', lesson_ids: ['l1'] }],
+    ['markbook/class1', { columns: [], marks: {}, hidden_quizzes: [], focus: {}, took: {}, groups: [], history: [] }],
+    ['lessons/l1', { id: 'l1', title: 'Lesson one' }],
+    ['published/lessons/l1', { id: 'l1', title: 'Lesson one', blocks: [] }]
+  ]);
+  const roster = await loadRoster(raw, 'class1');
+  const id = roster.students[0].id;
+  const plain = await teacherProfileAction(raw, 'class1', { action: 'progress', student_id: id });
+  assert.equal('timing' in plain, false);
+  const timed = await teacherProfileAction(raw, 'class1', { action: 'progress', student_id: id, timing: true });
+  for (const phase of ['roster', 'state', 'unit_lessons', 'markbook_view', 'markbook_book', 'lesson_ids', 'quizzes', 'work', 'done', 'feedback', 'map', 'todo']) {
+    assert.equal(typeof timed.timing.phases[phase], 'number', phase);
+  }
+  assert.ok(timed.timing.blobs.get > 0);
+  assert.equal(typeof timed.timing.total_ms, 'number');
+  const { timing, ...rest } = timed;
+  assert.deepEqual(rest, plain, 'the page itself is the same');
+});
