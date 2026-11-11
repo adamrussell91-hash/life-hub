@@ -2,7 +2,7 @@ import { el } from '@/quiz/dom';
 import { mountQuestionPlayer } from '@/quiz/player';
 import type { PublicQuestion, QuestionKey, QuizResponse } from '@/quiz/core';
 import type { PublicItem } from '../../core/schema';
-import type { RoomView } from '../../core/room-protocol';
+import { teamName as roomTeamName, type RoomView } from '../../core/room-protocol';
 import { registerLiveKind, type KindView, type KindViewApi } from '../../live/kind-views';
 import { avatar, createRing, type Ring } from '../../live/board-parts';
 import { ordinal } from '../../live/format';
@@ -38,7 +38,10 @@ const KEY_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 const SEG_COLOURS = ['var(--game-team-1)', 'var(--game-gold)', 'var(--game-team-2)', 'var(--depth, #0a1536)', 'var(--game-team-3)', 'var(--game-team-4)', 'var(--game-team-1)', 'var(--game-team-2)', 'var(--warm-white, #fbf8f1)', 'var(--game-gold)', 'var(--game-team-3)', 'var(--game-team-4)', 'var(--game-gold)', 'var(--game-team-1)', 'var(--game-team-2)', 'var(--game-team-3)'];
 const SOLVING: ReadonlySet<Stage> = new Set(['turn', 'spinning', 'landed', 'question', 'qclosed', 'letter', 'revealing', 'solved']);
 
-export const teamName = (t: number) => `Team ${t + 1}`;
+/** Teams go by the room's names (Kestrels, Otters, …), as on the lobby and the podium. */
+export const teamName = (t: number) => roomTeamName(Math.max(0, t));
+/** "a Kestrels player", "an Otters player". */
+const aTeamPlayer = (t: number) => `${/^[AEIOU]/i.test(teamName(t)) ? 'an' : 'a'} ${teamName(t)} player`;
 export const teamColour = (t: number) => `var(--game-team-${(Math.max(0, t) % 4) + 1})`;
 const fmt = (n: number) => (n < 0 ? '−' : '') + Math.abs(Math.round(n)).toLocaleString('en-AU');
 const segLabel = (v: Segment) => (v === 'bankrupt' ? 'BANKRUPT' : v === 'lose' ? 'LOSE A TURN' : String(v));
@@ -520,7 +523,7 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     box.style.setProperty('--tc', teamColour(win?.team ?? 0));
     const big = el('span', 'wf-solved__big', 'Solved');
     const who = el('span', 'wf-solved__who');
-    who.append(el('i'), win && win.team >= 0 ? `by a ${teamName(win.team)} player${win.initials ? ` (${win.initials})` : ''}` : 'by a player');
+    who.append(el('i'), win && win.team >= 0 ? `by ${aTeamPlayer(win.team)}${win.initials ? ` (${win.initials})` : ''}` : 'by a player');
     const bank = el('span', 'wf-solved__bank');
     const bv = el('span', '', '0');
     bank.append('+', bv, ' banked');
@@ -1049,7 +1052,7 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
       ready = () => !!response;
       payload = () => response;
     }
-    const note = q.kind === 'letter' ? el('p', 'wf-note', `If half of ${teamName(q.team ?? 0)} get it, your captain calls a letter.`) : null;
+    const note = q.kind === 'letter' ? el('p', 'wf-note', `If half the ${teamName(q.team ?? 0)} get it, your captain calls a letter.`) : null;
     if (note) parts.push(note);
     root.replaceChildren(...parts);
     const lock = button('Lock in', 'primary', () => {
@@ -1188,7 +1191,7 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
     const st = w.stage;
     if (st === 'turn' && y?.captain) {
       letterScreen();
-      root.insertBefore(wait('Your turn', `Spin the wheel for ${team}`, 'Hold the button to build power, then let go.'), root.children[2] ?? null);
+      root.insertBefore(wait('Your turn', `Spin the wheel for the ${team}`, 'Hold the button to build power, then let go.'), root.children[2] ?? null);
       setActions(withSolve([spinButton(), ...(letter && VOWELS.includes(letter) ? [callButton()] : [])]));
     } else if (st === 'turn' || st === 'spinning') {
       root.replaceChildren(top(), mini(w.board, w.category), wait(st === 'turn' ? `${team} are up` : 'Spinning', st === 'turn' ? `Captain ${w.captain ?? ''} is about to spin` : `${team} are spinning the wheel`, 'You can solve privately at any time.'));
@@ -1229,7 +1232,7 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
       root.replaceChildren(
         top(),
         mini(w.board, w.category),
-        wait(win && win.team >= 0 ? `Solved by a ${teamName(win.team)} player` : 'Solved', mine ? 'You got it too' : 'Still time to solve it for your record', mine ? `You needed ${mine.shown} of ${mine.total} letters.` : 'It counts for you, not for points.')
+        wait(win && win.team >= 0 ? `Solved by ${aTeamPlayer(win.team)}` : 'Solved', mine ? 'You got it too' : 'Still time to solve it for your record', mine ? `You needed ${mine.shown} of ${mine.total} letters.` : 'It counts for you, not for points.')
       );
       setActions(withSolve([]));
     } else if (st === 'revealed') {

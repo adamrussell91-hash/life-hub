@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RoomView } from '@/games/core/room-protocol';
 import type { KindViewApi } from '@/games/live/kind-views';
@@ -77,7 +79,7 @@ describe('Wheel board', () => {
     expect(host.querySelectorAll('.wf-cell.is-on')).toHaveLength(1);
     expect(host.querySelectorAll('.wf-used span')).toHaveLength(26);
     expect(host.querySelectorAll('.wf-team')).toHaveLength(2);
-    expect(host.querySelector('.wf-team.is-turn')?.textContent).toContain('Team 1');
+    expect(host.querySelector('.wf-team.is-turn')?.textContent).toContain('Kestrels'); // the room's team names, as on the lobby and podium
     expect(host.textContent!.toUpperCase()).not.toContain('LAMP');
     expect(board.controls?.(view('board', 'board')).map((c) => c.name)).toEqual(['reveal', 'spin']);
   });
@@ -125,7 +127,7 @@ describe('Wheel board', () => {
     h.tick();
     h.move('BB', { item: 'pz0', move: 'solve', response: { text: LINES[0] } });
     board.update(view('board', 'board'));
-    expect(host.querySelector('.wf-solved')?.textContent).toContain('Team 2');
+    expect(host.querySelector('.wf-solved')?.textContent).toContain('by an Otters player');
     expect(host.textContent!.toUpperCase()).not.toContain('LAMP');
     h.control('reveal');
     board.update(view('board', 'board'));
@@ -250,5 +252,15 @@ describe('Wheel phone', () => {
     mountWheelPhone(host, api).update(view('student', 'o_CC'));
     expect(host.textContent).toContain('0 of 21');
     expect(host.textContent).toContain('Letters needed');
+  });
+});
+
+describe('Wheel phone keyboard at 320 (walk: 37 px keys)', () => {
+  it('drops to six consonant columns under 360 px so every key stays at least 44 px wide', () => {
+    const css = readFileSync(join(__dirname, '../../src/games/kinds/wheel/wheel.css'), 'utf8');
+    const narrow = css.match(/@media \(max-width: 359px\) \{([\s\S]*?)\n\}/)?.[1] ?? '';
+    expect(narrow).toMatch(/\.wf-keys \{[^}]*repeat\(6, minmax\(0, 1fr\)\)[^}]*gap: 4px/);
+    // A 320 phone has 288 px for the keys: six columns with 4 px gaps leave 44.6 px a key.
+    expect((288 - 5 * 4) / 6).toBeGreaterThanOrEqual(44);
   });
 });

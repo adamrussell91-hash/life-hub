@@ -196,6 +196,11 @@
 .wf-keys--v { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .wf-keys--v button { background: var(--pastel-gold, #f1e2b6); color: var(--pastel-gold-ink, #6c581f); box-shadow: none; }
 .wf-keys--v button.is-sel { background: var(--navy, #17375e); color: #fff; }
+/* A 320 phone: seven columns make 37 px keys; six keep every key at least 44 px wide. */
+@media (max-width: 359px) {
+  .wf-keys { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+  .wf-keys--v { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
 .wf-break { display: grid; gap: 8px; padding: 14px 16px; border-radius: 20px; background: #fff; box-shadow: 0 0 0 1px rgba(23, 55, 94, 0.1); font-size: 15px; }
 .wf-break > div { display: flex; justify-content: space-between; gap: 12px; }
 .wf-break .is-tot { border-top: 1px solid rgba(23, 55, 94, 0.12); padding-top: 8px; font-weight: 700; font-size: 17px; }
