@@ -10,6 +10,7 @@ import './articulate';
 import './connections';
 import './crossword';
 import './find-a-word';
+import './wheel';
 import './who-said-it';
 
 export {};
