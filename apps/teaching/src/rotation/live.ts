@@ -145,7 +145,9 @@ export function mountRotationLive(o: RotationLiveOptions): RotationLiveHandle {
     const which = (k: string) => b.stations.filter((s) => s.kind === k || s.strand === k).map((s) => s.title).join(', ');
     const th = (label: string, k: string) => { const c = el('th'); c.append(el('span', '', label), el('small', 'rot-cover__which', which(k))); return c; };
     head.append(el('th', '', 'Student'), ...kinds.map((k) => th(ROTATION_KIND_INFO[k].label, k)), ...strands.map((s) => th(s.charAt(0).toUpperCase() + s.slice(1), s)));
-    t.append(groups, head);
+    const cols = el('colgroup');
+    cols.append(el('col', 'rot-cover__name'), ...[...kinds, ...strands].map(() => el('col')));
+    t.append(cols, groups, head);
     for (const st of b.students) {
       const tr = el('tr');
       tr.append(el('td', '', st.name));
