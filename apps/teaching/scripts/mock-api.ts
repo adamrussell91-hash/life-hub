@@ -160,6 +160,7 @@ import { mockWritingChecker } from './mock-rotation-writing';
 import { rotationLesson, ROTATION_ROSTER } from '../../../tests/unit/helpers/rotation-fixture.mjs';
 import { prepareGamePublish, storeGameKeys } from '../../../netlify/functions/_shared/games.mjs';
 import { gameLesson, GAME_ROSTER } from '../../../tests/unit/helpers/game-fixture.mjs';
+import { walkerGameContent } from './mock-game-walk';
 import { prepareScheduledLessonPatch } from '../src/schedule/scheduled-time.js';
 import { defaultScopeTerms } from '../src/scope/timeline-dates';
 import { reorderScheduledLesson } from '../src/schedule/reorder';
@@ -787,6 +788,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     });
     seedIds.classes.push(classId);
     const base = gameLesson();
+    walkerGameContent(base.game.games as Array<Record<string, unknown>>);
     const lesson = { ...base, id: lessonId, slug: 'harbour_lights_games', unit_id: unit.id, sequence: unit.lesson_ids.length + 2, tags: [], syllabus_outcomes: [], outcome_ids: [], game: { ...base.game, homework_closes_at: '2026-12-18T08:00:00.000Z' } };
     const pub = prepareGamePublish(lesson);
     if (pub.problems.length || !pub.snapshot || !pub.record) { console.error('game seed', pub.problems); return; }

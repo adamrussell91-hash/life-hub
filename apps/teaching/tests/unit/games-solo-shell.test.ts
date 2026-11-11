@@ -18,7 +18,7 @@ const lesson = {
   published_at: '2026-11-09T09:00:00.000Z',
   schema_version: 1,
   pedagogical_mode: 'game',
-  game: { version: 'v1', games: [pub(), pub({ id: 'g_wall', title: 'Sound wall', kind: 'connections', count: 16 })] }
+  game: { version: 'v1', games: [pub(), pub({ id: 'g_wall', title: 'Points rush', kind: 'points_rush', count: 16 })] }
 } as unknown as PublishedLesson;
 
 const arcade = (over: Partial<Arcade> = {}): Arcade => ({ identity: { need: null, initials: 'AB' }, games: [], closed: false, results: {}, ...over });
