@@ -245,7 +245,9 @@
 .rot-heat { width: 100%; border-collapse: separate; border-spacing: 3px; font-size: var(--text-xs); }
 .rot-heat th { font-weight: 600; color: var(--muted); text-align: left; padding: 2px 4px; }
 .rot-heat td { text-align: center; padding: 6px 0; border-radius: 4px; font-weight: 700; }
-.rot-cover { width: 100%; border-collapse: collapse; font-size: var(--text-xs); }
+.rot-cover { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--text-xs); }
+.rot-cover col.rot-cover__name { width: 9.5em; }
+.rot-cover th { overflow-wrap: anywhere; hyphens: auto; }
 .rot-cover th, .rot-cover td { padding: 5px 4px; border-top: 1px solid var(--line); text-align: center; }
 .rot-cover th:first-child, .rot-cover td:first-child { text-align: left; }
 .rot-tick { display: inline-block; width: 14px; height: 14px; border-radius: 4px; background: var(--shore); }
@@ -335,4 +337,4 @@
 .rot-cover__groups th { border-top: 0; font-size: var(--text-2xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .rot-cover__group { border-bottom: 2px solid var(--line); }
 .rot-cover__which { display: block; font-weight: 400; font-size: var(--text-2xs); color: var(--muted); margin-top: 2px; }
-.rot-cover td:first-child { white-space: nowrap; }
+.rot-cover td:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
