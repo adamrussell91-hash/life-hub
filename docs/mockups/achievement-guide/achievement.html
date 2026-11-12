@@ -656,7 +656,7 @@ const AREAS = [
     digHint: 'The three phases of self-regulated learning (Zimmerman). Pick any that fit.',
     digs: [
       { id: 'before', name: 'Before: planning and starting', q: 'I leave it to the last minute.', src: 'Forethought', moves: ['m_steps'] },
-      { id: 'during', name: 'During: focus and strategies', q: 'I just reread it and hope.', src: 'Performance', moves: ['m_strategy'] },
+      { id: 'during', name: 'During: focus and strategies', q: 'I just reread it and hope.', src: 'Performance', moves: ['m_retrieval', 'm_strategy'] },
       { id: 'after', name: 'After: using feedback', q: 'I look at the mark and move on.', src: 'Self-reflection', moves: ['m_after'] }
     ],
     base: ['m_steps', 'm_after']
@@ -679,6 +679,7 @@ const MOVES = {
   m_home: { area: 'env', text: 'Agree one message for home about effort and strategy, not marks.', src: 'Environmental perceptions · Siegle, McCoach and Roberts 2017' },
   m_fit: { area: 'env', text: 'Too easy: skip what they already know and extend or accelerate. Too hard: scaffold the next step.', src: 'Acceleration · Steenbergen-Hu, Makel and Olszewski-Kubilius 2016' },
   m_steps: { area: 'reg', text: 'Break the task into dated steps together, and have them write one plan as “When…, I will…”.', src: 'Implementation intentions · Gollwitzer and Sheeran 2006; Duckworth et al. 2011' },
+  m_retrieval: { area: 'reg', text: 'Swap rereading for self-testing: cover what they need to know and recall it, a little each day over several days.', src: 'Practice testing and spaced practice · Dunlosky et al. 2013' },
   m_strategy: { area: 'reg', text: 'Teach one strategy explicitly, and have them tick off the steps as they use it.', src: 'Performance phase · Zimmerman 2002' },
   m_after: { area: 'reg', text: 'When the next mark comes back, ask what caused it and what they will change. Steer to strategy, not ability.', src: 'Self-reflection phase · Zimmerman 2002; Cleary, Callan and Zimmerman 2012' },
   m_low: { area: null, text: 'Spend this meeting on the relationship and one small win. Do not try to fix four things at once.', src: 'Our rule of thumb · relationships (Roorda et al. 2011) and mastery (Usher and Pajares 2008)' },
@@ -1225,8 +1226,8 @@ function scPlan() {
       h('div', { class: 'hint', style: 'margin-top:2px' }, p.line)),
     h('div', { class: 'moves' }, leadMoves.map(moveBtn)),
     h('div', { class: 'hint' }, S.chosen.length >= 2 ? 'Two is plenty. Untick one to swap.' : 'Pick one or two. Small beats many.'),
-    lead === 'efficacy' || lead === 'reg' ? h('div', { class: 'diff' }, 'In the intervention study, plans aimed at value or the setting moved grades most, and ones aimed at belief or self-management moved them least. Think about pairing this with one from the other areas below.') : null,
-    others.length ? h('details', { class: 'more' }, h('summary', {}, 'Moves for the other areas'), h('div', { class: 'moves', style: 'margin-top:6px' }, others.flatMap((a) => movesFor(a.id)).map(moveBtn))) : null,
+    lead === 'efficacy' || lead === 'reg' ? h('div', { class: 'diff' }, 'In the intervention study, plans aimed at value or the setting moved grades most, and ones aimed at belief or self-management moved them least. Make one of your two a move from another area below.') : null,
+    others.length ? h('details', { class: 'more', open: lead === 'efficacy' || lead === 'reg' }, h('summary', {}, 'Moves for the other areas'), h('div', { class: 'moves', style: 'margin-top:6px' }, others.flatMap((a) => movesFor(a.id)).map(moveBtn))) : null,
     h('div', { class: 'sub-h', style: 'margin:4px 0 0' }, 'Their next step, in their words'),
     h('input', { class: 'textin', placeholder: 'When I get home Tuesday, I will…', value: S.next, 'aria-label': 'Their next step', oninput: (e) => { S.next = e.target.value; } }),
     h('div', { class: 'when' }, 'Plans written as “When…, I will…” have a medium-to-large effect on follow-through (implementation intentions).'),
@@ -1375,6 +1376,7 @@ const RESEARCH = [
   ['Backed? dig: teacher', 'Roorda et al. 2011', 'Warm teacher relationships go with engagement (medium to large) and achievement (small to medium), more strongly in the higher grades.', 'strong', 'Meta-analysis'],
   ['Backed? dig: peers', 'Cross, Coleman and Terhaar-Yonkers 1991', 'Gifted adolescents use strategies to manage how visible their ability is when they expect it to change how they are treated.', 'mod', 'Large survey'],
   ['Backed? dig: fit', 'Steenbergen-Hu, Makel and Olszewski-Kubilius 2016', 'Accelerated students outperformed similar students who were not accelerated.', 'strong', 'Second-order meta-analysis'],
+  ['Self-testing move', 'Dunlosky et al. 2013', 'Of ten study techniques, practice testing and spaced practice were rated most useful across ages and subjects; rereading and highlighting were rated low.', 'strong', 'Review'],
   ['Three phases (dig)', 'Zimmerman 2002', 'Self-regulated learning cycles through forethought, performance and self-reflection.', 'strong', 'Well established'],
   ['“When…, I will…” next step', 'Gollwitzer and Sheeran 2006; Duckworth et al. 2011', 'If-then plans had a medium-to-large effect on reaching goals across 94 tests. With mental contrasting, secondary students did more than 60% more practice questions.', 'strong', 'Meta-analysis and trial'],
   ['After-the-mark move', 'Cleary, Callan and Zimmerman 2012', 'Phase-specific questions, including what caused a result and what to change next, capture the self-reflection phase.', 'mod', 'Method review'],
@@ -1389,6 +1391,7 @@ const REFS = [
   'Covington, M. V. (1984). The self-worth theory of achievement motivation: Findings and implications. <i>The Elementary School Journal, 85</i>(1), 5–20.',
   'Cross, T. L., Coleman, L. J., &amp; Terhaar-Yonkers, M. (1991). The social cognition of gifted adolescents in schools: Managing the stigma of giftedness. <i>Journal for the Education of the Gifted, 15</i>(1), 44–55.',
   'Duckworth, A. L., Grant, H., Loew, B., Oettingen, G., &amp; Gollwitzer, P. M. (2011). Self-regulation strategies improve self-discipline in adolescents: Benefits of mental contrasting and implementation intentions. <i>Educational Psychology, 31</i>(1), 17–26.',
+  'Dunlosky, J., Rawson, K. A., Marsh, E. J., Nathan, M. J., &amp; Willingham, D. T. (2013). Improving students’ learning with effective learning techniques: Promising directions from cognitive and educational psychology. <i>Psychological Science in the Public Interest, 14</i>(1), 4–58.',
   'Flett, G. L., Hewitt, P. L., Besser, A., et al. (2016). The Child–Adolescent Perfectionism Scale: Development, psychometric properties, and associations with stress, distress, and psychiatric symptoms. <i>Journal of Psychoeducational Assessment, 34</i>(7), 634–652.',
   'Gollwitzer, P. M., &amp; Sheeran, P. (2006). Implementation intentions and goal achievement: A meta-analysis of effects and processes. <i>Advances in Experimental Social Psychology, 38</i>, 69–119.',
   'Hulleman, C. S., &amp; Harackiewicz, J. M. (2009). Promoting interest and performance in high school science classes. <i>Science, 326</i>(5958), 1410–1412.',
