@@ -220,3 +220,27 @@ describe('Explainer block', () => {
     expect(spliced.clips).toHaveLength(2);
   });
 });
+
+describe('Explainer text pane when it scrolls', () => {
+  it('draws the selection on the word, not a scroll height above it', async () => {
+    const { createTextPane } = await import('@/blocks/explainer/text-pane');
+    const lines = Array.from({ length: 3 }, (_, i) => ({ id: `l${i}`, text: `Line ${i} words` }));
+    const pane = createTextPane({ kind: 'prose', stanzas: [{ id: 's0', lines }] } as never);
+    document.body.append(pane.el);
+    const rect = (top: number, left = 20, width = 40, height = 20) =>
+      ({ top, left, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
+    // The pane's visible box sits at the top of the window, scrolled 120px down.
+    pane.el.getBoundingClientRect = () => rect(0, 0, 400, 200);
+    Object.defineProperty(pane.el, 'scrollTop', { value: 120, configurable: true });
+    // Word 6 shows 30px below the pane's top: 150px down its content.
+    const word = pane.el.querySelector<HTMLElement>('[data-w="6"]')!;
+    word.getClientRects = () => [rect(30)] as unknown as DOMRectList;
+    pane.paint({ marks: [], notes: [], pointer: null } as never, { selection: [6, 6] });
+    const d = pane.el.querySelector('.block-explainer__selection')!.getAttribute('d')!;
+    const top = Number(/M\s*-?[\d.]+[\s,]+(-?[\d.]+)/.exec(d)?.[1]);
+    expect(top).toBeGreaterThan(140);
+    expect(top).toBeLessThan(160);
+    pane.dispose();
+    pane.el.remove();
+  });
+});
