@@ -1357,4 +1357,34 @@ describe('mountLessonEditor', () => {
     const saved = apiPutMock.mock.calls.at(-1)![1] as Lesson;
     expect(saved.sprint?.criteria).toHaveLength(1);
   });
+
+  // Game and Station Rotation settings are edited on the page; the save carries them (they were dropped, so a refresh lost the plan).
+  it('a game added to a Game lesson goes out with the next save', async () => {
+    const lesson = makeLesson({ pedagogical_mode: 'game' });
+    mockLessonLoad(lesson);
+    apiPutMock.mockReset();
+    apiPutMock.mockResolvedValue(lesson);
+    apiPostMock.mockRejectedValue(new Error('offline'));
+    const handle = mount();
+    for (let i = 0; i < 4; i += 1) await tick();
+    refs.canvas.querySelector<HTMLButtonElement>('.gm-empty-list .btn')!.click();
+    refs.canvas.querySelector<HTMLButtonElement>('.gm-kind[data-kind="crossword"]')!.click();
+    await handle.flush();
+    const saved = apiPutMock.mock.calls.at(-1)![1] as Lesson;
+    expect(saved.game?.games.map((g) => g.kind)).toEqual(['crossword']);
+  });
+
+  it('a Station Rotation change goes out with the next save', async () => {
+    const lesson = makeLesson({ pedagogical_mode: 'station_rotation' });
+    mockLessonLoad(lesson);
+    apiPutMock.mockReset();
+    apiPutMock.mockResolvedValue(lesson);
+    apiPostMock.mockRejectedValue(new Error('offline'));
+    const handle = mount();
+    for (let i = 0; i < 4; i += 1) await tick();
+    refs.canvas.querySelector<HTMLButtonElement>('.rot-preset[aria-pressed="false"]')!.click();
+    await handle.flush();
+    const saved = apiPutMock.mock.calls.at(-1)![1] as Lesson;
+    expect(saved.rotation).toBeDefined();
+  });
 });
