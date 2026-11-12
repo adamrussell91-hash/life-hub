@@ -1,0 +1,1312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Achievement Guide</title>
+<style>
+  /* Achievement guide mockup. Same paper and ink as the Meeting Guides set and Check-in.
+     Its own four-colour family, one per area of the Achievement Orientation Model:
+     amber for Worth it, rose for Can I, moss for Backed, river blue for Run it.
+     Invented student and invented words throughout. */
+  :root {
+    --paper: #f7f4ec; --card: #fffdf8; --ink: #1b2230; --muted: #6b7380; --line: rgba(27, 34, 48, 0.12);
+    --desk: #e9e6dd;
+    --worth: #c98a24; --worth-ink: #855610; --worth-tint: #f7ecd6; --worth-hi: #e6ad4a;
+    --can: #b04f67; --can-ink: #8e3550; --can-tint: #f6e2e7; --can-hi: #dc8296;
+    --back: #5a8a48; --back-ink: #3e6331; --back-tint: #e4efdd; --back-hi: #95c07f;
+    --run: #2f5d8a; --run-ink: #244a70; --run-tint: #e0e9f3; --run-hi: #86acd4;
+    --channel: #4a5466;
+    --teal-3: #1f6f66; --clay-2: #e08a5c; --sage-1: #5f7f6e;
+    --font: Inter, ui-sans-serif, system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --ease: cubic-bezier(.2, .7, .2, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { overflow-x: hidden; }
+  body { margin: 0; background: var(--desk); font-family: var(--font); color: var(--ink); font-size: 15px; line-height: 1.4; }
+  .sheet { max-width: 1240px; margin: 0 auto; padding: 24px 16px 72px; }
+  .sheet > h1 { font-size: 22px; margin: 0 0 4px; }
+  .sheet > p { color: var(--muted); margin: 0 0 8px; max-width: 74ch; }
+  .label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 40px 0 10px; }
+  .lede { color: var(--muted); max-width: 74ch; margin: -2px 0 14px; font-size: 14px; }
+  .row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+  .row > div { max-width: 100%; min-width: 0; }
+  .frame { background: var(--paper); border-radius: 18px; box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 8px 24px rgba(27,34,48,.08); overflow: hidden; position: relative; }
+  .frame--phone { width: 390px; max-width: 100%; min-height: 760px; display: flex; flex-direction: column; }
+  .cap { font-size: 13px; color: var(--muted); margin: 8px 4px 0; max-width: 390px; line-height: 1.45; }
+
+  /* ---------- Shared bits (as in the Meeting Guides set) ---------- */
+  .emblem { width: 44px; height: 44px; flex: none; display: block; }
+  .btn { font: inherit; font-size: 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 8px 13px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; min-height: 40px; }
+  .btn--primary { background: var(--ink); color: #fff; border-color: var(--ink); font-weight: 600; }
+  .btn--primary:disabled { opacity: .35; cursor: default; }
+  .btn--quiet { border-color: transparent; background: transparent; color: var(--muted); }
+  .btn--on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; margin-top: 16px; }
+  .card h3 { margin: 0 0 8px; font-size: 16px; }
+  .chip { font-size: 13px; border-radius: 999px; padding: 4px 10px 4px 4px; background: var(--card); border: 1px solid var(--line); display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .chip--plain { padding: 4px 10px; }
+  button.chip { font: inherit; font-size: 13px; cursor: pointer; color: var(--ink); }
+  .av { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; background: #3c7a8c; flex: none; }
+  .badge { font-size: 11px; font-weight: 700; background: #efe7fb; color: #5a3fa6; border-radius: 6px; padding: 2px 6px; }
+  .hint { font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .sub-h { font-size: 12px; font-weight: 600; color: var(--muted); margin: 14px 0 6px; }
+
+  /* Area swatches and text colours */
+  .a-value { --a: var(--worth); --a-ink: var(--worth-ink); --a-tint: var(--worth-tint); --a-hi: var(--worth-hi); }
+  .a-efficacy { --a: var(--can); --a-ink: var(--can-ink); --a-tint: var(--can-tint); --a-hi: var(--can-hi); }
+  .a-env { --a: var(--back); --a-ink: var(--back-ink); --a-tint: var(--back-tint); --a-hi: var(--back-hi); }
+  .a-reg { --a: var(--run); --a-ink: var(--run-ink); --a-tint: var(--run-tint); --a-hi: var(--run-hi); }
+  .sw { width: 12px; height: 12px; border-radius: 3px; background: var(--a); flex: none; display: inline-block; }
+  .tag { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--a-ink, var(--ink)); }
+  .tag small { font-weight: 600; letter-spacing: .02em; text-transform: none; color: var(--muted); font-size: 12px; }
+
+  /* ---------- Style language ---------- */
+  .lang { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; }
+  .lang .card { margin-top: 0; }
+  .lang .card--wide { grid-column: span 2; }
+  @media (max-width: 700px) { .lang .card--wide { grid-column: auto; } }
+  .lang h4 { margin: 0 0 4px; font-size: 14px; }
+  .lang p { margin: 0 0 10px; font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .swatches { display: grid; gap: 8px; }
+  .swatch { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 10px; align-items: center; }
+  .swatch i { height: 40px; border-radius: 10px; background: linear-gradient(135deg, var(--a) 0 58%, var(--a-tint) 58%); border: 1px solid var(--line); }
+  .swatch b { display: block; font-size: 14px; color: var(--a-ink); }
+  .swatch span { font-size: 12px; color: var(--muted); }
+  .shelfrow { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .shelfrow figure { margin: 0; text-align: center; font-size: 12px; color: var(--muted); }
+  .shelfrow figure .emblem { width: 56px; height: 56px; margin: 0 auto 4px; }
+  .anatomy { width: 100%; max-width: 460px; height: auto; display: block; margin: 4px auto 0; }
+  .rules { margin: 0; padding: 0 0 0 18px; font-size: 13px; color: #3a4250; display: grid; gap: 6px; line-height: 1.45; }
+  .demo-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 10px; }
+
+  /* ---------- Meeting page (desktop) ---------- */
+  .meeting { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); min-height: 600px; }
+  .meeting__main { padding: 24px 28px; min-width: 0; }
+  .crumbs { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .meeting h2 { font-size: 26px; margin: 6px 0 14px; }
+  .strip { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 8px 10px; }
+  .strip .live { font-size: 13px; font-weight: 600; color: var(--teal-3); margin-right: auto; display: flex; gap: 6px; align-items: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #3d9c8f; }
+  .notes p { margin: 6px 0; color: #333a45; line-height: 1.5; }
+  .notes .guide-line { color: var(--worth-ink); font-weight: 600; font-size: 14px; }
+  .panel { background: var(--paper); border-left: 1px solid var(--line); padding: 18px 18px 24px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .panel__head { display: flex; justify-content: space-between; align-items: center; }
+  .about { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .shelf-card { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; text-align: left; font: inherit; color: inherit; width: 100%; cursor: pointer; }
+  .shelf-card b { display: block; font-size: 15px; }
+  .shelf-card span { font-size: 13px; color: var(--muted); }
+  .shelf-card--new { border-color: var(--worth); box-shadow: 0 0 0 3px var(--worth-tint); }
+  .shelf-card__new { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--worth-ink); background: var(--worth-tint); border-radius: 6px; padding: 2px 6px; align-self: flex-start; }
+
+  /* ---------- Prototype ---------- */
+  .proto { display: grid; grid-template-columns: 390px minmax(0, 1fr); gap: 28px; align-items: start; }
+  .proto > div { min-width: 0; }
+  .screen { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; flex: 1; animation: in .26s var(--ease); }
+  .screen.back { animation-name: inback; }
+  @keyframes in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+  @keyframes inback { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+  .top { display: flex; align-items: center; gap: 10px; }
+  .top .title { font-weight: 700; font-size: 15px; }
+  .top .who { font-size: 13px; color: var(--muted); }
+  .top .who b { color: var(--ink); font-weight: 600; }
+  .prog { display: flex; gap: 3px; align-items: center; height: 10px; }
+  .prog i { flex: 2 1 0; height: 4px; border-radius: 2px; background: var(--line); transition: background .2s var(--ease); }
+  .prog i.branch { flex: 1 1 0; height: 4px; background: transparent; border: 1.5px solid var(--a, var(--line)); border-radius: 3px; height: 6px; }
+  .prog i.done { background: var(--ink); }
+  .prog i.branch.done { background: var(--a); border-color: var(--a); }
+  .prog i.now { background: var(--a, var(--clay-2)); }
+  .prog i.branch.now { background: var(--a); }
+  .prompt { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; }
+  .prompt--branch { border-left: 5px solid var(--a); padding-left: 15px; }
+  .ask { font-size: 19px; font-weight: 650; line-height: 1.3; margin: 10px 0 4px; }
+  .alt { font-size: 13px; color: #3a4250; margin: 6px 0 2px; }
+  .alt b { color: var(--muted); font-weight: 600; }
+  .sounds { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 12px; }
+  .sounds h5 { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); display: flex; gap: 5px; align-items: center; }
+  .sounds ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; }
+  .sounds li { font-size: 13px; border-radius: 10px; padding: 6px 9px; font-style: italic; line-height: 1.3; }
+  .sounds .solid li { background: var(--a-tint); }
+  .sounds .shaky li { border: 1.5px dashed color-mix(in srgb, var(--a) 55%, transparent); color: #3a4250; }
+  .rib { display: inline-block; width: 18px; border-radius: 2px; background: var(--a); }
+  .taps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .tap { font: inherit; font-size: 13px; padding: 10px 4px 9px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); text-align: center; line-height: 1.2; cursor: pointer; color: var(--ink); min-height: 56px; }
+  .tap .ri { display: flex; height: 16px; align-items: center; justify-content: center; margin-bottom: 6px; }
+  .tap .ri s { display: block; width: 26px; border-radius: 3px; background: var(--line); text-decoration: none; transition: background .2s var(--ease); }
+  .tap[aria-pressed="true"] { border-color: var(--a); background: var(--a-tint); font-weight: 650; }
+  .tap[aria-pressed="true"] .ri s { background: var(--a); }
+  .quote { width: 100%; font: inherit; font-size: 16px; border: 1px dashed var(--line); border-radius: 12px; padding: 10px 12px; background: var(--card); color: var(--ink); }
+  .quote:not(:placeholder-shown) { border-style: solid; font-style: italic; }
+  .textin { width: 100%; font: inherit; font-size: 16px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--card); color: var(--ink); }
+  .forkbtn { font: inherit; font-size: 14px; font-weight: 600; color: var(--a-ink); background: var(--a-tint); border: 1px solid color-mix(in srgb, var(--a) 40%, transparent); border-radius: 12px; padding: 9px 12px; display: flex; gap: 8px; align-items: center; cursor: pointer; width: 100%; text-align: left; min-height: 44px; }
+  .forkbtn svg { flex: none; }
+  .forkbtn[aria-pressed="true"] { background: var(--a); color: #fff; }
+  .forkbtn[aria-pressed="true"] svg path { stroke: #fff; }
+  .forknote { font-size: 13px; color: var(--a-ink); display: flex; gap: 8px; align-items: center; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 6px; }
+  .pills { display: inline-flex; flex-wrap: wrap; gap: 4px; background: rgba(27,34,48,.06); border-radius: 12px; padding: 3px; max-width: 100%; }
+  .pills button { font: inherit; font-size: 13px; border: 0; background: transparent; border-radius: 9px; padding: 7px 11px; color: var(--ink); cursor: pointer; min-height: 36px; }
+  .pills button[aria-pressed="true"] { background: var(--card); box-shadow: 0 1px 2px rgba(27,34,48,.15); font-weight: 650; }
+  .modes { display: grid; gap: 6px; }
+  .mode { font: inherit; text-align: left; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; border: 1px solid var(--line); background: var(--card); border-radius: 14px; padding: 10px 12px; cursor: pointer; color: var(--ink); }
+  .mode b { font-size: 14px; display: block; }
+  .mode span { font-size: 12.5px; color: var(--muted); }
+  .mode .rd { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); margin-top: 1px; }
+  .mode[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink) inset; }
+  .mode[aria-pressed="true"] .rd { border: 5px solid var(--ink); }
+  .areapick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .areapick button { font: inherit; font-size: 13px; border-radius: 999px; padding: 6px 11px; border: 1px solid var(--line); background: var(--card); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; color: var(--ink); min-height: 36px; }
+  .areapick button[aria-pressed="true"] { background: var(--a-tint); border-color: var(--a); color: var(--a-ink); font-weight: 650; }
+  .switch { display: flex; gap: 10px; align-items: flex-start; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; cursor: pointer; font: inherit; text-align: left; color: var(--ink); width: 100%; }
+  .switch .knob { flex: none; width: 34px; height: 20px; border-radius: 10px; background: var(--line); position: relative; margin-top: 1px; transition: background .2s var(--ease); }
+  .switch .knob::after { content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .2s var(--ease); box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+  .switch[aria-pressed="true"] .knob { background: var(--ink); }
+  .switch[aria-pressed="true"] .knob::after { transform: translateX(14px); }
+  .switch b { font-size: 14px; display: block; }
+  .switch span { font-size: 12.5px; color: var(--muted); }
+
+  /* Dig options */
+  .opts { display: grid; gap: 6px; margin-top: 10px; }
+  .opt { font: inherit; text-align: left; border: 1px solid var(--line); background: var(--card); border-radius: 14px; padding: 10px 12px 10px 10px; cursor: pointer; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; color: var(--ink); }
+  .opt .bx { width: 18px; height: 18px; border-radius: 5px; border: 2px solid var(--line); margin-top: 1px; display: grid; place-items: center; }
+  .opt b { font-size: 14px; }
+  .opt q { display: block; font-size: 13px; color: #3a4250; font-style: italic; margin-top: 1px; quotes: "\201C" "\201D"; }
+  .opt small { display: block; font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .opt[aria-pressed="true"] { border-color: var(--a); background: var(--a-tint); }
+  .opt[aria-pressed="true"] .bx { background: var(--a); border-color: var(--a); }
+  .opt[aria-pressed="true"] .bx::after { content: ""; width: 9px; height: 5px; border: 2px solid #fff; border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); }
+  .opens { font-size: 13px; color: var(--a-ink); font-weight: 600; margin-top: 10px; min-height: 18px; }
+
+  /* Check */
+  .check { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; }
+  .check h4 { margin: 8px 0 6px; font-size: 18px; }
+  .balance { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; margin: 12px 0 4px; font-size: 12px; font-weight: 700; }
+  .balance .l { text-align: right; color: var(--worth-ink); }
+  .balance .r { color: var(--can-ink); }
+  .balance span span { font-weight: 400; color: var(--muted); }
+  .probe { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+  .probe p { margin: 0 0 8px; font-weight: 600; font-size: 15px; line-height: 1.35; }
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+  .two .tap { min-height: 44px; padding: 9px 6px; }
+  .nudge { font-size: 13px; color: var(--ink); font-weight: 600; margin-top: 10px; min-height: 18px; }
+  .side { display: flex; gap: 10px; align-items: center; margin-top: 10px; padding: 10px 12px; border-radius: 14px; background: #efe9f7; border: 1px solid #ddd0ef; }
+  .side b { font-size: 14px; display: block; }
+  .side span { font-size: 12.5px; color: var(--muted); }
+  .side .btn { margin-left: auto; flex: none; }
+
+  /* Their turn: the student's screen, deliberately plain */
+  .their { background: #fff; }
+  .their .screen { gap: 16px; }
+  .their h3 { font-size: 22px; margin: 6px 0 0; }
+  .stmt { border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
+  .stmt p { margin: 0 0 10px; font-size: 16px; font-weight: 600; line-height: 1.35; }
+  .dots5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+  .dots5 button { font: inherit; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: #fff; cursor: pointer; display: grid; place-items: center; }
+  .dots5 button i { width: 14px; height: 14px; border-radius: 50%; background: var(--line); display: block; }
+  .dots5 button[aria-pressed="true"] { border-color: var(--ink); background: #f3f1ec; }
+  .dots5 button[aria-pressed="true"] i { background: var(--ink); }
+  .ends5 { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* Read */
+  .stream { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; }
+  .stream text { font-family: var(--font); }
+  .stream .fade { transition: stroke-width .28s var(--ease), opacity .2s; }
+  .key { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 14px; line-height: 1.4; }
+  .key span { display: inline-flex; gap: 6px; align-items: center; }
+  .key i { display: inline-block; width: 18px; height: 8px; border-radius: 2px; }
+  .sliders { display: grid; gap: 4px; }
+  .sl { display: grid; grid-template-columns: 74px minmax(0, 1fr) 30px; gap: 8px; align-items: center; min-height: 40px; }
+  .sl label { font-size: 13px; font-weight: 650; color: var(--a-ink); display: flex; gap: 6px; align-items: center; }
+  .sl output { font-family: var(--mono); font-size: 13px; text-align: right; color: var(--muted); }
+  .track { position: relative; height: 32px; display: flex; align-items: center; }
+  .track input { -webkit-appearance: none; appearance: none; width: 100%; margin: 0; height: 32px; background: transparent; cursor: pointer; }
+  .track input::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--a) var(--p, 0%), var(--a-tint) var(--p, 0%)); }
+  .track input::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--a) var(--p, 0%), var(--a-tint) var(--p, 0%)); }
+  .track input::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 3px solid var(--a); margin-top: -7px; box-shadow: 0 1px 2px rgba(27,34,48,.2); }
+  .track input::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 3px solid var(--a); }
+  .track input:focus-visible { outline: 2px solid var(--a); outline-offset: 2px; border-radius: 6px; }
+  .track input:disabled { cursor: default; }
+  .track .sug, .track .them { position: absolute; top: 2px; width: 2px; height: 8px; transform: translateX(-1px); pointer-events: none; }
+  .track .sug { border-left: 2px dotted var(--ink); opacity: .6; }
+  .track .them { top: 0; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink); background: #fff; transform: translateX(-5px); }
+  .sl--off { opacity: .45; }
+  .reads { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; padding: 10px 12px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); }
+  .reads .k { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .reads .pname { font-weight: 700; font-size: 15px; }
+  .reads .pline { font-size: 13px; color: var(--muted); }
+  .reads > div { flex: 1 1 180px; }
+  .reads select { margin-left: auto; font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; background: var(--card); max-width: 100%; }
+  .diff[hidden] { display: none; }
+  .diff { font-size: 13px; background: #fff7e3; border: 1px solid #f0dfae; border-radius: 12px; padding: 8px 10px; }
+
+  /* Plan */
+  .start { display: flex; gap: 8px; align-items: center; font-weight: 700; font-size: 16px; }
+  .moves { display: grid; gap: 6px; }
+  .move { font: inherit; text-align: left; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; border: 1px solid var(--line); background: var(--card); border-radius: 14px; padding: 10px 12px 10px 10px; cursor: pointer; color: var(--ink); }
+  .move .bx { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); margin-top: 1px; display: grid; place-items: center; }
+  .move span { font-size: 14px; line-height: 1.4; }
+  .move small { display: block; font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .move[aria-pressed="true"] { border-color: var(--a); background: var(--a-tint); }
+  .move[aria-pressed="true"] .bx { background: var(--a); border-color: var(--a); }
+  .move[aria-pressed="true"] .bx::after { content: ""; width: 8px; height: 4px; border: 2px solid #fff; border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); }
+  .move:disabled { opacity: .45; cursor: default; }
+  details.more { border-top: 1px solid var(--line); padding-top: 8px; }
+  details.more summary { font-size: 13px; color: var(--muted); cursor: pointer; font-weight: 600; padding: 6px 0; }
+  .when { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+
+  /* Overlay sheet inside the phone */
+  .ov { position: absolute; inset: 0; background: rgba(27,34,48,.28); display: flex; align-items: flex-end; z-index: 5; }
+  .ov[hidden] { display: none; }
+  .ov__sheet { background: var(--paper); width: 100%; border-radius: 20px 20px 0 0; padding: 16px 18px 18px; max-height: 88%; overflow: auto; animation: up .26s var(--ease); }
+  @keyframes up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  /* Branch map */
+  .map { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; }
+  .map h3 { margin: 0 0 2px; font-size: 16px; }
+  .map > p { margin: 0 0 12px; font-size: 13px; color: var(--muted); max-width: 60ch; }
+  .tree { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .node { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px; align-items: center; min-height: 34px; }
+  .node--branch { padding-left: 26px; grid-template-columns: 18px 26px minmax(0, 1fr); }
+  .node--branch .elbow { width: 14px; height: 18px; border-left: 2px solid var(--line); border-bottom: 2px solid var(--line); border-radius: 0 0 0 6px; margin-top: -14px; }
+  .node button { font: inherit; font-size: 14px; text-align: left; background: none; border: 0; padding: 6px 8px; border-radius: 10px; cursor: pointer; color: var(--ink); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
+  .node button:hover { background: rgba(27,34,48,.05); }
+  .node .why { font-size: 12px; color: var(--muted); }
+  .pip { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; background: var(--card); justify-self: center; }
+  .pip--b { width: 18px; height: 18px; border-radius: 6px; border-color: var(--a, var(--line)); }
+  .node.is-done .pip { background: var(--ink); border-color: var(--ink); }
+  .node.is-done .pip--b { background: var(--a); border-color: var(--a); }
+  .node.is-done .pip::after { content: ""; width: 8px; height: 4px; border: 2px solid #fff; border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); }
+  .node.is-now .pip { border-color: var(--a, var(--ink)); box-shadow: 0 0 0 4px var(--a-tint, rgba(27,34,48,.1)); }
+  .node.is-now button { font-weight: 700; }
+  .node.is-off { opacity: .42; }
+  .node.is-off .pip { border-style: dashed; }
+  .maplegend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .maplegend span { display: inline-flex; gap: 6px; align-items: center; }
+
+  /* Result card */
+  .result { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 18px; }
+  .result__head { display: flex; gap: 12px; align-items: center; }
+  .result__head .k { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .result__head .t { font-size: 18px; font-weight: 700; }
+  .result__head .edit { margin-left: auto; }
+  .profile { display: flex; gap: 10px; align-items: center; margin: 14px 0 6px; padding: 10px 12px; border-radius: 14px; background: var(--a-tint, var(--paper)); }
+  .profile .pname { font-weight: 700; color: var(--a-ink, var(--ink)); }
+  .profile .pctx { font-size: 13px; color: #3a4250; }
+  .r-h { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
+  .r-moves { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; counter-reset: m; }
+  .r-moves li { counter-increment: m; display: flex; gap: 10px; align-items: flex-start; font-size: 15px; line-height: 1.4; }
+  .r-moves li::before { content: counter(m); flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--a, var(--ink)); color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; margin-top: 1px; }
+  .r-moves small { display: block; font-size: 11.5px; color: var(--muted); }
+  .words blockquote { margin: 0 0 6px; padding: 6px 10px; border-left: 3px solid var(--a, var(--line)); font-style: italic; font-size: 14px; color: #3a4250; }
+  .words blockquote.a-value { border-color: var(--worth); }
+  .words blockquote.a-efficacy { border-color: var(--can); }
+  .words blockquote.a-env { border-color: var(--back); }
+  .words blockquote.a-reg { border-color: var(--run); }
+  .nextstep { background: var(--paper); border-radius: 12px; padding: 10px 12px; font-size: 15px; }
+  .nextstep small { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .cite { font-size: 11px; color: var(--muted); margin-top: 14px; border-top: 1px solid var(--line); padding-top: 8px; line-height: 1.45; }
+  .saved { display: inline-flex; gap: 6px; align-items: center; color: var(--teal-3); font-weight: 700; font-size: 14px; }
+
+  /* Person page strip */
+  .person { padding: 20px; }
+  .person__head { display: flex; gap: 12px; align-items: center; }
+  .person__head .av { width: 44px; height: 44px; font-size: 15px; }
+  .person__head b { font-size: 20px; display: block; }
+  .mstrip { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 10px; margin-top: 10px; }
+  .mini { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; text-decoration: none; color: inherit; display: block; }
+  .mini b { font-size: 14px; }
+  .mini .d { font-size: 12px; color: var(--muted); }
+  .mini .n { font-size: 12px; font-weight: 650; margin-top: 2px; display: flex; gap: 6px; align-items: center; color: var(--a-ink); }
+  .timeline { margin-top: 18px; border-left: 2px solid var(--line); padding-left: 14px; display: grid; gap: 10px; }
+  .tl { font-size: 14px; }
+  .tl .d { font-size: 12px; color: var(--muted); }
+
+  /* Research map */
+  .rtable { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--card); border-radius: 16px; overflow: hidden; }
+  .rtable th, .rtable td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.45; }
+  .rtable th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--paper); }
+  .rtable td:first-child { font-weight: 650; }
+  .rtable .src { color: #3a4250; }
+  .str { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 7px; white-space: nowrap; }
+  .str--strong { background: #dcefeb; color: #1f6f66; }
+  .str--mod { background: #f7ecd6; color: #855610; }
+  .str--theory { background: #eceef0; color: #4a5466; }
+  .str--ours { background: #efe7fb; color: #5a3fa6; }
+  .rwrap { overflow-x: auto; border-radius: 16px; border: 1px solid var(--line); }
+  .nots { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; margin-top: 14px; }
+  .nots .card { margin-top: 0; }
+  .nots p { margin: 0; font-size: 13.5px; color: #3a4250; line-height: 1.5; }
+  .refs { font-size: 12.5px; color: #3a4250; line-height: 1.5; padding-left: 18px; columns: 2 340px; column-gap: 28px; }
+  .refs li { margin-bottom: 6px; break-inside: avoid; }
+
+  @media (max-width: 980px) {
+    .proto { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 860px) {
+    .meeting { grid-template-columns: minmax(0, 1fr); }
+    .panel { border-left: 0; border-top: 1px solid var(--line); }
+  }
+  @media (max-width: 720px) {
+    .reads select { font-size: 16px; }
+  }
+  @media (max-width: 600px) {
+    .rtable th:nth-child(3), .rtable td:nth-child(3) { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1>Achievement guide · mockups</h1>
+  <p>The third guide on the meeting shelf. Motivation reads <i>why</i> a student does the work. Check-in looks after wellbeing. Achievement asks what is standing between a capable student and the result, using Siegle and McCoach's Achievement Orientation Model. The student and every quote here are invented.</p>
+  <p>The middle section is a working prototype. Tap through it: answers change which cards appear, and the branch map beside it shows the path you are on.</p>
+
+  <!-- Emblem symbols -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="emblem-achievement" viewBox="0 0 44 44">
+      <circle cx="22" cy="22" r="21" fill="#1b2230"/>
+      <path d="M8 13.5 C14.5 13.5 15.5 22 21.5 22" fill="none" stroke="#e6ad4a" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M8 22 L21.5 22" fill="none" stroke="#dc8296" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M8 30.5 C14.5 30.5 15.5 22 21.5 22" fill="none" stroke="#95c07f" stroke-width="2.6" stroke-linecap="round"/>
+      <rect x="25" y="13" width="3.2" height="6" rx="1.2" fill="#86acd4"/>
+      <rect x="25" y="25" width="3.2" height="6" rx="1.2" fill="#86acd4"/>
+      <path d="M21.5 22 L34 22" fill="none" stroke="#f7f4ec" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M31 18.6 L34.6 22 L31 25.4" fill="none" stroke="#f7f4ec" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="emblem-motivation" viewBox="0 0 44 44">
+      <circle cx="22" cy="22" r="21" fill="#1b2230"/>
+      <line x1="11" y1="22" x2="33" y2="22" stroke="#f7f4ec" stroke-width="1.6" stroke-dasharray="1.5 2.5" stroke-linecap="round"/>
+      <circle cx="11.5" cy="22" r="5" fill="none" stroke="#e08a5c" stroke-width="2.4"/>
+      <circle cx="32.5" cy="22" r="6" fill="#3d9c8f"/>
+      <path d="M26 17.5 L29.5 22 L26 26.5" fill="none" stroke="#f7f4ec" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="emblem-checkin" viewBox="0 0 44 44">
+      <circle cx="22" cy="22" r="21" fill="#1b2230"/>
+      <path d="M7 29 L14 29 M30 29 L37 29" stroke="#8fae9c" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M12 29 Q22 13 32 29" fill="none" stroke="#f7f4ec" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M17 29 L17 23.5 M22 29 L22 21 M27 29 L27 23.5" stroke="#f7f4ec" stroke-width="1.4" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="ico-fork" viewBox="0 0 18 18">
+      <path d="M4 2.5 V9.5 Q4 13 7.5 13 H14 M11 10 L14 13 L11 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+  </svg>
+
+  <!-- ===================== 1. Style language ===================== -->
+  <div class="label">1 · The visual language</div>
+  <p class="lede">The model is drawn as water. Three streams (the attitudes) join into one channel, which passes a gate (self-regulation) on its way into the work. The model says all three attitudes have to be positive, though not equally strong, so the drawing lets any thin stream choke the channel. Every screen reuses this one picture, these four colours and the shelf's paper and ink.</p>
+  <div class="lang">
+    <div class="card">
+      <h4>Four areas, four colours</h4>
+      <p>One colour per area, used everywhere that area appears: tags, taps, chips, dig cards, streams. Text uses the deeper shade so it stays readable.</p>
+      <div class="swatches">
+        <div class="swatch a-value"><i></i><div><b>Worth it?</b><span>Goal valuation · does the task matter to them</span></div></div>
+        <div class="swatch a-efficacy"><i></i><div><b>Can I?</b><span>Self-efficacy · do they believe effort will pay off here</span></div></div>
+        <div class="swatch a-env"><i></i><div><b>Backed?</b><span>Environmental perceptions · will the people and setting let them do well</span></div></div>
+        <div class="swatch a-reg"><i></i><div><b>Run it?</b><span>Self-regulation · can they plan, keep going and learn from feedback</span></div></div>
+      </div>
+    </div>
+    <div class="card card--wide">
+      <h4>The stream picture</h4>
+      <p>Widths are your read on a 0 to 10 scale, not a test score. The grey core inside each stream is last time, at its true width. The little pinch marks sit on whatever names the read.</p>
+      <svg class="anatomy" viewBox="0 0 340 196" role="img" aria-label="Anatomy of the stream picture">
+        <g id="anat"></g>
+      </svg>
+    </div>
+    <div class="card">
+      <h4>The shelf, side by side</h4>
+      <p>Same dark disc and paper strokes as the other two emblems. Three streams meet, pass a gate and head out as one.</p>
+      <div class="shelfrow">
+        <figure><svg class="emblem"><use href="#emblem-motivation"/></svg>Motivation</figure>
+        <figure><svg class="emblem"><use href="#emblem-achievement"/></svg>Achievement</figure>
+        <figure><svg class="emblem"><use href="#emblem-checkin"/></svg>Check-in</figure>
+      </div>
+      <h4 style="margin-top:16px">Main path and branches</h4>
+      <p>Main-path cards are plain. A branch (a dig, or a check) carries its area's colour down the left edge and a fork mark, and shows in the progress bar as a smaller, outlined segment. You can always see whether you are on the main road or a side path.</p>
+      <div class="prog" style="max-width:300px" aria-hidden="true"><i class="done"></i><i class="done a-value"></i><i class="branch done a-value"></i><i class="now a-efficacy"></i><i class="branch a-efficacy"></i><i></i><i></i><i></i></div>
+    </div>
+    <div class="card">
+      <h4>Words on screen</h4>
+      <ul class="rules">
+        <li><b>Your question</b> is large and bold, in quote marks, with an "Or try" line so you can say it your own way.</li>
+        <li><b>Sounds solid</b> examples sit on a filled tint. <b>Sounds shaky</b> sit in a dashed outline. They are listening aids, never answers to tap.</li>
+        <li><b>Their words</b> are always italic with a coloured rule, and only ever what the student actually said.</li>
+        <li><b>Sources</b> sit in small grey type under each move, so the research is one glance away and never in the way.</li>
+        <li>Australian spelling, plain words, no dashes in sentences, nothing a student glancing at the screen would read as a judgement.</li>
+      </ul>
+      <h4 style="margin-top:14px">The tap scale</h4>
+      <p>Four steps, the same for every area. The icon is a stream getting wider.</p>
+      <div class="taps a-env" aria-hidden="true">
+        <span class="tap"><span class="ri"><s style="height:2px"></s></span>Missing</span>
+        <span class="tap"><span class="ri"><s style="height:5px"></s></span>Patchy</span>
+        <span class="tap" aria-pressed="true"><span class="ri"><s style="height:9px"></s></span>Mostly</span>
+        <span class="tap"><span class="ri"><s style="height:13px"></s></span>Solid</span>
+      </div>
+    </div>
+    <div class="card">
+      <h4>Motion</h4>
+      <ul class="rules">
+        <li>The hub's one ease, short durations, nothing that bounces or loops.</li>
+        <li>Forward slides in from the right, Back from the left. Branch cards slide in the same way, so a dig feels like a step aside, not a new place.</li>
+        <li>Streams widen or narrow in a quarter of a second when you move a slider, then settle.</li>
+        <li>All of it stops under reduced motion.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Flexible by design</h4>
+      <ul class="rules">
+        <li><b>Quick read</b>: four questions, about three minutes. Dig anywhere it looks weak with one tap.</li>
+        <li><b>Full</b>: digs open on their own wherever you tap Missing or Patchy.</li>
+        <li><b>One area</b>: just the bit that came up, mid-meeting.</li>
+        <li><b>Their turn</b>: hand over the phone and the student rates the four in their own words. Their dots sit beside your read.</li>
+        <li>Skip anything. Jump around the branch map. Only what you save is kept.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ===================== 2. Meeting page ===================== -->
+  <div class="label">2 · Meeting page, Guides open (desktop)</div>
+  <div class="frame">
+    <div class="meeting">
+      <div class="meeting__main">
+        <div class="crumbs">Professional · Meetings</div>
+        <h2>Essay meeting with Ollie</h2>
+        <div class="strip">
+          <span class="live"><span class="dot"></span>In meeting · 9 min</span>
+          <button class="btn" type="button">✎ Read a photo</button>
+          <button class="btn btn--on" type="button">◐ Guides</button>
+          <button class="btn btn--quiet" type="button">End ›</button>
+        </div>
+        <div class="card">
+          <h3>The room · 1</h3>
+          <span class="chip"><span class="av">OV</span>Ollie Vance <span class="badge">Student</span></span>
+        </div>
+        <div class="card notes">
+          <h3>Notes</h3>
+          <p>Went through the essay plan. The thesis is sharp but the body paragraphs are thin.</p>
+          <p>Says the essay is "just for marks". Started the draft two nights before.</p>
+          <p class="guide-line">◐ Achievement guide · English · Module B essay · see card</p>
+        </div>
+      </div>
+      <aside class="panel">
+        <div class="panel__head"><b>Guides</b><button class="btn btn--quiet" type="button" aria-label="Close guides">✕</button></div>
+        <div class="about">About <span class="chip"><span class="av">OV</span>Ollie Vance</span></div>
+        <button class="shelf-card" type="button">
+          <svg class="emblem"><use href="#emblem-motivation"/></svg>
+          <div><b>Motivation</b><span>Where their reasons sit, from controlled to their own. About 5 minutes.</span></div>
+        </button>
+        <button class="shelf-card shelf-card--new" type="button" onclick="document.getElementById('proto').scrollIntoView({behavior:'smooth'})">
+          <svg class="emblem"><use href="#emblem-achievement"/></svg>
+          <div><b>Achievement</b><span>What stands between them and the result. 3 to 8 minutes.</span></div>
+          <span class="shelf-card__new">New</span>
+        </button>
+        <button class="shelf-card" type="button">
+          <svg class="emblem"><use href="#emblem-checkin"/></svg>
+          <div><b>Check-in</b><span>A calm walk-through when wellbeing comes up.</span></div>
+        </button>
+      </aside>
+    </div>
+  </div>
+  <p class="cap" style="max-width:640px">Achievement sits between the two existing guides: a measuring guide like Motivation, so it keeps runs, history and the profile strip. The shelf order stays measuring guides first, then Check-in.</p>
+
+  <!-- ===================== 3. Prototype ===================== -->
+  <div class="label" id="proto">3 · Running the guide (working prototype, 390px)</div>
+  <div class="proto">
+    <div>
+      <div class="frame frame--phone" id="phone">
+        <div id="screen"></div>
+        <div class="ov" id="ov" hidden><div class="ov__sheet" id="ovSheet" role="dialog" aria-modal="true" aria-label="Side card"></div></div>
+      </div>
+      <p class="cap">390px is the phone, and about the width of the desktop side panel. Try tapping Missing or Patchy on Worth it and Can I to see the branches open.</p>
+    </div>
+    <div>
+      <div class="map">
+        <h3>Branch map</h3>
+        <p>Every card the guide can show. Solid steps are on your path now; faded ones open only if the answers call for them. Tap any step on your path to jump to it.</p>
+        <ul class="tree" id="tree"></ul>
+        <div class="maplegend">
+          <span><span class="pip" style="width:16px;height:16px;background:var(--ink);border-color:var(--ink)"></span>Main step done</span>
+          <span><span class="pip pip--b a-value" style="width:14px;height:14px"></span>Branch: a dig or a check</span>
+          <span><span class="pip" style="width:16px;height:16px;border-style:dashed;opacity:.5"></span>Not on this path</span>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3>What makes it branch</h3>
+        <ul class="rules">
+          <li><b>Dig</b> opens under an area when you tap Missing or Patchy (Full mode), when you press "Dig into why" (Quick mode), or always (One area mode).</li>
+          <li><b>Can't, or won't?</b> opens when Worth it and Can I both come up weak, or when you pick "Cost" in the Worth it dig. Low belief can hide behind "it's pointless".</li>
+          <li><b>Perfectionism side card</b> opens from that check if they say they hold back effort so a bad result doesn't count.</li>
+          <li><b>Their turn</b> adds the student's own ratings before your read, if you switch it on.</li>
+          <li><b>The plan</b> starts at the narrowest stream, and offers the moves your dig picks opened.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== 4. Result card and person page ===================== -->
+  <div class="label">4 · The result card on the meeting page</div>
+  <div class="row">
+    <div style="width:560px;max-width:100%">
+      <div id="staticCard"></div>
+      <p class="cap" style="max-width:560px">The narrowest stream names the read and colours the card. The faint ribbons are the run from 15 October, so you can see Worth it widen. The key also lists what Ollie rated when they took their turn.</p>
+    </div>
+  </div>
+
+  <div class="label">5 · On Ollie's profile</div>
+  <div class="row">
+    <div style="width:760px;max-width:100%">
+      <div class="frame">
+        <div class="person">
+          <div class="person__head"><span class="av">OV</span><div><b>Ollie Vance</b><span class="badge">Student</span> <span class="hint">· Year 11</span></div></div>
+          <div class="sub-h" style="margin-top:18px">Guides · latest per area of work</div>
+          <div class="mstrip" id="mstrip"></div>
+          <div class="timeline">
+            <div class="tl"><div class="d">12 Nov</div>◐ Achievement guide · English · Module B essay · narrowest: Worth it</div>
+            <div class="tl"><div class="d">10 Dec</div>Look again: Achievement guide · English · Module B essay</div>
+            <div class="tl"><div class="d">15 Oct</div>◐ Achievement guide · English · Module B essay</div>
+          </div>
+        </div>
+      </div>
+      <p class="cap" style="max-width:760px">One mini card per area of work, as Motivation does. The mini stream and its "narrowest" line say in words what the picture shows. The "look again" date is the task the plan made.</p>
+    </div>
+  </div>
+
+  <!-- ===================== 6. Research map ===================== -->
+  <div class="label">6 · Where each piece comes from</div>
+  <p class="lede">Every question, branch and move traces to a source. The last column says how much weight it can bear. Where the wording or a rule is ours, it says so.</p>
+  <div class="rwrap">
+    <table class="rtable">
+      <thead><tr><th>Piece of the guide</th><th>Source</th><th>What the source says</th><th>Weight</th></tr></thead>
+      <tbody id="rbody"></tbody>
+    </table>
+  </div>
+  <div class="nots">
+    <div class="card"><h3>Not a test</h3><p>The published instrument behind this model is the School Attitude Assessment Survey, Revised: 35 items in five factors. This guide is a structured conversation, not that survey, and its numbers are your read. Nothing on screen calls them scores.</p></div>
+    <div class="card"><h3>Their view is the thing</h3><p>The model is about the student's own beliefs and perceptions. Your read is a guess at those, so the guide pushes you to ask, keeps their words, and lets them rate it themselves. Where your read and theirs differ by three or more, it tells you to ask about it.</p></div>
+    <div class="card"><h3>Not wellbeing</h3><p>If doubt is really low mood or anxiety, this is the wrong tool. The Can I dig and the perfectionism side card both hand over to Check-in.</p></div>
+  </div>
+  <div class="label">References</div>
+  <ol class="refs" id="refs"></ol>
+</div>
+
+<script>
+/* ===================================================================
+   Content: the four areas, their digs, checks and moves.
+   =================================================================== */
+const AREAS = [
+  {
+    id: 'value', cls: 'a-value', short: 'Worth it', theory: 'Goal valuation', ink: '#855610', col: '#c98a24',
+    ask: 'What would doing well at this get you that you actually care about?',
+    alt: 'If English disappeared tomorrow, what would you miss?',
+    hint: 'Listen for a reason that is theirs: interest, usefulness, or who they want to be.',
+    solid: ['I need it for law.', 'I actually like arguing a point.', 'I want to write well.'],
+    shaky: ['What’s the point?', 'I’ll never use this.', 'It’s just for marks.'],
+    digAsk: 'What kind of worth is missing?',
+    digHint: 'Four kinds of value (Eccles and Wigfield). Pick any that fit.',
+    digs: [
+      { id: 'intrinsic', name: 'Enjoyment', q: 'It’s boring.', src: 'Intrinsic value', moves: ['m_choice'] },
+      { id: 'utility', name: 'Usefulness', q: 'I’ll never use it.', src: 'Utility value', moves: ['m_utility'] },
+      { id: 'attainment', name: 'Who they are', q: 'That’s not me.', src: 'Attainment value', moves: ['m_identity'] },
+      { id: 'cost', name: 'Cost', q: 'It takes too much, or what if I try and still fail?', src: 'Cost', moves: ['m_cost'] }
+    ],
+    base: ['m_utility', 'm_choice']
+  },
+  {
+    id: 'efficacy', cls: 'a-efficacy', short: 'Can I', theory: 'Self-efficacy', ink: '#8e3550', col: '#b04f67',
+    ask: 'If you put the work in, how sure are you that you’d do well at this?',
+    alt: 'What’s the hardest part of this for you?',
+    hint: 'Listen for belief about this task, not about being smart in general.',
+    solid: ['If I plan it, I can do it.', 'I’ve done it before.'],
+    shaky: ['I’m just not an English person.', 'I always lose marks on this.', 'Everyone else gets it straight away.'],
+    digAsk: 'Where does the doubt come from?',
+    digHint: 'The four sources of self-efficacy (Bandura). Pick any that fit.',
+    digs: [
+      { id: 'mastery', name: 'Results so far', q: 'I always lose marks. It never used to be this hard.', src: 'Mastery experience', moves: ['m_win', 'm_growth'] },
+      { id: 'vicarious', name: 'Comparing with others', q: 'Everyone else gets it.', src: 'Vicarious experience', moves: ['m_peer'] },
+      { id: 'persuasion', name: 'What they’ve been told', q: 'My last teacher said I’m not a writer.', src: 'Social persuasion', moves: ['m_feedback'] },
+      { id: 'affect', name: 'Nerves', q: 'My mind goes blank in the exam.', src: 'Physiological and emotional states', moves: ['m_nerves'] }
+    ],
+    base: ['m_win', 'm_growth']
+  },
+  {
+    id: 'env', cls: 'a-env', short: 'Backed', theory: 'Environmental perceptions', ink: '#3e6331', col: '#5a8a48',
+    ask: 'Who’s in your corner on this? And does the class feel too easy, too hard or about right?',
+    alt: 'Who would you go to if you got stuck on this?',
+    hint: 'Listen for whether they think the people and the setting will let them do well.',
+    solid: ['Sir explains it if I ask.', 'My friends take it seriously too.'],
+    shaky: ['The teacher doesn’t like me.', 'It’s not cool to try.', 'It’s too slow, I already know this.'],
+    digAsk: 'What isn’t backing them?',
+    digHint: 'The parts of the setting the model names. Pick any that fit.',
+    digs: [
+      { id: 'teacher', name: 'A teacher', q: 'She doesn’t like me.', src: 'Teacher relationship', moves: ['m_teacher'] },
+      { id: 'peers', name: 'Friends and class', q: 'It’s not cool to try.', src: 'Peer climate', moves: ['m_private'] },
+      { id: 'home', name: 'Home', q: 'They only ask about the mark.', src: 'Family messages', moves: ['m_home'] },
+      { id: 'fit', name: 'The fit', q: 'Too slow, I already know this. Or: way over my head.', src: 'Challenge and pace', moves: ['m_fit'] }
+    ],
+    base: ['m_teacher', 'm_fit']
+  },
+  {
+    id: 'reg', cls: 'a-reg', short: 'Run it', theory: 'Self-regulation', ink: '#244a70', col: '#2f5d8a',
+    ask: 'Walk me through the last big task. When did you start, and what did you do when you got stuck?',
+    alt: 'What did you do with the feedback on your last essay?',
+    hint: 'Listen for a plan, a way of checking progress, and what they do after a mark comes back.',
+    solid: ['I break it up over the week.', 'I check it against the criteria.'],
+    shaky: ['The night before.', 'I just read over my notes.', 'I don’t really look at feedback.'],
+    digAsk: 'Where does it break down?',
+    digHint: 'The three phases of self-regulated learning (Zimmerman). Pick any that fit.',
+    digs: [
+      { id: 'before', name: 'Before: planning and starting', q: 'I leave it to the last minute.', src: 'Forethought', moves: ['m_steps'] },
+      { id: 'during', name: 'During: focus and strategies', q: 'I just reread it and hope.', src: 'Performance', moves: ['m_strategy'] },
+      { id: 'after', name: 'After: using feedback', q: 'I look at the mark and move on.', src: 'Self-reflection', moves: ['m_after'] }
+    ],
+    base: ['m_steps', 'm_after']
+  }
+];
+const AREA = Object.fromEntries(AREAS.map((a) => [a.id, a]));
+
+const MOVES = {
+  m_utility: { area: 'value', text: 'Ask them to write two or three sentences on how this could matter in their own life. Let them find the link rather than hearing yours.', src: 'Utility value · Hulleman and Harackiewicz 2009, where it helped students who expected to do poorly' },
+  m_choice: { area: 'value', text: 'Give a real choice inside the task: the text, the angle or the format, tied to something they are already into.', src: 'Intrinsic value · Wigfield and Eccles 2000' },
+  m_identity: { area: 'value', text: 'Connect the skill to who they want to be: the advocate, the writer, the person who wins the argument.', src: 'Attainment value · Wigfield and Eccles 2000' },
+  m_cost: { area: 'value', text: 'Name the cost out loud, then shrink the first step until it is cheap to start.', src: 'Cost · Wigfield and Eccles 2000' },
+  m_win: { area: 'efficacy', text: 'Set one step they can succeed at this week, then point to it at the next meeting.', src: 'Mastery experience is the strongest source · Usher and Pajares 2008' },
+  m_growth: { area: 'efficacy', text: 'Put an early piece beside a recent one so they can see their own growth.', src: 'Making mastery visible · Usher and Pajares 2008' },
+  m_peer: { area: 'efficacy', text: 'Compare them with their own past work, not with others. Show a model who struggled and got there.', src: 'Vicarious experience · Usher and Pajares 2008' },
+  m_feedback: { area: 'efficacy', text: 'Give feedback that names the skill they used, so the praise is believable and repeatable.', src: 'Social persuasion · Usher and Pajares 2008' },
+  m_nerves: { area: 'efficacy', text: 'Name the nerves and rehearse it at low stakes. If it is more than nerves, open Check-in.', src: 'Physiological and emotional states · Usher and Pajares 2008' },
+  m_teacher: { area: 'env', text: 'Find one honest positive to say this week, and ask what helps them learn in that class.', src: 'Teacher relationships and engagement · Roorda et al. 2011' },
+  m_private: { area: 'env', text: 'Keep their stretch work low profile, or put them with peers who value it.', src: 'Social cost of achieving · Cross, Coleman and Terhaar-Yonkers 1991' },
+  m_home: { area: 'env', text: 'Agree one message for home about effort and strategy, not marks.', src: 'Environmental perceptions · Siegle, McCoach and Roberts 2017' },
+  m_fit: { area: 'env', text: 'Too easy: skip what they already know and extend or accelerate. Too hard: scaffold the next step.', src: 'Acceleration · Steenbergen-Hu, Makel and Olszewski-Kubilius 2016' },
+  m_steps: { area: 'reg', text: 'Break the task into dated steps together, and have them write one plan as “When…, I will…”.', src: 'Implementation intentions · Gollwitzer and Sheeran 2006; Duckworth et al. 2011' },
+  m_strategy: { area: 'reg', text: 'Teach one strategy explicitly, and have them tick off the steps as they use it.', src: 'Performance phase · Zimmerman 2002' },
+  m_after: { area: 'reg', text: 'When the next mark comes back, ask what caused it and what they will change. Steer to strategy, not ability.', src: 'Self-reflection phase · Zimmerman 2002; Cleary, Callan and Zimmerman 2012' },
+  m_low: { area: null, text: 'Spend this meeting on the relationship and one small win. Do not try to fix four things at once.', src: 'Our rule of thumb · relationships (Roorda et al. 2011) and mastery (Usher and Pajares 2008)' },
+  m_raise: { area: null, text: 'Nothing is pinching, so raise the challenge: extension, acceleration or a real audience.', src: 'Acceleration · Steenbergen-Hu et al. 2016' }
+};
+
+const PROFILES = {
+  value: { name: 'Not seeing the point', line: 'The worth is not there for them yet, so effort has nothing to pull on.' },
+  efficacy: { name: 'Doubting they can', line: 'They may want it, but do not believe their effort will pay off here.' },
+  env: { name: 'Not feeling backed', line: 'They do not trust the people or the setting to let them do well.' },
+  reg: { name: 'Willing, not yet organised', line: 'The reasons and the belief are there. The how is missing.' },
+  flowing: { name: 'All flowing', line: 'Nothing is pinching. If results still lag, look at challenge and the task itself.' },
+  low: { name: 'Low on every front', line: 'Start with the relationship and one small win, not all four at once.' }
+};
+
+const TAPS = ['Missing', 'Patchy', 'Mostly', 'Solid'];
+const TAP_POINTS = [1, 4, 7, 9];
+const THEIR = {
+  value: 'Doing well at this matters to me.',
+  efficacy: 'If I work at it, I can do well at this.',
+  env: 'The people around me help me do well at this.',
+  reg: 'I plan this work and keep on top of it.'
+};
+
+/* ===================================================================
+   The stream picture: one drawing used everywhere.
+   =================================================================== */
+const NS = 'http://www.w3.org/2000/svg';
+const W = (v) => 2 + v * 2.3; // 0..10 -> 2..25 units
+const qn = (a) => a.short + '?';
+const geo = (a, b, c) => Math.cbrt(Math.max(0, a) * Math.max(0, b) * Math.max(0, c));
+
+function svgEl(tag, attrs, text) {
+  const n = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+
+/** vals: {value, efficacy, env, reg} each 0..10 or null (not asked).
+    Labels sit in a left gutter and above the gate, so they never cross a ribbon. */
+function drawStream(g, vals, opts = {}) {
+  const { ghost = null, labels = true, top = 0 } = opts;
+  const pin = opts.pin || profileFor(vals); // the area that names the read, so picture and words agree
+  g.replaceChildren();
+  const ys = { value: top + 30, efficacy: top + 78, env: top + 126 };
+  const cy = top + 78;
+  const x0 = labels ? 88 : 10, xj = labels ? 200 : 170, xg = labels ? 262 : 246, xo = xg + 8, xe = 322;
+  const att = ['value', 'efficacy', 'env'];
+  const known = att.filter((k) => vals[k] != null);
+  const ch = known.length === 3 ? geo(vals.value, vals.efficacy, vals.env) : (known.length ? Math.min(...known.map((k) => vals[k])) : 0);
+  const reg = vals.reg;
+  const out = reg == null ? ch : Math.min(ch, reg);
+  const narrow = att.includes(pin) && vals[pin] != null ? pin : null;
+  const span = xj - x0;
+  const inflow = (k) => `M ${x0} ${ys[k]} C ${x0 + span * 0.6} ${ys[k]}, ${x0 + span * 0.72} ${cy}, ${xj} ${cy}`;
+
+  // channel first so the streams overlap it cleanly at the join
+  g.append(svgEl('path', { class: 'fade', d: `M ${xj - 2} ${cy} L ${xg} ${cy}`, fill: 'none', stroke: 'var(--channel)', 'stroke-width': W(ch) }));
+  for (const k of att) {
+    const a = AREA[k];
+    if (vals[k] == null) g.append(svgEl('path', { d: inflow(k), fill: 'none', stroke: a.col, 'stroke-opacity': '.5', 'stroke-width': 1.5, 'stroke-dasharray': '3 4' }));
+    else g.append(svgEl('path', { class: 'fade', d: inflow(k), fill: 'none', stroke: a.col, 'stroke-width': W(vals[k]) }));
+  }
+  // gate posts: the opening is the regulation read
+  const gap = reg == null ? W(ch) + 4 : Math.max(W(reg), 3);
+  const postCol = reg == null ? '#9aa3ad' : AREA.reg.col;
+  g.append(svgEl('rect', { x: xg, y: cy - gap / 2 - 24, width: 8, height: 24, rx: 2.5, fill: postCol }));
+  g.append(svgEl('rect', { x: xg, y: cy + gap / 2, width: 8, height: 24, rx: 2.5, fill: postCol }));
+  const ow = W(out);
+  g.append(svgEl('path', { class: 'fade', d: `M ${xo} ${cy} L ${xe} ${cy}`, fill: 'none', stroke: AREA.reg.col, 'stroke-opacity': reg == null ? '.4' : '1', 'stroke-width': ow }));
+  g.append(svgEl('path', { d: `M ${xe} ${cy - ow / 2 - 5} L ${xe + 14} ${cy} L ${xe} ${cy + ow / 2 + 5} Z`, fill: AREA.reg.col, 'fill-opacity': reg == null ? '.4' : '1' }));
+  // last time: a grey core at its true width, laid over the current stream
+  if (ghost) {
+    const gch = geo(ghost.value, ghost.efficacy, ghost.env);
+    const gs = { stroke: '#1b2230', 'stroke-opacity': '.2', fill: 'none' };
+    for (const k of att) if (vals[k] != null) g.append(svgEl('path', { ...gs, d: inflow(k), 'stroke-width': W(ghost[k]) }));
+    g.append(svgEl('path', { ...gs, d: `M ${xj} ${cy} L ${xg} ${cy}`, 'stroke-width': W(gch) }));
+    g.append(svgEl('path', { ...gs, d: `M ${xo} ${cy} L ${xe} ${cy}`, 'stroke-width': W(Math.min(gch, ghost.reg)) }));
+  }
+  // pinch marks on the narrowest stream, on its flat start
+  if (narrow) {
+    const y = ys[narrow], hh = W(vals[narrow]) / 2, x = x0 + 16;
+    g.append(svgEl('path', { d: `M ${x - 4} ${y - hh - 7} L ${x} ${y - hh - 1.5} L ${x + 4} ${y - hh - 7} M ${x - 4} ${y + hh + 7} L ${x} ${y + hh + 1.5} L ${x + 4} ${y + hh + 7}`, fill: 'none', stroke: '#1b2230', 'stroke-width': 1.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+  }
+  if (pin === 'reg' && reg != null) {
+    const x = xg + 4;
+    g.append(svgEl('path', { d: `M ${x - 4} ${cy - gap / 2 - 31} L ${x} ${cy - gap / 2 - 26} L ${x + 4} ${cy - gap / 2 - 31} M ${x - 4} ${cy + gap / 2 + 31} L ${x} ${cy + gap / 2 + 26} L ${x + 4} ${cy + gap / 2 + 31}`, fill: 'none', stroke: '#1b2230', 'stroke-width': 1.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+  }
+  if (!labels) return;
+  for (const k of att) {
+    const a = AREA[k];
+    const t = svgEl('text', { x: x0 - 8, y: ys[k] + 4, 'font-size': 11.5, 'font-weight': 650, fill: a.ink, 'text-anchor': 'end' });
+    t.append(svgEl('tspan', {}, qn(a) + ' '));
+    t.append(svgEl('tspan', { 'font-weight': 400, fill: '#6b7380' }, vals[k] == null ? '·' : String(vals[k])));
+    g.append(t);
+    if (k === narrow) g.append(svgEl('text', { x: x0 - 8, y: ys[k] + 17, 'font-size': 10, 'font-weight': 700, fill: '#1b2230', 'text-anchor': 'end' }, 'narrowest'));
+  }
+  g.append(svgEl('text', { x: (xj + xg) / 2, y: cy + W(ch) / 2 + 14, 'font-size': 10.5, fill: '#6b7380', 'text-anchor': 'middle' }, 'together'));
+  const rt = svgEl('text', { x: xg + 4, y: cy - gap / 2 - 30, 'font-size': 11.5, 'font-weight': 650, fill: AREA.reg.ink, 'text-anchor': 'middle' });
+  rt.append(svgEl('tspan', {}, 'Run it? '));
+  rt.append(svgEl('tspan', { 'font-weight': 400, fill: '#6b7380' }, reg == null ? '·' : String(reg)));
+  g.append(rt);
+  if (pin === 'reg') g.append(svgEl('text', { x: xg + 4, y: cy - gap / 2 - 43, 'font-size': 10, 'font-weight': 700, fill: '#1b2230', 'text-anchor': 'middle' }, 'narrowest'));
+  g.append(svgEl('text', { x: xe + 14, y: cy - ow / 2 - 8, 'font-size': 10.5, fill: '#6b7380', 'text-anchor': 'end' }, 'into the work'));
+}
+
+function streamSvg(vals, opts = {}) {
+  const box = opts.labels === false ? '0 8 340 140' : '0 -4 340 156';
+  const svg = svgEl('svg', { class: 'stream', viewBox: box, role: 'img', 'aria-label': streamWords(vals) });
+  const g = svgEl('g', {});
+  svg.append(g);
+  drawStream(g, vals, opts);
+  return { svg, g };
+}
+
+function streamWords(vals) {
+  const parts = AREAS.map((a) => `${qn(a)} ${vals[a.id] == null ? 'not asked' : vals[a.id] + ' of 10'}`);
+  return 'Your read. ' + parts.join(', ') + '.';
+}
+
+/* Anatomy in the style section */
+(function anatomy() {
+  const g = document.getElementById('anat');
+  drawStream(g, { value: 3, efficacy: 6, env: 7, reg: 4 }, { ghost: { value: 2, efficacy: 4, env: 7, reg: 3 }, top: 4 });
+  const call = (x, y, tx, ty, label) => {
+    g.append(svgEl('line', { x1: x, y1: y, x2: tx, y2: ty - 4, stroke: '#1b2230', 'stroke-width': 1, 'stroke-dasharray': '2 2' }));
+    g.append(svgEl('text', { x: tx, y: ty + 6, 'font-size': 10.5, 'font-weight': 700, fill: '#1b2230', 'text-anchor': 'middle' }, label));
+  };
+  call(30, 140, 40, 178, '3 streams');
+  call(205, 92, 160, 178, 'channel');
+  call(248, 112, 248, 178, 'gate');
+  call(300, 92, 312, 178, 'out');
+})();
+
+/* ===================================================================
+   Prototype state
+   =================================================================== */
+const S = {
+  step: 'context', dir: 'fwd', mode: 'quick', one: 'value', theirOn: false, context: 'English · Module B essay',
+  taps: {}, quotes: {}, digs: { value: [], efficacy: [], env: [], reg: [] }, forceDig: {},
+  checks: {}, their: {}, values: null, touched: {}, profile: null, chosen: [], next: '', again: '4w', saved: false
+};
+
+const tapVal = (k) => (S.taps[k] == null ? null : TAP_POINTS[S.taps[k]]);
+const weakTap = (k) => S.taps[k] != null && S.taps[k] <= 1;
+const askedAreas = () => (S.mode === 'one' ? [S.one] : AREAS.map((a) => a.id));
+const digOn = (k) => (S.mode === 'one' ? true : S.mode === 'full' ? weakTap(k) || !!S.forceDig[k] : !!S.forceDig[k]);
+const checkOn = () => {
+  const both = askedAreas().includes('value') && askedAreas().includes('efficacy') && weakTap('value') && weakTap('efficacy');
+  return both || (digOn('value') && S.digs.value.includes('cost'));
+};
+
+function path() {
+  const p = ['context'];
+  for (const k of askedAreas()) {
+    p.push('gate:' + k);
+    if (digOn(k)) p.push('dig:' + k);
+    if (k === 'efficacy' && checkOn()) p.push('check');
+    if (k === 'value' && S.mode === 'one' && checkOn()) p.push('check');
+  }
+  if (S.theirOn) p.push('their');
+  p.push('read', 'plan', 'saved');
+  return p;
+}
+
+function suggested() {
+  const v = {};
+  for (const a of AREAS) v[a.id] = askedAreas().includes(a.id) ? tapVal(a.id) : null;
+  if (v.value != null && S.checks.want === 'yes') v.value = Math.min(10, v.value + 3);
+  return v;
+}
+
+function currentValues() {
+  const sug = suggested();
+  if (!S.values) S.values = { ...sug };
+  for (const a of AREAS) {
+    if (!askedAreas().includes(a.id)) S.values[a.id] = null;
+    else if (!S.touched[a.id]) S.values[a.id] = sug[a.id];
+  }
+  return S.values;
+}
+
+function profileFor(v) {
+  const att = ['value', 'efficacy', 'env'].filter((k) => v[k] != null);
+  const all = [...att, ...(v.reg != null ? ['reg'] : [])];
+  if (!all.length) return 'low';
+  if (all.length === 4 && all.every((k) => v[k] < 5)) return 'low';
+  const weakAtt = att.filter((k) => v[k] < 6).sort((a, b) => v[a] - v[b] || ['value', 'efficacy', 'env'].indexOf(a) - ['value', 'efficacy', 'env'].indexOf(b));
+  if (weakAtt.length) return weakAtt[0];
+  if (v.reg != null && v.reg < 6) return 'reg';
+  return 'flowing';
+}
+
+function movesFor(areaId) {
+  const a = AREA[areaId];
+  const fromDigs = (S.digs[areaId] || []).flatMap((d) => a.digs.find((x) => x.id === d).moves);
+  const list = [...new Set([...fromDigs, ...a.base])];
+  return list;
+}
+
+/* ===================================================================
+   Rendering helpers
+   =================================================================== */
+const $ = (sel, root = document) => root.querySelector(sel);
+function h(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') n.className = v;
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else if (k === 'html') n.innerHTML = v;
+    else n.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) n.append(kid);
+  return n;
+}
+const useEmblem = () => { const s = document.createElementNS(NS, 'svg'); s.setAttribute('class', 'emblem'); s.setAttribute('aria-hidden', 'true'); const u = document.createElementNS(NS, 'use'); u.setAttribute('href', '#emblem-achievement'); s.append(u); return s; };
+const forkIcon = () => { const s = document.createElementNS(NS, 'svg'); s.setAttribute('width', '18'); s.setAttribute('height', '18'); s.setAttribute('aria-hidden', 'true'); const u = document.createElementNS(NS, 'use'); u.setAttribute('href', '#ico-fork'); s.append(u); return s; };
+
+function topBar(title) {
+  return h('div', { class: 'top' }, useEmblem(), h('div', {}, h('div', { class: 'title' }, title), h('div', { class: 'who' }, 'Ollie Vance · ', h('b', {}, S.context))));
+}
+
+function stepArea(id) { const k = id.split(':')[1]; return k ? AREA[k] : id === 'check' ? AREA.efficacy : null; }
+
+function progress() {
+  const p = path().filter((s) => s !== 'saved');
+  const idx = p.indexOf(S.step);
+  const bar = h('div', { class: 'prog', 'aria-label': `Step ${Math.max(1, idx + 1)} of ${p.length}` });
+  p.forEach((s, i) => {
+    const a = stepArea(s);
+    const branch = s.startsWith('dig:') || s === 'check';
+    bar.append(h('i', { class: [branch ? 'branch' : '', a ? a.cls : '', i < idx ? 'done' : '', i === idx ? 'now' : ''].join(' ') }));
+  });
+  return bar;
+}
+
+function go(step, dir = 'fwd') { S.step = step; S.dir = dir; render(); }
+function nextStep() { const p = path(); go(p[Math.min(p.length - 1, p.indexOf(S.step) + 1)]); }
+function prevStep() { const p = path(); go(p[Math.max(0, p.indexOf(S.step) - 1)], 'back'); }
+function nav(backLabel, nextLabel, opts = {}) {
+  return h('div', { class: 'nav' },
+    h('button', { class: 'btn btn--quiet', type: 'button', onclick: opts.onBack || prevStep }, backLabel),
+    h('button', { class: 'btn btn--primary', type: 'button', disabled: opts.disabled, onclick: opts.onNext || nextStep }, nextLabel));
+}
+
+/* ===================================================================
+   Screens
+   =================================================================== */
+function scContext() {
+  const minutes = { quick: 'About 3 minutes. Dig anywhere with one tap.', full: 'About 8 minutes. Digs open wherever it looks weak.', one: 'About 2 minutes. Just the area that came up.' };
+  const modeBtn = (id, name, line) => h('button', { class: 'mode', type: 'button', 'aria-pressed': String(S.mode === id), onclick: () => { S.mode = id; render(); } }, h('span', { class: 'rd' }), h('span', {}, h('b', {}, name), h('span', {}, line)));
+  return [
+    topBar('Achievement'), progress(),
+    h('div', { class: 'prompt' },
+      h('div', { class: 'ask', style: 'margin-top:0' }, 'What’s this about?'),
+      h('div', { class: 'hint' }, 'One subject or task at a time. Run it again for another.'),
+      h('input', { class: 'textin', style: 'margin-top:12px;font-weight:600', value: S.context, 'aria-label': 'What the guide is about', oninput: (e) => { S.context = e.target.value; } }),
+      h('div', { class: 'sub-h' }, 'Used before with Ollie'),
+      h('div', { class: 'demo-row' },
+        h('button', { class: 'chip chip--plain', type: 'button', onclick: () => { S.context = 'English · Module B essay'; render(); } }, 'English · Module B essay · 15 Oct'),
+        h('button', { class: 'chip chip--plain', type: 'button', onclick: () => { S.context = 'Maths'; render(); } }, 'Maths · 3 Sep'))),
+    h('div', { class: 'sub-h', style: 'margin:2px 0 0' }, 'How deep?'),
+    h('div', { class: 'modes' },
+      modeBtn('quick', 'Quick read', 'Four questions, one per area.'),
+      modeBtn('full', 'Full', 'Four questions, then dig into each weak one.'),
+      modeBtn('one', 'One area', 'Just the part that came up.')),
+    S.mode === 'one' ? h('div', { class: 'areapick' }, AREAS.map((a) => h('button', { class: a.cls, type: 'button', 'aria-pressed': String(S.one === a.id), onclick: () => { S.one = a.id; render(); } }, h('span', { class: 'sw' }), qn(a)))) : null,
+    h('button', { class: 'switch', type: 'button', 'aria-pressed': String(S.theirOn), onclick: () => { S.theirOn = !S.theirOn; render(); } }, h('span', { class: 'knob' }), h('span', {}, h('b', {}, 'Their turn at the end'), h('span', {}, 'Hand over the phone and they rate the four themselves.'))),
+    h('div', { class: 'hint' }, minutes[S.mode]),
+    nav('Cancel', 'Start ›', { onBack: () => reset() })
+  ];
+}
+
+function scGate(k) {
+  const a = AREA[k];
+  const asked = askedAreas();
+  const n = asked.indexOf(k) + 1;
+  const weak = weakTap(k);
+  let fork = null;
+  if (S.mode === 'quick' && weak) {
+    fork = h('button', { class: 'forkbtn ' + a.cls, type: 'button', 'aria-pressed': String(!!S.forceDig[k]), onclick: () => { S.forceDig[k] = !S.forceDig[k]; render(); } }, forkIcon(), S.forceDig[k] ? 'Digging into why: it opens next' : 'Dig into why');
+  } else if (S.mode === 'full' && weak) {
+    fork = h('div', { class: 'forknote ' + a.cls }, forkIcon(), 'You will dig into this next.');
+  }
+  return [
+    topBar('Achievement'), progress(),
+    h('div', { class: 'prompt ' + a.cls },
+      h('span', { class: 'tag' }, h('span', { class: 'sw' }), `${n} of ${asked.length} · ${qn(a)}`, h('small', {}, a.theory)),
+      h('div', { class: 'ask' }, `“${a.ask}”`),
+      h('div', { class: 'alt' }, h('b', {}, 'Or try: '), `“${a.alt}”`),
+      h('div', { class: 'hint', style: 'margin-top:6px' }, a.hint),
+      h('div', { class: 'sounds' },
+        h('div', { class: 'solid' }, h('h5', {}, h('span', { class: 'rib', style: 'height:7px' }), 'Sounds solid'), h('ul', {}, a.solid.map((s) => h('li', {}, `“${s}”`)))),
+        h('div', { class: 'shaky' }, h('h5', {}, h('span', { class: 'rib', style: 'height:2px' }), 'Sounds shaky'), h('ul', {}, a.shaky.map((s) => h('li', {}, `“${s}”`)))))),
+    h('div', { class: 'taps ' + a.cls, role: 'group', 'aria-label': `How solid is ${a.short}` },
+      TAPS.map((t, i) => h('button', { class: 'tap', type: 'button', 'aria-pressed': String(S.taps[k] === i), onclick: () => { S.taps[k] = i; S.touched[k] = false; if (i > 1) S.forceDig[k] = false; render(); } }, h('span', { class: 'ri' }, h('s', { style: `height:${[2, 5, 9, 13][i]}px` })), t))),
+    fork,
+    h('input', { class: 'quote', placeholder: 'Their words, if you caught them (optional)', value: S.quotes[k] || '', 'aria-label': 'Their words', oninput: (e) => { S.quotes[k] = e.target.value; } }),
+    nav('‹ Back', 'Next ›')
+  ];
+}
+
+function scDig(k) {
+  const a = AREA[k];
+  const picks = S.digs[k];
+  const opened = [...new Set(picks.flatMap((d) => a.digs.find((x) => x.id === d).moves))];
+  return [
+    topBar('Achievement'), progress(),
+    h('div', { class: 'prompt prompt--branch ' + a.cls },
+      h('span', { class: 'tag' }, forkIcon(), `Dig · ${qn(a)}`),
+      h('div', { class: 'ask' }, a.digAsk),
+      h('div', { class: 'hint' }, a.digHint),
+      h('div', { class: 'opts' }, a.digs.map((d) => h('button', { class: 'opt', type: 'button', 'aria-pressed': String(picks.includes(d.id)), onclick: () => { S.digs[k] = picks.includes(d.id) ? picks.filter((x) => x !== d.id) : [...picks, d.id]; render(); } },
+        h('span', { class: 'bx' }), h('span', {}, h('b', {}, d.name), h('q', {}, d.q), h('small', {}, d.src))))),
+      h('div', { class: 'opens' }, opened.length ? `Opens ${opened.length} move${opened.length === 1 ? '' : 's'} for the plan.` : ''),
+      k === 'value' && picks.includes('cost') ? h('div', { class: 'forknote a-efficacy', style: 'margin-top:4px' }, forkIcon(), 'Cost can hide doubt. A quick check opens after Can I.') : null),
+    nav('‹ Back', 'Next ›')
+  ];
+}
+
+function scCheck() {
+  const want = S.checks.want, hold = S.checks.hold;
+  let nudge = '';
+  if (want === 'yes') nudge = 'Worth it moved up three in the suggestion. The doubt is doing the work, so Can I is the place to start.';
+  if (want === 'no') nudge = 'The suggestion stays. The worth really is low for now.';
+  const t = (key, val, label, cls) => h('button', { class: 'tap ' + cls, type: 'button', 'aria-pressed': String(S.checks[key] === val), onclick: () => { S.checks[key] = val; S.touched.value = false; render(); } }, label);
+  return [
+    topBar('Achievement'), progress(),
+    h('div', { class: 'check prompt--branch a-efficacy' },
+      h('span', { class: 'tag', style: 'color:var(--ink)' }, h('span', { class: 'sw', style: 'background:linear-gradient(90deg,var(--worth) 50%,var(--can) 50%)' }), 'Getting the call right'),
+      h('h4', {}, 'Can’t, or won’t?'),
+      h('div', { class: 'hint' }, 'Worth it and Can I both came up weak. A student who doubts they can do well may say it is pointless, which protects how able they look. Check which one is driving it.'),
+      h('div', { class: 'balance', 'aria-hidden': 'true' },
+        h('span', { class: 'l' }, 'Won’t', h('br'), h('span', {}, 'the worth is low')),
+        h('span', { html: '<svg width="110" height="34" viewBox="0 0 110 34" aria-hidden="true"><path d="M55 30 L49 34 L61 34 Z" fill="#1b2230"/><line x1="10" y1="14" x2="100" y2="18" stroke="#1b2230" stroke-width="2.5" stroke-linecap="round"/><circle cx="10" cy="14" r="7" fill="#c98a24"/><circle cx="100" cy="18" r="7" fill="#b04f67"/><line x1="55" y1="16" x2="55" y2="30" stroke="#1b2230" stroke-width="2"/></svg>' }),
+        h('span', { class: 'r' }, 'Can’t', h('br'), h('span', {}, 'the doubt is driving'))),
+      h('div', { class: 'probe' },
+        h('p', {}, '“If you knew you’d do well at it, would you want to do it?”'),
+        h('div', { class: 'two' }, t('want', 'no', 'No, still not', 'a-value'), t('want', 'yes', 'Yes, then I would', 'a-efficacy'))),
+      h('div', { class: 'probe' },
+        h('p', {}, '“Do you ever not try properly, so if it goes badly it doesn’t really count?”'),
+        h('div', { class: 'two' }, t('hold', 'no', 'No', 'a-efficacy'), t('hold', 'yes', 'Yes, sometimes', 'a-efficacy'))),
+      h('div', { class: 'nudge' }, nudge),
+      hold === 'yes' ? h('div', { class: 'side' }, h('div', {}, h('b', {}, 'Perfectionism side card'), h('span', {}, 'Holding back so a bad result doesn’t count can be fear of falling short.')), h('button', { class: 'btn', type: 'button', onclick: openPerfection }, 'Open')) : null),
+    nav('Skip', 'Next ›', { onBack: nextStep })
+  ];
+}
+
+function openPerfection() {
+  const ov = $('#ov'), sheet = $('#ovSheet');
+  const q = (ask, sub) => h('div', { class: 'probe' }, h('p', {}, ask), h('div', { class: 'hint' }, sub));
+  sheet.replaceChildren(
+    h('div', { class: 'top' }, h('div', {}, h('div', { class: 'title' }, 'Perfectionism · side card'), h('div', { class: 'who' }, 'Three questions to ask. Not a screen, not a diagnosis.'))),
+    q('“How far is your work from where you think it should be?”', 'A big gap between their standard and how they see their work is the part that hurts (the discrepancy in the Almost Perfect Scale).'),
+    q('“Do you feel other people expect it to be perfect?”', 'Pressure they feel from others, rather than standards they own, is the riskier kind (socially prescribed perfectionism).'),
+    q('“When it matters, do you put off starting, or leave it too late to do well?”', 'Holding back effort protects how able they look (self-handicapping).'),
+    h('div', { class: 'diff', style: 'margin-top:12px' }, 'If any of this sounds like real distress, stop here and open Check-in.'),
+    h('div', { class: 'nav', style: 'margin-top:14px' }, h('button', { class: 'btn btn--quiet', type: 'button', onclick: closeOv }, 'Open Check-in'), h('button', { class: 'btn btn--primary', type: 'button', onclick: closeOv }, 'Back to the guide')));
+  ov.hidden = false;
+  ov.onclick = (e) => { if (e.target === ov) closeOv(); };
+}
+function closeOv() { $('#ov').hidden = true; }
+
+function scTheir() {
+  const asked = askedAreas();
+  return h('div', { class: 'their', style: 'display:flex;flex-direction:column;flex:1' }, h('div', { class: `screen ${S.dir === 'back' ? 'back' : ''}` },
+    h('div', { class: 'hint' }, 'Your turn · ', S.context),
+    h('h3', {}, 'How true is each of these for you?'),
+    asked.map((k) => h('div', { class: 'stmt' },
+      h('p', {}, THEIR[k]),
+      h('div', { class: 'dots5', role: 'group', 'aria-label': THEIR[k] }, [0, 1, 2, 3, 4].map((i) => h('button', { type: 'button', 'aria-label': `${i + 1} of 5`, 'aria-pressed': String(S.their[k] === i), onclick: () => { S.their[k] = i; render(); } }, h('i', { style: `width:${8 + i * 3}px;height:${8 + i * 3}px` })))),
+      h('div', { class: 'ends5' }, h('span', {}, 'Not at all'), h('span', {}, 'Totally')))),
+    h('div', { class: 'hint' }, 'There are no right answers. Your teacher sees these next to their own notes.'),
+    nav('‹ Back', 'Hand back ›')));
+}
+
+function scRead() {
+  const v = currentValues();
+  const sug = suggested();
+  const { svg, g } = streamSvg(v, { pin: S.profile || undefined });
+  const prof = S.profile || profileFor(v);
+  const pa = AREA[prof];
+  const theirVal = (k) => (S.their[k] == null ? null : Math.round(S.their[k] * 2.5));
+  const diffBox = h('div', { class: 'diff', hidden: true });
+  const rows = AREAS.map((a) => {
+    const off = v[a.id] == null;
+    const out = h('output', {}, off ? '·' : String(v[a.id]));
+    const input = h('input', { type: 'range', min: 0, max: 10, step: 1, value: off ? 0 : v[a.id], disabled: off, style: `--p:${off ? 0 : v[a.id] * 10}%`, 'aria-label': `${a.short}, your read`, oninput: (e) => { S.values[a.id] = +e.target.value; S.touched[a.id] = true; S.profile = null; e.target.style.setProperty('--p', `${e.target.value * 10}%`); out.textContent = e.target.value; drawStream(g, S.values, {}); svg.setAttribute('aria-label', streamWords(S.values)); refreshReads(); } });
+    return h('div', { class: `sl ${a.cls} ${off ? 'sl--off' : ''}` },
+      h('label', {}, h('span', { class: 'sw' }), a.short),
+      h('div', { class: 'track' }, input,
+        !off && sug[a.id] != null ? h('span', { class: 'sug', style: `left:calc(8px + ${sug[a.id] / 10} * (100% - 16px))`, title: `Suggested from your tap: ${sug[a.id]}` }) : null,
+        !off && theirVal(a.id) != null ? h('span', { class: 'them', style: `left:calc(8px + ${theirVal(a.id) / 10} * (100% - 16px))`, title: `Ollie’s own rating: ${S.their[a.id] + 1} of 5` }) : null),
+      out);
+  });
+  const reads = h('div', { class: 'reads ' + (pa ? pa.cls : '') });
+  function refreshReads() {
+    const id = S.profile || profileFor(S.values);
+    const p = PROFILES[id];
+    const sel = h('select', { 'aria-label': 'Change the read', onchange: (e) => { S.profile = e.target.value; render(); } }, Object.entries(PROFILES).map(([pid, pp]) => h('option', { value: pid, selected: pid === id }, pp.name)));
+    reads.className = 'reads ' + (AREA[id] ? AREA[id].cls : '');
+    reads.replaceChildren(h('div', { style: 'min-width:0' }, h('div', { class: 'k' }, 'Reads as'), h('div', { class: 'pname' }, p.name), h('div', { class: 'pline' }, p.line)), sel);
+    const diffs = AREAS.filter((a) => S.values[a.id] != null && theirVal(a.id) != null && Math.abs(theirVal(a.id) - S.values[a.id]) >= 3);
+    diffBox.hidden = !diffs.length;
+    diffBox.textContent = diffs.length ? `You and Ollie see ${diffs.map((a) => a.short).join(' and ')} differently. Ask about it before you plan.` : '';
+  }
+  refreshReads();
+  return [
+    topBar('Your read'), progress(),
+    h('div', { class: 'hint' }, 'The widths start at your taps (dotted marks). Drag to your call. Only what you save is kept.'),
+    svg,
+    h('div', { class: 'key' },
+      h('span', {}, 'Streams: your read, 0 to 10'),
+      h('span', {}, 'Channel: held back by the narrowest stream'),
+      h('span', {}, 'Gate: how well they run it'),
+      Object.keys(S.their).length ? h('span', {}, h('i', { style: 'width:10px;height:10px;border-radius:50%;border:2px solid var(--ink)' }), 'Ollie’s own rating') : null),
+    h('div', { class: 'sliders' }, rows),
+    diffBox,
+    reads,
+    nav('‹ Back', 'Plan ›')
+  ];
+}
+
+function scPlan() {
+  const v = currentValues();
+  const prof = S.profile || profileFor(v);
+  const lead = AREA[prof] ? prof : null;
+  const p = PROFILES[prof];
+  const leadMoves = lead ? movesFor(lead) : prof === 'low' ? ['m_low'] : ['m_raise'];
+  const others = AREAS.filter((a) => a.id !== lead && v[a.id] != null);
+  const moveBtn = (id) => {
+    const m = MOVES[id];
+    const on = S.chosen.includes(id);
+    return h('button', { class: 'move ' + (m.area ? AREA[m.area].cls : ''), type: 'button', 'aria-pressed': String(on), disabled: !on && S.chosen.length >= 2, onclick: () => { S.chosen = on ? S.chosen.filter((x) => x !== id) : [...S.chosen, id]; render(); } },
+      h('span', { class: 'bx' }), h('span', {}, m.text, h('small', {}, m.src)));
+  };
+  const againLabel = { '2w': '26 Nov', '4w': '10 Dec', '6w': '24 Dec', none: '' };
+  return [
+    topBar('The plan'), progress(),
+    h('div', { class: lead ? AREA[lead].cls : '' },
+      h('div', { class: 'start' }, lead ? h('span', { class: 'sw' }) : null, lead ? `Start with ${AREA[lead].short}` : p.name),
+      h('div', { class: 'hint', style: 'margin-top:2px' }, p.line)),
+    h('div', { class: 'moves' }, leadMoves.map(moveBtn)),
+    h('div', { class: 'hint' }, S.chosen.length >= 2 ? 'Two is plenty. Untick one to swap.' : 'Pick one or two. Small beats many.'),
+    lead === 'efficacy' || lead === 'reg' ? h('div', { class: 'diff' }, 'In the intervention study, plans aimed at value or the setting moved grades most, and ones aimed at belief or self-management moved them least. Think about pairing this with one from the other areas below.') : null,
+    others.length ? h('details', { class: 'more' }, h('summary', {}, 'Moves for the other areas'), h('div', { class: 'moves', style: 'margin-top:6px' }, others.flatMap((a) => movesFor(a.id)).map(moveBtn))) : null,
+    h('div', { class: 'sub-h', style: 'margin:4px 0 0' }, 'Their next step, in their words'),
+    h('input', { class: 'textin', placeholder: 'When I get home Tuesday, I will…', value: S.next, 'aria-label': 'Their next step', oninput: (e) => { S.next = e.target.value; } }),
+    h('div', { class: 'when' }, 'Plans written as “When…, I will…” have a medium-to-large effect on follow-through (implementation intentions).'),
+    h('div', { class: 'sub-h', style: 'margin:4px 0 0' }, 'Look again in'),
+    h('div', { class: 'pills', role: 'group', 'aria-label': 'Look again in' }, [['2w', '2 weeks'], ['4w', '4 weeks'], ['6w', '6 weeks'], ['none', 'Not now']].map(([id, label]) => h('button', { type: 'button', 'aria-pressed': String(S.again === id), onclick: () => { S.again = id; render(); } }, label))),
+    h('div', { class: 'when' }, S.again === 'none' ? 'No reminder.' : `Adds a task for ${againLabel[S.again]}. Running it again shows whether the narrow stream widened.`),
+    nav('‹ Back', 'Save to meeting', { onNext: () => { S.saved = true; nextStep(); } })
+  ];
+}
+
+function resultCard(data) {
+  const prof = data.profile;
+  const pa = AREA[prof];
+  const p = PROFILES[prof];
+  const { svg } = streamSvg(data.values, { ghost: data.ghost, pin: prof });
+  const card = h('article', { class: 'result ' + (pa ? pa.cls : '') },
+    h('div', { class: 'result__head' }, useEmblem(), h('div', {}, h('div', { class: 'k' }, `Achievement guide · ${data.date}`), h('div', { class: 't' }, data.context)), h('button', { class: 'btn btn--quiet edit', type: 'button' }, 'Edit')),
+    h('div', { class: 'profile' }, h('div', {}, h('div', { class: 'pname' }, p.name), h('div', { class: 'pctx' }, p.line))),
+    svg,
+    h('div', { class: 'key' },
+      data.ghost ? h('span', {}, h('i', { style: 'background:#1b2230;opacity:.2;height:8px' }), `Grey core: last time, ${data.ghostDate}`) : h('span', {}, 'First run'),
+      h('span', {}, 'Widths are your read, 0 to 10'),
+      data.their ? h('span', {}, h('i', { style: 'width:10px;height:10px;border-radius:50%;border:2px solid var(--ink)' }), `Ollie rated: ${AREAS.map((a) => `${a.short} ${data.their[a.id]}/5`).join(', ')}`) : null),
+    data.quotes.length ? h('div', { class: 'words' }, h('div', { class: 'r-h' }, 'Their words'), data.quotes.map(([k, q]) => h('blockquote', { class: AREA[k].cls }, `“${q}”`))) : null,
+    data.moves.length ? h('div', {}, h('div', { class: 'r-h' }, 'Moves'), h('ol', { class: 'r-moves' }, data.moves.map((id) => h('li', {}, h('span', {}, MOVES[id].text, h('small', {}, MOVES[id].src)))))) : null,
+    data.next ? h('div', {}, h('div', { class: 'r-h' }, 'Their next step'), h('div', { class: 'nextstep' }, `“${data.next}”`, data.again ? h('small', {}, `Look again ${data.again}`) : null)) : null,
+    h('div', { class: 'cite' }, 'Achievement Orientation Model after Siegle and McCoach (2005) and Siegle, McCoach and Roberts (2017) · value types after Wigfield and Eccles (2000) · sources of self-efficacy after Bandura, reviewed by Usher and Pajares (2008) · phases after Zimmerman (2002). Your read, not a test score.'));
+  return card;
+}
+
+function scSaved() {
+  const v = currentValues();
+  const prof = S.profile || profileFor(v);
+  const again = { '2w': 'on 26 Nov', '4w': 'on 10 Dec', '6w': 'on 24 Dec', none: '' }[S.again];
+  const quotes = AREAS.filter((a) => S.quotes[a.id]).map((a) => [a.id, S.quotes[a.id]]);
+  const their = Object.keys(S.their).length ? Object.fromEntries(AREAS.map((a) => [a.id, S.their[a.id] == null ? '·' : S.their[a.id] + 1])) : null;
+  return [
+    h('div', { class: 'top' }, h('span', { class: 'saved' }, '✓ Saved to the meeting'), h('button', { class: 'btn btn--quiet', type: 'button', style: 'margin-left:auto', onclick: reset }, 'Run the demo again')),
+    resultCard({ profile: prof, values: v, ghost: null, date: '12 Nov', context: S.context, quotes, moves: S.chosen, next: S.next, again, their })
+  ];
+}
+
+function reset() {
+  Object.assign(S, { step: 'context', dir: 'back', taps: {}, quotes: {}, digs: { value: [], efficacy: [], env: [], reg: [] }, forceDig: {}, checks: {}, their: {}, values: null, touched: {}, profile: null, chosen: [], next: '', saved: false });
+  render();
+}
+
+/* ===================================================================
+   Branch map
+   =================================================================== */
+function renderTree() {
+  const p = path();
+  const idx = p.indexOf(S.step);
+  const all = ['context'];
+  for (const a of AREAS) {
+    all.push('gate:' + a.id, 'dig:' + a.id);
+    if (a.id === 'efficacy') all.push('check');
+  }
+  all.push('their', 'read', 'plan', 'saved');
+  const label = (s) => {
+    if (s === 'context') return ['What it’s about', 'context and depth'];
+    if (s === 'check') return ['Can’t, or won’t?', 'if Worth it and Can I are both weak'];
+    if (s === 'their') return ['Their turn', 'if switched on'];
+    if (s === 'read') return ['Your read', 'the stream picture'];
+    if (s === 'plan') return ['The plan', 'starts at the narrowest stream'];
+    if (s === 'saved') return ['Saved card', 'on the meeting page'];
+    const [kind, k] = s.split(':');
+    const a = AREA[k];
+    const name = `${qn(a)}`;
+    return kind === 'gate' ? [name, a.theory] : [`Dig · ${name}`, a.digs.map((d) => d.name.split(':')[0].toLowerCase()).join(', ')];
+  };
+  const tree = $('#tree');
+  tree.replaceChildren(...all.map((s) => {
+    const a = stepArea(s);
+    const branch = s.startsWith('dig:') || s === 'check';
+    const on = p.includes(s);
+    const i = p.indexOf(s);
+    const [name, why] = label(s);
+    const cls = ['node', branch ? 'node--branch' : '', a ? a.cls : '', !on ? 'is-off' : i < idx ? 'is-done' : i === idx ? 'is-now' : ''].join(' ');
+    const btn = h('button', { type: 'button', disabled: !on || (s === 'saved' && !S.saved), 'aria-current': i === idx ? 'step' : null, onclick: () => go(s, i < idx ? 'back' : 'fwd') }, h('span', {}, name), h('span', { class: 'why' }, why));
+    return h('li', { class: cls }, branch ? h('span', { class: 'elbow' }) : null, h('span', { class: 'pip' + (branch ? ' pip--b' : '') }), btn);
+  }));
+}
+
+/* ===================================================================
+   Render
+   =================================================================== */
+function render() {
+  if (!path().includes(S.step)) S.step = 'read';
+  const host = $('#screen');
+  let content;
+  const [kind, k] = S.step.split(':');
+  if (S.step === 'their') { host.replaceChildren(scTheir()); host.style.cssText = 'display:flex;flex-direction:column;flex:1;background:#fff'; renderTree(); return; }
+  host.style.cssText = 'display:flex;flex-direction:column;flex:1';
+  if (kind === 'context') content = scContext();
+  else if (kind === 'gate') content = scGate(k);
+  else if (kind === 'dig') content = scDig(k);
+  else if (kind === 'check') content = scCheck();
+  else if (kind === 'read') content = scRead();
+  else if (kind === 'plan') content = scPlan();
+  else content = scSaved();
+  host.replaceChildren(h('div', { class: `screen ${S.dir === 'back' ? 'back' : ''}` }, content));
+  renderTree();
+}
+render();
+
+/* ===================================================================
+   Static result card and profile strip
+   =================================================================== */
+$('#staticCard').append(resultCard({
+  profile: 'value', date: '12 Nov', context: 'English · Module B essay',
+  values: { value: 3, efficacy: 6, env: 7, reg: 4 },
+  ghost: { value: 1, efficacy: 4, env: 7, reg: 3 }, ghostDate: '15 Oct',
+  quotes: [['value', 'It’s just for marks.'], ['reg', 'I started it two nights before.']],
+  moves: ['m_utility', 'm_steps'],
+  next: 'When I get home Tuesday, I will write three sentences on where arguing a case could matter for me.',
+  again: 'on 10 Dec',
+  their: { value: 2, efficacy: 4, env: 4, reg: 2 }
+}));
+
+const strip = $('#mstrip');
+for (const m of [
+  { ctx: 'English · Module B essay', when: '12 Nov · 2 runs', vals: { value: 3, efficacy: 6, env: 7, reg: 4 }, ghost: { value: 1, efficacy: 4, env: 7, reg: 3 }, narrow: 'value', line: 'Narrowest: Worth it · wider than 15 Oct' },
+  { ctx: 'Maths', when: '3 Sep · 1 run', vals: { value: 7, efficacy: 8, env: 6, reg: 2 }, ghost: null, narrow: 'reg', line: 'Narrowest: Run it' }
+]) {
+  const { svg } = streamSvg(m.vals, { labels: false, ghost: m.ghost });
+  svg.style.margin = '6px 0 4px';
+  strip.append(h('a', { class: 'mini ' + AREA[m.narrow].cls, href: '#proto' }, h('b', {}, m.ctx), h('div', { class: 'd' }, m.when), svg, h('div', { class: 'n' }, h('span', { class: 'sw' }), m.line)));
+}
+
+/* ===================================================================
+   Research map
+   =================================================================== */
+const RESEARCH = [
+  ['The four areas and how they fit', 'Siegle and McCoach 2005; Siegle, McCoach and Roberts 2017', 'Self-efficacy, goal valuation and environmental perceptions interact to motivate a student to self-regulate, and so to engage and achieve.', 'mod', 'Model with survey evidence'],
+  ['A thin stream names the read', 'Siegle, McCoach and Roberts 2017', 'All three need to be positive, though not equally strong. The weakest-link rule and the choking channel are our way of showing that.', 'ours', 'Model idea · our rule'],
+  ['Worth it is asked first', 'McCoach and Siegle 2003', 'Underachieving and achieving able students differed on goal valuation, motivation and self-regulation, and attitudes to teachers and school. Motivation and self-regulation showed the biggest gap.', 'mod', 'Group comparison'],
+  ['Value and setting get the first moves', 'Rubenstein, Siegle, Reis, McCoach and Burton 2012', 'Interventions matched to goal valuation or environment gave the clearest grade gains. Those aimed at self-efficacy or self-regulation showed little.', 'mod', 'Small intervention studies'],
+  ['Can I? is read, not assumed', 'McCoach and Siegle 2003', 'Academic self-perceptions did not separate underachievers from achievers. Low belief can matter for one student, but it is not the usual story.', 'mod', 'Group comparison'],
+  ['Four kinds of worth (dig)', 'Wigfield and Eccles 2000', 'Task value has intrinsic, attainment and utility parts, weighed against cost.', 'strong', 'Well established'],
+  ['“Find your own link” move', 'Hulleman and Harackiewicz 2009', 'Writing about how course material related to their lives raised interest and grades for students who expected to do poorly. There was no overall effect.', 'strong', 'Randomised trial'],
+  ['Four sources of doubt (dig)', 'Usher and Pajares 2008', 'Self-efficacy grows from mastery experience, others’ example, what people are told and their emotional state. Mastery is usually the strongest, though this varies by student and subject.', 'strong', 'Review'],
+  ['Can’t, or won’t? check', 'Covington 1984', 'Students act to protect their sense of worth when failure threatens it. The two probe questions are ours.', 'theory', 'Theory · our wording'],
+  ['Perfectionism side card', 'Slaney et al. 2001; Flett et al. 2016', 'The gap between standards and perceived performance, and pressure felt from others, mark the harmful kind. The three questions are ours, not items from either scale.', 'mod', 'Validated scales · our questions'],
+  ['Backed? dig: teacher', 'Roorda et al. 2011', 'Warm teacher relationships go with engagement (medium to large) and achievement (small to medium), more strongly in the higher grades.', 'strong', 'Meta-analysis'],
+  ['Backed? dig: peers', 'Cross, Coleman and Terhaar-Yonkers 1991', 'Gifted adolescents use strategies to manage how visible their ability is when they expect it to change how they are treated.', 'mod', 'Large survey'],
+  ['Backed? dig: fit', 'Steenbergen-Hu, Makel and Olszewski-Kubilius 2016', 'Accelerated students outperformed similar students who were not accelerated.', 'strong', 'Second-order meta-analysis'],
+  ['Three phases (dig)', 'Zimmerman 2002', 'Self-regulated learning cycles through forethought, performance and self-reflection.', 'strong', 'Well established'],
+  ['“When…, I will…” next step', 'Gollwitzer and Sheeran 2006; Duckworth et al. 2011', 'If-then plans had a medium-to-large effect on reaching goals across 94 tests. With mental contrasting, secondary students did more than 60% more practice questions.', 'strong', 'Meta-analysis and trial'],
+  ['After-the-mark move', 'Cleary, Callan and Zimmerman 2012', 'Phase-specific questions, including what caused a result and what to change next, capture the self-reflection phase.', 'mod', 'Method review'],
+  ['Their turn', 'McCoach and Siegle 2003 (SAAS-R)', 'The model is measured through the student’s own report. Our four statements stand in for the idea, not the survey.', 'ours', 'Our design'],
+  ['The stream picture', 'This guide', 'A drawing of the model. The channel width is the geometric mean of the three streams, so a stream near zero closes it.', 'ours', 'Our design']
+];
+const strLabel = { strong: 'str--strong', mod: 'str--mod', theory: 'str--theory', ours: 'str--ours' };
+$('#rbody').replaceChildren(...RESEARCH.map(([piece, src, says, w, wl]) => h('tr', {}, h('td', {}, piece), h('td', { class: 'src' }, src), h('td', {}, says), h('td', {}, h('span', { class: 'str ' + strLabel[w] }, wl)))));
+
+const REFS = [
+  'Cleary, T. J., Callan, G. L., &amp; Zimmerman, B. J. (2012). Assessing self-regulation as a cyclical, context-specific phenomenon: Overview and analysis of SRL microanalytic protocols. <i>Education Research International, 2012</i>, 428639.',
+  'Covington, M. V. (1984). The self-worth theory of achievement motivation: Findings and implications. <i>The Elementary School Journal, 85</i>(1), 5–20.',
+  'Cross, T. L., Coleman, L. J., &amp; Terhaar-Yonkers, M. (1991). The social cognition of gifted adolescents in schools: Managing the stigma of giftedness. <i>Journal for the Education of the Gifted, 15</i>(1), 44–55.',
+  'Duckworth, A. L., Grant, H., Loew, B., Oettingen, G., &amp; Gollwitzer, P. M. (2011). Self-regulation strategies improve self-discipline in adolescents: Benefits of mental contrasting and implementation intentions. <i>Educational Psychology, 31</i>(1), 17–26.',
+  'Flett, G. L., Hewitt, P. L., Besser, A., et al. (2016). The Child–Adolescent Perfectionism Scale: Development, psychometric properties, and associations with stress, distress, and psychiatric symptoms. <i>Journal of Psychoeducational Assessment, 34</i>(7), 634–652.',
+  'Gollwitzer, P. M., &amp; Sheeran, P. (2006). Implementation intentions and goal achievement: A meta-analysis of effects and processes. <i>Advances in Experimental Social Psychology, 38</i>, 69–119.',
+  'Hulleman, C. S., &amp; Harackiewicz, J. M. (2009). Promoting interest and performance in high school science classes. <i>Science, 326</i>(5958), 1410–1412.',
+  'McCoach, D. B., &amp; Siegle, D. (2003). Factors that differentiate underachieving gifted students from high-achieving gifted students. <i>Gifted Child Quarterly, 47</i>(2), 144–154.',
+  'McCoach, D. B., &amp; Siegle, D. (2003). The School Attitude Assessment Survey–Revised: A new instrument to identify academically able students who underachieve. <i>Educational and Psychological Measurement, 63</i>(3), 414–429.',
+  'Roorda, D. L., Koomen, H. M. Y., Spilt, J. L., &amp; Oort, F. J. (2011). The influence of affective teacher–student relationships on students’ school engagement and achievement: A meta-analytic approach. <i>Review of Educational Research, 81</i>(4), 493–529.',
+  'Rubenstein, L. D., Siegle, D., Reis, S. M., McCoach, D. B., &amp; Burton, M. G. (2012). A complex quest: The development and research of underachievement interventions for gifted students. <i>Psychology in the Schools, 49</i>(7), 678–694.',
+  'Siegle, D. (2013). <i>The underachieving gifted child: Recognizing, understanding, and reversing underachievement.</i> Prufrock Press.',
+  'Siegle, D., &amp; McCoach, D. B. (2005). Making a difference: Motivating gifted students who are not achieving. <i>Teaching Exceptional Children, 38</i>(1), 22–27.',
+  'Siegle, D., McCoach, D. B., &amp; Roberts, A. (2017). Why I believe I achieve determines whether I achieve. <i>High Ability Studies, 28</i>(1), 59–72.',
+  'Slaney, R. B., Rice, K. G., Mobley, M., Trippi, J., &amp; Ashby, J. S. (2001). The Revised Almost Perfect Scale. <i>Measurement and Evaluation in Counseling and Development, 34</i>(3), 130–145.',
+  'Steenbergen-Hu, S., Makel, M. C., &amp; Olszewski-Kubilius, P. (2016). What one hundred years of research says about the effects of ability grouping and acceleration on K–12 students’ academic achievement. <i>Review of Educational Research, 86</i>(4), 849–899.',
+  'Usher, E. L., &amp; Pajares, F. (2008). Sources of self-efficacy in school: Critical review of the literature and future directions. <i>Review of Educational Research, 78</i>(4), 751–796.',
+  'Wigfield, A., &amp; Eccles, J. S. (2000). Expectancy–value theory of achievement motivation. <i>Contemporary Educational Psychology, 25</i>(1), 68–81.',
+  'Zimmerman, B. J. (2002). Becoming a self-regulated learner: An overview. <i>Theory Into Practice, 41</i>(2), 64–70.'
+];
+$('#refs').replaceChildren(...REFS.map((r) => h('li', { html: r })));
+</script>
+</body>
+</html>
