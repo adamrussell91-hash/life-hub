@@ -44,7 +44,8 @@ test('POST /api/annotation/voice/transcribe stores media and enqueues job', asyn
     }
   });
   const token = createSessionToken({
-    now: Date.parse('2026-10-13T00:00:00Z'),
+    // Today: the handler checks the session against the real clock, so a fixed date expires.
+    now: Date.now(),
     randomBytes: () => Buffer.alloc(16, 4)
   }, SECRET).token;
 
@@ -90,7 +91,8 @@ test('upload still succeeds when the background run cannot be kicked', async () 
     }
   });
   const token = createSessionToken({
-    now: Date.parse('2026-10-13T00:00:00Z'),
+    // Today: the handler checks the session against the real clock, so a fixed date expires.
+    now: Date.now(),
     randomBytes: () => Buffer.alloc(16, 4)
   }, SECRET).token;
   const form = new FormData();
@@ -109,7 +111,8 @@ test('upload still succeeds when the background run cannot be kicked', async () 
 
 function runRequest(id) {
   const token = createSessionToken({
-    now: Date.parse('2026-10-13T00:00:00Z'),
+    // Today: the handler checks the session against the real clock, so a fixed date expires.
+    now: Date.now(),
     randomBytes: () => Buffer.alloc(16, 4)
   }, SECRET).token;
   return new Request('https://api.adam-russell.com/api/annotation/voice/transcribe/run', {
@@ -204,7 +207,8 @@ function partsStore() {
 
 function authed(url, init) {
   const token = createSessionToken({
-    now: Date.parse('2026-10-13T00:00:00Z'),
+    // Today: the handler checks the session against the real clock, so a fixed date expires.
+    now: Date.now(),
     randomBytes: () => Buffer.alloc(16, 4)
   }, SECRET).token;
   return new Request(url, {
