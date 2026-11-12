@@ -138,6 +138,12 @@ describe('explainer board', () => {
     expect(take.lastT).toBe(20);
   });
 
+  it('a long run of board edits is cut into rows at most 3s from their first change', () => {
+    const take = new TakeEvents();
+    for (const t of [1, 2, 3, 4, 5, 6, 7, 8]) take.push({ id: `ev_${t}`, t, kind: 'board', elements: [{ id: 'txt', type: 'text', version: t }] });
+    expect(take.events.map((e) => e.t)).toEqual([4, 8]);
+  });
+
   it('labels board events in the timeline', () => {
     expect(eventLabel(events.find((e) => e.id === 'ev_del')!)).toBe('Board · 1 removed');
     expect(eventLabel(events.find((e) => e.id === 'ev_move')!)).toBe('Board · 1 shape drawn or moved');
@@ -165,5 +171,30 @@ describe('explainer board', () => {
     expect(clean!.content.board_start!.elements.map((e) => (e as { link?: unknown }).link)).toEqual([null, 'https://example.org']);
     const send = clean!.content.recording!.events.find((e) => e.kind === 'send');
     expect(send && send.kind === 'send' ? (send.element as { link?: unknown }).link : 'x').toBeNull();
+  });
+});
+
+describe('explainer timeline edits', () => {
+  const anchor = { granularity: 'word', stanza: 's', quote: { exact: 'x' } };
+  const rec = {
+    status: 'draft' as const,
+    clips: [],
+    duration_s: 30,
+    events: [
+      { id: 'm1', t: 10, kind: 'mark', style: 'highlight', anchor },
+      { id: 'e1', t: 12, kind: 'erase', target: 'm1' }
+    ]
+  } as never;
+
+  it('an erase cannot be moved before the mark it rubs out, nor the mark after it', async () => {
+    const { moveEvent } = await import('@/blocks/explainer/timeline');
+    const times = (r: { events: Array<{ id: string; t: number }> }) => Object.fromEntries(r.events.map((e) => [e.id, e.t]));
+    expect(times(moveEvent(rec, 'e1', 5))).toEqual({ m1: 10, e1: 10 });
+    expect(times(moveEvent(rec, 'm1', 20))).toEqual({ m1: 12, e1: 12 });
+  });
+
+  it('re-recording from a row replaces that row', () => {
+    const out = spliceRecording(rec, 10, { clips: [], duration_s: 5, events: [] });
+    expect(out.events.map((e) => e.id)).toEqual([]);
   });
 });

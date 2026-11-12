@@ -63,7 +63,7 @@ export function mergeTranscripts(
 }
 
 /**
- * Re-record from t0: everything before t0 stays, the clip spanning t0 is
+ * Re-record from t0: everything before t0 stays (an event at t0 is replaced), the clip spanning t0 is
  * shortened, the take's clips and events follow from t0, and later events go.
  */
 export function spliceRecording(rec: ExplainerRecording, t0: number, take: ExplainerTake): ExplainerRecording {
@@ -76,7 +76,7 @@ export function spliceRecording(rec: ExplainerRecording, t0: number, take: Expla
   }
   for (const c of take.clips) clips.push({ ...c, start_s: round(c.start_s + at) });
   const events = [
-    ...rec.events.filter((ev) => ev.t <= at).map((ev) => trimEvent(ev, at)).filter((ev): ev is ExplainerEvent => ev !== null),
+    ...rec.events.filter((ev) => ev.t < at).map((ev) => trimEvent(ev, at)).filter((ev): ev is ExplainerEvent => ev !== null),
     ...take.events.map((ev) => shiftEvent(ev, at))
   ];
   const duration_s = Math.min(EXPLAINER_MAX_SECONDS, round(at + take.duration_s));
