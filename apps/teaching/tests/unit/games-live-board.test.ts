@@ -40,13 +40,12 @@ beforeEach(() => {
 afterEach(() => document.body.replaceChildren());
 
 describe('live board', () => {
-  it('lobby: the QR opens this lesson for the class with the code, since the class site has no join page of its own', () => {
+  it('lobby: the QR opens this lesson for the class with the code; typing it at the class site lands there too', () => {
     const { root, snap } = board({ ...OPEN, join_url: undefined, lesson_id: 'lesson_t1', class_id: 'class_t1' });
     snap({ seats: [] });
     const label = root.querySelector('.gl-qr svg')?.getAttribute('aria-label') ?? '';
     expect(label).toMatch(/\/s\/classes\/class_t1\/lessons\/lesson_t1\?join=482913$/);
-    expect(root.textContent).not.toMatch(/Go to class\./);
-    expect(root.querySelector('.gl-join-card__code')?.textContent).toMatch(/Join live game/);
+    expect(root.querySelector('.gl-join-card__code')?.textContent).toMatch(/go to class\.adam-russell\.com and enter/);
   });
 
   it('lobby: huge code, a QR, and a chip per student as they join', () => {

@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { gameKeys, prepareGamePublish, storeGameKeys } from '../../netlify/functions/_shared/games.mjs';
-import { foldRoom, joinRoom, listRooms, openRoom } from '../../netlify/functions/_shared/game-rooms.mjs';
+import { findCode, foldRoom, joinRoom, listRooms, openRoom } from '../../netlify/functions/_shared/game-rooms.mjs';
 import { roomCodeKey } from '../../netlify/functions/_shared/game-store.mjs';
 import { SIGNATURE_HEADER, initialState, reduce, roomStyle, signBody, verifyBody, verifyTicket } from '../../netlify/functions/_shared/game-room-core.mjs';
 import { createGameFoldHandler } from '../../netlify/functions/games-fold.mjs';
@@ -60,6 +60,12 @@ test('open: a signed room config with the published game, its keys and initials 
   // The board's QR opens this lesson for this class on the class site (it has no join page of its own).
   assert.equal(opened.lesson_id, 'gl1');
   assert.equal(opened.class_id, 'class1');
+  // The class site's join page: an open code says which lesson and class; anything else is 'not open'.
+  assert.deepEqual(await findCode(store, opened.code, { now: NOW + 1000 }), { code: opened.code, lesson_id: 'gl1', class_id: 'class1' });
+  assert.deepEqual(await findCode(store, `${opened.code.slice(0, 3)} ${opened.code.slice(3)}`, { now: NOW + 1000 }), { code: opened.code, lesson_id: 'gl1', class_id: 'class1' });
+  await rejects(findCode(store, '12345', { now: NOW }), 'bad_code');
+  await rejects(findCode(store, opened.code === '000000' ? '000001' : '000000', { now: NOW }), 'bad_code');
+  await rejects(findCode(store, opened.code, { now: NOW + 7 * 24 * 3600_000 }), 'bad_code');
   assert.equal(w.calls.length, 1);
   assert.equal(w.calls[0].url, 'https://rooms.example.test/g/rooms');
   assert.equal(await verifyBody(SECRET, w.calls[0].body, w.calls[0].sig, NOW), true);

@@ -1,5 +1,5 @@
 import { el } from '@/quiz/dom';
-import { studentSiteOrigin } from '@/app/class-site';
+import { CLASS_SITE_HOST, studentSiteOrigin } from '@/app/class-site';
 import type { LiveOpen } from '../api';
 import { FAKE_SPEAKER, GAME_KIND_INFO, type PublicGame } from '../core/schema';
 import { ROOM_LIMITS, type ControlOp, type PacedItem, type RoomView, type Seat, type ServerMsg } from '../core/room-protocol';
@@ -56,7 +56,7 @@ const KIND_TICKER: Record<string, string> = { connections: 'First to find it', w
 
 /**
  * Where the QR sends a phone: this lesson for this class on the class site, with the code ready
- * (the arcade offers it on Join live game). The class site serves only student pages, so its root is no use.
+ * (the arcade offers it on Join live game). Typing the code at the class site's home page lands in the same place.
  */
 export function joinUrl(open: LiveOpen): string {
   if (open.join_url) return open.join_url;
@@ -88,7 +88,7 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
   const slow = el('span', 'gl-chip-slow', 'Slow connection');
   slow.hidden = true;
   const codePill = el('p', 'gl-top__code');
-  codePill.append('Code ', el('b', '', spacedCode(open.code)));
+  codePill.append(`Join at ${CLASS_SITE_HOST} · `, el('b', '', spacedCode(open.code)));
   top.append(titleEl, slow, codePill);
 
   const stage = el('main', 'gl-stage');
@@ -237,8 +237,8 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     }
     const code = el('div', 'gl-join-card__code');
     const go = el('small');
-    // The class site has no page of its own for codes: students join from inside the lesson.
-    go.append('Scan, or open this lesson and tap ', el('span', '', 'Join live game'));
+    // The class site's home page asks for the code and opens this lesson (workers/class-site/join-page.mjs).
+    go.append('Scan, or go to ', el('span', '', CLASS_SITE_HOST), ' and enter');
     const big = el('b', '', spacedCode(open.code));
     big.setAttribute('aria-label', `Code ${open.code.split('').join(' ')}`);
     code.append(go, big);

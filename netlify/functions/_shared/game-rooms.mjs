@@ -152,6 +152,20 @@ export async function listRooms(store, lessonId, { env = process.env, now = Date
  * the class initials claim, exactly as solo play; the seat is the same owner
  * solo play uses, so live and homework results sit together.
  */
+/**
+ * Student, before joining: which lesson and class an open room code is for. The class site's
+ * home page (class.adam-russell.com) asks for the code and sends the phone to that lesson for
+ * that class, where Join live game takes it from there. Lesson and class ids are already in
+ * every student link, so this tells a guesser nothing a link wouldn't.
+ */
+export async function findCode(store, rawCode, { now = Date.now() } = {}) {
+  const code = String(rawCode ?? '').replace(/\s+/g, '');
+  if (!CODE.test(code)) reject(400, 'bad_code', 'Type the 6 numbers on the board.');
+  const entry = await read(store, roomCodeKey(code));
+  if (!entry || entry.folded || expired(entry.opened_at, now) || !isSafeId(entry.lesson_id) || !isSafeId(entry.class_id)) reject(404, 'bad_code', 'That code isn’t open. Check the board.');
+  return { code, lesson_id: entry.lesson_id, class_id: entry.class_id };
+}
+
 export async function joinRoom(store, lessonId, body, { env = process.env, now = Date.now() } = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const secret = secretOf(env);
