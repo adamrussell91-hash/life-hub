@@ -53,6 +53,27 @@ describe('explainer recorder', () => {
     expect(document.documentElement.classList.contains('block-explainer-full-open')).toBe(false);
   });
 
+  it('leaves a transformed lesson row for the body while full, and goes back on Shrink', async () => {
+    // Lesson block rows carry a transform, which traps position: fixed inside the row.
+    const row = document.createElement('div');
+    row.style.transform = 'matrix(1, 0, 0, 1, 0, 0)';
+    document.body.append(row);
+    const block = sampleExplainer();
+    block.content = { ...block.content, layout: 'both' };
+    rec = mountExplainerRecorder(block, { blockId: block.id, lessonId: 'lesson_x', onDone: noop, onCancel: noop });
+    row.append(rec.el);
+    await Promise.resolve();
+    expect(rec.el.parentElement).toBe(document.body);
+    rec.el.querySelector<HTMLButtonElement>('.block-explainer__full')!.click();
+    expect(rec.el.parentElement).toBe(row);
+    rec.el.querySelector<HTMLButtonElement>('.block-explainer__full')!.click();
+    expect(rec.el.parentElement).toBe(document.body);
+    rec.dispose();
+    expect(rec.el.isConnected).toBe(false);
+    expect(row.childNodes.length).toBe(0);
+    row.remove();
+  });
+
   it('a text-only recorder stays in the lesson', () => {
     rec = mount('text');
     expect(rec.el.classList.contains('is-full')).toBe(false);
