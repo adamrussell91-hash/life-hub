@@ -595,11 +595,25 @@ export async function returnVoiceSubmission(store, lesson, block, id, deps = {})
   return teacherRecord(next);
 }
 
+/**
+ * A lesson split (lesson-split.mjs) copies a take but not its audio, so both copies name one
+ * voice_audio blob: the copy carries `audio_shared_from`, and the original's block is in a split
+ * record. Deleting either take keeps that audio; the 28-day sweep still removes it.
+ */
+export async function audioShared(store, lesson, block, record) {
+  if (record?.audio_shared_from) return true;
+  for (const key of await listBlobKeys(store, `lesson_splits/${lesson}/`)) {
+    const split = await read(store, key);
+    if ((split?.moved_ids ?? []).some((ids) => Array.isArray(ids) && ids.includes(block))) return true;
+  }
+  return false;
+}
+
 /** Removes everything for a submission and frees the device to submit again. */
 export async function deleteVoiceSubmission(store, lesson, block, id) {
   const record = await readSubmission(store, lesson, block, id);
   if (record.rubric && record.class_id && record.student_id) await forgetRubric(store, record.class_id, record.student_id, `v:${lesson}:${block}`);
-  if (record.audio_key) await store.delete(voiceKeys.audio(record.audio_key)).catch(() => undefined);
+  if (record.audio_key && !(await audioShared(store, lesson, block, record))) await store.delete(voiceKeys.audio(record.audio_key)).catch(() => undefined);
   await Promise.all([
     store.delete(voiceKeys.claim(lesson, block, record.device_hash)),
     dropStart(store, lesson, block, record.device_hash),

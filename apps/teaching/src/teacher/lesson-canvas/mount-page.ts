@@ -183,6 +183,8 @@ export type MountLessonPageOptions = {
   idFactory: () => string;
   onSaveTemplate?: () => void;
   onExport?: () => void;
+  /** Split lesson…: opens the split dialog; focus goes back to the page menu button when it closes. */
+  onSplit?: (returnFocus: HTMLElement | null) => void;
   onTrash?: () => void;
   onSaveComposition?: (blockId: string) => void;
   onEditSource?: (compositionId: string) => void;
@@ -1148,6 +1150,17 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
           options.onSaveTemplate?.();
         }
       },
+      ...(options.onSplit
+        ? [
+            {
+              label: 'Split lesson…',
+              className: 'lesson-page__split',
+              onSelect: () => {
+                options.onSplit?.(optionsMenu.el.querySelector<HTMLElement>('.page-options__trigger'));
+              }
+            }
+          ]
+        : []),
       ...(options.onToggleFullPage
         ? [
             {
