@@ -15,6 +15,7 @@ import { workOwner } from './lesson-work.mjs';
 import { read } from './question-drop.mjs';
 import { inTutorial, isSideLesson } from './lesson-assign.mjs';
 import { doneAmong } from './profile-done.mjs';
+import { studentQuizFacts } from './quiz.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { CLASS_PREFIX, SCHEDULED_LESSON_PREFIX, draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
 import {
@@ -175,6 +176,21 @@ function releasesFor(viewer, releases, unit, classId) {
   return out;
 }
 
+/**
+ * The lessons this student has finished, by the progress map's rule: a tick or a teacher's complete mark,
+ * or (not for an assessment) a handed-in quiz. A student who only did a lesson's quiz still gets its cards.
+ */
+async function finishedAmong(store, classId, studentId, lessonIds) {
+  const done = await doneAmong(store, classId, studentId, lessonIds);
+  const rest = [...new Set(lessonIds)].filter((id) => !done.has(id) && isSafeId(id));
+  await mapBounded(rest, 8, async (id) => {
+    const draft = await read(store, draftLessonKey(id));
+    if (!draft || draft.pedagogical_mode === 'assessment') return;
+    if ((await studentQuizFacts(store, id, classId, studentId))?.submitted_at) done.add(id);
+  });
+  return done;
+}
+
 /** The class's units that have a sheet, current first, with what this viewer may see of each. */
 async function classSheets(store, cls, today, viewer) {
   const dates = await scheduleDates(store, [cls.id]);
@@ -186,7 +202,7 @@ async function classSheets(store, cls, today, viewer) {
     const organiser = await read(store, organiserKey(unitId));
     if (!organiser?.sections?.length) continue;
     const ticked = lessonIdsOf(organiser);
-    if (viewer.student) for (const id of await doneAmong(store, cls.id, viewer.student.id, ticked)) viewer.done.add(id);
+    if (viewer.student) for (const id of await finishedAmong(store, cls.id, viewer.student.id, ticked)) viewer.done.add(id);
     const releases = await lessonReleases(store, ticked, { classId: cls.id, today, dates });
     const sheet = releasedSheet(organiser, releasesFor(viewer, releases, unit, cls.id), today);
     // The claim a piece builds, for the back of a card.
