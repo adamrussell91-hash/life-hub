@@ -52,7 +52,12 @@ export type MountExplainerRecorderOptions = {
   transcribeWaitMs?: number;
 };
 
-export type ExplainerRecorderHandle = { el: HTMLElement; dispose: () => void };
+export type ExplainerRecorderHandle = {
+  el: HTMLElement;
+  dispose: () => void;
+  /** Move into a rebuilt editor's slot, keeping the take running. */
+  adopt: (container: HTMLElement) => void;
+};
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -504,6 +509,9 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
 
   function loop(): void {
     if (disposed) return;
+    // Knocked off the page mid-take (the lesson redrew its blocks): fill the
+    // window so Stop is always in reach and the take is never lost from view.
+    if (!root.isConnected && !finishing) setFull(true);
     const t = now();
     clock.textContent = `${formatClock(startAt + t)} / ${formatClock(EXPLAINER_MAX_SECONDS)}`;
     // Let the text dot fade once the pointer stops moving or leaves the text.
@@ -666,7 +674,8 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
     const events = take.events.filter((ev) => ev.t <= duration_s).sort((a, b) => a.t - b.t);
     flash('Done.');
     handedBack = true;
-    options.onDone({ clips, duration_s, events, ...(transcript ? { transcript } : {}) });
+    const files = board?.getFiles() ?? {};
+    options.onDone({ clips, duration_s, events, ...(transcript ? { transcript } : {}), ...(Object.keys(files).length ? { files } : {}) });
   }
 
   // Marking the text with the pointer (mouse, pen or touch).
@@ -777,5 +786,11 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
     view.dispose();
   }
 
-  return { el: root, dispose };
+  function adopt(container: HTMLElement): void {
+    // Lifted onto <body>: only its place marker moves, so Shrink lands in the new editor.
+    if (spot.parentNode || root.parentNode === document.body) container.replaceChildren(spot);
+    else container.replaceChildren(root);
+  }
+
+  return { el: root, dispose, adopt };
 }

@@ -23,6 +23,8 @@ export type ExplainerTake = {
   duration_s: number;
   events: ExplainerEvent[];
   transcript?: ExplainerTranscript;
+  /** Image files put on the board during the take, by Excalidraw file id. */
+  files?: Record<string, unknown>;
 };
 
 const round = (n: number) => Math.round(n * 1000) / 1000;

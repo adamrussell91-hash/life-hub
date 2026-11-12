@@ -35,12 +35,25 @@ export function applyTake(current: ExplainerRecording | undefined, take: Explain
   return { status: 'draft', clips: take.clips, duration_s: take.duration_s, events: take.events, ...(take.transcript ? { transcript: take.transcript } : {}) };
 }
 
+/**
+ * Takes in progress, by block id. The lesson page can rebuild a block's editor
+ * mid-take (a click elsewhere, Done, a late fetch). The take carries on, and
+ * the newest editor for the block adopts it and saves it when it finishes.
+ */
+type LiveTake = { recorder: ExplainerRecorderHandle; startAt: number; owner: { done: (take: ExplainerTake) => void; cancel: () => void } };
+const liveTakes = new Map<string, LiveTake>();
+
 export function createExplainerEditor(
   block: ExplainerBlock,
   onChange: (block: ExplainerBlock) => void,
-  context: { lessonId?: string; countdownMs?: number; transcribeWaitMs?: number } = {}
+  context: { lessonId?: string; countdownMs?: number; transcribeWaitMs?: number; getLatest?: () => unknown } = {}
 ): HTMLElement {
   let current = block;
+  /** The lesson's own copy of this block, newer than ours if the page changed it. */
+  const latest = (): ExplainerBlock => {
+    const b = context.getLatest?.() as ExplainerBlock | undefined;
+    return b && b.block_type === 'explainer' && b.id === block.id ? b : current;
+  };
   const commit = (content: Partial<ExplainerBlock['content']>) => {
     current = { ...current, content: { ...current.content, ...content } };
     onChange(current);
@@ -187,27 +200,46 @@ export function createExplainerEditor(
   let player: ExplainerPlayer | null = null;
   let recorder: ExplainerRecorderHandle | null = null;
 
+  const owner = (startAt: number): LiveTake['owner'] => ({
+    done: (take) => {
+      liveTakes.get(current.id)?.recorder.dispose();
+      liveTakes.delete(current.id);
+      recorder = null;
+      // Save onto the lesson's latest copy of the block, never an older one.
+      current = latest();
+      // Images pasted during the take play back from the starting picture's
+      // file store (files only: the starting picture's shapes stay as they were).
+      const start = current.content.board_start;
+      const extra = take.files
+        ? { board_start: start ? { ...start, files: { ...take.files, ...(start.files ?? {}) } } : { format: 'excalidraw' as const, version: 1 as const, elements: [], appState: {}, files: take.files } }
+        : {};
+      commit({ recording: applyTake(current.content.recording, take, startAt), ...extra });
+      paintStartBoard();
+      paintRecording();
+    },
+    cancel: () => {
+      liveTakes.delete(current.id);
+      recorder = null;
+      paintRecording();
+    }
+  });
+
   const openRecorder = (startAt: number) => {
     player?.dispose();
     player = null;
+    current = latest();
+    const live: LiveTake = { recorder: null as unknown as ExplainerRecorderHandle, startAt, owner: owner(startAt) };
     recorder = mountExplainerRecorder(current, {
       blockId: current.id,
       lessonId: context.lessonId,
       startAt,
       countdownMs: context.countdownMs,
       transcribeWaitMs: context.transcribeWaitMs,
-      onDone: (take) => {
-        recorder?.dispose();
-        recorder = null;
-        commit({ recording: applyTake(current.content.recording, take, startAt) });
-        paintStartBoard();
-        paintRecording();
-      },
-      onCancel: () => {
-        recorder = null;
-        paintRecording();
-      }
+      onDone: (take) => live.owner.done(take),
+      onCancel: () => live.owner.cancel()
     });
+    live.recorder = recorder;
+    liveTakes.set(current.id, live);
     recArea.replaceChildren(recorder.el);
     setup.hidden = true;
   };
@@ -287,7 +319,14 @@ export function createExplainerEditor(
     });
     recArea.append(statusRow, player.el, timeline);
   }
-  paintRecording();
+  // A take already running for this block (the page rebuilt the editor): adopt it.
+  const running = liveTakes.get(block.id);
+  if (running) {
+    running.owner = owner(running.startAt);
+    recorder = running.recorder;
+    recorder.adopt(recArea);
+    setup.hidden = true;
+  } else paintRecording();
 
   root.append(setup, recArea);
   return root;
