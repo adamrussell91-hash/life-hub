@@ -12,7 +12,7 @@ import { keepTake, memoryTakes, MAX_TAKES } from '@/blocks/voice-takes';
 import { renderVoiceFeedback } from '@/blocks/voice-feedback-view';
 import { alignTagWords } from '@/blocks/voice-marking';
 import { focusStep, type FeedbackCode } from '@/blocks/feedback-codes';
-import { mountVoiceTeacher } from '@/blocks/voice-teacher';
+import { mountVoiceTake, mountVoiceTeacher } from '@/blocks/voice-teacher';
 import { primeFeedbackCodes, type FeedbackCode } from '@/blocks/feedback-codes';
 import { speakingSeconds } from '@/blocks/voice-student';
 import { BlockSchema, type Block } from '@/schemas/block';
@@ -226,6 +226,35 @@ describe('teacher marking', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace' }));
     expect([...root.querySelectorAll('.voice-note .fc-chip')].map((c) => c.textContent)).not.toContain('TS+');
     root.remove();
+  });
+
+  it('a take opened from To mark starts its transcript and opens tagging when it lands', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const base = {
+        id: 'vs_2', initials: 'MR', device_hash: 'def456', submitted_at: '2026-11-12T00:00:00Z', duration_s: 3, status: 'new',
+        audio_deleted: false, audio_delete_after: '2026-12-10T00:00:00Z', prompt: 'Q', points: [], tags: [], comment: '', audio_url: '/api/published/voice-audio/y'
+      };
+      let ready = false;
+      vi.mocked(apiGet).mockImplementation(async (path: string) => {
+        if (!path.endsWith('/vs_2')) return { submissions: [] };
+        return ready
+          ? { ...base, transcript_status: 'done', transcript: { segments: [{ text: 'the road', start: 0, end: 1, words: [{ word: 'the', start: 0, end: 0.3 }, { word: 'road', start: 0.4, end: 0.9 }] }] } }
+          : { ...base, transcript_status: 'pending', transcript: null };
+      });
+      const take = mountVoiceTake(vivaBlock(), 'lesson1', 'vs_2', () => undefined);
+      document.body.append(take.el);
+      await vi.waitFor(() => expect(take.el.textContent).toContain('The transcript is on its way'));
+      // Loading the block's list is what starts Whisper on the server.
+      expect(vi.mocked(apiGet).mock.calls.some(([path]) => !String(path).endsWith('/vs_2'))).toBe(true);
+      ready = true;
+      await vi.advanceTimersByTimeAsync(8000);
+      await vi.waitFor(() => expect(take.el.textContent).not.toContain('The transcript is on its way'));
+      expect(take.el.querySelector('.voice-mark__paper')?.textContent).toContain('road');
+      take.el.remove();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

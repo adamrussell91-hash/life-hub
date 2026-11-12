@@ -59,6 +59,19 @@ describe('mark piece', () => {
       expect(menu.style.top).toBe('444px'); // line top 700 - gap 6 - height 150 - column top 100
     });
 
+    it('turns a tag into a strength: the highlight goes green and it saves as positive', async () => {
+      const { handle, save, menu } = open(300, 150);
+      expect(handle.el.querySelector<HTMLElement>('.pa-run--mark')!.style.getPropertyValue('--pa-mark')).toBe('var(--pastel-peach-ink)');
+      [...menu.querySelectorAll('button')].find((b) => b.textContent === 'Make it a strength')!.click();
+      expect(handle.el.querySelector<HTMLElement>('.pa-run--mark')!.style.getPropertyValue('--pa-mark')).toBe('var(--pastel-sage-ink)');
+      handle.el.querySelector<HTMLElement>('.pa-run--mark')!.dispatchEvent(new MouseEvent('click', { bubbles: true, clientY: 310 }));
+      expect([...menu.querySelectorAll('button')].some((b) => b.textContent === 'Not a strength')).toBe(true);
+      (handle.el.querySelector('[data-action="save"]') as HTMLButtonElement).click();
+      await Promise.resolve();
+      expect(save.mock.calls[0]![0].tags[0]).toEqual(expect.objectContaining({ code_id: 'ts', positive: true }));
+      handle.el.remove();
+    });
+
     it('grows a short column so the whole menu fits, and shrinks it back when the menu goes', () => {
       const { handle, menu } = open(110, 200);
       const left = handle.el.querySelector<HTMLElement>('.mk-left')!;
