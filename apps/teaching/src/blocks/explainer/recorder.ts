@@ -52,7 +52,12 @@ export type MountExplainerRecorderOptions = {
   transcribeWaitMs?: number;
 };
 
-export type ExplainerRecorderHandle = { el: HTMLElement; dispose: () => void };
+export type ExplainerRecorderHandle = {
+  el: HTMLElement;
+  dispose: () => void;
+  /** Move into a rebuilt editor's slot, keeping the take running. */
+  adopt: (container: HTMLElement) => void;
+};
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -78,19 +83,22 @@ export class TakeEvents {
   events: ExplainerEvent[] = [];
   private pointer: Extract<ExplainerEvent, { kind: 'pointer' }> | null = null;
   private lastSampleAt = -Infinity;
+  private burstStart = -Infinity;
 
   push(ev: ExplainerEvent): ExplainerEvent {
     // Board edits come in bursts (a drag, typing in a text box, several clicks
     // on one shape). Fold a burst into one row, timed at its last change, so the
     // timeline is not a long list of "1 shape drawn or moved".
     const prev = this.events[this.events.length - 1];
-    if (ev.kind === 'board' && prev?.kind === 'board' && ev.t - prev.t <= BOARD_BURST_S) {
+    // Capped from the burst's first change, so a long run of edits never slides to its end.
+    if (ev.kind === 'board' && prev?.kind === 'board' && ev.t - this.burstStart <= BOARD_BURST_S) {
       const byId = new Map(prev.elements.map((e) => [e.id, e]));
       for (const e of ev.elements) byId.set(e.id, e);
       prev.elements = [...byId.values()];
       prev.t = ev.t;
       return prev;
     }
+    if (ev.kind === 'board') this.burstStart = ev.t;
     this.events.push(ev);
     return ev;
   }
@@ -223,7 +231,8 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   const startAt = Math.max(0, options.startAt ?? 0);
   const maxTake = Math.max(0, EXPLAINER_MAX_SECONDS - startAt);
   const content = block.content;
-  const before = (content.recording?.events ?? []).filter((ev) => ev.t <= startAt);
+  // Re-record from a row replaces that row too: keep only what came before it.
+  const before = (content.recording?.events ?? []).filter((ev) => ev.t < startAt);
   const take = new TakeEvents();
 
   const root = el('div', 'block-explainer__recorder');
@@ -297,7 +306,7 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   notePanel.append(el('p', 'block-explainer__hint', 'Pick a note, then select the words it belongs to.'), chips, typed);
 
   const layout = content.layout ?? 'text';
-  const startState = stateAt(content, startAt);
+  const startState = stateAt({ ...content, recording: content.recording ? { ...content.recording, events: before } : undefined }, startAt);
   let capture: BoardCapture | null = null;
   const view = createPanes(block, {
     editableBoard: true,
@@ -309,13 +318,15 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   const { el: panes, text } = view;
   const board = view.board;
   const commitBoard = () => {
-    if (!board || !capture || !started) return;
+    if (!board || !capture || !started || stopped) return;
     for (const ev of capture.commit(board.getElements(), now())) take.push(ev);
   };
+  const commitSoon = () => setTimeout(commitBoard, 0);
   if (board) {
     board.setInteractive(false);
-    // Excalidraw finishes an edit on release; diff the board just after.
-    board.el.addEventListener('pointerup', () => setTimeout(commitBoard, 0), true);
+    // Excalidraw finishes an edit on release; diff the board just after. A drag
+    // can end outside the board, so listen on the whole window.
+    window.addEventListener('pointerup', commitSoon, true);
     // Typing in a board text box finishes when the box closes (a click), so a
     // key in the box itself is not a change worth a row.
     board.el.addEventListener('keyup', (e) => {
@@ -413,6 +424,11 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   let timer = 0;
   let disposed = false;
   let finishing = false;
+  let starting = false;
+  /** Set once Stop has the take: later board keys (Delete, undo) are not recorded. */
+  let stopped = false;
+  /** The clip being closed, until its audio is in hand. */
+  let closing: Promise<void> = Promise.resolve();
 
   const wall = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   /** Seconds into this take: closed clips plus the open one. */
@@ -443,7 +459,10 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
 
   function openClip(): void {
     if (!stream) return;
-    chunks = [];
+    // Each clip keeps its own chunks: the last chunk of a clip being closed can
+    // arrive after the next clip has opened, and must not land in it.
+    const mine: Blob[] = [];
+    chunks = mine;
     try {
       mediaRecorder = new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 64_000 });
     } catch {
@@ -451,7 +470,7 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
     }
     mime = mediaRecorder.mimeType || mime;
     mediaRecorder.addEventListener('dataavailable', (e) => {
-      if (e.data && e.data.size > 0) chunks.push(e.data);
+      if (e.data && e.data.size > 0) mine.push(e.data);
     });
     mediaRecorder.start(1000);
     clipStartedAt = wall();
@@ -461,26 +480,38 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   /** Close the open clip; resolves when its audio is in hand. */
   function closeClip(): Promise<void> {
     const rec = mediaRecorder;
+    const mine = chunks;
     const dur = (wall() - clipStartedAt) / 1000;
     closed += dur;
     recording = false;
     mediaRecorder = null;
-    if (!rec || rec.state === 'inactive') return Promise.resolve();
-    return new Promise((resolve) => {
+    const keep = () => {
+      if (mine.length) blobs.push({ blob: new Blob(mine, { type: mime }), duration_s: round2(dur) });
+    };
+    // The browser stopped it already (mic unplugged, interrupted): keep what came in.
+    if (!rec || rec.state === 'inactive') {
+      keep();
+      return (closing = Promise.resolve());
+    }
+    closing = new Promise((resolve) => {
       rec.addEventListener(
         'stop',
         () => {
-          blobs.push({ blob: new Blob(chunks, { type: mime }), duration_s: round2(dur) });
+          keep();
           resolve();
         },
         { once: true }
       );
       rec.stop();
     });
+    return closing;
   }
 
   function loop(): void {
     if (disposed) return;
+    // Knocked off the page mid-take (the lesson redrew its blocks): fill the
+    // window so Stop is always in reach and the take is never lost from view.
+    if (!root.isConnected && !finishing) setFull(true);
     const t = now();
     clock.textContent = `${formatClock(startAt + t)} / ${formatClock(EXPLAINER_MAX_SECONDS)}`;
     // Let the text dot fade once the pointer stops moving or leaves the text.
@@ -494,16 +525,32 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   }
 
   async function start(): Promise<void> {
-    if (started) return;
+    if (started || starting) return;
     if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       flash('This browser cannot record audio. Try Chrome or Safari on a laptop.');
       return;
     }
+    // A second click while the microphone prompt is open must not start a second recorder.
+    starting = true;
+    startBtn.disabled = true;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
       flash('Allow the microphone, then press Start again.');
       return;
+    } finally {
+      starting = false;
+      startBtn.disabled = false;
+    }
+    if (disposed) {
+      // Cancelled while the prompt was open: let go of the microphone.
+      for (const track of stream.getTracks()) track.stop();
+      return;
+    }
+    for (const track of stream.getTracks()) {
+      track.addEventListener('ended', () => {
+        if (!finishing) flash('The microphone stopped. Press Stop to save what you have.');
+      });
     }
     started = true;
     mime = pickMime() ?? 'audio/webm';
@@ -534,7 +581,11 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
     take.endPointer(now());
     commitBoard();
     board?.setInteractive(false);
+    // Locked until the clip's audio is in hand, so a quick second click cannot resume into it.
+    holdBtn.disabled = true;
     await closeClip();
+    holdBtn.disabled = false;
+    if (finishing) return;
     holdBtn.textContent = 'Resume';
     root.classList.remove('is-recording');
     flash('Paused. Resume when you are ready.');
@@ -542,6 +593,8 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
 
   async function resume(): Promise<void> {
     if (recording || !started || finishing) return;
+    await closing;
+    if (recording || finishing || disposed) return;
     board?.setInteractive(true);
     openClip();
     holdBtn.textContent = 'Pause';
@@ -556,6 +609,9 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
     if (recording) commitBoard();
     board?.setInteractive(false);
     if (recording) await closeClip();
+    // A Pause still closing its clip: wait for its audio before saving.
+    await closing;
+    stopped = true;
     window.clearTimeout(timer);
     for (const track of stream?.getTracks() ?? []) track.stop();
     holdBtn.hidden = true;
@@ -569,7 +625,12 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   /** Upload every clip, wait for word timings, then hand the take back. */
   async function finish(): Promise<void> {
     retryBtn.hidden = true;
-    const duration_s = round2(Math.min(maxTake, closed));
+    if (blobs.length === 0) {
+      // Never hand back an empty take: it would replace the recording with silence.
+      flash('No audio came through from the microphone, so nothing was saved. Your old recording is unchanged.');
+      cancelBtn.hidden = false;
+      return;
+    }
     const clips: ExplainerClip[] = [];
     const jobs: Array<{ jobId: string; start_s: number; duration_s: number }> = [];
     let at = 0;
@@ -602,6 +663,9 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
       cancelBtn.hidden = false;
       return;
     }
+    // The length is the clips laid end to end, as playback adds them up, so the
+    // last clip ends exactly at the end (a rounded total could sit past it).
+    const duration_s = round2(Math.min(maxTake, at));
     flash('Audio saved. Writing captions…');
     const perClip = await Promise.all(
       jobs.map(async (job) => ({ start_s: job.start_s, transcript: await transcribe(job.jobId, job.duration_s, options.transcribeWaitMs ?? 120_000) }))
@@ -609,7 +673,9 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
     const transcript = perClip.some((p) => p.transcript) ? mergeTranscripts(perClip) : undefined;
     const events = take.events.filter((ev) => ev.t <= duration_s).sort((a, b) => a.t - b.t);
     flash('Done.');
-    options.onDone({ clips, duration_s, events, ...(transcript ? { transcript } : {}) });
+    handedBack = true;
+    const files = board?.getFiles() ?? {};
+    options.onDone({ clips, duration_s, events, ...(transcript ? { transcript } : {}), ...(Object.keys(files).length ? { files } : {}) });
   }
 
   // Marking the text with the pointer (mouse, pen or touch).
@@ -691,9 +757,20 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
 
   requestAnimationFrame(() => repaint());
 
+  // Until the take is handed back its audio lives only in this tab: warn before leaving.
+  let handedBack = false;
+  const guardLeave = (e: BeforeUnloadEvent) => {
+    if (!started || handedBack) return;
+    e.preventDefault();
+    e.returnValue = '';
+  };
+  window.addEventListener('beforeunload', guardLeave);
+
   function dispose(): void {
     disposed = true;
     window.clearTimeout(timer);
+    window.removeEventListener('pointerup', commitSoon, true);
+    window.removeEventListener('beforeunload', guardLeave);
     try {
       if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
     } catch {
@@ -709,5 +786,11 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
     view.dispose();
   }
 
-  return { el: root, dispose };
+  function adopt(container: HTMLElement): void {
+    // Lifted onto <body>: only its place marker moves, so Shrink lands in the new editor.
+    if (spot.parentNode || root.parentNode === document.body) container.replaceChildren(spot);
+    else container.replaceChildren(root);
+  }
+
+  return { el: root, dispose, adopt };
 }

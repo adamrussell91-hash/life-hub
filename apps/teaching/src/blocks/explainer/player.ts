@@ -239,13 +239,44 @@ export function mountExplainerPlayer(block: Pick<ExplainerBlock, 'content'>, opt
     const a = audios[index];
     if (!a || offset >= rec.clips[index]!.duration_s) return;
     active = index;
+    // Safari loads nothing before play, so a seek set now is dropped: set it
+    // again once the length is known, or the voice restarts at the clip start.
+    if (a.readyState < 1) a.addEventListener('loadedmetadata', () => { if (active === index) a.currentTime = offset; }, { once: true });
     try {
       a.currentTime = offset;
     } catch {
       /* metadata not loaded yet */
     }
+    // Safari resets playbackRate to the default when a source loads.
+    a.defaultPlaybackRate = rate;
     a.playbackRate = rate;
     safePlay(a);
+  };
+
+  /**
+   * iPhones only let audio start from a tap. The next clip starts mid-play, not
+   * from a tap, so on the first Play every other clip is started silently and
+   * stopped, which lets it play later on its own.
+   */
+  let unlocked = false;
+  const unlockOthers = () => {
+    if (unlocked) return;
+    unlocked = true;
+    audios.forEach((a, i) => {
+      if (i === active || !a.paused) return;
+      a.muted = true;
+      try {
+        const p = a.play();
+        const done = () => {
+          if (i !== active) a.pause();
+          a.muted = false;
+        };
+        if (p && typeof p.then === 'function') p.then(done, () => (a.muted = false));
+        else done();
+      } catch {
+        a.muted = false;
+      }
+    });
   };
 
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -321,6 +352,9 @@ export function mountExplainerPlayer(block: Pick<ExplainerBlock, 'content'>, opt
         wallAt = now();
         startAudioAt(following.start_s);
         next = following.start_s;
+      } else {
+        // The last clip has run out: that is the end, even if rounding left a sliver.
+        next = duration;
       }
     }
     const p = nextPauseAfter(events, lastT);
@@ -356,6 +390,7 @@ export function mountExplainerPlayer(block: Pick<ExplainerBlock, 'content'>, opt
     wallBase = t;
     wallAt = now();
     startAudioAt(t);
+    unlockOthers();
     syncButton();
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(tick);
@@ -387,11 +422,33 @@ export function mountExplainerPlayer(block: Pick<ExplainerBlock, 'content'>, opt
       wallAt = now();
     }
     rate = next;
-    for (const a of audios) a.playbackRate = next;
+    for (const a of audios) {
+      a.defaultPlaybackRate = next;
+      a.playbackRate = next;
+    }
     for (const b of speedBtns) b.setAttribute('aria-pressed', String(Number(b.dataset.rate) === next));
   }
 
-  scrub.addEventListener('input', () => seek(Number(scrub.value)));
+  // Dragging the scrubber moves the picture; the voice picks up on release,
+  // not on every step of the drag.
+  let resumeAfterScrub = false;
+  scrub.addEventListener('input', () => {
+    if (isPlaying) {
+      pause();
+      resumeAfterScrub = true;
+    }
+    card.hidden = true;
+    t = Math.max(0, Math.min(duration, Number(scrub.value)));
+    lastT = t;
+    render(t);
+  });
+  scrub.addEventListener('change', () => {
+    seek(Number(scrub.value));
+    if (resumeAfterScrub) {
+      resumeAfterScrub = false;
+      if (t < duration) play();
+    }
+  });
 
   requestAnimationFrame(() => render(t));
   if (opts.autoplay) play();

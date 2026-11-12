@@ -3557,7 +3557,7 @@ function createBlockEditorFields(
     case 'hinge_question':
       return createHingeQuestionEditor(block, onChange);
     case 'explainer':
-      return createExplainerEditor(block, onChange, { lessonId: context.lessonId });
+      return createExplainerEditor(block, onChange, { lessonId: context.lessonId, getLatest: latest });
     case 'comparative_judgement':
       return createComparativeJudgementEditor(block, onChange, { lessonId: context.lessonId, getLessonBlocks: context.getLessonBlocks, unitLessons: context.unitLessons });
     case 'continuum_line':

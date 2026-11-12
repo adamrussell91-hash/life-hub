@@ -592,12 +592,24 @@ html.block-explainer-full-open {
 
 .block-explainer__recorder.is-full .block-explainer__board {
   height: 100%;
-  min-height: 420px;
+  min-height: 0;
+}
+
+/* The panes stay inside the stage, and Pause and Stop always sit above the board. */
+.block-explainer__recorder.is-full .block-explainer__stage {
+  overflow: hidden;
+}
+
+.block-explainer__recorder.is-full .block-explainer__rec-actions {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
 }
 
 @media (max-width: 900px) {
+  /* Narrow window: text above, board below, both on screen; the text scrolls. */
   .block-explainer__recorder.is-full .block-explainer__panes[data-layout='both'] {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(420px, 1fr);
+    grid-template-rows: minmax(0, 2fr) minmax(0, 3fr);
   }
 }

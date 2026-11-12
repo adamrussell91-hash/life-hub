@@ -23,7 +23,13 @@ function btn(label: string, cls: string, onClick: () => void): HTMLButtonElement
   b.addEventListener('click', onClick);
   return b;
 }
-const htmlText = (html: string) => (new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '').trim();
+/** A note's words for the edit box, one blank line between paragraphs. */
+const htmlText = (html: string) => {
+  const body = new DOMParser().parseFromString(html, 'text/html').body;
+  const blocks = Array.from(body.querySelectorAll('p, li, h1, h2, h3, h4, blockquote'));
+  if (blocks.length === 0) return (body.textContent ?? '').trim();
+  return blocks.map((b) => (b.textContent ?? '').trim()).filter(Boolean).join('\n\n');
+};
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -57,7 +63,14 @@ export function eventLabel(ev: ExplainerEvent, all: readonly ExplainerEvent[] = 
 
 /** Move an event to a new time and keep the list in time order. */
 export function moveEvent(rec: ExplainerRecording, id: string, t: number): ExplainerRecording {
-  const at = round2(Math.max(0, Math.min(rec.duration_s, t)));
+  let at = round2(Math.max(0, Math.min(rec.duration_s, t)));
+  // An erase has to come after what it rubs out, or that mark would never go.
+  const ev = rec.events.find((e) => e.id === id);
+  if (ev?.kind === 'erase') {
+    const target = rec.events.find((e) => e.id === ev.target);
+    if (target) at = Math.max(at, target.t);
+  }
+  for (const e of rec.events) if (e.kind === 'erase' && e.target === id) at = Math.min(at, e.t);
   return { ...rec, events: sortEvents(rec.events.map((ev) => (ev.id === id ? { ...ev, t: at } : ev))) };
 }
 
@@ -107,9 +120,16 @@ export function createTimeline(
       input.rows = 2;
       input.value = htmlText(ev.html);
       input.setAttribute('aria-label', 'Note text');
-      input.addEventListener('change', () =>
-        hooks.onChange({ ...rec, events: rec.events.map((x) => (x.id === ev.id ? { ...ev, html: `<p>${escapeHtml(input.value.trim())}</p>` } : x)) })
-      );
+      input.addEventListener('change', () => {
+        // Unchanged words keep the note's own formatting; an edit keeps its paragraphs.
+        if (input.value.trim() === htmlText(ev.html).trim()) return;
+        const html = input.value
+          .trim()
+          .split(/\n\s*\n/)
+          .map((para) => `<p>${escapeHtml(para.trim()).replace(/\n/g, '<br>')}</p>`)
+          .join('');
+        hooks.onChange({ ...rec, events: rec.events.map((x) => (x.id === ev.id ? { ...ev, html } : x)) });
+      });
       row.append(input);
     }
     if (ev.kind === 'pause') {

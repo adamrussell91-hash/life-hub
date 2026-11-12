@@ -244,3 +244,28 @@ describe('Explainer text pane when it scrolls', () => {
     pane.el.remove();
   });
 });
+
+describe('Explainer take survives the editor being rebuilt', () => {
+  it('a new editor for the same block adopts the running recorder', async () => {
+    const { createExplainerEditor } = await import('@/blocks/explainer/editor');
+    const { sampleExplainer } = await import('@/dev/explainer-sample');
+    const base = sampleExplainer();
+    const block = { ...base, id: 'blk_rebuild', content: { ...base.content, recording: undefined } } as typeof base;
+    const a = createExplainerEditor(block, () => undefined);
+    document.body.append(a);
+    a.querySelector<HTMLButtonElement>('.block-explainer-editor__record')!.click();
+    await Promise.resolve();
+    const rec = a.querySelector('.block-explainer__recorder');
+    expect(rec).not.toBeNull();
+    // The page redraws: the old editor goes, a new one is built for the same block.
+    a.remove();
+    const b = createExplainerEditor(block, () => undefined);
+    document.body.append(b);
+    expect(b.querySelector('.block-explainer__recorder')).toBe(rec);
+    expect(b.querySelector('.block-explainer-editor__record')).toBeNull();
+    // Cancel hands control back to the new editor.
+    b.querySelector<HTMLButtonElement>('.block-explainer__cancel')!.click();
+    expect(b.querySelector('.block-explainer-editor__record')).not.toBeNull();
+    b.remove();
+  });
+});
