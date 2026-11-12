@@ -4,7 +4,10 @@
  * column). "Skip in picker" lives here and only here, so it is never set,
  * shown or hinted at on a lesson page or the board.
  *
- * Each student has initials for quizzes. A student claims theirs once on their own device. The badge shows who has, and Release lets a student claim again on a new device.
+ * Each student has initials for quizzes and a personal code. A student claims their
+ * initials once; on another computer (or after a reset) they type their code to get
+ * back in. The badge shows who has claimed, the code shows here for the teacher to
+ * read out, and Sign out clears every computer a student is on.
  *
  * The list stays on the class record, which is teacher-only. Published class
  * pages build their own allowlisted copy and never include it.
@@ -19,11 +22,15 @@ import { peekCurriculum, replaceCurriculum } from '@/app/curriculum-state';
 import { createClassFold } from '@/teacher/class-fold';
 import '@/blocks/classroom-tools/classroom-tools.css';
 
+/** When each student claimed, and each student's code, by student id. */
+type ClaimsReply = { claims: Record<string, string>; codes?: Record<string, string> };
+
 type Options = {
   /** Test seam. Defaults to POST /api/classes/:id/claims. */
   claims?: {
-    list: (classId: string) => Promise<Record<string, string>>;
-    release: (classId: string, studentId: string) => Promise<Record<string, string>>;
+    list: (classId: string) => Promise<ClaimsReply>;
+    release: (classId: string, studentId: string) => Promise<ClaimsReply>;
+    newCode?: (classId: string, studentId: string) => Promise<ClaimsReply>;
   };
   /** Test seam. Defaults to PATCH /api/classes/:id. */
   save?: (classId: string, students: ClassStudent[]) => Promise<Class | void>;
@@ -54,13 +61,19 @@ export function mountClassStudents(host: HTMLElement, cls: Class, options: Optio
       rememberStudents(classId, students);
       return updated;
     });
+  const claimsCall = (classId: string, body: Record<string, string>) => apiPost<ClaimsReply>(`/api/classes/${encodeURIComponent(classId)}/claims`, body);
   const claimsApi = options.claims ?? {
-    list: async (classId: string) => (await apiPost<{ claims: Record<string, string> }>(`/api/classes/${encodeURIComponent(classId)}/claims`, { action: 'list' })).claims,
-    release: async (classId: string, studentId: string) =>
-      (await apiPost<{ claims: Record<string, string> }>(`/api/classes/${encodeURIComponent(classId)}/claims`, { action: 'release', student_id: studentId })).claims
+    list: (classId: string) => claimsCall(classId, { action: 'list' }),
+    release: (classId: string, studentId: string) => claimsCall(classId, { action: 'release', student_id: studentId }),
+    newCode: (classId: string, studentId: string) => claimsCall(classId, { action: 'new_code', student_id: studentId })
   };
   let students: ClassStudent[] = assignInitials((cls.students ?? []).map((s) => ({ ...s, skip_picker: Boolean(s.skip_picker) })));
   let claims: Record<string, string> | null = null;
+  let codes: Record<string, string> = {};
+  const take = (reply: ClaimsReply) => {
+    claims = reply.claims;
+    codes = reply.codes ?? codes;
+  };
 
   // Folds shut so the page leads with the calendar; open at first when there is no list yet.
   const { details: section, summary: head } = createClassFold(cls.id, 'students', {
@@ -101,7 +114,7 @@ export function mountClassStudents(host: HTMLElement, cls: Class, options: Optio
   const skipHint = el(
     'p',
     'class-students__hint',
-    'A ticked student is quietly left out of the name picker. Groups still include them. Nothing on a lesson or the board shows that anyone is skipped. Students type their initials to take a quiz from the class page.'
+    'A ticked student is quietly left out of the name picker. Groups still include them. Nothing on a lesson or the board shows that anyone is skipped. Students type their initials once. On another computer, or after a reset, they also type their code. Students see their code on their progress page.'
   );
   const list = el('ul', 'class-students__list');
   const empty = el('p', 'class-students__empty', 'No students yet. Choose Edit list and type or paste the class list.');
@@ -180,18 +193,38 @@ export function mountClassStudents(host: HTMLElement, cls: Class, options: Optio
         const claimedAt = student.id ? claims?.[student.id] : undefined;
         const claim = el('span', `class-students__claim${claimedAt ? ' is-claimed' : ''}`, claims === null ? '' : claimedAt ? 'Claimed' : 'Not claimed');
         item.append(name, initials, claim);
+        const studentCode = student.id ? codes[student.id] : undefined;
+        if (studentCode && student.id) {
+          const code = el('button', 'class-students__code', studentCode);
+          code.type = 'button';
+          code.title = 'Make a new code';
+          code.setAttribute('aria-label', `Code for ${student.name}: ${studentCode}. Make a new code`);
+          const studentId = student.id;
+          code.addEventListener('click', async () => {
+            if (!claimsApi.newCode || !window.confirm(`Make a new code for ${student.name}? ${studentCode} stops working. Computers already in stay in.`)) return;
+            code.disabled = true;
+            try {
+              take(await claimsApi.newCode(cls.id, studentId));
+              say(`${student.name}’s new code is ${codes[studentId] ?? ''}.`);
+            } catch {
+              say('No new code made. Check your connection and try again.', 'error');
+            }
+            paint();
+          });
+          item.append(code);
+        }
         if (claimedAt && student.id) {
-          const release = el('button', 'btn btn--ghost class-students__release', 'Release');
+          const release = el('button', 'btn btn--ghost class-students__release', 'Sign out');
           release.type = 'button';
-          release.setAttribute('aria-label', `Release ${student.initials} so ${student.name} can claim it again`);
+          release.setAttribute('aria-label', `Sign ${student.name} out of every computer`);
           const studentId = student.id;
           release.addEventListener('click', async () => {
             release.disabled = true;
             try {
-              claims = await claimsApi.release(cls.id, studentId);
-              say(`${student.initials} can be claimed again.`);
+              take(await claimsApi.release(cls.id, studentId));
+              say(`${student.initials} is signed out of every computer. The next one to type ${student.initials} gets in without a code.`);
             } catch {
-              say('Not released. Check your connection and try again.', 'error');
+              say('Not signed out. Check your connection and try again.', 'error');
             }
             paint();
           });
@@ -237,7 +270,7 @@ export function mountClassStudents(host: HTMLElement, cls: Class, options: Optio
   void claimsApi
     .list(cls.id)
     .then((found) => {
-      claims = found;
+      take(found);
       paint();
     })
     .catch(() => {

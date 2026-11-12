@@ -404,3 +404,8 @@
 .pg-draft-pill { border: 1px solid var(--line); background: var(--paper); color: var(--muted); border-radius: var(--radius-full); padding: 4px 12px; min-height: 36px; font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer; }
 .pg-draft-pill.is-on { background: var(--navy); border-color: var(--navy); color: #fff; }
 .pg-returned__ask { display: block; font-size: var(--text-sm); color: var(--pastel-gold-ink); font-weight: 600; }
+
+.pm-code__value {
+  color: var(--navy);
+  letter-spacing: 0.04em;
+}

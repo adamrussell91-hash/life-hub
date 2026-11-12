@@ -40,7 +40,13 @@ export type ProfileUnit = {
 };
 type ProfileMap = { lessons: ProfileLesson[]; next: string | null; unit: ProfileUnit | null };
 /** The `progress` action's payload, or the bare initials prompt. */
-export type ProfilePayload = Partial<Omit<ProgressPayload, 'need' | 'map'>> & { need: 'initials' | null; map?: ProfileMap; todo?: TodoPayload };
+export type ProfilePayload = Partial<Omit<ProgressPayload, 'need' | 'map'>> & {
+  need: 'initials' | null;
+  map?: ProfileMap;
+  todo?: TodoPayload;
+  /** The student's own code for getting in on another computer. Never on the teacher's view. */
+  code?: string;
+};
 
 export type RenderProfileOptions = {
   classId: string;
@@ -338,6 +344,11 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
   else {
     root.append(el('h1', 'pm-title', 'Your progress'));
     if (payload.initials) root.append(el('p', 'pm-who', `${payload.initials} on this device.`));
+    if (payload.code) {
+      const code = el('p', 'pm-who pm-code');
+      code.append('Your code for another computer: ', el('strong', 'pm-code__value', payload.code), '. Write it in your book.');
+      root.append(code);
+    }
   }
   const map = withTodo(renderMap(payload.map, options.classId, payload), payload, options);
   const hasReturned = !!(payload.pieces?.length || payload.has_returned);

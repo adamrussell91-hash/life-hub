@@ -9,7 +9,7 @@
  */
 import { isSafeId } from './class-examples.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
-import { claimFor, claimInitials, loadRoster } from './class-claims.mjs';
+import { claimFor, claimInitials, codeFor, loadRoster } from './class-claims.mjs';
 import { read, reject } from './question-drop.mjs';
 import { draftLessonKey, publishedLessonKey, SCHEDULED_LESSON_PREFIX, unitKey } from './teaching-blobs.mjs';
 import { unitMapPayload } from './profile-map.mjs';
@@ -72,7 +72,7 @@ export async function profileAction(store, classId, body, { now = new Date() } =
   if (!['status', 'done', 'undone', 'claim', 'progress', 'returned', 'piece', 'seen', 'steps', 'token', 'skills'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');
-  if (action === 'claim') return profileFor(store, roster, await claimInitials(store, roster, body.class_token, body.initials));
+  if (action === 'claim') return profileFor(store, roster, await claimInitials(store, roster, body.class_token, body.initials, body.code));
   const student = await claimFor(store, roster, body.class_token);
   if (!student) {
     if (action === 'done' || action === 'undone') reject(403, 'need_initials', 'Type your initials first.');
@@ -85,7 +85,8 @@ export async function profileAction(store, classId, body, { now = new Date() } =
     const record = (await listDone(store, classId, student.id))[body.lesson_id];
     return { need: null, initials: student.initials, ticked: !!record && !record.partial };
   }
-  if (action === 'progress') return progressPage(store, roster, student, now);
+  // The student's own page shows their code, for getting in on another computer.
+  if (action === 'progress') return { ...(await progressPage(store, roster, student, now)), code: await codeFor(store, classId, student.id) };
   if (action === 'returned') return { need: null, ...(await returnedFor(store, roster, student)) };
   // Writing boxes' next steps: every skill at once (a lesson is small), so `lesson_id` only has to be safe.
   if (action === 'steps') {

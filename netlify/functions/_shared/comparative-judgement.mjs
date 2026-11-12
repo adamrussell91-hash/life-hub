@@ -249,7 +249,7 @@ export async function cjStudentAction(store, lesson, block, body) {
     return { need: null, anonymous: true };
   }
   const student = action === 'claim'
-    ? await claimInitials(store, roster, body.class_token, body.initials)
+    ? await claimInitials(store, roster, body.class_token, body.initials, body.code)
     : await claimFor(store, roster, body.class_token);
   if (!student) {
     if (action !== 'status') reject(403, 'need_initials', 'Type your initials first.');

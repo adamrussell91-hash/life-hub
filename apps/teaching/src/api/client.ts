@@ -88,12 +88,53 @@ export function apiGet<T>(path: string, options?: ApiRequestOptions): Promise<T>
   return apiRequest<T>('GET', path, options);
 }
 
-export function apiPost<T>(
+/** Asks the student for their personal code. Resolves null if they close the box. */
+export type CodePrompt = (message: string, wrong: boolean) => Promise<string | null>;
+
+let codePrompt: CodePrompt = async (message, wrong) => (await import('@/student/code-prompt')).askForCode(message, wrong);
+let openPrompt: Promise<string | null> | null = null;
+
+/** Test seam: replace the box that asks for a student's code. */
+export function setCodePrompt(prompt: CodePrompt): void {
+  codePrompt = prompt;
+}
+
+// Two blocks on one page can claim at once: they share one box and one answer.
+const askCode: CodePrompt = (message, wrong) => (openPrompt ??= codePrompt(message, wrong).finally(() => (openPrompt = null)));
+
+/**
+ * A student's initials are in on another computer (`need_code`): ask for their
+ * personal code and send the same request again with it, until it matches or
+ * they close the box. Every block that claims initials goes through here.
+ */
+async function claimWithCode<T>(path: string, body: Record<string, unknown>, options: ApiRequestOptions | undefined, first: ApiClientError): Promise<T> {
+  let message = first.message;
+  let wrong = false;
+  for (;;) {
+    const code = await askCode(message, wrong);
+    if (!code) throw first;
+    try {
+      return await apiRequest<T>('POST', path, { ...options, body: { ...body, code } });
+    } catch (error) {
+      if (!(error instanceof ApiClientError) || error.code !== 'wrong_code') throw error;
+      message = error.message;
+      wrong = true;
+    }
+  }
+}
+
+export async function apiPost<T>(
   path: string,
   body?: unknown,
   options?: ApiRequestOptions
 ): Promise<T> {
-  return apiRequest<T>('POST', path, { ...options, body });
+  try {
+    return await apiRequest<T>('POST', path, { ...options, body });
+  } catch (error) {
+    const plain = typeof body === 'object' && body !== null && !Array.isArray(body);
+    if (!(error instanceof ApiClientError) || error.code !== 'need_code' || !plain) throw error;
+    return claimWithCode<T>(path, body as Record<string, unknown>, options, error);
+  }
 }
 
 export function apiPut<T>(

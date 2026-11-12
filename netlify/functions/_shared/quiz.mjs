@@ -553,7 +553,7 @@ export async function identify(store, body, action) {
   if (!roster) reject(404, 'need_class', 'Open this quiz from your class page.');
   if (!roster.students.length) return { classId: roster.cls.id, student: null, need: null };
   const student = action === 'claim'
-    ? await claimInitials(store, roster, body.class_token, body.initials)
+    ? await claimInitials(store, roster, body.class_token, body.initials, body.code)
     : await claimFor(store, roster, body.class_token);
   return { classId: roster.cls.id, student, need: student ? null : 'initials' };
 }

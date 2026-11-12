@@ -1,0 +1,53 @@
+/* The "type your code" box a student sees when their initials are in on another computer. */
+.st-code {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(15 23 42 / 0.45);
+}
+
+.st-code__box {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 26rem);
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--paper, #fff);
+  box-shadow: 0 12px 40px rgb(15 23 42 / 0.25);
+}
+
+.st-code__title {
+  margin: 0;
+  font-size: var(--text-lg, 1.125rem);
+  color: var(--navy, #1e2a4a);
+}
+
+.st-code__msg,
+.st-code__hint {
+  margin: 0;
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--muted, #555);
+}
+
+.st-code__msg.is-wrong {
+  color: var(--danger, #b42318);
+}
+
+.st-code__input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line, #ccd);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 1.125rem;
+  letter-spacing: 0.04em;
+}
+
+.st-code__actions {
+  display: flex;
+  gap: 8px;
+}

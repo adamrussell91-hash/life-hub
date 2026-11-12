@@ -548,7 +548,7 @@ test('initials: claim once, then start; someone else’s initials are refused', 
 
   const claimed = await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'claim', initials: 'bb' });
   assert.deepEqual(claimed.identity, { need: null, initials: 'BB' });
-  await assert.rejects(rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'claim', initials: 'BB' }), /BB is already taken/);
+  await assert.rejects(rawQuizAction(store, 'quiz1', { ...tomDevice, action: 'claim', initials: 'BB' }), /BB is already in on another computer/);
 
   const started = await rawQuizAction(store, 'quiz1', { ...bobDevice, action: 'start' });
   assert.ok(started.current);
