@@ -73,7 +73,9 @@ function shortQuote(quote: string): string {
 export function buildAnthologyGraph(
   data: AnthologyData,
   grouping: AnthologyGrouping,
-  knowledge: readonly KnowledgeItem[] = []
+  knowledge: readonly KnowledgeItem[] = [],
+  /** Technique names, so a search for "metaphor" lights up the notes tagged with it. */
+  techniqueName: (id: string) => string | undefined = () => undefined
 ): ArchiveGraphModel {
   const titles = textTitles(data);
   const items = anthologyMapItems(data);
@@ -86,7 +88,13 @@ export function buildAnthologyGraph(
       title: `“${shortQuote(item.quote)}”`,
       area: 'notes',
       tags: [],
-      excerpt: [item.note, titles.get(item.block_id) ?? item.lesson_title, ...item.themes, ...item.concepts]
+      excerpt: [
+        item.note,
+        titles.get(item.block_id) ?? item.lesson_title,
+        item.technique_id ? techniqueName(item.technique_id) : '',
+        ...item.themes,
+        ...item.concepts
+      ]
         .filter(Boolean)
         .join(' · ')
     };
