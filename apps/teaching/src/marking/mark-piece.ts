@@ -176,7 +176,7 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
   bar.append(prev, next, saveBtn, retBtn);
 
   const palette = el('div', 'mk-palette');
-  palette.append(el('span', 'mk-palette__hint', 'Select the words, then tap a code or press its number. Hold Shift for a strength.'));
+  palette.append(el('span', 'mk-palette__hint', 'Select the words, then tap a code or press its number. Hold Shift for a strength, which shows green.'));
   const pressCode = (id: string, positive: boolean): void => {
     onSelection();
     if (selected) {
@@ -374,7 +374,7 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
     if (tag.why) menu.append(el('p', 'mk-ai', tag.why));
     const actions = el('div', 'mk-menu__actions');
     if (tag.ai) actions.append(button('Keep it', 'primary', () => { delete tag.ai; delete tag.why; paint(); }));
-    const flip = button(tag.positive ? 'Make it growth' : 'Make it a strength', 'secondary', () => { tag.positive = !tag.positive; paint(); });
+    const flip = button(tag.positive ? 'Not a strength' : 'Make it a strength', 'secondary', () => { tag.positive = !tag.positive; paint(); });
     const remove = button(tag.ai ? 'Drop it' : 'Remove', 'secondary', () => { tags = tags.filter((t) => t !== tag); paint(); });
     const close = button('Done', 'ghost', () => { hideMenu(); });
     actions.append(flip, remove, close);
@@ -434,7 +434,7 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
       if (part.startsWith('step.')) continue;
       for (const [field, text] of Object.entries(fields)) {
         const mine = (past?.tags ?? []).filter((t) => t.part === part && t.field === field);
-        out.push(paper(text, mine.map((t, i) => ({ start: t.start, end: t.end, layer: i, colour: `var(--pastel-${codes.get(t.code_id)?.colour ?? 'blue'}-ink)` })), null));
+        out.push(paper(text, mine.map((t, i) => ({ start: t.start, end: t.end, layer: i, colour: `var(--pastel-${t.positive ? 'sage' : codes.get(t.code_id)?.colour ?? 'blue'}-ink)` })), null));
       }
     }
     return out;
@@ -452,7 +452,8 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
       if (part.startsWith('step.')) continue;
       for (const [field, text] of Object.entries(fields)) {
         const mine = tags.filter((t) => t.part === part && t.field === field);
-        const marks: Mark[] = mine.map((t, i) => ({ start: t.start, end: t.end, layer: i, colour: `var(--pastel-${codes.get(t.code_id)?.colour ?? 'blue'}-ink)` }));
+        // A strength is green, as it is in the student's returned writing.
+        const marks: Mark[] = mine.map((t, i) => ({ start: t.start, end: t.end, layer: i, colour: `var(--pastel-${t.positive ? 'sage' : codes.get(t.code_id)?.colour ?? 'blue'}-ink)` }));
         if (ask === 'section' && section?.part === part && section.field === field) marks.push({ start: section.start, end: section.end, layer: marks.length, colour: 'var(--pastel-gold-ink)' });
         const step = d.steps?.find((s) => s.part === part && s.field === field);
         const pick = placedPick(step?.pick, text);

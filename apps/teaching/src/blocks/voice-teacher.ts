@@ -297,6 +297,8 @@ export function mountVoiceTeacher(
     let reviewing = -1;
     let reaction = readJSON<number>(REACTION_KEY) ?? DEFAULT_REACTION_S;
     let saveTimer = 0;
+    let waitTimer = 0;
+    let closed = false;
     let saving: Promise<void> = Promise.resolve();
     let status = record.status;
     const aiRead = (record as Submission & { ai_read?: VoiceAiRead }).ai_read ?? null;
@@ -478,6 +480,7 @@ export function mountVoiceTeacher(
           ? 'The transcript is on its way. You can listen now; tagging opens when it arrives.'
           : record.transcript_error || 'There is no transcript for this recording.';
       left.replaceChildren(el('p', 'block-secondary', why));
+      if (take && record.transcript_status === 'pending') waitForTranscript();
       if (record.transcript_status === 'error' && record.audio_url) {
         left.append(
           button('Try transcription again', 'secondary', async () => {
@@ -992,8 +995,37 @@ export function mountVoiceTeacher(
       void flush({ fillers_suggested: true });
     }
 
+    /**
+     * To mark opens one take on its own, so nothing else starts Whisper.
+     * Loading the block's list starts the run; then check this take until its transcript lands.
+     */
+    function waitForTranscript(): void {
+      let checks = 0;
+      void apiGet(base(lessonId, block.id)).catch(() => undefined);
+      const check = async (): Promise<void> => {
+        if (closed) return;
+        checks += 1;
+        try {
+          const fresh = await apiGet<Submission>(`${base(lessonId, block.id)}/${encodeURIComponent(record.id)}`);
+          if (closed) return;
+          if (fresh.transcript_status !== 'pending') {
+            closeMarking?.();
+            closeMarking = null;
+            void openMarking(record.id);
+            return;
+          }
+        } catch {
+          // Try again on the next check.
+        }
+        if (checks < MAX_POLLS) waitTimer = window.setTimeout(() => void check(), POLL_MS);
+      };
+      waitTimer = window.setTimeout(() => void check(), POLL_MS);
+    }
+
     paintAll();
     return () => {
+      closed = true;
+      window.clearTimeout(waitTimer);
       document.removeEventListener('keydown', onKey);
       audio.pause();
       audio.removeAttribute('src');
