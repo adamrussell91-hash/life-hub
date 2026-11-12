@@ -283,3 +283,40 @@ test('assemblePeopleDirectory carries lifecycle_status so archived people can be
     [['Isla Emberly', 'active'], ['Rowan Pike', 'archived']]
   );
 });
+
+test('assemblePeopleDirectory: a student reads as year and school, never a job', () => {
+  const studentId = 'person_00000000-0000-4000-8000-000000000097';
+  const schoolRef = `shared:organisation:${ORG_ID}`;
+  const data = assemblePeopleDirectory(
+    [
+      {
+        person: {
+          id: studentId,
+          display_name: 'Ava Tran',
+          is_self: false,
+          lifecycle_status: 'active',
+          created_at: '2026-09-01T00:00:00.000Z',
+          updated_at: '2026-09-20T00:00:00.000Z',
+          ref: `shared:person:${studentId}`
+        },
+        relationships: [
+          {
+            link: { id: 'l-pro', relationship_type: 'professional_relationship', role: 'student', status: 'current', metadata: {} },
+            endpoint: { kind: 'person', ref: 'shared:person:self', display_label: 'Me' },
+            direction: 'incoming'
+          },
+          {
+            link: { id: 'l-school', relationship_type: 'studied_at', role: 'Year 11', status: 'current', metadata: {} },
+            endpoint: { kind: 'organisation', ref: schoolRef, display_label: 'Tallowwood College' },
+            direction: 'outgoing'
+          }
+        ]
+      }
+    ],
+    { now: '2026-09-26T12:00:00.000Z', includeStudents: true }
+  );
+  const row = data.students[0];
+  assert.equal(row.role_line, 'Year 11 · Tallowwood College');
+  assert.equal(row.organisation.ref, schoolRef);
+  assert.equal(row.job_title, null);
+});

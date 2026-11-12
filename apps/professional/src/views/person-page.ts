@@ -1,5 +1,6 @@
 import { renderEntityDetail, renderPersonSummaryCard } from '@/components/entity-detail';
 import { mountIdentityEditor } from '@/components/person-identity-editor';
+import { currentSchoolOf, rolesFromOverview } from '@/domain/person-roles';
 import { buildPersonTabs } from '@/components/person-tabs';
 import { personBriefRoute } from '@/app/router';
 import { personRef } from '@/domain/ids';
@@ -86,7 +87,11 @@ export async function renderPersonPage(
           (e.link.relationship_type === 'employee_at' || e.link.relationship_type === 'member_of') &&
           e.endpoint.kind === 'organisation'
       );
+      const school = currentSchoolOf(rolesFromOverview(overview));
       const editor = mountIdentityEditor(person, reload, {
+        school: school
+          ? { ref: school.orgRef, display_label: school.orgName, linkId: school.linkId, year: school.title, imported: school.imported }
+          : null,
         jobTitle: workplaceRel?.link.role ?? null,
         relationshipRole:
           overview.current_relationships?.find((e) => e.link.relationship_type === 'professional_relationship')

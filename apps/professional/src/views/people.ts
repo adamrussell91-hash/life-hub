@@ -66,7 +66,7 @@ import {
 } from '@/domain/directory-query';
 import { cleanIdentityDisplayName } from '@/domain/identity-display-name';
 import { buildPersonModel, type PersonModel } from '@/domain/person-model';
-import { currentRoles, orgMonogram, rolesFromOverview, type PersonRole } from '@/domain/person-roles';
+import { currentRoles, currentSchoolOf, orgMonogram, rolesFromOverview, type PersonRole } from '@/domain/person-roles';
 import { buildPersonTimeline } from '@/domain/person-timeline';
 import { renderPersonTimeline } from '@/components/person-timeline';
 import { listMeetings } from '@/api/meetings';
@@ -914,7 +914,15 @@ export async function renderPeoplePage(
           headerHost.replaceChildren();
           const personEntity = overview.entity;
           const roles = rolesFromOverview(overview);
-          const mainOrg = currentRoles(roles)[0] ?? null;
+          const isStudent =
+            findRow(id)?.person_type === 'student' ||
+            (overview.current_relationships ?? []).some(
+              (e) => e.link.relationship_type === 'professional_relationship' && e.link.role === 'student'
+            );
+          // A student's header line is their year and school, not a job.
+          const currentSchool = isStudent ? currentSchoolOf(roles) : null;
+          const headerRoles = currentSchool ? [currentSchool, ...currentRoles(roles)] : currentRoles(roles);
+          const mainOrg = headerRoles[0] ?? null;
           const badgeRef = mainOrg?.orgRef ?? model.organisation?.ref ?? null;
           const badgeName = mainOrg?.orgName ?? model.organisation?.displayName ?? '';
           const ring = warmthRing(
@@ -928,7 +936,7 @@ export async function renderPeoplePage(
                   logoKey: directory?.organisations.find((o) => o.ref === badgeRef)?.logo_key ?? null
                 }
               : undefined,
-            findRow(id)?.person_type === 'student'
+            isStudent
           );
           ring.title = `${model.warmth} · ${model.warmthFeedNote}`;
           if (personEntity.kind === 'person') {
@@ -956,7 +964,16 @@ export async function renderPeoplePage(
                   ? { ref: orgRel.endpoint.ref, display_label: orgRel.endpoint.display_label }
                   : null,
                 workplaceLinkId: orgRel?.link.id ?? null,
-                jobTitle: orgRel?.link.role ?? null
+                jobTitle: orgRel?.link.role ?? null,
+                school: currentSchool
+                  ? {
+                      ref: currentSchool.orgRef,
+                      display_label: currentSchool.orgName,
+                      linkId: currentSchool.linkId,
+                      year: currentSchool.title,
+                      imported: currentSchool.imported
+                    }
+                  : null
               }
             );
             const archived = personEntity.lifecycle_status === 'archived';
@@ -996,7 +1013,7 @@ export async function renderPeoplePage(
               warmthBand: model.warmthBand,
               warmthTitle: `${model.warmth} · ${model.warmthFeedNote}`,
               avatar: ring,
-              currentRoles: currentRoles(roles),
+              currentRoles: headerRoles,
               crest: (orgRef, orgName) => crestFor(orgRef, orgName),
               editButton: editor.button,
               menuItems,
