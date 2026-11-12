@@ -7,6 +7,7 @@ import {
   endUniversalLink
 } from '@/api/universal-links';
 import { setPersonWorkplace } from '@/api/people-workplace';
+import { addPersonRole, editPersonRole, endPersonRole, removePersonRole } from '@/api/people-roles';
 import { fetchOrgStructure } from '@/api/org-structure';
 import { ApiClientError } from '@/api/client';
 import type { EntityRecord, ProfessionalProfile } from '@/domain/types';
@@ -66,7 +67,11 @@ export interface PersonEditorContext {
   workplaceLinkId?: string | null;
   /** Job title at that organisation — the `role` on the workplace link. */
   jobTitle?: string | null;
+  /** A student's current school: the `studied_at` link, its role the year. */
+  school?: (SelectedOrg & { linkId: string; year: string | null; imported?: boolean }) | null;
 }
+
+const YEAR_SUGGESTIONS = ['Year 7', 'Year 8', 'Year 9', 'Year 10', 'Year 11', 'Year 12'];
 
 /** Stay-in-place person editor: identity + profile + relational links.
  * Shared by the legacy person page and the People redesign pane. */
@@ -81,6 +86,16 @@ export function mountIdentityEditor(
   const profile: ProfessionalProfile | undefined = person.professional_profile;
   const initialRole = context.relationshipRole ?? '';
   const initialOrg = context.organisation ?? null;
+  // A student has a school and a year, not an organisation and a job. When
+  // an older save put their school in as a workplace, the student fields
+  // start from it and saving moves it across.
+  const initialSchool: SelectedOrg | null = context.school
+    ? { ref: context.school.ref, display_label: context.school.display_label }
+    : initialRole === 'student' && initialOrg
+      ? initialOrg
+      : null;
+  const initialYear = context.school ? context.school.year ?? '' : initialRole === 'student' ? context.jobTitle ?? '' : '';
+  const schoolFromWorkplace = !context.school && initialRole === 'student' && Boolean(initialOrg);
   const initialWorkplaceText = profile?.current_workplace?.join(', ') ?? '';
   const initialJobTitle = context.jobTitle ?? '';
   const initialNotes = profile?.summary ?? '';
@@ -145,9 +160,48 @@ export function mountIdentityEditor(
   jobTitleInput.setAttribute('list', jobTitleList.id);
   const jobTitleHint = el('p', 'add-person-form__hint');
   const jobTitleLabel = el('label', 'add-person-form__label', 'Job title');
+  const orgLabel = el('label', 'add-person-form__label', 'Organisation');
   let titlesFor = '';
 
+  // The Organisation and Job title fields hold either the workplace or, for
+  // a student, the school and year. Each mode keeps its own values.
+  let studentMode = initialRole === 'student';
+  const stash = {
+    work: { org: initialOrg, title: initialJobTitle },
+    school: { org: initialSchool, title: initialYear }
+  };
+
+  function applyMode(): void {
+    orgLabel.textContent = studentMode ? 'School' : 'Organisation';
+    orgInput.placeholder = studentMode ? 'Start typing a school…' : 'Start typing an organisation…';
+    orgInput.setAttribute('aria-label', studentMode ? 'School' : 'Organisation');
+    jobTitleLabel.textContent = studentMode ? 'Year' : 'Job title';
+    jobTitleInput.setAttribute('aria-label', studentMode ? 'Year' : 'Job title');
+    jobTitleInput.placeholder = studentMode ? 'e.g. Year 11' : 'e.g. Head of Department Learning Enrichment';
+  }
+
+  function switchMode(next: boolean): void {
+    if (next === studentMode) return;
+    stash[studentMode ? 'school' : 'work'] = { org: selectedOrg, title: jobTitleInput.value };
+    studentMode = next;
+    const slot = stash[studentMode ? 'school' : 'work'];
+    jobTitleInput.value = slot.title;
+    jobTitleList.replaceChildren();
+    applyMode();
+    setOrg(slot.org);
+  }
+
   function syncWorkplaceFields(org: SelectedOrg | null): void {
+    if (studentMode) {
+      workplaceTextLabel.hidden = true;
+      workplaceTextInput.hidden = true;
+      jobTitleHint.textContent = 'Their year group this year.';
+      titlesFor = '';
+      jobTitleList.replaceChildren(
+        ...YEAR_SUGGESTIONS.map((year) => Object.assign(document.createElement('option'), { value: year }))
+      );
+      return;
+    }
     // With a linked organisation the free-text field is redundant.
     workplaceTextLabel.hidden = Boolean(org);
     workplaceTextInput.hidden = Boolean(org);
@@ -170,7 +224,7 @@ export function mountIdentityEditor(
       .catch(() => undefined);
   }
 
-  let selectedOrg: SelectedOrg | null = initialOrg;
+  let selectedOrg: SelectedOrg | null = studentMode ? initialSchool : initialOrg;
   const orgWrap = el('div', 'add-person-form__field');
   const orgInput = document.createElement('input');
   orgInput.type = 'text';
@@ -197,7 +251,10 @@ export function mountIdentityEditor(
     syncWorkplaceFields(next);
   }
   orgClear.addEventListener('click', () => setOrg(null));
-  setOrg(initialOrg);
+  if (studentMode) jobTitleInput.value = initialYear;
+  applyMode();
+  setOrg(selectedOrg);
+  roleSelect.addEventListener('change', () => switchMode(roleSelect.value === 'student'));
 
   const orgPicker = createEntityPicker({
     input: orgInput,
@@ -248,7 +305,7 @@ export function mountIdentityEditor(
   form.append(
     el('label', 'add-person-form__label', 'Name'),
     nameInput,
-    el('label', 'add-person-form__label', 'Organisation'),
+    orgLabel,
     orgWrap,
     jobTitleLabel,
     jobTitleInput,
@@ -281,11 +338,15 @@ export function mountIdentityEditor(
     sortInput.value = person.sort_name ?? '';
     aliasesInput.value = person.aliases.join(', ');
     roleSelect.value = initialRole;
-    jobTitleInput.value = initialJobTitle;
     notesInput.value = initialNotes;
     workplaceTextInput.value = initialWorkplaceText;
     linkedinInput.value = initialLinkedin;
-    setOrg(initialOrg);
+    stash.work = { org: initialOrg, title: initialJobTitle };
+    stash.school = { org: initialSchool, title: initialYear };
+    studentMode = initialRole === 'student';
+    jobTitleInput.value = studentMode ? initialYear : initialJobTitle;
+    applyMode();
+    setOrg(studentMode ? initialSchool : initialOrg);
   }
 
   function close(): void {
@@ -371,11 +432,19 @@ export function mountIdentityEditor(
           }
         }
 
+        if (studentMode) {
+          try {
+            await saveSchool(selectedOrg, jobTitleInput.value.trim() || null);
+          } catch (err) {
+            warnings.push(`School / year failed: ${errorMessage(err, 'unknown error')}`);
+          }
+        }
+
         // Organisation + job title in one server call; the org chart follows.
         const nextOrg = selectedOrg;
         const nextTitle = jobTitleInput.value.trim();
         const orgChanged = (nextOrg?.ref ?? null) !== (initialOrg?.ref ?? null);
-        if (orgChanged || nextTitle !== initialJobTitle.trim()) {
+        if (!studentMode && (orgChanged || nextTitle !== initialJobTitle.trim())) {
           try {
             await setPersonWorkplace({
               person_ref: person.ref,
@@ -399,6 +468,35 @@ export function mountIdentityEditor(
       }
     })();
   });
+
+  /** A student's school is a `studied_at` link with the year as its role. */
+  async function saveSchool(nextSchool: SelectedOrg | null, nextYear: string | null): Promise<void> {
+    const current = context.school ?? null;
+    if (current && nextSchool?.ref === current.ref) {
+      if ((current.year ?? null) !== nextYear) {
+        await editPersonRole({ person_ref: person.ref, link_id: current.linkId, role: nextYear });
+      }
+    } else {
+      // A new school (or none): the old one ends, so its years stay on record.
+      if (current) await endPersonRole({ person_ref: person.ref, link_id: current.linkId });
+      if (nextSchool) {
+        await addPersonRole({
+          person_ref: person.ref,
+          organisation_ref: nextSchool.ref,
+          relationship_type: 'studied_at',
+          role: nextYear
+        });
+      }
+    }
+    // Their school was saved as a job before: take that workplace away.
+    if (schoolFromWorkplace && context.workplaceLinkId) {
+      try {
+        await removePersonRole({ person_ref: person.ref, link_id: context.workplaceLinkId });
+      } catch {
+        await endPersonRole({ person_ref: person.ref, link_id: context.workplaceLinkId });
+      }
+    }
+  }
 
   return { button, form };
 }

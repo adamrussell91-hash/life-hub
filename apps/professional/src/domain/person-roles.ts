@@ -76,6 +76,11 @@ export function currentRoles(roles: PersonRole[]): PersonRole[] {
   return roles.filter((r) => r.kind === 'role' && r.current);
 }
 
+/** A student's current school: their newest current education row. */
+export function currentSchoolOf(roles: PersonRole[]): PersonRole | null {
+  return roles.find((r) => r.kind === 'education' && r.current) ?? null;
+}
+
 /**
  * "2016", "2016-03", "3/2016", "Mar 2016", "March 2016" → ISO at the first
  * of the month. Empty → null. Anything else → undefined (invalid).

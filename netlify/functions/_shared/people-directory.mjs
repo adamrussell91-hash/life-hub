@@ -81,6 +81,8 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
     const personRef = person.ref ?? formatEntityRef({ namespace: 'shared', kind: 'person', id: person.id });
     const currentOrgLinks = [];
     const formerOrgLinks = [];
+    // A student's school is a `studied_at` link, its role the year group.
+    const currentSchoolLinks = [];
     const proRoles = [];
 
     for (const entry of relationships ?? []) {
@@ -98,6 +100,18 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
         if (!organisationsByRef.has(org.ref)) organisationsByRef.set(org.ref, org);
         if (org.current) currentOrgLinks.push({ ...org, role: link.role ?? null });
         else formerOrgLinks.push({ ...org, role: link.role ?? null });
+      }
+      if (link.relationship_type === 'studied_at' && endpoint?.kind === 'organisation' && isCurrentLink(link)) {
+        const school = {
+          ref: endpoint.ref,
+          id: endpoint.ref?.split(':')[2] ?? null,
+          display_name: endpoint.display_label ?? 'School',
+          logo_key: null,
+          monogram: orgMonogram(endpoint.display_label),
+          current: true
+        };
+        if (!organisationsByRef.has(school.ref)) organisationsByRef.set(school.ref, school);
+        currentSchoolLinks.push({ ...school, role: link.role ?? null });
       }
       if (link.relationship_type === 'professional_relationship') {
         const role = link.role ?? 'other';
@@ -155,6 +169,12 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
     const isStudent =
       importedStudent || proRoles.some((r) => r.role === 'student' && r.current);
     const target = isStudent ? students : people;
+    // A student's line is their year and school ("Year 11 · Tallowwood
+    // College"), never a job; the school stands in for an organisation.
+    const school = isStudent ? currentSchoolLinks[0] ?? null : null;
+    const schoolYear = school && typeof school.role === 'string' && school.role.trim() ? school.role.trim() : null;
+    const schoolLine = school ? (schoolYear ? `${schoolYear} · ${school.display_name}` : `At ${school.display_name}`) : null;
+    const shownOrg = school ?? primaryOrg;
 
     target.push({
       id: person.id,
@@ -162,16 +182,16 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
       ref: personRef,
       display_name: displayName,
       initials: monogram(displayName),
-      role_line: importedStudent && !proRoles.length && !primaryOrg ? 'Student' : roleLine,
+      role_line: schoolLine ?? (importedStudent && !proRoles.length && !primaryOrg ? 'Student' : roleLine),
       relationship_roles: proRoles,
-      job_title: titled ? titled.role.trim() : null,
-      organisation: primaryOrg
+      job_title: school ? null : titled ? titled.role.trim() : null,
+      organisation: shownOrg
         ? {
-            ref: primaryOrg.ref,
-            display_name: primaryOrg.display_name,
-            monogram: primaryOrg.monogram,
-            logo_key: primaryOrg.logo_key,
-            current: primaryOrg.current
+            ref: shownOrg.ref,
+            display_name: shownOrg.display_name,
+            monogram: shownOrg.monogram,
+            logo_key: shownOrg.logo_key,
+            current: shownOrg.current
           }
         : null,
       organisations: [...currentOrgLinks, ...formerOrgLinks].map((o) => ({
