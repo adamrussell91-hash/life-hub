@@ -307,3 +307,57 @@
   .td-count--big .td-count__clock { flex-wrap: nowrap; }
   .td-count--big .td-count__cell { flex: 1; min-width: 0; }
 }
+
+/* The four boxes: Do now, Do next, Extra practice, Challenge. A coloured dot heads each one, and the
+   reason under each row takes the box's colour. */
+.td-box { --td-box: var(--muted); }
+.td-box--now { --td-box: var(--high-sea-ink); }
+.td-box--next { --td-box: var(--pastel-gold-ink); }
+.td-box--extra { --td-box: var(--navy-2, var(--navy)); }
+.td-box--challenge { --td-box: var(--muted); }
+
+.td-box .td-group__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+  color: var(--td-box);
+}
+
+.td-box--extra .td-group__title,
+.td-box--challenge .td-group__title { color: var(--muted); }
+
+.td-box__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--td-box);
+}
+
+.td-box__hint { margin: 0 0 var(--space-1); font-size: 11px; color: var(--muted); }
+
+.td-item__why { font-size: var(--text-xs); color: var(--td-box, var(--muted)); overflow-wrap: anywhere; }
+.td-box--extra .td-item__why,
+.td-box--challenge .td-item__why { color: var(--muted); }
+
+.td-box__more[hidden] { display: none; }
+
+.td-morebtn {
+  min-height: 32px;
+  padding: 0 0 0 28px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--wave);
+  cursor: pointer;
+}
+
+.td-morebtn:hover,
+.td-morebtn:focus-visible { text-decoration: underline; }
+
+@media (pointer: coarse) {
+  .td-morebtn { min-height: 44px; }
+}

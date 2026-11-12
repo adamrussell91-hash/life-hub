@@ -80,11 +80,14 @@ try {
     const panel = p.getByRole('complementary', { name: 'Your to do list' });
     await panel.waitFor();
     const text = await panel.textContent();
-    for (const want of ['Assessment task', 'Poem task: your own ghost poem', 'From your teacher', 'Bring a printed copy', 'Sprint step 2: first draft', 'Due soon', 'Ghost poem', 'Done today', 'Close reading', 'With your teacher', 'Speaker and voice', '1 of 3 activities done', 'Who is speaking?', 'Sound and rhythm']) {
+    for (const want of ['Assessment task', 'Poem task: your own ghost poem', 'From your teacher', 'Bring a printed copy', 'Sprint step 2: first draft', 'Due soon', 'Ghost poem', 'Done today', 'Close reading', 'With your teacher', 'Speaker and voice', '1 of 3 activities done', 'Who is speaking?', 'Sound and rhythm', 'Do now', 'For your next test, or something to fix', 'Before the Poem task: your own ghost poem']) {
       assert.ok(text.includes(want), `panel shows "${want}"`);
     }
     assert.ok(!text.includes('Private reminder'), 'teacher-only announcements stay out');
     assert.ok(!text.includes('Practise your organiser'), 'no organiser, no Today row');
+    assert.ok(!text.includes('Keep going') && !text.includes('Still to do'), 'the old groups are gone');
+    // Do now: started l3, ticked l1, then l2 and l4; the assessment itself waits behind Show more.
+    assert.equal(await panel.getByRole('button', { name: 'Show 1 more' }).getAttribute('aria-expanded'), 'false');
     // Two countdowns stack, soonest first: the sprint step, then the assessment.
     const timers = await panel.getByRole('timer').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
     assert.equal(timers.length, 2);

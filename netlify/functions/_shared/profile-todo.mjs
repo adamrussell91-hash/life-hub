@@ -6,10 +6,11 @@
  *                  assessment lessons planned on the calendar for this class (published or not), soonest first
  *   announcements  the newest text announcements on the class page
  *   practice       organiser cards left today and cards answered today
- *   back           returned pieces not opened yet, pieces opened today (ticked), redrafts asked for
  *   waiting        handed-in pieces the teacher has not returned yet (a sent redraft too)
- *   started        lessons with saved writing or a quiz go, not yet done, and their activities
- *   todo           the student's other lessons not done yet, in route order, plus any done today (ticked)
+ *   boxes          four prioritised boxes (boxesFor): Do now, Do next, Extra practice, Challenge. They
+ *                  hold the lessons left (started ones with their activities), lessons done today
+ *                  (ticked), and returned feedback to read or redo
+ *   more           lessons left that did not fit in a box; the map shows them all
  *
  * Something finished stays on the list, ticked, for the rest of that Sydney day, then drops off.
  * Only the student's own records go out. The teacher's read of the page gets the same panel.
@@ -23,7 +24,7 @@ import { isDeletedRecord } from './record-liveness.mjs';
 import { SCHEDULED_LESSON_PREFIX } from './teaching-blobs.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 
-export const TODO_LIMITS = { countdowns: 3, announcements: 3, text: 280, back: 6, waiting: 6, started: 3, activities: 12, todo: 6 };
+export const TODO_LIMITS = { countdowns: 3, announcements: 3, text: 280, back: 6, waiting: 6, activities: 12, box: 12 };
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^\d{2}:\d{2}$/;
 
@@ -166,7 +167,7 @@ async function waitingFor(store, classId, student, columns) {
       read(store, `piece_feedback/${classId}/${student.id}/${pieceId(lesson_id, block_id)}`)
     ]);
     if (!handin?.handed_in_at || handin.student_id !== student.id) return null;
-    // Returned, or a redraft asked for: those show under Back to you instead.
+    // Returned, or a redraft asked for: those show in the Do now box instead.
     if (row?.redraft || row?.status === 'returned') return null;
     return { title: clip(String(column.title ?? 'Your work'), 120), lesson_id, at: handin.handed_in_at };
   }));
@@ -181,21 +182,144 @@ function doneAt(lessonId, done, view, studentId) {
   return view.quizzes.find((q) => q.lesson_id === lessonId)?.scores?.[studentId]?.submitted_at ?? null;
 }
 
+const WEEKDAY = new Intl.DateTimeFormat('en-AU', { weekday: 'short', timeZone: 'UTC' });
+const SHORT_DATE = new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+
+/** "today", "tomorrow", "on Fri" within the week, else "on 20 Nov". Both are YYYY-MM-DD days. */
+export function dayPhrase(day, today) {
+  const at = new Date(`${day}T00:00:00Z`);
+  const days = Math.round((at.getTime() - new Date(`${today}T00:00:00Z`).getTime()) / 86_400_000);
+  if (Number.isNaN(days)) return '';
+  if (days <= 0) return 'today';
+  if (days === 1) return 'tomorrow';
+  return days < 7 ? `on ${WEEKDAY.format(at)}` : `on ${SHORT_DATE.format(at)}`;
+}
+
+/**
+ * The core lesson a support lesson branches from: the one the teacher picked (branch_from, else the
+ * side stop on the unit map), else the core lesson before it in unit order. Matches the map's hangSides.
+ */
+export function anchorOf(unit, lessons, lesson) {
+  const core = new Set(lessons.filter((l) => (l.route_role ?? 'core') === 'core').map((l) => l.id));
+  const map = (unit?.blocks ?? []).find((b) => b?.block_type === 'curriculum_lines' && b.content?.version === 2);
+  const stop = map?.content.rail_stops?.find((s) => s?.lesson_id === lesson.id && typeof s.after_lesson_id === 'string');
+  for (const picked of [lesson.branch_from, stop?.after_lesson_id]) if (typeof picked === 'string' && core.has(picked)) return picked;
+  let last = null;
+  for (const l of lessons) {
+    if (l.id === lesson.id) return last;
+    if (core.has(l.id)) last = l.id;
+  }
+  return null;
+}
+
+export const BOX_KEYS = ['now', 'next', 'extra', 'challenge'];
+
+/**
+ * The four boxes, in order, each kept only when it has something in it.
+ *
+ *   now        redrafts asked for, feedback to read, started lessons, core lessons before the next
+ *              assessment (and that assessment), support lessons once the lesson they branch from is done
+ *              (no assessment coming: the first core lesson not done instead)
+ *   next       the other core lessons, support lessons still waiting on their lesson
+ *   extra      optional lessons
+ *   challenge  extension lessons
+ *
+ * Within a box, started lessons come first. `rows` are the map's rows in unit order; `lessons` the
+ * student's lessons (route_role, branch_from); `started` maps lesson id to its activities;
+ * `doneToday` the lessons finished today (kept, ticked); `back` the returned pieces (backFor);
+ * `countdowns` from countdownsFrom. A box keeps TODO_LIMITS.box rows not done; the rest count in `more`.
+ */
+export function boxesFor({ unit, lessons, rows, started = new Map(), doneToday = new Set(), back = [], countdowns = [], today }) {
+  const byId = new Map(lessons.map((l) => [l.id, l]));
+  const titles = new Map(rows.map((r) => [r.id, r.title]));
+  const finished = new Set(rows.filter((r) => r.done).map((r) => r.id));
+  const order = new Map((unit?.lesson_ids ?? lessons.map((l) => l.id)).map((id, i) => [id, i]));
+  const test = countdowns.find((c) => c.assessment);
+  const cutoff = test && order.has(test.lesson_id) ? order.get(test.lesson_id) : -1;
+  const before = test ? `Before the ${test.title} ${dayPhrase(test.due_date, today)}`.trim() : '';
+  // rank: 0 started, 1 redraft, 2 feedback, 3 core / assessment, 4 support
+  const boxes = { now: [], next: [], extra: [], challenge: [] };
+  const put = (key, rank, item) => boxes[key].push({ rank, at: boxes[key].length, item });
+
+  for (const b of back) {
+    const state = b.state === 'redraft' ? 'redraft' : b.state === 'read' ? 'read' : 'new';
+    const reason = state === 'redraft' ? 'Your teacher asked for another go' : state === 'read' ? 'Feedback read today' : 'Feedback is back. Have a read';
+    put('now', state === 'redraft' ? 1 : 2, { id: b.id, title: b.title, kind: 'feedback', done: state === 'read', reason, feedback: { state, kind: b.kind, date: b.date } });
+  }
+
+  let firstNext = true;
+  for (const r of rows) {
+    const done = finished.has(r.id);
+    if (done && !doneToday.has(r.id)) continue;
+    const base = { id: r.id, title: r.title, kind: r.kind, role: r.role, done };
+    const going = !done && started.get(r.id);
+    if (r.role === 'optional' || r.role === 'extension') {
+      const key = r.role === 'optional' ? 'extra' : 'challenge';
+      put(key, going ? 0 : 3, { ...base, reason: going ? 'Pick up where you left off' : r.role === 'optional' ? 'Optional' : 'Challenge lesson', ...(going ? { started: { activities: going } } : {}) });
+      continue;
+    }
+    if (going) {
+      put('now', 0, { ...base, reason: 'Pick up where you left off', started: { activities: going } });
+      continue;
+    }
+    if (r.role === 'support') {
+      const anchor = anchorOf(unit, lessons, byId.get(r.id) ?? r);
+      if (anchor && titles.has(anchor) && !finished.has(anchor)) put('next', 4, { ...base, reason: `After ${titles.get(anchor)}` });
+      else put('now', 4, { ...base, reason: 'Your teacher picked this for you' });
+      continue;
+    }
+    const at = order.get(r.id) ?? Infinity;
+    if (cutoff >= 0 && at < cutoff) put('now', 3, { ...base, reason: before });
+    else if (test && r.id === test.lesson_id) put('now', 3, { ...base, reason: `Due ${dayPhrase(test.due_date, today)}` });
+    else if (!test && firstNext) {
+      // No assessment coming: the next core lesson is Do now, so Do now is never empty while core
+      // lessons remain. One done today before it stays ticked there too.
+      put('now', 3, { ...base, reason: 'Next in the unit' });
+      if (!done) firstNext = false;
+    } else {
+      put('next', 3, { ...base, reason: !done && firstNext ? 'Next in the unit' : 'Later in the unit' });
+      if (!done) firstNext = false;
+    }
+  }
+
+  let more = 0;
+  const out = [];
+  for (const key of BOX_KEYS) {
+    const sorted = boxes[key].sort((a, b) => a.rank - b.rank || a.at - b.at).map((e) => e.item);
+    let left = 0;
+    const items = sorted.filter((item) => {
+      if (item.done || item.kind === 'feedback') return true;
+      left += 1;
+      if (left <= TODO_LIMITS.box) return true;
+      more += 1;
+      return false;
+    });
+    if (items.length) out.push({ key, items });
+  }
+  return { boxes: out, more };
+}
+
 /**
  * The panel for one student. `lessons`, `rows` and `done` are the student's own map and records
  * (lessonsForStudent, mapRows, listDone); `published` maps lesson id to its published copy; `view`
- * is the class's markbook load; `assessments` the unit's assessment lessons, published or not
- * ({ id, title, published }); `now` the moment of the read.
+ * is the class's markbook load; `unit` the class's unit; `assessments` the unit's assessment
+ * lessons, published or not ({ id, title, published }); `now` the moment of the read.
  */
-export async function todoFor(store, roster, student, { lessons, rows, done, published, view, assessments = [], now = new Date() }) {
+export async function todoFor(store, roster, student, { unit = null, lessons, rows, done, published, view, assessments = [], now = new Date() }) {
   const today = sydneyDay(now);
-  const titles = new Map(lessons.map((l) => [l.id, l.title]));
   const finished = new Set(rows.filter((r) => r.done).map((r) => r.id));
   const writing = new Map((view.work ?? []).map((w) => [w.lesson_id, w.students?.[student.id]?.blocks ?? null]));
 
-  const started = [];
+  const started = new Map();
+  const doneToday = new Set();
   for (const row of rows) {
-    if (finished.has(row.id) || row.kind === 'assessment') continue;
+    if (finished.has(row.id)) {
+      // Finished today: stays ticked until the day ends.
+      const at = doneAt(row.id, done, view, student.id);
+      if (at && sydneyDay(at) === today) doneToday.add(row.id);
+      continue;
+    }
+    if (row.kind === 'assessment') continue;
     const saved = writing.get(row.id);
     const quiz = view.quizzes.find((q) => q.lesson_id === row.id);
     const score = quiz?.scores?.[student.id];
@@ -203,21 +327,7 @@ export async function todoFor(store, roster, student, { lessons, rows, done, pub
     if (!saved && !quizGo) continue;
     const activities = activitiesOf(published.get(row.id), saved ?? {});
     if (quiz) activities.push({ id: `quiz:${row.id}`, title: 'Quiz', done: Boolean(score?.submitted_at) });
-    started.push({ lesson_id: row.id, title: titles.get(row.id) ?? row.title, activities: activities.slice(0, TODO_LIMITS.activities) });
-  }
-  const startedIds = new Set(started.map((s) => s.lesson_id));
-  // Lessons left, plus those finished today, which stay ticked until the day ends.
-  const todo = [];
-  let left = 0;
-  for (const r of rows) {
-    if (startedIds.has(r.id)) continue;
-    if (finished.has(r.id)) {
-      const at = doneAt(r.id, done, view, student.id);
-      if (at && sydneyDay(at) === today) todo.push({ id: r.id, title: r.title, kind: r.kind, done: true });
-      continue;
-    }
-    left += 1;
-    if (left <= TODO_LIMITS.todo) todo.push({ id: r.id, title: r.title, kind: r.kind, done: false });
+    started.set(row.id, activities.slice(0, TODO_LIMITS.activities));
   }
 
   const [back, waiting, practice, planned] = await Promise.all([
@@ -226,14 +336,14 @@ export async function todoFor(store, roster, student, { lessons, rows, done, pub
     practiceToday(store, roster, student, { now }),
     plannedAssessments(store, roster.cls.id, assessments)
   ]);
+  const countdowns = countdownsFrom(lessons, published, today, planned);
+  const { boxes, more } = boxesFor({ unit, lessons, rows, started, doneToday, back, countdowns, today });
   return {
-    countdowns: countdownsFrom(lessons, published, today, planned),
+    countdowns,
     announcements: announcementsFrom(roster.cls),
     practice: practice && (practice.today > 0 || practice.answered > 0) ? practice : null,
-    back,
     waiting,
-    started: started.slice(0, TODO_LIMITS.started),
-    todo,
-    more: Math.max(0, left - TODO_LIMITS.todo)
+    boxes,
+    more
   };
 }

@@ -16,14 +16,28 @@ export type TodoPayload = {
   announcements: { id: string; text: string; at: string | null }[];
   /** Organiser cards left today and already answered today; null when there is nothing either way. */
   practice: { today: number; answered: number } | null;
-  /** `read`: opened today, so it shows ticked until the day ends. */
-  back: { id: string; kind: string; title: string; date: string; state: 'new' | 'redraft' | 'read' }[];
   waiting: { title: string; lesson_id: string; at: string }[];
-  started: { lesson_id: string; title: string; activities: TodoActivity[] }[];
-  /** `done`: finished today, ticked until the day ends. */
-  todo: { id: string; title: string; kind: 'lesson' | 'quiz' | 'assessment'; done: boolean }[];
+  /** Do now, Do next, Extra practice, Challenge: only boxes with something in them, in that order. */
+  boxes: TodoBox[];
+  /** Lessons left that did not fit in a box; the map has them all. */
   more: number;
 };
+export type TodoBoxKey = 'now' | 'next' | 'extra' | 'challenge';
+/**
+ * One row in a box: a lesson, or returned feedback (`kind: 'feedback'`). `done`: finished (or
+ * feedback read) today, ticked until the day ends. `reason`: why it sits in this box.
+ */
+export type TodoBoxItem = {
+  id: string;
+  title: string;
+  kind: 'lesson' | 'quiz' | 'assessment' | 'feedback';
+  role?: 'core' | 'support' | 'extension' | 'optional';
+  done: boolean;
+  reason: string;
+  started?: { activities: TodoActivity[] };
+  feedback?: { state: 'new' | 'redraft' | 'read'; kind: string; date: string };
+};
+export type TodoBox = { key: TodoBoxKey; items: TodoBoxItem[] };
 export type TodoOptions = {
   classId: string;
   /** The teacher looking at a student's page: same list, no Practise link (the organiser tab is the student's). */
@@ -180,6 +194,99 @@ function lessonLink(classId: string, lessonId: string, label: string, title: str
 
 const KIND_NOTE: Record<string, string> = { lesson: '', quiz: 'Quiz', assessment: 'Assessment task' };
 
+const BOXES: Record<TodoBoxKey, { title: string; hint: string }> = {
+  now: { title: 'Do now', hint: 'For your next test, or something to fix' },
+  next: { title: 'Do next', hint: 'Start once Do now is done' },
+  extra: { title: 'Extra practice', hint: 'Helps, but you won’t fall behind' },
+  challenge: { title: 'Challenge', hint: 'For when you want to go further' }
+};
+/** Rows not done that a box shows before Show more. A row done today stays and takes no slot. */
+export const BOX_SHOWN = 3;
+
+function startedRow(t: TodoBoxItem, activities: TodoActivity[], classId: string): HTMLElement {
+  const finished = activities.filter((a) => a.done).length;
+  const total = activities.length;
+  const row = item('box', t.title, total ? `${finished} of ${total} ${total === 1 ? 'activity' : 'activities'} done` : 'Started', lessonLink(classId, t.id, 'Carry on →', t.title));
+  if (total) {
+    const meter = el('span', 'td-meter');
+    meter.setAttribute('aria-hidden', 'true');
+    const fill = el('i');
+    fill.style.width = `${Math.round((finished / total) * 100)}%`;
+    meter.append(fill);
+    row.querySelector('.td-item__note')?.prepend(meter);
+    const list = el('ul', 'td-acts');
+    for (const a of activities) {
+      const li = el('li', a.done ? 'is-done' : undefined, a.title);
+      li.setAttribute('aria-label', `${a.title}: ${a.done ? 'done' : 'not done yet'}`);
+      list.append(li);
+    }
+    row.querySelector('.td-item__body')?.append(list);
+  }
+  return row;
+}
+
+function feedbackRow(t: TodoBoxItem, f: NonNullable<TodoBoxItem['feedback']>): HTMLElement {
+  if (t.done || f.state === 'read') return item('tick', t.title, 'Feedback read today.');
+  if (f.state === 'redraft') {
+    return item('redraft', t.title, '', f.kind === 'answer' ? tabLink('Answer again →', 'returned', `Answer ${t.title} again`) : tabLink('Redraft →', 'returned', `Redraft ${t.title}`), ['again', 'Have another go']);
+  }
+  return item('new', t.title, '', tabLink('Open →', 'returned', `Open feedback on ${t.title}`), ['new', 'New']);
+}
+
+function boxRow(t: TodoBoxItem, classId: string): HTMLElement {
+  let row: HTMLElement;
+  if (t.feedback) row = feedbackRow(t, t.feedback);
+  else if (t.done) row = item('tick', t.title, 'Done today');
+  else if (t.started) row = startedRow(t, t.started.activities, classId);
+  else row = item('box', t.title, KIND_NOTE[t.kind] ?? '', lessonLink(classId, t.id, 'Open →', t.title));
+  if (t.reason && !t.done) row.querySelector('.td-item__title')?.after(el('span', 'td-item__why', t.reason));
+  return row;
+}
+
+let boxSeq = 0;
+
+/** One box: a dot heading and hint, its first rows, and Show more for the rest. */
+function boxGroup(box: TodoBox, options: TodoOptions): HTMLElement {
+  const meta = BOXES[box.key];
+  const g = el('section', `td-group td-box td-box--${box.key}`);
+  const title = el('h4', 'td-group__title');
+  const dot = el('span', 'td-box__dot');
+  dot.setAttribute('aria-hidden', 'true');
+  title.append(dot, meta.title);
+  g.append(title, el('p', 'td-box__hint', meta.hint));
+  const hidden: HTMLElement[] = [];
+  let shown = 0;
+  for (const t of box.items) {
+    const row = boxRow(t, options.classId);
+    if (!t.done && shown >= BOX_SHOWN) {
+      hidden.push(row);
+      continue;
+    }
+    if (!t.done) shown += 1;
+    g.append(row);
+  }
+  if (hidden.length) {
+    const id = `td-more-${box.key}-${++boxSeq}`;
+    const extra = el('div', 'td-box__more');
+    extra.id = id;
+    // The rows past the first three sit in one wrapper the toggle opens, in their order.
+    extra.append(...hidden);
+    extra.hidden = true;
+    const toggle = el('button', 'td-morebtn', `Show ${hidden.length} more`);
+    toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-controls', id);
+    toggle.addEventListener('click', () => {
+      const open = toggle.getAttribute('aria-expanded') !== 'true';
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.textContent = open ? 'Show less' : `Show ${hidden.length} more`;
+      extra.hidden = !open;
+    });
+    g.append(extra, toggle);
+  }
+  return g;
+}
+
 export function renderTodoPanel(todo: TodoPayload, options: TodoOptions): HTMLElement {
   const now = options.now ?? (() => new Date());
   const panel = el('aside', 'td-panel');
@@ -224,13 +331,9 @@ export function renderTodoPanel(todo: TodoPayload, options: TodoOptions): HTMLEl
     any = true;
   }
 
-  if (todo.back.length || todo.waiting.length) {
+  // Back to you holds only work still with the teacher; feedback to read or redo sits in Do now.
+  if (todo.waiting.length) {
     const g = group('Back to you');
-    for (const b of todo.back) {
-      if (b.state === 'read') g.append(item('tick', b.title, 'Feedback read today.'));
-      else if (b.state === 'redraft') g.append(item('redraft', b.title, 'Your teacher asked for another go.', b.kind === 'answer' ? tabLink('Answer again →', 'returned', `Answer ${b.title} again`) : tabLink('Redraft →', 'returned', `Redraft ${b.title}`), ['again', 'Have another go']));
-      else g.append(item('new', b.title, 'Feedback is back. Have a read.', tabLink('Open →', 'returned', `Open feedback on ${b.title}`), ['new', 'New']));
-    }
     for (const w of todo.waiting) {
       g.append(item('wait', w.title, `Handed in${onDay(w.at, now())}. Feedback not back yet.`, undefined, ['wait', 'With your teacher']));
     }
@@ -238,41 +341,13 @@ export function renderTodoPanel(todo: TodoPayload, options: TodoOptions): HTMLEl
     any = true;
   }
 
-  if (todo.started.length) {
-    const g = group('Keep going');
-    for (const s of todo.started) {
-      const finished = s.activities.filter((a) => a.done).length;
-      const total = s.activities.length;
-      const row = item('box', s.title, total ? `${finished} of ${total} ${total === 1 ? 'activity' : 'activities'} done` : 'Started', lessonLink(options.classId, s.lesson_id, 'Carry on →', s.title));
-      if (total) {
-        const meter = el('span', 'td-meter');
-        meter.setAttribute('aria-hidden', 'true');
-        const fill = el('i');
-        fill.style.width = `${Math.round((finished / total) * 100)}%`;
-        meter.append(fill);
-        row.querySelector('.td-item__note')?.prepend(meter);
-        const list = el('ul', 'td-acts');
-        for (const a of s.activities) {
-          const li = el('li', a.done ? 'is-done' : undefined, a.title);
-          li.setAttribute('aria-label', `${a.title}: ${a.done ? 'done' : 'not done yet'}`);
-          list.append(li);
-        }
-        row.querySelector('.td-item__body')?.append(list);
-      }
-      g.append(row);
-    }
-    panel.append(g);
+  for (const box of todo.boxes) {
+    if (!box.items.length || !BOXES[box.key]) continue;
+    panel.append(boxGroup(box, options));
     any = true;
   }
-
-  if (todo.todo.length) {
-    const g = group('Still to do');
-    for (const t of todo.todo) {
-      if (t.done) g.append(item('tick', t.title, 'Done today'));
-      else g.append(item('box', t.title, KIND_NOTE[t.kind] ?? '', lessonLink(options.classId, t.id, 'Open →', t.title)));
-    }
-    if (todo.more > 0) g.append(el('p', 'td-more', `And ${todo.more} more on the map.`));
-    panel.append(g);
+  if (todo.more > 0) {
+    panel.append(el('p', 'td-more', `And ${todo.more} more on the map.`));
     any = true;
   }
 
