@@ -56,10 +56,11 @@ export const MESSAGES = {
 
 /** Lesson types that run as one piece. Their settings mark them even if the mode was changed. */
 const WHOLE_MODES = ['design_sprint', 'case_study', 'station_rotation', 'game', 'tutorial', 'lecture', 'quiz'];
-const WHOLE_CONFIGS = ['sprint', 'case', 'rotation', 'game', 'tutorial', 'quiz'];
+// A plain lesson's `quiz` is only its settings for in-lesson questions; the quiz rule in splitProblems keeps those together.
+const WHOLE_CONFIGS = ['sprint', 'case', 'rotation', 'game', 'tutorial'];
 
 /** Lesson fields a new part takes from the lesson it came from (createLessonRecord leaves them out). */
-const COPIED_FIELDS = ['line_stops', 'line_off', 'dot_points', 'focus_pieces', 'syllabus_outcomes', 'outcome_ids', 'focus_skills', 'tags', 'cover', 'feedback_off', 'conditions_off', 'end_questions'];
+const COPIED_FIELDS = ['line_stops', 'line_off', 'dot_points', 'focus_pieces', 'syllabus_outcomes', 'outcome_ids', 'focus_skills', 'tags', 'cover', 'feedback_off', 'conditions_off', 'end_questions', 'quiz'];
 
 /**
  * The root of a `{root}/{lesson}/{block}/…` key, read from the module's own key helper,

@@ -118,6 +118,8 @@ test('refusals: lesson kind, quiz cut in two, nothing left, bad ids', () => {
     assert.deepEqual(splitProblems({ ...lesson, pedagogical_mode: mode }, [{ name: 'A', role: 'core', section_ids: ['s_write'], whole_class: false }]), [MESSAGES.mode]);
   }
   assert.deepEqual(splitProblems({ ...lesson, rotation: { stations: [1] } }, [{ name: 'A', role: 'core', section_ids: ['s_write'] }]), [MESSAGES.mode]);
+  // A plain lesson with quiz settings for its in-lesson questions can still split.
+  assert.deepEqual(splitProblems({ ...lesson, pedagogical_mode: 'direct', quiz: { attempts: 1 } }, [{ name: 'A', role: 'core', section_ids: ['s_write'] }]), []);
   const half = { ...lesson, blocks: [...lesson.blocks, quizQ('qq_top')] };
   assert.ok(splitProblems(half, [{ name: 'A', role: 'core', section_ids: ['s_check'] }]).includes(MESSAGES.quiz));
   const twoQuiz = { blocks: [section('s1', 'One', [quizQ('a1')]), section('s2', 'Two', [quizQ('a2')]), section('s3', 'Three', [])] };
