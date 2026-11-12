@@ -129,7 +129,7 @@ export async function openRoom(store, lessonId, body, { env = process.env, fetch
   }
   await store.setJSON(k.room(gameId, room), { room, code, game_id: gameId, class_id: classId, version: record.version, opened_at: now, folded: false });
   // The published game (no answers) goes back with the room, so the board shows what the room plays, not the editor's draft.
-  return { room, code, game_id: gameId, class_id: classId, kind: keys.kind, style, ...(teams ? { teams: teams.count } : {}), opened_at: now, game, ...(await teacherTickets(secret, room, now)), ...urls };
+  return { room, code, lesson_id: lessonId, game_id: gameId, class_id: classId, kind: keys.kind, style, ...(teams ? { teams: teams.count } : {}), opened_at: now, game, ...(await teacherTickets(secret, room, now)), ...urls };
 }
 
 /** Teacher: this lesson's rooms still open (not folded, under 6 h), each with fresh tickets so any device can resume. */
@@ -141,7 +141,7 @@ export async function listRooms(store, lessonId, { env = process.env, now = Date
     const keys = await listBlobKeys(store, k.rooms(gameId));
     const rows = (await mapBounded(keys, 6, (key) => read(store, key))).filter((r) => r && !r.folded && !expired(r.opened_at, now));
     const game = list(lesson.game?.games).find((g) => g.id === gameId);
-    for (const r of rows) rooms.push({ room: r.room, code: r.code, game_id: gameId, class_id: r.class_id, opened_at: r.opened_at, ...(game ? { game } : {}), ...(await teacherTickets(secret, r.room, now)) });
+    for (const r of rows) rooms.push({ room: r.room, code: r.code, lesson_id: lessonId, game_id: gameId, class_id: r.class_id, opened_at: r.opened_at, ...(game ? { game } : {}), ...(await teacherTickets(secret, r.room, now)) });
   }
   rooms.sort((a, b) => b.opened_at - a.opened_at);
   return { rooms, ...roomUrls(env) };

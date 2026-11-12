@@ -57,6 +57,9 @@ test('open: a signed room config with the published game, its keys and initials 
   assert.match(opened.code, /^\d{6}$/);
   assert.equal(opened.ws_base, 'wss://rooms.example.test/g');
   assert.equal(opened.http_base, 'https://rooms.example.test/g');
+  // The board's QR opens this lesson for this class on the class site (it has no join page of its own).
+  assert.equal(opened.lesson_id, 'gl1');
+  assert.equal(opened.class_id, 'class1');
   assert.equal(w.calls.length, 1);
   assert.equal(w.calls[0].url, 'https://rooms.example.test/g/rooms');
   assert.equal(await verifyBody(SECRET, w.calls[0].body, w.calls[0].sig, NOW), true);
@@ -104,6 +107,7 @@ test('rooms: the open ones with fresh tickets, newest first; folded and 6-hour-o
   const a = await openRoom(store, 'gl1', { game_id: 'g_cross', class_id: 'class1' }, { env: ENV, fetchImpl: w.fetchImpl, now: NOW });
   const b = await openRoom(store, 'gl1', { game_id: 'g_wall', class_id: 'class1' }, { env: ENV, fetchImpl: w.fetchImpl, now: NOW + 1000 });
   const listed = await listRooms(store, 'gl1', { env: ENV, now: NOW + 2000 });
+  assert.ok(listed.rooms.every((r) => r.lesson_id === 'gl1'), 'a resumed board gets the lesson for its QR too');
   assert.deepEqual(listed.rooms.map((r) => [r.room, r.code, r.game_id]), [[b.room, b.code, 'g_wall'], [a.room, a.code, 'g_cross']]);
   assert.equal((await verifyTicket(SECRET, listed.rooms[0].teacher_ticket, NOW + 2000, { room: b.room, roles: ['teacher'] })).ok, true);
   assert.deepEqual(listed.rooms.map((r) => r.game?.id), ['g_wall', 'g_cross'], 'a reopened board gets the published game too');

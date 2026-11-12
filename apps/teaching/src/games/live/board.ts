@@ -1,5 +1,5 @@
 import { el } from '@/quiz/dom';
-import { CLASS_SITE_HOST } from '@/app/class-site';
+import { studentSiteOrigin } from '@/app/class-site';
 import type { LiveOpen } from '../api';
 import { FAKE_SPEAKER, GAME_KIND_INFO, type PublicGame } from '../core/schema';
 import { ROOM_LIMITS, type ControlOp, type PacedItem, type RoomView, type Seat, type ServerMsg } from '../core/room-protocol';
@@ -54,6 +54,19 @@ const KIND_END_MS = 3200;
 
 const KIND_TICKER: Record<string, string> = { connections: 'First to find it', who_said_it: 'First to lock in' };
 
+/**
+ * Where the QR sends a phone: this lesson for this class on the class site, with the code ready
+ * (the arcade offers it on Join live game). The class site serves only student pages, so its root is no use.
+ */
+export function joinUrl(open: LiveOpen): string {
+  if (open.join_url) return open.join_url;
+  const origin = studentSiteOrigin();
+  const code = encodeURIComponent(open.code);
+  if (open.lesson_id && open.class_id) return `${origin}/s/classes/${encodeURIComponent(open.class_id)}/lessons/${encodeURIComponent(open.lesson_id)}?join=${code}`;
+  if (open.lesson_id) return `${origin}/s/lessons/${encodeURIComponent(open.lesson_id)}?join=${code}`;
+  return `${origin}/?join=${code}`;
+}
+
 export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
   const open = options.open;
   const game = options.game ?? open.game ?? null;
@@ -75,7 +88,7 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
   const slow = el('span', 'gl-chip-slow', 'Slow connection');
   slow.hidden = true;
   const codePill = el('p', 'gl-top__code');
-  codePill.append(`Join at ${CLASS_SITE_HOST} · `, el('b', '', spacedCode(open.code)));
+  codePill.append('Code ', el('b', '', spacedCode(open.code)));
   top.append(titleEl, slow, codePill);
 
   const stage = el('main', 'gl-stage');
@@ -216,7 +229,7 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     hero.append(el('span', 'gl-eyebrow', `Live game · ${kindLabel(view?.kind)}`), el('h2', 'gl-lobby__title', view?.title || game?.title || 'Live game'));
     const join = el('div', 'gl-join-card');
     const qr = el('div', 'gl-qr');
-    const url = open.join_url ?? `https://${CLASS_SITE_HOST}/?join=${open.code}`;
+    const url = joinUrl(open);
     try {
       qr.innerHTML = qrSvg(url, `QR code: ${url}`);
     } catch {
@@ -224,7 +237,8 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     }
     const code = el('div', 'gl-join-card__code');
     const go = el('small');
-    go.append('Go to ', el('span', '', CLASS_SITE_HOST), ' and enter');
+    // The class site has no page of its own for codes: students join from inside the lesson.
+    go.append('Scan, or open this lesson and tap ', el('span', '', 'Join live game'));
     const big = el('b', '', spacedCode(open.code));
     big.setAttribute('aria-label', `Code ${open.code.split('').join(' ')}`);
     code.append(go, big);
