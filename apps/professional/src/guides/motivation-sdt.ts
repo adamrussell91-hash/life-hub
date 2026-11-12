@@ -128,9 +128,9 @@ export const motivationSdt: GuideDefinition = {
     },
     {
       scale: 'integrated',
-      ask: 'Does it fit with who you are, or who you want to be?',
-      hint: 'Listen for identity and values.',
-      listenFor: ['It’s part of who I am.', 'That’s just what I do.', 'It fits with what I care about.']
+      ask: 'Does it tie in with anything you care about outside school?',
+      hint: 'Listen for it linking to things they already care about or do anyway.',
+      listenFor: ['It’s kind of my thing.', 'I’d be doing this stuff anyway.', 'It ties in with what I want to do.']
     },
     {
       scale: 'intrinsic',

@@ -179,6 +179,8 @@ export function canvasRadius(worldR: number, k: number, minPx: number) {
 
 export type GraphMount = (() => void) & {
   canOpenSelected?: () => boolean;
+  /** Select a note by its page id, as a click on its dot would. False when it is not on the map. */
+  selectNote?: (pageId: string) => boolean;
   setSearch: (query: string) => void;
   setModel: (model: ArchiveGraphModel) => void;
   setTuning: (partial: Partial<ShowAllTuning>) => void;
