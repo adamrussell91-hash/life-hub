@@ -101,10 +101,18 @@ export type StudentQuizOptions = { classId?: string; pickClass?: boolean; slots?
 
 /** What the lesson footer needs from a quiz on the page: how far the open go has got, and a way to hand it in. */
 export type LessonQuizHandle = {
-  progress(): { open: boolean; answered: number; total: number; blank: Array<{ prompt: string; marks: number }> };
+  progress(): {
+    open: boolean; answered: number; total: number; blank: Array<{ prompt: string; marks: number }>;
+    /** Question ids answered in the open go (the lesson map ticks sections from these). */
+    answeredIds?: string[];
+    /** True when no go is open and one has been handed in. */
+    handedIn?: boolean;
+  };
   /** Hands in the open go. True once the server has it; true with nothing open. */
   handIn(): Promise<boolean>;
 };
+/** Fired (bubbling, from the quiz box) when answers are kept or the quiz repaints, so the lesson map can re-tick. */
+export const LESSON_QUIZ_CHANGE = 'lesson-quiz-change';
 const lessonQuizzes = new Map<string, { root: HTMLElement; handle: LessonQuizHandle }>();
 
 /** The quiz mounted for this lesson, while it's on the page. */
@@ -357,6 +365,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
       showError('This browser isn’t saving your answers as you go. Keep this page open until you finish.');
     }
     if (draft && status?.current) queueSave();
+    root.dispatchEvent(new CustomEvent(LESSON_QUIZ_CHANGE, { bubbles: true }));
   }
 
   /* ── Views ── */
@@ -364,6 +373,7 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
   function paint(): void {
     paintBody();
     paintSlots();
+    root.dispatchEvent(new CustomEvent(LESSON_QUIZ_CHANGE, { bubbles: true }));
   }
 
   function paintBody(): void {
@@ -1183,11 +1193,11 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
     handle: {
       progress() {
         const current = status?.current;
-        if (!current || preview) return { open: false, answered: 0, total: 0, blank: [] };
+        if (!current || preview) return { open: false, answered: 0, total: 0, blank: [], answeredIds: [], handedIn: !preview && (status?.results.length ?? 0) > 0 };
         const d = draft ?? loadDraft(current);
         const done = (id: string) => hasAnswer(d.responses[id]) || !!current.answers[id];
         const blank = d.order.filter((id) => !done(id)).map((id) => byId.get(id)).filter((q): q is PublicQuestion => !!q);
-        return { open: true, answered: d.order.length - blank.length, total: d.order.length, blank: blank.map((q) => ({ prompt: q.prompt, marks: q.marks })) };
+        return { open: true, answered: d.order.length - blank.length, total: d.order.length, blank: blank.map((q) => ({ prompt: q.prompt, marks: q.marks })), answeredIds: d.order.filter(done), handedIn: false };
       },
       async handIn() {
         if (!status?.current || preview) return true;
