@@ -439,6 +439,20 @@ function overTimeTab(options: RenderProfileOptions): { panel: HTMLElement; start
 export type MountStudentProfileViewOptions = { root: HTMLElement; classId: string; isStale?: () => boolean };
 export type StudentProfileViewHandle = { dispose(): void };
 
+/**
+ * The To do panel's practice row after the organiser reloads (a practice round just ended). The
+ * profile payload was read before the round, so its count is stale; the organiser load counts the
+ * same cards the same way, so its numbers replace it and a finished round ticks the row off.
+ */
+export function withPracticeFrom(payload: ProfilePayload, organiser: OrganiserLoad | null): ProfilePayload {
+  if (!payload.todo || !organiser) return payload;
+  const p = organiser.practice;
+  const today = p ? p.today : 0;
+  const answered = p?.answered ?? 0;
+  const practice = today > 0 || answered > 0 ? { today, answered } : null;
+  return { ...payload, todo: { ...payload.todo, practice } };
+}
+
 export function mountStudentProfileView(options: MountStudentProfileViewOptions): StudentProfileViewHandle {
   const { root, classId, isStale = () => false } = options;
   const clearNoIndex = ensureNoIndex();
@@ -474,7 +488,7 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
             if (disposed || isStale() || !latest) return;
             organiser = o;
             startTab = 'organiser';
-            show(latest);
+            show(withPracticeFrom(latest, o));
           });
         },
         onClaim: (initials) => {

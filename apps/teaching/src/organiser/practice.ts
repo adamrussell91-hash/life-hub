@@ -7,6 +7,9 @@ import { el, readJSON, writeJSON } from '@/quiz/dom';
 import { studentOrganiserApi } from './api';
 import type { PracticeCard, PracticeLoad, PracticeNext, ReviewResult } from './types';
 
+/** Sent on `document` after each saved review: `{ classId, today }`, cards still left today. */
+export const PRACTISED_EVENT = 'organiser:practised';
+
 export type PracticeApi = { review(classId: string, results: ReviewResult[]): Promise<{ today: number; next: PracticeNext }> };
 export type PracticeOptions = {
   classId: string;
@@ -93,7 +96,11 @@ export function mountPractice(host: HTMLElement, options: PracticeOptions): Prac
         let reply: Awaited<ReturnType<PracticeApi['review']>> | undefined;
         for (let at = 0; at < list.length; at += MAX_PER_REVIEW) reply = await api.review(classId, list.slice(at, at + MAX_PER_REVIEW));
         writePending(classId, []);
-        if (reply) next = reply.next;
+        if (reply) {
+          next = reply.next;
+          // The To do panel on the Progress tab counts down with this and ticks off at none left.
+          document.dispatchEvent(new CustomEvent(PRACTISED_EVENT, { detail: { classId, today: reply.today } }));
+        }
       } catch {
         writePending(classId, list);
       }

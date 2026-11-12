@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderOrganiserPanel } from '@/organiser/student-panel';
 import { mountTestMyself } from '@/organiser/test-myself';
-import { boxChip, mountPractice, readPending } from '@/organiser/practice';
+import { boxChip, mountPractice, PRACTISED_EVENT, readPending } from '@/organiser/practice';
 import { mountOrganiserEndCard } from '@/organiser/lesson-end-card';
 import type { OrganiserLoad, PracticeCard, Sheet, SheetSection } from '@/organiser/types';
 
@@ -169,6 +169,20 @@ describe('practice', () => {
     expect(host.textContent).toContain('All done for today');
     expect(host.textContent).toContain('3 cards come on Thursday');
     expect(readPending('c1')).toEqual([]);
+  });
+
+  it('tells the page how many cards are left after each saved review', async () => {
+    const seen: unknown[] = [];
+    const listen = (e: Event) => seen.push((e as CustomEvent).detail);
+    document.addEventListener(PRACTISED_EVENT, listen);
+    const review = vi.fn().mockResolvedValueOnce({ today: 1, next: null }).mockResolvedValueOnce({ today: 0, next: null });
+    const host = document.createElement('div');
+    const h = mountPractice(host, { classId: 'c1', load: { today: 2, cards, next: null }, api: { review } });
+    answer(host, 'got');
+    answer(host, 'got');
+    await h.settled();
+    document.removeEventListener(PRACTISED_EVENT, listen);
+    expect(seen).toEqual([{ classId: 'c1', today: 1 }, { classId: 'c1', today: 0 }]);
   });
   it('keeps a failed result and sends it with the next review', async () => {
     const review = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ today: 0, next: null });
