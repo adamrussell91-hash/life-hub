@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  GAPS, ORGANISER_LIMITS, OrganiserError, addDays, applyChange, applyResult, joinedSections, buildCards, lineText, releasedSheet, studentSheet, sydneyDay, todaysCards, upgradeOrganiser
+  GAPS, ORGANISER_LIMITS, OrganiserError, addDays, applyChange, applyResult, joinedSections, buildCards, lineText, releasedSheet, studentSheet, sydneyDay, todaysCards, upgradeOrganiser, noteReady, streakOf, weekStats, DAYS_KEPT
 } from '../../netlify/functions/_shared/organiser-model.mjs';
 
 const T = '2026-11-10';
@@ -76,15 +76,18 @@ test('a card carries its big idea, its box and its history', () => {
   assert.deepEqual(todaysCards([card], {}, T).cards[0].history, []);
   const yesterday = applyResult(undefined, 'again', '2026-11-09');
   const [back] = todaysCards([card], { l: yesterday }, T).cards;
-  assert.deepEqual(back.history, [{ d: '2026-11-09', ok: false }]);
+  assert.deepEqual(back.history, [{ d: '2026-11-09', ok: false, f: false }]);
   assert.equal(back.box, 1);
 });
 
 test('the history keeps one result a day, newest last', () => {
   const first = applyResult(undefined, 'got', '2026-11-09');
   const second = applyResult(first, 'again', T);
-  assert.deepEqual(second.h, [{ d: '2026-11-09', ok: true }, { d: T, ok: false }]);
-  assert.deepEqual(applyResult(second, 'got', T).h, [{ d: '2026-11-09', ok: true }, { d: T, ok: true }]);
+  assert.deepEqual(second.h, [{ d: '2026-11-09', ok: true, f: true }, { d: T, ok: false, f: false }]);
+  // A same-day resend replaces ok and keeps the first go.
+  assert.deepEqual(applyResult(second, 'got', T).h, [{ d: '2026-11-09', ok: true, f: true }, { d: T, ok: true, f: false }]);
+  // An old entry with no first go counts its ok as the first go.
+  assert.deepEqual(applyResult({ box: 1, due: T, last: T, h: [{ d: T, ok: true }] }, 'again', T).h, [{ d: T, ok: false, f: true }]);
 });
 
 test('only lines of ticked-off lessons, and lines no lesson holds, make cards', () => {
@@ -367,4 +370,48 @@ test('answered counts the cards already done today, so a page can tell done from
   const out = todaysCards(cards, boxes, T);
   assert.equal(out.answered, 2);
   assert.equal(out.cards.length, 0);
+});
+
+test('streak: days in a row ending today, or yesterday before today starts', () => {
+  assert.equal(streakOf(new Set(['2026-11-08', '2026-11-09', T]), T), 3);
+  assert.equal(streakOf(new Set(['2026-11-08', '2026-11-09']), T), 2);
+  assert.equal(streakOf(new Set(['2026-11-07']), T), 0);
+});
+
+test('ready log: keeps the most seen today, drops old days, unchanged returns the same array', () => {
+  const days = [{ d: '2026-10-01', ready: 15 }, { d: '2026-11-09', ready: 9 }];
+  const next = noteReady(days, T, 12);
+  assert.deepEqual(next, [{ d: '2026-11-09', ready: 9 }, { d: T, ready: 12 }]);
+  assert.equal(noteReady(next, T, 10), next);
+  assert.equal(noteReady(next, T, 12), next);
+  assert.deepEqual(noteReady(next, T, 14).at(-1), { d: T, ready: 14 });
+  assert.equal(noteReady([], T, 0).length, 0);
+  assert.ok(DAYS_KEPT >= 7);
+});
+
+test('week stats: answers per day, first go, known for good and green days', () => {
+  const entry = (box, h) => ({ box, due: T, last: h.at(-1)?.d ?? T, h });
+  const boxes = {
+    a: entry(4, [{ d: '2026-11-08', ok: true, f: true }, { d: T, ok: true, f: false }]),
+    b: entry(5, [{ d: '2026-11-08', ok: true }, { d: '2026-11-09', ok: false, f: false }]),
+    c: entry(1, [{ d: '2026-11-01', ok: true, f: true }]) // outside the week
+  };
+  const days = [{ d: '2026-11-08', ready: 2 }, { d: '2026-11-09', ready: 3 }];
+  const w = weekStats(boxes, days, [5, 0, 0, 1, 1], T);
+  assert.deepEqual(w.days.map((x) => x.d), ['2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08', '2026-11-09', T]);
+  assert.deepEqual(w.days.slice(4), [
+    { d: '2026-11-08', answered: 2, ready: 2, done: true },
+    { d: '2026-11-09', answered: 1, ready: 3, done: false },
+    // No ready logged: done only at the daily cap.
+    { d: T, answered: 1, ready: null, done: false }
+  ]);
+  assert.equal(w.cards, 4);
+  assert.equal(w.first_go, 50);
+  assert.equal(w.streak, 3);
+  assert.equal(w.known, 2);
+  assert.equal(w.total, 7);
+  assert.equal(w.done_days, 1);
+  const empty = weekStats({}, [], [0, 0, 0, 0, 0], T);
+  assert.equal(empty.first_go, null);
+  assert.equal(empty.streak, 0);
 });

@@ -3,7 +3,7 @@
  * and a student's Leitner boxes.
  *
  *   unit_organisers/{unit}                      the teacher's sheet (organiser-model.mjs), one blob per unit
- *   organiser_practice/{class}/{owner}          { boxes: { [line_id]: { box, due, last } }, at }
+ *   organiser_practice/{class}/{owner}          { boxes: { [line_id]: { box, due, last, h } }, days: [{ d, ready }], at }
  *
  * `owner` is workOwner(class, student): the hash lesson work uses, from the class's initials claim.
  * Boxes hold no line text. Release is decided here, on the server; unreleased text never leaves it.
@@ -18,7 +18,7 @@ import { doneAmong } from './profile-done.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { CLASS_PREFIX, SCHEDULED_LESSON_PREFIX, draftLessonKey, publishedLessonKey, unitKey } from './teaching-blobs.mjs';
 import {
-  OrganiserError, REVIEW_LIMIT, addDays, applyChange, applyResult, buildCards, joinedSections, lessonsOfLine, lineText, releasedSheet, studentSheet, sydneyDay, todaysCards, upgradeOrganiser
+  OrganiserError, REVIEW_LIMIT, addDays, applyChange, applyResult, buildCards, joinedSections, lessonsOfLine, lineText, noteReady, releasedSheet, streakOf, studentSheet, sydneyDay, todaysCards, upgradeOrganiser, weekStats
 } from './organiser-model.mjs';
 
 export { OrganiserError };
@@ -209,7 +209,21 @@ function practiceFor(sheets, done, boxes, today) {
 
 async function readBoxes(store, cls, student) {
   const held = await readWithEtag(store, practiceKey(cls, workOwner(cls, student.id)));
-  return { boxes: held.data?.boxes && typeof held.data.boxes === 'object' ? held.data.boxes : {}, etag: held.etag, exists: !!held.data };
+  const days = Array.isArray(held.data?.days) ? held.data.days : [];
+  return { boxes: held.data?.boxes && typeof held.data.boxes === 'object' ? held.data.boxes : {}, days, etag: held.etag, exists: !!held.data };
+}
+
+/**
+ * Logs how many cards were ready today (answered + still to do) on a load. Writes only when the count
+ * rose and the student already has a practice blob (a first review starts it and logs the day too). A
+ * lost race skips the log: the next load or review writes it. Returns the log to show.
+ */
+async function logReady(store, cls, student, held, today, ready, now) {
+  const days = noteReady(held.days, today, ready);
+  if (days === held.days || !held.exists) return days;
+  const options = held.etag ? { onlyIfMatch: held.etag } : {};
+  await store.setJSON(practiceKey(cls, workOwner(cls, student.id)), { boxes: held.boxes, days, at: now.toISOString() }, options);
+  return days;
 }
 
 /** The Monday (Sydney calendar) of the week a Sydney day falls in. */
@@ -257,12 +271,8 @@ export async function organiserHabits(store, classId, studentId, { now = new Dat
       weeks.set(weekStart(d), w);
     }
   }
-  const today = sydneyDay(now);
-  let day = days.has(today) ? today : addDays(today, -1);
-  let streak = 0;
-  while (days.has(day)) { streak += 1; day = addDays(day, -1); }
   return {
-    streak,
+    streak: streakOf(days, sydneyDay(now)),
     avg_box: boxed ? Math.round((boxSum / boxed) * 10) / 10 : null,
     weekly: [...weeks].sort(([a], [b]) => a.localeCompare(b)).map(([week_start, w]) => ({ week_start, ...w }))
   };
@@ -282,8 +292,10 @@ async function review(store, roster, student, sheets, done, results, now, today)
     for (const [id, entry] of Object.entries(held.boxes)) if (known.has(id)) boxes[id] = entry;
     if (!moves.length) break;
     for (const m of moves) boxes[m.line_id] = applyResult(boxes[m.line_id], m.result, today);
+    const after = todaysCards(deck(sheets, done), boxes, today);
+    const days = noteReady(held.days, today, after.cards.length + after.answered);
     const options = held.exists ? (held.etag ? { onlyIfMatch: held.etag } : {}) : { onlyIfNew: true };
-    const written = await store.setJSON(key, { boxes, at: now.toISOString() }, options);
+    const written = await store.setJSON(key, { boxes, days, at: now.toISOString() }, options);
     if (written?.modified !== false) break;
     if (attempt >= 3) reject(409, 'retry', 'Please send it again.');
   }
@@ -324,7 +336,12 @@ export async function organiserStudentAction(store, classId, body, { now = new D
 
   const need = student ? null : roster.students.length ? 'initials' : 'no_list';
   let practice = null;
-  if (student) practice = practiceFor(sheets, viewer.done, (await readBoxes(store, roster.cls.id, student)).boxes, today);
+  if (student) {
+    const held = await readBoxes(store, roster.cls.id, student);
+    practice = practiceFor(sheets, viewer.done, held.boxes, today);
+    const days = await logReady(store, roster.cls.id, student, held, today, practice.today + practice.answered, now);
+    practice.week = weekStats(held.boxes, days, practice.boxes, today);
+  }
   return {
     need,
     sheets: sheets.map((s) => ({ unit_id: s.unit_id, title: s.title, current: s.current, ...studentSheet(s.internal) })),
@@ -367,7 +384,7 @@ export async function sendPiecesToBoxOne(store, roster, student, pieceIds, { now
     }
     if (!moved) return 0;
     const options = held.exists ? (held.etag ? { onlyIfMatch: held.etag } : {}) : { onlyIfNew: true };
-    const written = await store.setJSON(key, { boxes, at: now.toISOString() }, options);
+    const written = await store.setJSON(key, { boxes, days: held.days, at: now.toISOString() }, options);
     if (written?.modified !== false) return moved;
     if (attempt >= 3) reject(409, 'retry', 'Please send it again.');
   }

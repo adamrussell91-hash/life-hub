@@ -8,7 +8,8 @@
  *
  * The sheet is written on the unit page before teaching. Lessons tick lines: lesson_id is the first lesson
  * that ticked a line, also_lesson_ids the others. An unticked line waits. `open` marks a line from before lessons ticked (v1, no lesson): students already have it.
- *   boxes       { [line_id]: { box: 1..5, due: day, last: day, h: [{ d: day, ok }] } }
+ *   boxes       { [line_id]: { box: 1..5, due: day, last: day, h: [{ d: day, ok, f? }] } }   f: right first go that day
+ *   days        [{ d: day, ready }]   cards ready each day (answered + still to do), newest last, DAYS_KEPT kept
  */
 import { randomBytes } from 'node:crypto';
 
@@ -456,7 +457,11 @@ export function buildCards(sections, builds = new Map()) {
  * day: a resend keeps its box.
  */
 export function applyResult(entry, result, today) {
-  const h = [...(entry?.h ?? []).filter((x) => x.d !== today), { d: today, ok: result === 'got' }].slice(-HISTORY_KEPT);
+  const ok = result === 'got';
+  const earlier = (entry?.h ?? []).find((x) => x.d === today);
+  // f: the day's first result, kept when a same-day resend replaces ok (old entries have none).
+  const f = earlier ? (typeof earlier.f === 'boolean' ? earlier.f : !!earlier.ok) : ok;
+  const h = [...(entry?.h ?? []).filter((x) => x.d !== today), { d: today, ok, f }].slice(-HISTORY_KEPT);
   if (result === 'again') return { box: 1, due: addDays(today, 1), last: today, h };
   if (entry && entry.last === today) return { box: entry.box, due: addDays(today, gapOf(entry.box)), last: today, h };
   const box = Math.min(GAPS.length, (entry?.box ?? 1) + 1);
@@ -506,5 +511,77 @@ export function todaysCards(cards, boxes, today) {
     next: date ? { date, count: Math.min(DAILY_CARDS, upcoming.get(date)) } : null,
     // Cards already answered today, so a page can tell "done for today" from "nothing due".
     answered: cards.filter((c) => entry(c)?.last === today).length
+  };
+}
+
+// ---- Your week -------------------------------------------------------------------------------
+
+/** Days of the ready log the practice blob keeps. */
+export const DAYS_KEPT = 14;
+const WEEK_DAYS = 7;
+
+/** Days in a row with answers, ending today (or yesterday, when today has none yet). */
+export function streakOf(days, today) {
+  let day = days.has(today) ? today : addDays(today, -1);
+  let streak = 0;
+  while (days.has(day)) { streak += 1; day = addDays(day, -1); }
+  return streak;
+}
+
+/**
+ * The ready log with today's count: the most seen today wins, older days fall off. Returns the same
+ * array when nothing changed, so a caller can skip the write.
+ */
+export function noteReady(days, today, ready) {
+  const list = Array.isArray(days) ? days.filter((x) => x && typeof x.d === 'string' && DAY.test(x.d) && Number.isFinite(x.ready)) : [];
+  const held = list.find((x) => x.d === today);
+  if (held && held.ready >= ready) return days;
+  if (!held && !(ready > 0)) return days;
+  const cutoff = addDays(today, -(DAYS_KEPT - 1));
+  return [...list.filter((x) => x.d !== today && x.d >= cutoff), { d: today, ready }].sort((a, b) => a.d.localeCompare(b.d));
+}
+
+/**
+ * A student's last seven days for the "Your week" strip: streak, cards answered, the share right at the
+ * first go, cards known for good (box 4 or 5) of every card they have, and one bar a day (oldest first,
+ * today last). A day is done when every card ready that day was answered; with no ready count logged,
+ * when DAILY_CARDS were answered. `counts` is todaysCards' boxes (new cards count in box 1).
+ */
+export function weekStats(boxes, days, counts, today) {
+  const answered = new Map();
+  const firstRight = new Map();
+  const practised = new Set();
+  for (const e of Object.values(boxes && typeof boxes === 'object' ? boxes : {})) {
+    if (!e || typeof e !== 'object') continue;
+    if (typeof e.last === 'string' && DAY.test(e.last)) practised.add(e.last);
+    for (const h of Array.isArray(e.h) ? e.h : []) {
+      if (typeof h?.d !== 'string' || !DAY.test(h.d)) continue;
+      practised.add(h.d);
+      answered.set(h.d, (answered.get(h.d) ?? 0) + 1);
+      if (typeof h.f === 'boolean' ? h.f : !!h.ok) firstRight.set(h.d, (firstRight.get(h.d) ?? 0) + 1);
+    }
+  }
+  const readyOn = new Map((Array.isArray(days) ? days : []).filter((x) => x && typeof x.d === 'string' && Number.isFinite(x.ready)).map((x) => [x.d, x.ready]));
+  const bars = [];
+  let cards = 0;
+  let right = 0;
+  for (let i = WEEK_DAYS - 1; i >= 0; i -= 1) {
+    const d = addDays(today, -i);
+    const n = answered.get(d) ?? 0;
+    const ready = readyOn.has(d) ? Math.max(readyOn.get(d), n) : null;
+    const done = n > 0 && (ready === null ? n >= DAILY_CARDS : n >= ready);
+    cards += n;
+    right += firstRight.get(d) ?? 0;
+    bars.push({ d, answered: n, ready, done });
+  }
+  const box = Array.isArray(counts) ? counts : [];
+  return {
+    streak: streakOf(practised, today),
+    cards,
+    first_go: cards ? Math.round((right / cards) * 100) : null,
+    known: (box[3] ?? 0) + (box[4] ?? 0),
+    total: box.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0),
+    days: bars,
+    done_days: bars.filter((b) => b.done).length
   };
 }

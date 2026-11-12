@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { claimInitials, loadRoster } from '../../netlify/functions/_shared/class-claims.mjs';
-import { OrganiserError, organiserStudentAction, organiserTeacherAction, practiceToday } from '../../netlify/functions/_shared/organiser.mjs';
+import { OrganiserError, organiserStudentAction, organiserTeacherAction, practiceToday, sendPiecesToBoxOne } from '../../netlify/functions/_shared/organiser.mjs';
 import { recordDone } from '../../netlify/functions/_shared/profile-done.mjs';
 import { ORGANISER_LIMITS } from '../../netlify/functions/_shared/organiser-model.mjs';
 
@@ -261,14 +261,14 @@ test('review: needs a claim, moves boxes on the server, once a day, and Not yet 
   let out = await student(store, { action: 'review', class_token: token(1), results: [{ line_id: past, result: 'got' }] });
   const left = out.today;
   const key = [...store.data.keys()].find((k) => k.startsWith('organiser_practice/class1/'));
-  assert.deepEqual(store.data.get(key).boxes[past], { box: 2, due: '2026-11-13', last: '2026-11-10', h: [{ d: '2026-11-10', ok: true }] });
+  assert.deepEqual(store.data.get(key).boxes[past], { box: 2, due: '2026-11-13', last: '2026-11-10', h: [{ d: '2026-11-10', ok: true, f: true }] });
   // A resend the same day changes nothing.
   await student(store, { action: 'review', class_token: token(1), results: [{ line_id: past, result: 'got' }] });
   assert.equal(store.data.get(key).boxes[past].box, 2);
   // Not yet sends it to box 1 for tomorrow; it does not come back today.
   out = await student(store, { action: 'review', class_token: token(1), results: [{ line_id: past, result: 'again' }] });
   assert.equal(out.today, left);
-  assert.deepEqual(store.data.get(key).boxes[past], { box: 1, due: '2026-11-11', last: '2026-11-10', h: [{ d: '2026-11-10', ok: false }] });
+  assert.deepEqual(store.data.get(key).boxes[past], { box: 1, due: '2026-11-11', last: '2026-11-10', h: [{ d: '2026-11-10', ok: false, f: true }] });
   assert.equal(JSON.stringify(store.data.get(key)).includes('past term'), false);
 });
 
@@ -383,4 +383,44 @@ test('practiceToday gives the To do panel the same numbers as the student load: 
   assert.deepEqual(await practiceToday(store, roster, bob, { now: NOW }), { today: load.practice.today, answered: 0 });
   await student(store, { action: 'review', class_token: token(1), results: [{ line_id: load.practice.cards[0].line_id, result: 'got' }] });
   assert.deepEqual(await practiceToday(store, roster, bob, { now: NOW }), { today: load.practice.today - 1, answered: 1 });
+});
+
+test('student load: your week counts answers, logs what was ready, and writes only when the count rises', async () => {
+  const store = await fixture();
+  const { lines } = await seeded(store);
+  await tickOff(store, 'past');
+  let out = await student(store, { action: 'load', class_token: token(1) });
+  // No practice blob yet: the load shows the week without starting one.
+  assert.equal([...store.data.keys()].some((k) => k.startsWith('organiser_practice/')), false);
+  assert.equal(out.practice.week.cards, 0);
+  assert.equal(out.practice.week.total, 2);
+  assert.equal(out.practice.week.days.length, 7);
+  assert.equal(out.practice.week.days[6].d, '2026-11-10');
+  await student(store, { action: 'review', class_token: token(1), results: [{ line_id: lines[0].id, result: 'again' }] });
+  await student(store, { action: 'review', class_token: token(1), results: [{ line_id: lines[0].id, result: 'got' }] });
+  const key = [...store.data.keys()].find((k) => k.startsWith('organiser_practice/class1/'));
+  assert.deepEqual(store.data.get(key).days, [{ d: '2026-11-10', ready: 2 }]);
+  const before = JSON.stringify(store.data.get(key));
+  out = await student(store, { action: 'load', class_token: token(1) });
+  assert.equal(JSON.stringify(store.data.get(key)), before);
+  assert.deepEqual(out.practice.week.days[6], { d: '2026-11-10', answered: 1, ready: 2, done: false });
+  assert.equal(out.practice.week.first_go, 0);
+  assert.equal(out.practice.week.streak, 1);
+  await student(store, { action: 'review', class_token: token(1), results: [{ line_id: lines[3].id, result: 'got' }] });
+  out = await student(store, { action: 'load', class_token: token(1) });
+  assert.deepEqual(out.practice.week.days[6], { d: '2026-11-10', answered: 2, ready: 2, done: true });
+  assert.equal(out.practice.week.done_days, 1);
+  assert.equal(out.practice.week.first_go, 50);
+});
+
+test('a game miss keeps the ready log', async () => {
+  const store = await fixture();
+  const { lines } = await seeded(store);
+  await tickOff(store, 'past');
+  await student(store, { action: 'review', class_token: token(1), results: [{ line_id: lines[0].id, result: 'got' }] });
+  const key = [...store.data.keys()].find((k) => k.startsWith('organiser_practice/class1/'));
+  const roster = await loadRoster(store, 'class1');
+  const bob = roster.students.find((s) => s.initials === 'BB');
+  assert.equal(await sendPiecesToBoxOne(store, roster, bob, ['kp_rain'], { now: NOW }), 1);
+  assert.deepEqual(store.data.get(key).days, [{ d: '2026-11-10', ready: 2 }]);
 });

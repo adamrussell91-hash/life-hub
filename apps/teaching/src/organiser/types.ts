@@ -49,7 +49,7 @@ export type EndCardItem = { section: string; text: string };
 export type PracticeCard = {
   /** The Leitner box it sits in, and its past answers, oldest first. */
   box?: number;
-  history?: Array<{ d: string; ok: boolean }>;
+  history?: Array<{ d: string; ok: boolean; f?: boolean }>;
   line_id: string;
   section: string;
   cue_label: string;
@@ -60,8 +60,15 @@ export type PracticeCard = {
   builds?: string;
 };
 export type PracticeNext = { date: string; count: number } | null;
+/** One day of "Your week": cards answered, cards ready that day (null when not logged), all done. */
+export type PracticeDay = { d: string; answered: number; ready: number | null; done: boolean };
+/**
+ * The student's last seven days: days in a row, cards answered, percent right at the first go (null
+ * with no answers), cards in box 4 or 5 of all their cards, and one bar a day, today last.
+ */
+export type PracticeWeek = { streak: number; cards: number; first_go: number | null; known: number; total: number; days: PracticeDay[]; done_days: number };
 /** `answered`: cards already answered today. */
-export type PracticeLoad = { today: number; cards: PracticeCard[]; next: PracticeNext; boxes?: number[]; answered?: number };
+export type PracticeLoad = { today: number; cards: PracticeCard[]; next: PracticeNext; boxes?: number[]; answered?: number; week?: PracticeWeek };
 export type OrganiserLoad = { need: null | 'initials' | 'no_list'; sheets: Sheet[]; practice: PracticeLoad | null };
 export type ReviewResult = { line_id: string; result: 'got' | 'again' };
 
