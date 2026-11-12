@@ -117,7 +117,9 @@ try {
   await cara.goto(`${origin}/done-check?lesson=l2`);
   await cara.getByLabel(/Type your initials/).fill('bb');
   await cara.getByRole('button', { name: 'Done', exact: true }).click();
-  await cara.getByRole('alert').filter({ hasText: 'already taken' }).waitFor();
+  // Bob's initials are in on another computer: Cara is asked for Bob's code, and closing the box leaves her out.
+  await cara.getByRole('dialog', { name: 'Type your code' }).getByRole('button', { name: 'Cancel' }).click();
+  await cara.getByRole('alert').filter({ hasText: 'already in on another computer' }).waitFor();
   await cara.getByLabel(/Type your initials/).fill('cc');
   await cara.getByRole('button', { name: 'Done', exact: true }).click();
   await cara.getByText('Marked done').waitFor();
@@ -127,5 +129,38 @@ try {
   assert.equal(await support.evaluate((e) => e.classList.contains('cm-faded') && e.querySelector('.cm-station').classList.contains('cm-p-done')), true, 'an unassigned lesson fills when done');
   await shot(cara, 'phone-typed');
   await noSideScroll(cara);
+
+  // 6. Bob on a second computer (or after a reset): his initials ask for his code, and then his map is there.
+  await bob.goto(`${origin}/profile-check`);
+  const shown = await bob.locator('.pm-code__value').textContent();
+  assert.match(shown, /^[a-z]+-\d{2}$/, 'Bob sees his code on his progress page');
+  const laptop = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await laptop.route(`${origin}/api/**`, async (route) => {
+    const req = route.request();
+    const response = await handler(new Request(req.url(), { method: req.method(), headers: { ...req.headers(), origin }, body: req.postData() }));
+    await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() });
+  });
+  const bob2 = await laptop.newPage();
+  bob2.setDefaultTimeout(20000);
+  bob2.on('pageerror', (e) => { throw e; });
+  await bob2.goto(`${origin}/profile-check`);
+  await bob2.getByLabel('Your initials').fill('bb');
+  await bob2.getByRole('button', { name: 'Show my progress', exact: true }).click();
+  const box = bob2.getByRole('dialog', { name: 'Type your code' });
+  await box.waitFor();
+  await box.getByLabel('Your code').fill('nope-00');
+  await box.getByRole('button', { name: 'Go' }).click();
+  await box.getByRole('alert').filter({ hasText: 'doesn’t match' }).waitFor();
+  await shot(bob2, 'phone-code');
+  await noSideScroll(bob2);
+  await box.getByLabel('Your code').fill(shown.toUpperCase().replace('-', ' '));
+  await box.getByRole('button', { name: 'Go' }).click();
+  await bob2.locator('.pm-map').waitFor();
+  assert.equal(await box.count(), 0, 'the box closes');
+  assert.ok((await doneStations(bob2).count()) > 0, 'Bob’s done lesson is on the new computer');
+  await bob.reload();
+  await bob.locator('.pm-map').waitFor();
+  console.log('A second computer gets in with the code; the first still works');
+  await laptop.close();
   console.log('PASS: unclaimed step, grey map, Done on a known device, typed initials, isolation between students, faded lessons, no numbers, 390px.');
 } finally { await browser?.close(); await server.close(); }

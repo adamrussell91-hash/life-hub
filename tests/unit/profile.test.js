@@ -130,7 +130,7 @@ test('claim: typed initials claim and unknown or taken ones are refused', async 
   const out = await profileAction(s, 'class1', { action: 'claim', class_token: token(2), initials: 'tt' });
   assert.equal(out.initials, 'TT');
   await assert.rejects(profileAction(s, 'class1', { action: 'claim', class_token: token(3), initials: 'zz' }), { code: 'not_in_class' });
-  await assert.rejects(profileAction(s, 'class1', { action: 'claim', class_token: token(3), initials: 'BB' }), { code: 'taken' });
+  await assert.rejects(profileAction(s, 'class1', { action: 'claim', class_token: token(3), initials: 'BB' }), { code: 'need_code' });
 });
 
 test('a released claim loses the profile', async () => {

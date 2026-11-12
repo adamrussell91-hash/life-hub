@@ -24,14 +24,19 @@ function classRecord(id: string, code: string, students: Array<{ name: string; s
   });
 }
 
-const fakeClaims = (initial: Record<string, string> = {}) => {
+const fakeClaims = (initial: Record<string, string> = {}, startCodes: Record<string, string> = {}) => {
   let claims = { ...initial };
+  const codes = { ...startCodes };
   return {
-    list: vi.fn(async () => claims),
+    list: vi.fn(async () => ({ claims, codes })),
     release: vi.fn(async (_c: string, id: string) => {
       const { [id]: _gone, ...rest } = claims;
       claims = rest;
-      return claims;
+      return { claims, codes };
+    }),
+    newCode: vi.fn(async (_c: string, id: string) => {
+      codes[id] = 'wren-77';
+      return { claims, codes };
     })
   };
 };
@@ -74,6 +79,20 @@ describe('class list initials', () => {
     host.querySelector<HTMLButtonElement>('.class-students__release')!.click();
     await vi.waitFor(() => expect(claims.release).toHaveBeenCalledWith('c1', bob!.id));
     await vi.waitFor(() => expect(host.querySelectorAll('.class-students__claim.is-claimed').length).toBe(0));
-    expect(host.querySelector('.class-students__status')?.textContent).toBe('BB can be claimed again.');
+    expect(host.querySelector('.class-students__status')?.textContent).toMatch(/^BB is signed out of every computer\./);
+  });
+
+  it('shows each student’s code and makes a new one', async () => {
+    const cls = classRecord('c1', '9ENG2', [{ name: 'Bob Brown' }, { name: 'Tom Tills' }]);
+    const [bob, tom] = assignInitials(cls.students ?? []);
+    const claims = fakeClaims({}, { [bob!.id]: 'apple-42', [tom!.id]: 'oak-17' });
+    const host = document.createElement('div');
+    mountClassStudents(host, cls, { save: async () => undefined, claims });
+    const codes = () => [...host.querySelectorAll<HTMLButtonElement>('.class-students__code')].map((b) => b.textContent);
+    await vi.waitFor(() => expect(codes()).toEqual(['apple-42', 'oak-17']));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    host.querySelector<HTMLButtonElement>('.class-students__code')!.click();
+    await vi.waitFor(() => expect(codes()).toEqual(['wren-77', 'oak-17']));
+    expect(claims.newCode).toHaveBeenCalledWith('c1', bob!.id);
   });
 });

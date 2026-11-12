@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { API_BASE_URL, getApiBaseUrl } from '@/api/config';
-import { apiGet, apiPost, apiPut, apiPatch, ApiClientError } from '@/api/client';
+import { apiGet, apiPost, apiPut, apiPatch, ApiClientError, setCodePrompt } from '@/api/client';
 
 function mockFetchJson(body: unknown, status = 200): Response {
   return {
@@ -188,5 +188,61 @@ describe('api client', () => {
         { path: ['title'], message: 'Required' }
       ]);
     }
+  });
+});
+
+describe('claiming initials on another computer', () => {
+  const fetchMock = vi.fn<typeof fetch>();
+  const needCode = { ok: false, error: { code: 'need_code', message: 'BB is already in on another computer. Type your code to use this one too.' } };
+  const wrongCode = { ok: false, error: { code: 'wrong_code', message: 'That code doesn’t match.' } };
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const sent = (n: number) => JSON.parse(String(fetchMock.mock.calls[n]![1]!.body));
+
+  it('asks for the code and sends the same claim again with it, until it matches', async () => {
+    fetchMock
+      .mockResolvedValueOnce(mockFetchJson(needCode, 409))
+      .mockResolvedValueOnce(mockFetchJson(wrongCode, 403))
+      .mockResolvedValueOnce(mockFetchJson({ ok: true, data: { initials: 'BB' } }));
+    const asked: Array<[string, boolean]> = [];
+    const answers = ['nope-00', 'apple-42'];
+    setCodePrompt(async (message, wrong) => {
+      asked.push([message, wrong]);
+      return answers.shift() ?? null;
+    });
+    const data = await apiPost<{ initials: string }>('/api/published/quiz/l1', { action: 'claim', initials: 'BB', class_id: 'c1' });
+    expect(data.initials).toBe('BB');
+    expect(asked).toEqual([[needCode.error.message, false], [wrongCode.error.message, true]]);
+    expect(sent(2)).toEqual({ action: 'claim', initials: 'BB', class_id: 'c1', code: 'apple-42' });
+  });
+
+  it('closing the box leaves the original error for the page to show', async () => {
+    fetchMock.mockResolvedValueOnce(mockFetchJson(needCode, 409));
+    setCodePrompt(async () => null);
+    await expect(apiPost('/api/x', { action: 'claim', initials: 'BB' })).rejects.toMatchObject({ code: 'need_code' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('two claims at once share one box', async () => {
+    fetchMock
+      .mockResolvedValueOnce(mockFetchJson(needCode, 409))
+      .mockResolvedValueOnce(mockFetchJson(needCode, 409))
+      .mockResolvedValue(mockFetchJson({ ok: true, data: {} }));
+    let opened = 0;
+    setCodePrompt(async () => {
+      opened += 1;
+      await new Promise((r) => setTimeout(r, 5));
+      return 'apple-42';
+    });
+    await Promise.all([apiPost('/api/a', { action: 'claim' }), apiPost('/api/b', { action: 'claim' })]);
+    expect(opened).toBe(1);
   });
 });
