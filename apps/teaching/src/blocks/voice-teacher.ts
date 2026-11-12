@@ -447,7 +447,6 @@ export function mountVoiceTeacher(
     // Player and codes stick together, so the codes stay in reach while the transcript scrolls.
     const dock = el('div', 'voice-mark__dock');
     dock.append(player, strip);
-    if (deepPanel) dock.append(deepPanel.el);
     if (typeof ResizeObserver === 'function') {
       new ResizeObserver(() => screen.style.setProperty('--voice-dock-h', `${dock.offsetHeight}px`)).observe(dock);
     }
@@ -473,6 +472,8 @@ export function mountVoiceTeacher(
     const notes = el('div', 'voice-mark__notes');
     work.append(left, notes);
     screen.append(work);
+    // The rubric sits under the transcript, not in the sticky dock: in the dock it outgrew the pane and hid the words.
+    if (deepPanel) screen.append(deepPanel.el);
 
     if (!words.length) {
       const why =
