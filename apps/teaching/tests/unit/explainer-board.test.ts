@@ -119,6 +119,25 @@ describe('explainer board', () => {
     ]);
   });
 
+  it('a burst of board edits is one timeline row at its last change', () => {
+    const take = new TakeEvents();
+    const board = (t: number, x: number) => ({ id: `ev_b${t}`, t, kind: 'board' as const, elements: [{ id: 'box_a', type: 'rectangle', version: t * 10, x }] });
+    take.push(board(1, 1));
+    take.push(board(2, 2));
+    take.push(board(4, 3));
+    take.push({ id: 'ev_m', t: 5, kind: 'mark', style: 'highlight', anchor: { granularity: 'word', stanza: 's', quote: { exact: 'x' } } } as ExplainerEvent);
+    take.push(board(6, 4));
+    take.push(board(20, 5));
+    const rows = take.events.map((e) => [e.kind, e.t, e.kind === 'board' ? (e.elements[0] as { x?: number }).x : null]);
+    expect(rows).toEqual([
+      ['board', 4, 3],
+      ['mark', 5, null],
+      ['board', 6, 4],
+      ['board', 20, 5]
+    ]);
+    expect(take.lastT).toBe(20);
+  });
+
   it('labels board events in the timeline', () => {
     expect(eventLabel(events.find((e) => e.id === 'ev_del')!)).toBe('Board · 1 removed');
     expect(eventLabel(events.find((e) => e.id === 'ev_move')!)).toBe('Board · 1 shape drawn or moved');

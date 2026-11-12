@@ -68,6 +68,8 @@ function btn(label: string, cls: string, onClick: () => void): HTMLButtonElement
 }
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const round2 = (n: number) => Math.round(n * 100) / 100;
+/** Board edits this close together become one timeline row. */
+const BOARD_BURST_S = 3;
 let seq = 0;
 const eventId = (kind: string) => `ev_${kind}_${Date.now().toString(36)}${(++seq).toString(36)}`;
 
@@ -78,8 +80,26 @@ export class TakeEvents {
   private lastSampleAt = -Infinity;
 
   push(ev: ExplainerEvent): ExplainerEvent {
+    // Board edits come in bursts (a drag, typing in a text box, several clicks
+    // on one shape). Fold a burst into one row, timed at its last change, so the
+    // timeline is not a long list of "1 shape drawn or moved".
+    const prev = this.events[this.events.length - 1];
+    if (ev.kind === 'board' && prev?.kind === 'board' && ev.t - prev.t <= BOARD_BURST_S) {
+      const byId = new Map(prev.elements.map((e) => [e.id, e]));
+      for (const e of ev.elements) byId.set(e.id, e);
+      prev.elements = [...byId.values()];
+      prev.t = ev.t;
+      return prev;
+    }
     this.events.push(ev);
     return ev;
+  }
+
+  /** The time of the latest event, so a repaint never misses one just pushed. */
+  get lastT(): number {
+    let t = 0;
+    for (const ev of this.events) t = Math.max(t, ev.t);
+    return t;
   }
 
   /** About 15 samples a second, and only when the word changes. */
@@ -296,7 +316,12 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
     board.setInteractive(false);
     // Excalidraw finishes an edit on release; diff the board just after.
     board.el.addEventListener('pointerup', () => setTimeout(commitBoard, 0), true);
-    board.el.addEventListener('keyup', () => setTimeout(commitBoard, 0), true);
+    // Typing in a board text box finishes when the box closes (a click), so a
+    // key in the box itself is not a change worth a row.
+    board.el.addEventListener('keyup', (e) => {
+      if (e.target instanceof HTMLTextAreaElement) return;
+      setTimeout(commitBoard, 0);
+    }, true);
     board.el.addEventListener('pointermove', (e) => {
       if (!recording || tool !== 'pointer') return;
       const at = board.sceneCoords(e.clientX, e.clientY);
@@ -400,8 +425,10 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   }
 
   function repaint(selection: [number, number] | null = null): void {
-    const t = now();
-    const shifted = take.events.map((ev) => ({ ...ev, t: ev.t + startAt }));
+    // An event's time is rounded to 0.01s, which can land just after now(). Show
+    // everything already recorded, or a new mark waits for the next one to appear.
+    const t = Math.max(now(), take.lastT);
+    const shifted = take.events.map((ev) => ({ ...ev, t: ev.t + startAt })).sort((a, b) => a.t - b.t);
     const state = stateAt({ board_start: content.board_start, recording: { status: 'draft', clips: [], duration_s: EXPLAINER_MAX_SECONDS, events: [...before, ...shifted] } }, startAt + t);
     view.paint({ ...state, pointer: shownPointer(state.pointer) }, { selection });
   }
