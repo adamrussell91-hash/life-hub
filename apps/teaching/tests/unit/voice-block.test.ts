@@ -182,6 +182,25 @@ describe('teacher marking', () => {
     primeFeedbackCodes(codes);
   });
 
+  it('keeps the rubric out of the sticky dock, under the transcript, so the words have room', async () => {
+    const record = {
+      id: 'vs_3', initials: 'TK', device_hash: 'ghi789', submitted_at: '2026-11-12T00:00:00Z', duration_s: 2, status: 'new', transcript_status: 'done',
+      audio_deleted: false, audio_delete_after: '2026-12-10T00:00:00Z', prompt: 'Q', points: [], tags: [], comment: '', audio_url: '/api/published/voice-audio/z',
+      transcript: { segments: [{ text: 'the river', start: 0, end: 1, words: [{ word: 'the', start: 0, end: 0.3 }, { word: 'river', start: 0.4, end: 0.9 }] }] }
+    };
+    vi.mocked(apiGet).mockImplementation(async (path: string) => (path.endsWith('/vs_3') ? record : { submissions: [] }));
+    const block = { ...vivaBlock(), settings: { deep_skills: ['arguing.thesis'] } } as ReturnType<typeof vivaBlock>;
+    const take = mountVoiceTake(block, 'lesson1', 'vs_3', () => undefined);
+    document.body.append(take.el);
+    await vi.waitFor(() => expect(take.el.querySelector('.voice-mark__paper')?.textContent).toContain('river'));
+    const rubric = take.el.querySelector('.voice-rubric')!;
+    expect(rubric).not.toBeNull();
+    expect(take.el.querySelector('.voice-mark__dock .voice-rubric')).toBeNull();
+    const work = take.el.querySelector('.voice-mark__work')!;
+    expect(work.compareDocumentPosition(rubric) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    take.el.remove();
+  });
+
   it('lists submissions, opens one, pre-marks fillers, and tags with keys', async () => {
     const record = {
       id: 'vs_1',

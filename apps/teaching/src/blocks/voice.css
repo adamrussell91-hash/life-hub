@@ -1066,7 +1066,7 @@
   }
 }
 
-/* The rubric in the marking dock: it scrolls on its own, so the player and codes stay in reach. */
+/* The rubric under the transcript, out of the sticky dock so the words keep the room. */
 .voice-rubric {
   border-top: 1px solid var(--line);
   padding-top: var(--space-2);
@@ -1078,8 +1078,6 @@
   font-weight: 600;
 }
 .voice-rubric .rb {
-  max-height: min(46dvh, 30rem);
-  overflow-y: auto;
   padding: var(--space-2) 2px;
   border: 0;
   background: transparent;
