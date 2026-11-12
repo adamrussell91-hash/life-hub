@@ -432,6 +432,7 @@
         <li><b>Their words</b> are always italic with a coloured rule, and only ever what the student actually said.</li>
         <li><b>Sources</b> sit in small grey type under each move, so the research is one glance away and never in the way.</li>
         <li>Australian spelling, plain words, no dashes in sentences, nothing a student glancing at the screen would read as a judgement.</li>
+        <li>Questions ask about the task and what they do, never about who they are. If a 17 year old would roll their eyes at it, it gets rewritten.</li>
       </ul>
       <h4 style="margin-top:14px">The tap scale</h4>
       <p>Four steps, the same for every area. The icon is a stream getting wider.</p>
@@ -597,7 +598,7 @@ const AREAS = [
     id: 'value', cls: 'a-value', short: 'Worth it', theory: 'Goal valuation', ink: '#855610', col: '#c98a24',
     ask: 'What would doing well at this get you that you actually care about?',
     alt: 'If English disappeared tomorrow, what would you miss?',
-    hint: 'Listen for a reason that is theirs: interest, usefulness, or who they want to be.',
+    hint: 'Listen for a reason that is theirs: they like it, it’s useful, or they’d be annoyed to be bad at it.',
     solid: ['I need it for law.', 'I actually like arguing a point.', 'I want to write well.'],
     shaky: ['What’s the point?', 'I’ll never use this.', 'It’s just for marks.'],
     digAsk: 'What kind of worth is missing?',
@@ -605,7 +606,7 @@ const AREAS = [
     digs: [
       { id: 'intrinsic', name: 'Enjoyment', q: 'It’s boring.', src: 'Intrinsic value', moves: ['m_choice'] },
       { id: 'utility', name: 'Usefulness', q: 'I’ll never use it.', src: 'Utility value', moves: ['m_utility'] },
-      { id: 'attainment', name: 'Who they are', q: 'That’s not me.', src: 'Attainment value', moves: ['m_identity'] },
+      { id: 'attainment', name: 'Doesn’t care about being good at it', q: 'Whatever, I don’t mind if I’m bad at it.', src: 'Attainment value', moves: ['m_identity'] },
       { id: 'cost', name: 'Cost', q: 'It takes too much, or what if I try and still fail?', src: 'Cost', moves: ['m_cost'] }
     ],
     base: ['m_utility', 'm_choice']
@@ -666,7 +667,7 @@ const AREA = Object.fromEntries(AREAS.map((a) => [a.id, a]));
 const MOVES = {
   m_utility: { area: 'value', text: 'Ask them to write two or three sentences on how this could matter in their own life. Let them find the link rather than hearing yours.', src: 'Utility value · Hulleman and Harackiewicz 2009, where it helped students who expected to do poorly' },
   m_choice: { area: 'value', text: 'Give a real choice inside the task: the text, the angle or the format, tied to something they are already into.', src: 'Intrinsic value · Wigfield and Eccles 2000' },
-  m_identity: { area: 'value', text: 'Connect the skill to who they want to be: the advocate, the writer, the person who wins the argument.', src: 'Attainment value · Wigfield and Eccles 2000' },
+  m_identity: { area: 'value', text: 'Give them a turn where being good at it shows: going first, modelling an answer, or helping a classmate.', src: 'Attainment value · Wigfield and Eccles 2000 · the move is our idea' },
   m_cost: { area: 'value', text: 'Name the cost out loud, then shrink the first step until it is cheap to start.', src: 'Cost · Wigfield and Eccles 2000' },
   m_win: { area: 'efficacy', text: 'Set one step they can succeed at this week, then point to it at the next meeting.', src: 'Mastery experience is the strongest source · Usher and Pajares 2008' },
   m_growth: { area: 'efficacy', text: 'Put an early piece beside a recent one so they can see their own growth.', src: 'Making mastery visible · Usher and Pajares 2008' },
