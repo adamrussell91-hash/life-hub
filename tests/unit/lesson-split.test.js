@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createLessonSplitHandler } from '../../netlify/functions/lesson-split.mjs';
-import { BLOCK_DATA, MESSAGES, splitProblems } from '../../netlify/functions/_shared/lesson-split.mjs';
+import { BLOCK_DATA, MESSAGES, inlineReturnLines, splitProblems } from '../../netlify/functions/_shared/lesson-split.mjs';
 import { draftLessonKey, publishedLessonKey, unitKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
 import { deleteVoiceSubmission } from '../../netlify/functions/_shared/voice-submissions.mjs';
 
@@ -323,4 +323,39 @@ test('deleting a split take in either lesson keeps the audio the other copy uses
   store.data.set(`voice_submissions/${L}/h_warm/take2`, { id: 'take2', lesson_id: L, block_id: 'h_warm', audio_key: 'aud2', device_hash: 'dev9', audio_delete_after: '2026-12-01T00:00:00.000Z' });
   await deleteVoiceSubmission(store, L, 'h_warm', 'take2');
   assert.equal(store.data.has('voice_audio/aud2'), false);
+});
+
+test('a continuum Return line split away from its earlier line takes that line with it', () => {
+  const line = (id, content) => block(id, 'continuum_line', { stimulus: { kind: 'text', text: '', url: '', alt_text: '' }, scale: { left: 'Agree', right: 'Disagree', stops: [] }, statements: [], pace: 'self', replace: false, ...content });
+  const earlier = line('cl_first', { stimulus: { kind: 'text', text: 'Place each prediction.', url: '', alt_text: '' }, statements: [{ id: 'st1', text: 'The river wins.', snap: false }], pace: 'teacher', mode: 'predict' });
+  const back = line('cl_back', { returns_to: 'cl_first', pace: 'self', replace: true });
+  const all = [section('s_a', 'Start', [earlier]), section('s_b', 'End', [back]), section('s_c', 'Again', [line('cl_again', { returns_to: 'cl_first' })])];
+
+  // The return line moves; its earlier line stays.
+  const moved = structuredClone([all[1]]);
+  assert.equal(inlineReturnLines(moved, all), 1);
+  const got = moved[0].content.blocks[0].content;
+  assert.equal(got.returns_to, undefined);
+  assert.deepEqual(got.statements, [{ id: 'st1', text: 'The river wins.', snap: false }]);
+  assert.equal(got.stimulus.text, 'Place each prediction.');
+  assert.equal(got.mode, 'predict');
+  // Its own pace and re-place setting stay.
+  assert.equal(got.pace, 'self');
+  assert.equal(got.replace, true);
+
+  // Both move together: nothing changes.
+  const together = structuredClone([all[0], all[1]]);
+  assert.equal(inlineReturnLines(together, all), 0);
+  assert.equal(together[1].content.blocks[0].content.returns_to, 'cl_first');
+
+  // The earlier line moves away and the return line stays behind: it takes the line too.
+  const stays = structuredClone([all[2]]);
+  assert.equal(inlineReturnLines(stays, all), 1);
+  assert.equal(stays[0].content.blocks[0].content.statements.length, 1);
+
+  // An earlier line that no longer exists: the pointer goes, the line keeps what it has.
+  const orphan = structuredClone([section('s_x', 'X', [line('cl_lost', { returns_to: 'cl_gone' })])]);
+  assert.equal(inlineReturnLines(orphan, orphan), 1);
+  assert.equal(orphan[0].content.blocks[0].content.returns_to, undefined);
+  assert.match(MESSAGES.returnLines(2), /^2 continuum lines/);
 });
