@@ -17,12 +17,17 @@ export function nodeMatchesQuery(node: GraphNodeDatum, query: string) {
   return node.label.toLowerCase().includes(needle);
 }
 
-export function searchCluster(nodes: GraphNodeDatum[], query: string) {
+export function searchCluster(
+  nodes: GraphNodeDatum[],
+  query: string,
+  /** Optional: a note also matches when its page text holds the query (labels alone are short). */
+  matchesPage?: (pageId: string, needle: string) => boolean,
+) {
   const needle = query.trim().toLowerCase();
   const cluster = new Set<string>();
   if (!needle) return cluster;
   for (const node of nodes) {
-    if (nodeMatchesQuery(node, needle)) cluster.add(node.id);
+    if (nodeMatchesQuery(node, needle) || (matchesPage && node.pageId && matchesPage(node.pageId, needle))) cluster.add(node.id);
   }
   const pageIds = new Set(nodes.filter(node => cluster.has(node.id) && node.pageId).map(node => node.pageId!));
   for (const node of nodes) {

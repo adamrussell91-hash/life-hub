@@ -14,7 +14,18 @@ import {
   type KnowledgeDraft,
   type KnowledgeItem
 } from '@/blocks/anthology-knowledge';
+import {
+  factConnections,
+  flatQuote,
+  noteConnections,
+  searchAnthology,
+  type LinkedFact,
+  type LinkedNote,
+  type SearchHit,
+  type TechniqueNamer
+} from '@/blocks/anthology-connections';
 import { lessonCollectionHref } from '@/blocks/collection-resolve';
+import { loadLiteraryElements } from '@/blocks/literary-elements';
 import { identityName, token, tokenParts } from '@/blocks/peer-feedback-ui';
 import '@/blocks/peer-feedback.css';
 import { rememberInitials, voiceDevice } from '@/blocks/voice-client';
@@ -125,48 +136,6 @@ function chip(text: string, kind: 'theme' | 'concept'): HTMLElement {
   span.className = `block-anthology__chip block-anthology__chip--${kind}`;
   span.textContent = text;
   return span;
-}
-
-function noteCard(item: AnthologyItem, textTitle: string, mode: AnthologyViewMode): HTMLElement {
-  const card = document.createElement('article');
-  card.className = 'block-anthology__card';
-  const quote = document.createElement('p');
-  quote.className = 'block-anthology__card-quote';
-  quote.textContent = `“${item.quote.replace(/\s+/g, ' ').trim()}”`;
-  const meta = document.createElement('p');
-  meta.className = 'block-anthology__card-meta';
-  meta.textContent = [textTitle, item.line_number > 0 ? `line ${item.line_number}` : '', item.layer_name]
-    .filter(Boolean)
-    .join(' · ');
-  card.append(quote, meta);
-  if (item.note) {
-    const note = document.createElement('p');
-    note.className = 'block-anthology__card-note';
-    note.textContent = item.note;
-    card.append(note);
-  }
-  if (item.themes.length || item.concepts.length) {
-    const chips = document.createElement('div');
-    chips.className = 'block-anthology__chips';
-    for (const theme of item.themes) chips.append(chip(theme, 'theme'));
-    for (const concept of item.concepts) chips.append(chip(concept, 'concept'));
-    card.append(chips);
-  }
-  const foot = document.createElement('div');
-  foot.className = 'block-anthology__card-foot';
-  const open = document.createElement('a');
-  open.className = 'block-anthology__card-open';
-  open.href = noteHref(item);
-  open.textContent = 'Open in the lesson';
-  foot.append(open);
-  if (mode === 'teacher' && item.published === false) {
-    const tag = document.createElement('span');
-    tag.className = 'block-anthology__unpublished';
-    tag.textContent = 'Not published';
-    foot.append(tag);
-  }
-  card.append(foot);
-  return card;
 }
 
 /** Paper has no canvas to pan: print lists each theme's notes instead. */
@@ -385,6 +354,86 @@ function knowledgeForm(
   return form;
 }
 
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+/** How many links a panel list shows before "Show all". */
+const PANEL_LIST_START = 5;
+
+/** A heading, a one-line why, and a list that folds after five. */
+function panelSection(heading: string, why: string, rows: HTMLElement[], empty: string): HTMLElement {
+  const section = el('section', 'block-anthology__panel-section');
+  section.append(el('h4', 'block-anthology__panel-heading', `${heading} (${rows.length})`));
+  if (why) section.append(el('p', 'block-anthology__panel-why', why));
+  if (!rows.length) {
+    section.append(el('p', 'block-anthology__panel-empty', empty));
+    return section;
+  }
+  const list = el('div', 'block-anthology__links');
+  list.append(...rows.slice(0, PANEL_LIST_START));
+  section.append(list);
+  if (rows.length > PANEL_LIST_START) {
+    const more = el('button', 'btn btn--ghost btn--small block-anthology__more', `Show all ${rows.length}`);
+    more.type = 'button';
+    more.addEventListener('click', () => {
+      list.replaceChildren(...rows);
+      more.remove();
+    });
+    section.append(more);
+  }
+  return section;
+}
+
+function sharedChips(shared: string[]): HTMLElement {
+  const chips = el('span', 'block-anthology__chips block-anthology__link-tags');
+  for (const tag of shared) chips.append(chip(tag, 'theme'));
+  return chips;
+}
+
+function noteLink(row: LinkedNote, onOpen: () => void, showShared = true): HTMLButtonElement {
+  const btn = el('button', 'block-anthology__link');
+  btn.type = 'button';
+  btn.append(
+    el('span', 'block-anthology__link-where', [row.poem, row.technique].filter(Boolean).join(' · ')),
+    el('span', 'block-anthology__link-text', `“${flatQuote(row.item.quote)}”`)
+  );
+  if (showShared && row.shared.length) btn.append(sharedChips(row.shared));
+  btn.addEventListener('click', onOpen);
+  return btn;
+}
+
+function factLink(row: LinkedFact, onOpen: () => void): HTMLButtonElement {
+  const btn = el('button', 'block-anthology__link block-anthology__link--fact');
+  btn.type = 'button';
+  btn.append(el('span', 'block-anthology__link-title', row.item.title));
+  const words = row.item.info || flatQuote(row.item.quote);
+  if (words) btn.append(el('span', 'block-anthology__link-text', words));
+  if (row.shared.length) btn.append(sharedChips(row.shared));
+  btn.addEventListener('click', onOpen);
+  return btn;
+}
+
+/** The note set out as one row of the anatomy table: Poem, Technique, Quotation, Effect. */
+function anatomyRow(row: ReturnType<typeof noteConnections>['row']): HTMLElement {
+  const grid = el('dl', 'block-anthology__row');
+  const cell = (label: string, value: string, fallback: string, extra = '') => {
+    grid.append(el('dt', '', label));
+    const dd = el('dd', value ? extra : 'block-anthology__row-blank', value || fallback);
+    grid.append(dd);
+  };
+  cell('Poem', row.poem, '');
+  cell('Technique', row.technique, 'Name the technique yourself');
+  cell('Quotation', row.quote ? `“${row.quote}”${row.line > 0 ? ` (line ${row.line})` : ''}` : '', '', 'block-anthology__row-quote');
+  cell('Effect', row.effect, 'Write the effect on the reader yourself');
+  grid.append(el('dt', '', 'So… why?'));
+  grid.append(el('dd', 'block-anthology__row-blank', 'Pick a class fact below for the purpose and context'));
+  return grid;
+}
+
 export function buildAnthologyView(
   block: Extract<Block, { block_type: 'anthology' }>,
   options: BuildAnthologyViewOptions
@@ -429,7 +478,7 @@ export function buildAnthologyView(
 
   /** Only shown additions go on the map; the teacher reviews the rest underneath. */
   const onMap = () => (layer === 'class' ? knowledge.filter((item) => !item.status || item.status === 'shown') : []);
-  const redraw = () => graph?.setModel(buildAnthologyGraph(options.data, grouping, onMap()));
+  const redraw = () => graph?.setModel(buildAnthologyGraph(options.data, grouping, onMap(), nameOf));
 
   const bar = document.createElement('div');
   bar.className = 'block-anthology__bar';
@@ -465,6 +514,8 @@ export function buildAnthologyView(
   search.addEventListener('input', () => {
     query = search.value.trim();
     graph?.setSearch(query);
+    focus = null;
+    paintPanel();
   });
 
   const count = document.createElement('span');
@@ -491,20 +542,177 @@ export function buildAnthologyView(
     pop.classList.remove('block-anthology__pop--form');
     pop.replaceChildren();
   };
-  const showCard = (card: HTMLElement) => {
-    const close = document.createElement('button');
-    close.type = 'button';
-    close.className = 'block-anthology__pop-close';
-    close.setAttribute('aria-label', 'Close this note');
-    close.textContent = '×';
-    close.addEventListener('click', closePop);
-    card.prepend(close);
-    pop.classList.remove('block-anthology__pop--form');
-    pop.replaceChildren(card);
-    pop.hidden = false;
-    pop.scrollTop = 0;
-  };
   frame.append(stage, pop);
+
+  // Beside the map: the chosen note as a table row and what it links to, or the search's matches.
+  const panel = el('aside', 'block-anthology__panel');
+  panel.setAttribute('aria-label', 'What this note links to');
+  panel.setAttribute('aria-live', 'polite');
+  const body = el('div', 'block-anthology__body');
+  body.append(frame, panel);
+
+  type Focus = { kind: 'note' | 'fact'; id: string } | null;
+  let focus: Focus = null;
+  const techniqueNames = new Map<string, string>();
+  const nameOf: TechniqueNamer = (id) => techniqueNames.get(id);
+  const shownKnowledge = () => knowledge.filter((item) => !item.status || item.status === 'shown');
+
+  let hitCache: { query: string; ids: Set<string> } | null = null;
+  const searchHitIds = () => {
+    if (hitCache?.query !== query) {
+      const ids = searchAnthology(query, options.data, shownKnowledge(), nameOf).map((hit) =>
+        hit.kind === 'note' ? anthologyNoteId(hit.item) : knowledgeNoteId(hit.item.id)
+      );
+      hitCache = { query, ids: new Set(ids) };
+    }
+    return hitCache.ids;
+  };
+
+  /** Go to a note or fact: on the map when its dot is there, else straight to the panel. */
+  const openId = (id: string) => {
+    if (graph?.selectNote?.(id)) return;
+    focus = { kind: isKnowledgeNoteId(id) ? 'fact' : 'note', id };
+    paintPanel();
+  };
+  const openNote = (item: AnthologyItem) => openId(anthologyNoteId(item));
+  const openFact = (item: KnowledgeItem) => openId(knowledgeNoteId(item.id));
+
+  const panelHead = (label: string) => {
+    const head = el('div', 'block-anthology__panel-head');
+    head.append(el('p', 'block-anthology__panel-label', label));
+    if (query) {
+      const back = el('button', 'btn btn--ghost btn--small', 'Back to matches');
+      back.type = 'button';
+      back.addEventListener('click', () => {
+        focus = null;
+        paintPanel();
+      });
+      head.append(back);
+    }
+    const close = el('button', 'block-anthology__pop-close block-anthology__panel-close', '×');
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Close');
+    close.addEventListener('click', () => {
+      focus = null;
+      paintPanel();
+    });
+    head.append(close);
+    return head;
+  };
+
+  const addFactButton = () => {
+    if (!knowledgeApi) return null;
+    const btn = el('button', 'btn btn--secondary btn--small', 'Add a fact to the class map');
+    btn.type = 'button';
+    btn.addEventListener('click', () => {
+      if (layer !== 'class') {
+        layer = 'class';
+        paintLayers();
+        paintCount();
+        redraw();
+      }
+      add.click();
+    });
+    return btn;
+  };
+
+  const notePanel = (item: AnthologyItem): HTMLElement[] => {
+    const links = noteConnections(item, options.data, shownKnowledge(), nameOf);
+    const out: HTMLElement[] = [panelHead('Your table row'), anatomyRow(links.row)];
+    const facts = panelSection(
+      'So… why? Class facts that fit',
+      'Facts the class added on the same theme or concept. Use one to explain the purpose and context.',
+      links.facts.map((row) => factLink(row, () => openFact(row.item))),
+      'No class facts share this note’s themes yet. Add one from your pre-reading.'
+    );
+    const addBtn = links.facts.length ? null : addFactButton();
+    if (addBtn) facts.append(addBtn);
+    out.push(facts);
+    if (links.row.technique) {
+      out.push(
+        panelSection(
+          `${links.row.technique} in other poems`,
+          'Is the pattern kept the same, or does it change? Why?',
+          links.sameTechnique.map((row) => noteLink(row, () => openNote(row.item))),
+          'No other poem has a note on this technique yet.'
+        )
+      );
+    }
+    out.push(
+      panelSection(
+        'Same idea in other poems',
+        'Notes from other poems on a shared theme or concept.',
+        links.sameIdea.map((row) => noteLink(row, () => openNote(row.item))),
+        'No other poem shares these themes yet.'
+      )
+    );
+    const foot = el('div', 'block-anthology__card-foot');
+    const open = el('a', 'block-anthology__card-open', 'Open in the lesson');
+    open.href = noteHref(item);
+    foot.append(open);
+    if (options.mode === 'teacher' && item.published === false) {
+      foot.append(el('span', 'block-anthology__unpublished', 'Not published'));
+    }
+    out.push(foot);
+    return out;
+  };
+
+  const factPanel = (item: KnowledgeItem): HTMLElement[] => {
+    const links = factConnections(item, options.data, shownKnowledge(), nameOf);
+    return [
+      panelHead('Class fact'),
+      knowledgeCard(item, moderateFor(item)),
+      panelSection(
+        'Poem notes this fact helps explain',
+        'Use it in the So… why? column for any of these.',
+        links.notes.map((row) => noteLink(row, () => openNote(row.item))),
+        'No poem note shares this fact’s themes yet.'
+      ),
+      panelSection(
+        'Other class facts on this',
+        '',
+        links.facts.map((row) => factLink(row, () => openFact(row.item))),
+        'No other class fact shares these themes yet.'
+      )
+    ];
+  };
+
+  const searchPanel = (hits: SearchHit[]): HTMLElement[] => {
+    const head = el('div', 'block-anthology__panel-head');
+    head.append(el('p', 'block-anthology__panel-label', `Matches for “${query}” (${hits.length})`));
+    const rows = hits.map((hit) =>
+      hit.kind === 'note'
+        ? noteLink({ item: hit.item, poem: hit.poem, technique: hit.technique, shared: [] }, () => openNote(hit.item), false)
+        : factLink({ item: hit.item, shared: [] }, () => openFact(hit.item))
+    );
+    if (!rows.length) return [head, el('p', 'block-anthology__panel-empty', 'Nothing matches. Try one word, a poem or a technique.')];
+    const list = el('div', 'block-anthology__links');
+    list.append(...rows);
+    return [head, list];
+  };
+
+  function paintPanel(): void {
+    const note = focus?.kind === 'note' ? byId.get(focus.id) : undefined;
+    const fact = focus?.kind === 'fact' ? knowledgeById.get(focus.id) : undefined;
+    if (note) panel.replaceChildren(...notePanel(note));
+    else if (fact) panel.replaceChildren(...factPanel(fact));
+    else if (query) panel.replaceChildren(...searchPanel(searchAnthology(query, options.data, shownKnowledge(), nameOf)));
+    else {
+      panel.replaceChildren(
+        el('p', 'block-anthology__panel-label', 'What links to what'),
+        el(
+          'p',
+          'block-anthology__panel-empty',
+          'Click a dot, or search, to see a note as a table row: its poem, technique, quote and effect, the class facts that explain why, and the same technique or idea in other poems.'
+        )
+      );
+    }
+    panel.scrollTop = 0;
+    // On a phone the panel sits under the map: bring a chosen note's links into view.
+    if (focus && panel.getBoundingClientRect().top > frame.getBoundingClientRect().bottom - 1) {
+      panel.scrollIntoView?.({ block: 'start' });
+    }
+  }
 
   const review = document.createElement('details');
   review.className = 'block-anthology__review';
@@ -516,6 +724,7 @@ export function buildAnthologyView(
           void knowledgeApi.moderate!(item.id, action)
             .then(() => {
               closePop();
+              focus = null;
               return loadKnowledge();
             })
             .catch(() => window.alert('That did not save. Try again.'));
@@ -545,10 +754,12 @@ export function buildAnthologyView(
       if (knowledge.some((row) => row.id === id)) justAdded.delete(id);
       else knowledge = [...knowledge, item];
     }
+    hitCache = null;
     knowledgeById.clear();
     for (const item of knowledge) knowledgeById.set(knowledgeNoteId(item.id), item);
     paintCount();
     paintReview();
+    paintPanel();
     redraw();
   }
 
@@ -629,9 +840,18 @@ export function buildAnthologyView(
 
   const hint = document.createElement('p');
   hint.className = 'block-anthology__hint';
-  hint.textContent = 'Click a dot to read its note. Drag to move around; scroll or pinch to zoom.';
+  hint.textContent = 'Click a dot to see what it links to. Drag to move around; scroll or pinch to zoom.';
 
-  root.append(bar, frame, hint, review);
+  root.append(bar, body, hint, review);
+  paintPanel();
+  void loadLiteraryElements()
+    .then((table) => {
+      for (const technique of table.techniques) techniqueNames.set(technique.id, technique.name);
+      hitCache = null;
+      paintPanel();
+      redraw();
+    })
+    .catch(() => {});
 
   if (canDraw()) {
     let generation = 0;
@@ -642,18 +862,12 @@ export function buildAnthologyView(
         if (mine !== generation || !stage.isConnected) return;
         graph = mountForceGraph(
           stage,
-          buildAnthologyGraph(options.data, grouping, onMap()),
+          buildAnthologyGraph(options.data, grouping, onMap(), nameOf),
           {
             onNoteSelect: (note) => {
-              if (!note) return closePop();
-              if (isKnowledgeNoteId(note.pageId)) {
-                const item = knowledgeById.get(note.pageId);
-                return item ? showCard(knowledgeCard(item, moderateFor(item))) : closePop();
-              }
-              const item = byId.get(note.pageId);
-              return item
-                ? showCard(noteCard(item, titles.get(item.block_id) ?? item.lesson_title, options.mode))
-                : closePop();
+              closePop();
+              focus = note ? { kind: isKnowledgeNoteId(note.pageId) ? 'fact' : 'note', id: note.pageId } : null;
+              paintPanel();
             }
           },
           {
@@ -663,13 +877,18 @@ export function buildAnthologyView(
               const known = knowledgeById.get(id);
               if (known) return `${known.quote} ${known.info} ${known.themes.join(' ')} ${known.concepts.join(' ')}`;
               const item = byId.get(id);
-              return item ? `${item.note} ${item.themes.join(' ')} ${item.concepts.join(' ')}` : '';
+              if (!item) return '';
+              const technique = item.technique_id ? (nameOf(item.technique_id) ?? '') : '';
+              const poem = titles.get(item.block_id) ?? item.lesson_title;
+              return `${item.note} ${technique} ${poem} ${item.themes.join(' ')} ${item.concepts.join(' ')}`;
             },
             tools: ANTHOLOGY_TOOLS,
             toolHints: ANTHOLOGY_TOOL_HINTS,
             theme: 'light',
             labelZoom: { topics: 0, notes: 1.6 },
             ringFor: isKnowledgeNoteId,
+            // Light up every note the panel's matches list, so the map and the list agree.
+            searchMatches: (id) => searchHitIds().has(id),
             badgeFor: (id) => {
               const item = knowledgeById.get(id);
               return item ? knowledgeBadge(item, Boolean(knowledgeApi?.teacher), stage) : null;

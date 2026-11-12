@@ -107,6 +107,8 @@ export type ForceGraphOptions = {
   labelZoom?: { topics: number; notes: number };
   /** Show All only: notes drawn as hollow rings (a second kind of note, such as class additions). */
   ringFor?: (pageId: string) => boolean;
+  /** Show All only: search also lights a note whose page text holds the query, not just its label. */
+  searchMatches?: (pageId: string, needle: string) => boolean;
   /**
    * Show All only: notes drawn as a labelled bubble instead of a dot, at a fixed size on screen.
    * `text` writes initials on a disc in the note's colour; `path` (a 24×24 SVG path) draws a
@@ -551,7 +553,7 @@ export function mountForceGraph(
     if (searchNodes !== simNodes || searchQuery !== options.search) {
       searchNodes = simNodes;
       searchQuery = options.search;
-      searchHits = searchCluster(simNodes, searchQuery);
+      searchHits = searchCluster(simNodes, searchQuery, options.searchMatches);
     }
     const cluster = selectionCluster(simNodes, selected, simLinks);
     return { query: options.search, nodes: simNodes, selected, hover, links: simLinks, cluster, searchHits };
@@ -2446,7 +2448,7 @@ export function mountForceGraph(
   draw();
   if (showAllMode) kickAnimations();
 
-  return attachGraphSearch(
+  const mount = attachGraphSearch(
     () => {
       disposed = true;
       window.cancelAnimationFrame(growRaf);
@@ -2472,4 +2474,11 @@ export function mountForceGraph(
     },
     canOpenSelected,
   );
+  mount.selectNote = (pageId: string) => {
+    const node = simNodes.find(row => row.kind === "leaf" && row.pageId === pageId);
+    if (!node || !selectable(node)) return false;
+    showNote(node);
+    return true;
+  };
+  return mount;
 }
