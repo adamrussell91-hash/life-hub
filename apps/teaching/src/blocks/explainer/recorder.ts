@@ -331,7 +331,21 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
   // A board needs room: the recorder fills the window, and the teacher can shrink it back.
   const fullBtn = btn('', 'btn--ghost block-explainer__full', () => setFull(!root.classList.contains('is-full')));
   head.append(fullBtn);
+  // Lesson block rows carry a transform (and lists a container type), which
+  // traps position: fixed inside the row: the recorder became a thin strip far
+  // down a page that could no longer scroll. While full it sits on <body>, and
+  // a marker holds its place in the lesson for Shrink and Cancel.
+  const spot = document.createComment('explainer recorder');
+  function lift(on: boolean): void {
+    if (on && root.parentNode && root.parentNode !== document.body) {
+      root.replaceWith(spot);
+      document.body.append(root);
+    } else if (!on && spot.parentNode) {
+      spot.replaceWith(root);
+    }
+  }
   function setFull(on: boolean): void {
+    lift(on);
     root.classList.toggle('is-full', on);
     document.documentElement.classList.toggle('block-explainer-full-open', on);
     fullBtn.textContent = on ? 'Shrink' : 'Fill the window';
@@ -340,6 +354,10 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
     requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
   }
   setFull(layout !== 'text');
+  // The editor puts the recorder in the lesson after this returns; lift it then.
+  queueMicrotask(() => {
+    if (!disposed && root.classList.contains('is-full')) lift(true);
+  });
 
   function pickTool(next: RecorderTool): void {
     const leavingPointer = tool === 'pointer' && next !== 'pointer';
@@ -656,6 +674,11 @@ export function mountExplainerRecorder(block: Pick<ExplainerBlock, 'content'>, o
     }
     for (const track of stream?.getTracks() ?? []) track.stop();
     document.documentElement.classList.remove('block-explainer-full-open');
+    // Lifted onto <body>: take it off the page along with its marker.
+    if (spot.parentNode) {
+      spot.remove();
+      root.remove();
+    }
     view.dispose();
   }
 
