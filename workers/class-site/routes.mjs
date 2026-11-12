@@ -1,10 +1,13 @@
 /**
- * Public class host. Serves published Teaching pages and the published
- * personal line (`/line#<code>`, Tasks hub) only. Anything else — including sign-in and the umbrella root — is a dead page.
+ * Public class host. Serves published Teaching pages, the published
+ * personal line (`/line#<code>`, Tasks hub) and, at the root, the "Join a game"
+ * page (join-page.mjs). Anything else — including sign-in — is a dead page.
  *
  * ponytail: asset allow-list is flat `/teaching/assets/<file>` and `/tasks/assets/<file>` names Vite emits
  * today. A nested asset path would 404 until the pattern grows a segment.
  */
+
+import { joinPageResponse } from './join-page.mjs';
 
 export const UPSTREAM_ORIGIN = 'https://life-hub.adam-russell.com';
 export const SHELL_PATH = '/teaching/index.html';
@@ -129,6 +132,10 @@ export async function handleClassSiteRequest(request, fetchImpl = fetch) {
   } catch {
     return deadPage();
   }
+
+  // The home page is "Join a game" (join-page.mjs): type the code on the board, land in that lesson.
+  const join = joinPageResponse(normalisePath(url.pathname), request.method);
+  if (join) return join;
 
   const line = isLinePath(url.pathname);
   if (line || studentPath(url.pathname)) {
