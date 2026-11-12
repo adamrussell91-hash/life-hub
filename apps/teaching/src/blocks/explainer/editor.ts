@@ -7,6 +7,7 @@ import { askConfirmCard } from '@/teacher/confirm-dialog';
 import type { ExplainerBlock, ExplainerBoardElement, ExplainerRecording } from '@/schemas/block';
 import { mountBoard, type BoardHandle } from './board-runtime';
 import { spliceRecording, type ExplainerTake } from './clips';
+import { retextRecording } from './retext';
 import { mountExplainerPlayer, type ExplainerPlayer } from './player';
 import { mountExplainerRecorder, type ExplainerRecorderHandle } from './recorder';
 import { createTimeline } from './timeline';
@@ -59,6 +60,22 @@ export function createExplainerEditor(
     onChange(current);
   };
 
+  /**
+   * New text: the recording's marks, notes and pointer move onto the same
+   * words in it, so a fixed typo or an added paragraph moves nothing.
+   */
+  const setText = (text: ReturnType<typeof parseAnnotationSource>) => {
+    const rec = current.content.recording;
+    commit(rec ? { text, recording: retextRecording(rec, current.content.text, text) } : { text });
+    if (recorder) return;
+    if (!rec) paintRecording();
+    else {
+      const t = player?.time() ?? 0;
+      paintRecording();
+      player?.seek(t);
+    }
+  };
+
   const root = el('div', 'block-explainer-editor');
 
   // Set up.
@@ -103,7 +120,7 @@ export function createExplainerEditor(
     const b = btn(k === 'prose' ? 'Prose' : 'Verse', 'btn--ghost', () => {
       kind = k;
       for (const x of kindBtns) x.setAttribute('aria-pressed', String(x === b));
-      commit({ text: parseAnnotationSource(source.value, kind) });
+      setText(parseAnnotationSource(source.value, kind));
     });
     b.setAttribute('aria-pressed', String(k === kind));
     kindRow.append(b);
@@ -117,10 +134,7 @@ export function createExplainerEditor(
   source.rows = 8;
   source.value = current.content.text ? serializeAnnotationSource(current.content.text) : '';
   source.placeholder = 'Paste the answer, poem or notes you will talk through. Leave a blank line between paragraphs or stanzas.';
-  source.addEventListener('change', () => {
-    commit({ text: parseAnnotationSource(source.value, kind) });
-    if (!current.content.recording && !recorder) paintRecording();
-  });
+  source.addEventListener('change', () => setText(parseAnnotationSource(source.value, kind)));
   const textHint = el('p', 'block-explainer__hint', 'Marks stay on their words when you fix a typo after recording.');
 
   // Notes tray.
