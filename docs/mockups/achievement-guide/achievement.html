@@ -865,7 +865,7 @@ function makeStream(vals, opts = {}) {
     const from = shown;
     const sameShape = from && ['value', 'efficacy', 'env', 'reg'].every((k) => (from[k] == null) === (target[k] == null));
     if (!from || !sameShape || o.animate === false || reduceMotion()) { shown = { ...target }; return paint(shown); }
-    const t0 = performance.now(), dur = 280;
+    const t0 = performance.now(), dur = o.duration || 280;
     const step = (now) => {
       const p = Math.min(1, Math.max(0, (now - t0) / dur));
       const ease = 1 - Math.pow(1 - p, 3);
@@ -878,7 +878,17 @@ function makeStream(vals, opts = {}) {
     };
     raf = requestAnimationFrame(step);
   }
-  set(vals, { pin: opts.pin, animate: false });
+  if (opts.enter && !reduceMotion()) {
+    // reveal once: the picture grows from a trickle to the read, then settles
+    const zero = {};
+    for (const k of ['value', 'efficacy', 'env', 'reg']) zero[k] = vals[k] == null ? null : 0;
+    shown = zero;
+    target = { ...zero };
+    paint(zero);
+    pinNow = opts.pin || profileFor(vals);
+    words(vals);
+    requestAnimationFrame(() => set(vals, { pin: opts.pin, duration: 750 }));
+  } else set(vals, { pin: opts.pin, animate: false });
   return { svg, set, layer, geometry: () => streamGeometry(target, labels) };
 }
 
@@ -1149,7 +1159,7 @@ function scTheir() {
 function scRead() {
   const v = currentValues();
   const sug = suggested();
-  const st = makeStream(v, { pin: S.profile || undefined });
+  const st = makeStream(v, { pin: S.profile || undefined, enter: S.lastRendered !== 'read' });
   const svg = st.svg;
   const prof = S.profile || profileFor(v);
   const pa = AREA[prof];
@@ -1309,7 +1319,7 @@ function render() {
   const host = $('#screen');
   let content;
   const [kind, k] = S.step.split(':');
-  if (S.step === 'their') { host.replaceChildren(scTheir()); host.style.cssText = 'display:flex;flex-direction:column;flex:1;background:#fff'; renderTree(); return; }
+  if (S.step === 'their') { host.replaceChildren(scTheir()); host.style.cssText = 'display:flex;flex-direction:column;flex:1;background:#fff'; renderTree(); S.lastRendered = S.step; return; }
   host.style.cssText = 'display:flex;flex-direction:column;flex:1';
   if (kind === 'context') content = scContext();
   else if (kind === 'gate') content = scGate(k);
@@ -1320,6 +1330,7 @@ function render() {
   else content = scSaved();
   host.replaceChildren(h('div', { class: `screen ${S.dir === 'back' ? 'back' : ''}` }, content));
   renderTree();
+  S.lastRendered = S.step;
 }
 render();
 
