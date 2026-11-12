@@ -165,7 +165,10 @@ export type LiveOpen = {
   ws_base: string;
   http_base?: string;
   game_id?: string;
-  /** Where the board's QR code points (defaults to the class site with the code). */
+  /** The lesson and class the room is for: the board's QR opens that lesson on the class site with the code. */
+  lesson_id?: string;
+  class_id?: string;
+  /** Where the board's QR code points (overrides the lesson link). */
   join_url?: string;
   /** The game as students see it (no answers), for the board's quotes and cast. */
   game?: PublicGame;

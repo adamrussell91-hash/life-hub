@@ -18,10 +18,10 @@ const OPEN: LiveOpen = { room: 'room_test_0001', code: '482913', teacher_ticket:
 const INITIALS = ['AB', 'CD', 'EF', 'GH', 'IJ', 'KL', 'MN', 'OP'];
 const seats = (n: number, over: Partial<Seat> = {}): Seat[] => INITIALS.slice(0, n).map((initials, k) => ({ owner: `own_${initials.toLowerCase()}`, initials, connected: true, score: 8 - k, ...over }));
 
-function board() {
+function board(open: LiveOpen = OPEN) {
   const host = document.createElement('div');
   document.body.append(host);
-  const b = openLiveBoard({ open: OPEN, host, connect: { WebSocketImpl: FakeWS, fetchImpl: undefined } });
+  const b = openLiveBoard({ open, host, connect: { WebSocketImpl: FakeWS, fetchImpl: undefined } });
   const ws = FakeWS.last();
   ws.open();
   let seq = 1;
@@ -40,6 +40,15 @@ beforeEach(() => {
 afterEach(() => document.body.replaceChildren());
 
 describe('live board', () => {
+  it('lobby: the QR opens this lesson for the class with the code, since the class site has no join page of its own', () => {
+    const { root, snap } = board({ ...OPEN, join_url: undefined, lesson_id: 'lesson_t1', class_id: 'class_t1' });
+    snap({ seats: [] });
+    const label = root.querySelector('.gl-qr svg')?.getAttribute('aria-label') ?? '';
+    expect(label).toMatch(/\/s\/classes\/class_t1\/lessons\/lesson_t1\?join=482913$/);
+    expect(root.textContent).not.toMatch(/Go to class\./);
+    expect(root.querySelector('.gl-join-card__code')?.textContent).toMatch(/Join live game/);
+  });
+
   it('lobby: huge code, a QR, and a chip per student as they join', () => {
     const { root, ws, snap, patch } = board();
     expect(ws.url).toBe('wss://rooms.test/g/rooms/room_test_0001/ws?ticket=tkt.board');
