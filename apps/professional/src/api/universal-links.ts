@@ -92,7 +92,7 @@ export function changeUniversalLinkRole(
 
 /** Professional work files under Tasks' teaching domain; /api/tasks rejects a task with no valid domain. */
 export function createTask(
-  body: { title: string; status?: string; domain?: string; priority?: string; kind?: string },
+  body: { title: string; status?: string; domain?: string; priority?: string; kind?: string; due_date?: string },
   options: { signal?: AbortSignal } = {}
 ): Promise<{ id: string; title: string }> {
   return apiPost('/api/tasks', { domain: 'teaching', ...body }, { signal: options.signal });

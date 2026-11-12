@@ -1,7 +1,7 @@
 import { meetingRoute } from '@/app/router';
 import type { TimelinePoint } from '@/domain/person-timeline';
 import { shortDate } from '@/guides/continuum-chart';
-import { guideById } from '@/guides/registry';
+import { guideById, guideName } from '@/guides/registry';
 import { sameContext, type PlacedRun } from '@/guides/runs';
 
 /** Newest run per context (input newest first or not), with how many runs that context has. */
@@ -54,6 +54,6 @@ export function guideTimelinePoints(placed: PlacedRun[]): TimelinePoint[] {
   return placed.map(({ run }) => ({
     id: `guide_${run.id}`,
     at: run.created_at,
-    label: `◐ ${guideById(run.guide)?.name ?? 'Guide'} guide · ${run.context}`
+    label: `◐ ${guideName(run.guide)} guide · ${run.context}`
   }));
 }

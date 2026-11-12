@@ -51,6 +51,10 @@ import type { GuideRun } from '@/guides/types';
 import { openCheckInPanel } from '@/guides/check-in/panel';
 import { renderCheckInCard } from '@/guides/check-in/card';
 import { CHECK_IN_EMBLEM } from '@/guides/check-in/icons';
+import { openAchievementPanel } from '@/guides/achievement/panel';
+import { renderAchievementCard } from '@/guides/achievement/card';
+import { ACHIEVEMENT_EMBLEM } from '@/guides/achievement/icons';
+import { ACHIEVEMENT_ID, ACHIEVEMENT_LINE, ACHIEVEMENT_NAME } from '@/guides/achievement/model';
 import { deleteCheckIn, getCheckIn, listMeetingCheckIns, saveCheckIn } from '@/guides/check-in/api';
 import { followUpTaskTitle, newFollowUps } from '@/guides/check-in/model';
 import type { CheckInRecord, CheckInSummary } from '@/guides/check-in/types';
@@ -804,7 +808,27 @@ export async function renderMeetingPage(
     })));
   }
 
+  // Achievement has its own branching panel but saves an ordinary guide run on this meeting.
+  function openAchievement(edit?: GuideRun): void {
+    openAchievementPanel(document, {
+      about: aboutCandidates(),
+      placedRuns: placed,
+      edit,
+      onSave: async (saved, { lookAgain }) => {
+        await storeGuideRun(saved);
+        if (!lookAgain) return;
+        try {
+          const task = await createTask({ title: `Achievement guide again with ${saved.person_name} · ${saved.context}`, due_date: lookAgain });
+          await createUniversalLink({ source_ref: `tasks:task:${task.id}`, target_ref: meetingRef, relationship_type: 'tagged_with' });
+        } catch {
+          // The run is saved; a missed reminder is not worth failing the save over.
+        }
+      }
+    });
+  }
+
   function openGuides(edit?: GuideRun): void {
+    if (edit?.guide === ACHIEVEMENT_ID) return openAchievement(edit);
     const guide = edit ? guideById(edit.guide) : null;
     openGuidePanel(document, {
       guides: GUIDES,
@@ -812,7 +836,10 @@ export async function renderMeetingPage(
       placedRuns: placed,
       onSave: storeGuideRun,
       edit: edit && guide ? { guide, run: edit } : undefined,
-      protocols: [{ id: 'check_in', name: 'Check-in', line: 'Steps for a supportive conversation', emblem: CHECK_IN_EMBLEM, start: () => openCheckIn(undefined, 'fade') }]
+      protocols: [
+        { id: ACHIEVEMENT_ID, name: ACHIEVEMENT_NAME, line: ACHIEVEMENT_LINE, emblem: ACHIEVEMENT_EMBLEM, start: () => openAchievement() },
+        { id: 'check_in', name: 'Check-in', line: 'Steps for a supportive conversation', emblem: CHECK_IN_EMBLEM, start: () => openCheckIn(undefined, 'fade') }
+      ]
     });
   }
 
@@ -841,6 +868,10 @@ export async function renderMeetingPage(
     // A newer paint started while this one waited: let it draw, or the cards double up.
     if (seq !== guidesPaint) return;
     for (const saved of runs) {
+      if (saved.guide === ACHIEVEMENT_ID) {
+        guidesHost.append(renderAchievementCard(document, { run: saved, history: historyFor(all, saved, 1), onEdit: () => openAchievement(saved) }));
+        continue;
+      }
       const guide = guideById(saved.guide);
       if (!guide) continue;
       guidesHost.append(renderGuideCard(document, {

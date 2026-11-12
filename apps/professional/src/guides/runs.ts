@@ -1,6 +1,6 @@
 import type { MeetingRecord } from '@/domain/types';
 import { nameKey } from '@/lib/room';
-import { guideById } from './registry';
+import { guideName } from './registry';
 import type { GuideRun, Values } from './types';
 
 export type PlacedRun = { run: GuideRun; meetingId: string; meetingTitle: string };
@@ -61,10 +61,10 @@ export function recentContexts(placed: PlacedRun[], count = 5): string[] {
 }
 
 export function noteLine(run: GuideRun): string {
-  return `${guideById(run.guide)?.name ?? 'Guide'} guide · ${run.context} · see card`;
+  return `${guideName(run.guide)} guide · ${run.context} · see card`;
 }
 
 /** What Clare may see: who, which guide, the context and the moves. Never the profile or values. */
 export function guideDigest(runs: GuideRun[]): Array<{ about: string; guide: string; context: string; moves: string[] }> {
-  return runs.map((run) => ({ about: run.person_name, guide: guideById(run.guide)?.name ?? 'Guide', context: run.context, moves: run.moves }));
+  return runs.map((run) => ({ about: run.person_name, guide: guideName(run.guide), context: run.context, moves: run.moves }));
 }
