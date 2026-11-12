@@ -297,6 +297,9 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       if (next.sprint) lesson.sprint = next.sprint;
       // A case study's settings are edited on the page too.
       if (next.case) lesson.case = next.case;
+      // So are a Station Rotation's stations and a Game lesson's games.
+      if (next.rotation) lesson.rotation = next.rotation;
+      if (next.game) lesson.game = next.game;
     }
 
     function bumpDraftClock(): void {
