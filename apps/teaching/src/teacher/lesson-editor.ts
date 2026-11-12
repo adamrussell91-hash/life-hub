@@ -3,6 +3,7 @@ import { lessonClassDates, lessonRouteRole, linesBeforeOnMap, setLessonDate, uni
 import { mountAnnReview } from '@/alchemy/ann-review';
 import { askTextCard } from '@/teacher/confirm-dialog';
 import { navigate } from '@/app/router';
+import { openLessonSplit } from '@/teacher/lesson-split';
 import { withAppBase } from '@/app/base-path';
 import { apiGet, apiPatch, apiPost, ApiClientError } from '@/api/client';
 import { subjectUsesAlignment } from '@/alignment/model';
@@ -782,6 +783,19 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       onExport: () => {
         void downloadPortableExport('lesson', lesson.id, lesson.slug).catch(() => {
           window.alert('Unable to export this lesson.');
+        });
+      },
+      onSplit: (returnFocus) => {
+        openLessonSplit({
+          lessonId: lesson.id,
+          returnFocus,
+          beforeSplit: async () => {
+            await saveController?.flush();
+            if (saveController?.getState() === 'save_failed') throw new Error('Save your latest changes first.');
+          },
+          onChanged: async () => {
+            applyRestoredLesson(await apiGet<Lesson>(`/api/lessons/${lesson.id}`));
+          }
         });
       },
           onTrash: () => {

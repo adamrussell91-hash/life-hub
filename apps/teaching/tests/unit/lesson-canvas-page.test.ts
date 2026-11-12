@@ -118,7 +118,7 @@ describe('mountLessonPage', () => {
     document.body.replaceChildren();
   });
 
-  function mount(lesson: Lesson = makeLesson(), extras: { onSaveTemplate?: () => void; onExport?: () => void; onTrash?: () => void } = {}) {
+  function mount(lesson: Lesson = makeLesson(), extras: { onSaveTemplate?: () => void; onExport?: () => void; onTrash?: () => void; onSplit?: (returnFocus: HTMLElement | null) => void } = {}) {
     const onChange = vi.fn();
     const onPrint = vi.fn();
     const onSelect = vi.fn();
@@ -577,6 +577,21 @@ describe('mountLessonPage', () => {
     host.querySelector<HTMLButtonElement>('.lesson-page__more-btn')!.click();
     host.querySelector<HTMLButtonElement>('.lesson-page__trash')!.click();
     expect(onTrash).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers Split lesson in the page menu and hands back the menu button for focus', () => {
+    mount(makeLesson());
+    host.querySelector<HTMLButtonElement>('.lesson-page__more-btn')!.click();
+    expect(host.querySelector('.lesson-page__split')).toBeNull();
+    host.replaceChildren();
+    const onSplit = vi.fn();
+    mount(makeLesson(), { onSplit });
+    const trigger = host.querySelector<HTMLButtonElement>('.lesson-page__more-btn')!;
+    trigger.click();
+    const item = host.querySelector<HTMLButtonElement>('.lesson-page__split')!;
+    expect(item.textContent).toBe('Split lesson…');
+    item.click();
+    expect(onSplit).toHaveBeenCalledWith(trigger);
   });
 
   it('inserting flashcards reveals front and back fields on the canvas', () => {

@@ -1,0 +1,48 @@
+/* apps/teaching/src/teacher/lesson-split.css — Split lesson dialog (kit confirm-card shell). */
+.confirm-card-overlay.lesson-split-overlay { padding: var(--space-4); }
+.confirm-card-overlay .confirm-card.lesson-split { width: min(100%, 40rem); max-height: calc(100dvh - 2 * var(--space-4)); overflow-y: auto; gap: var(--space-3); box-sizing: border-box; background: var(--paper); }
+.lesson-split__title { margin: 0; font-size: var(--text-lg); }
+.lesson-split__title:focus { outline: none; }
+.lesson-split__body { display: grid; gap: var(--space-3); min-width: 0; }
+.lesson-split__body > * { margin: 0; min-width: 0; }
+.lesson-split [hidden] { display: none !important; }
+.lesson-split__intro, .lesson-split__status, .lesson-split__hint { margin: 0; color: var(--muted); }
+.lesson-split__hint { font-size: var(--text-sm); }
+.lesson-split__reason { margin: 0; }
+.lesson-split__flash { margin: 0; font-weight: var(--weight-semibold); }
+.lesson-split__group { display: grid; gap: var(--space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
+.lesson-split__subtitle { margin: 0 0 var(--space-1); padding: 0; font-size: var(--text-md, 1rem); font-weight: var(--weight-semibold); }
+.lesson-split__parts { display: grid; gap: var(--space-2); }
+.lesson-split__part { display: grid; grid-template-columns: minmax(0, 1fr) 9rem auto; gap: var(--space-2); align-items: end; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.lesson-split__whole { grid-column: 1 / -1; display: grid; gap: 2px; }
+.lesson-split__field { display: grid; gap: 2px; min-width: 0; }
+.lesson-split__label { font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.lesson-split__check { display: inline-flex; align-items: center; gap: var(--space-1); cursor: pointer; }
+.lesson-split__add { justify-self: start; }
+.lesson-split__sections { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.lesson-split__section { display: grid; grid-template-columns: minmax(0, 1fr) 12rem; gap: var(--space-2); align-items: center; padding: var(--space-1) 0; border-bottom: 1px solid var(--line); }
+.lesson-split__section-title { min-width: 0; overflow-wrap: anywhere; }
+.lesson-split__tag { display: inline-block; padding: 0 var(--space-1); border-radius: 999px; background: color-mix(in srgb, var(--marine) 12%, transparent); color: var(--marine); font-size: var(--text-xs, 0.75rem); font-weight: var(--weight-semibold); vertical-align: middle; }
+.lesson-split__preview { display: grid; gap: var(--space-1); }
+.lesson-split__preview:empty { display: none; }
+.lesson-split__preview p { margin: 0; }
+.lesson-split__problems { margin: 0; padding-left: 1.25rem; color: var(--danger, #b42318); }
+.lesson-split__summary, .lesson-split__done-list { margin: 0; padding-left: 1.25rem; }
+.lesson-split__safe { font-weight: var(--weight-semibold); }
+.lesson-split__note { color: var(--muted); font-size: var(--text-sm); }
+.lesson-split__error { margin: 0; color: var(--danger, #b42318); }
+.lesson-split__error:empty { display: none; }
+.lesson-split__actions { justify-content: flex-end; flex-wrap: wrap; }
+.lesson-split__undo-ask { display: grid; gap: var(--space-2); padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.lesson-split__undo-text { margin: 0; }
+.lesson-split__earlier { display: grid; gap: var(--space-1); padding-top: var(--space-2); border-top: 1px solid var(--line); }
+.lesson-split__earlier-list { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.lesson-split__earlier-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; font-size: var(--text-sm); }
+.lesson-split__earlier-item .lesson-split__undo-ask { grid-column: 1 / -1; }
+.lesson-split__earlier-line { margin: 0; overflow-wrap: anywhere; }
+.lesson-split__earlier-date { color: var(--muted); }
+@media (max-width: 30rem) {
+  .lesson-split__part { grid-template-columns: minmax(0, 1fr) auto; }
+  .lesson-split__part .lesson-split__field--name { grid-column: 1 / -1; }
+  .lesson-split__section { grid-template-columns: minmax(0, 1fr); }
+}
