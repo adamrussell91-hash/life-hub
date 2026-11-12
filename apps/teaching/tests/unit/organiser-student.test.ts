@@ -35,6 +35,35 @@ const byText = (root: ParentNode, sel: string, text: string): HTMLElement =>
 beforeEach(() => localStorage.clear());
 
 describe('organiser panel', () => {
+  it('shows Your week at the top: numbers, known for good, a bar a day and green for days done', () => {
+    const days = ['2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08', '2026-11-09', '2026-11-10'].map((d, i) => ({
+      d,
+      answered: [15, 9, 0, 11, 15, 0, 7][i]!,
+      ready: [15, 15, null, 11, null, 6, 7][i] ?? null,
+      done: [true, false, false, true, true, false, true][i]!
+    }));
+    const week = { streak: 6, cards: 57, first_go: 84, known: 34, total: 62, days, done_days: 4 };
+    const root = renderOrganiserPanel(loadOf({ practice: { today: 2, cards, next: null, week } }), { classId: 'c1' });
+    const block = root.firstElementChild as HTMLElement;
+    expect(block.classList.contains('kos-week')).toBe(true);
+    expect([...block.querySelectorAll('.kos-stat__v')].map((n) => n.textContent)).toEqual(['6', '57', '84%', '34/62']);
+    expect(block.querySelector('.kos-ring')?.getAttribute('aria-label')).toBe('34 of 62 cards known for good');
+    const names = [...block.querySelectorAll('.kos-day__name')].map((n) => n.textContent);
+    expect(names).toHaveLength(7);
+    expect(names[6]).toBe('Tue');
+    expect([...block.querySelectorAll('.kos-day__n')].map((n) => n.textContent)).toEqual(['15/15', '9/15', '0', '11/11', '15', '0/6', '7/7']);
+    expect(block.querySelectorAll('.kos-day__bar.is-done')).toHaveLength(4);
+    expect(block.querySelectorAll('.kos-day__bar.is-zero')).toHaveLength(2);
+    expect(block.querySelector('.kos-days')?.getAttribute('aria-label')).toContain('Tue 7 of 7, all done');
+    expect(block.querySelector('.kos-week__count')?.textContent).toBe('4 of 7 days');
+  });
+
+  it('leaves Your week out with no cards yet, or without the week in the load', () => {
+    const none = { streak: 0, cards: 0, first_go: null, known: 0, total: 0, days: [], done_days: 0 };
+    expect(renderOrganiserPanel(loadOf({ practice: { today: 0, cards: [], next: null, week: none } }), { classId: 'c1' }).querySelector('.kos-week')).toBeNull();
+    expect(renderOrganiserPanel(loadOf(), { classId: 'c1' }).querySelector('.kos-week')).toBeNull();
+  });
+
   it('shows the sheet as it has grown, with new marks and Test myself under a card', () => {
     const concept: SheetSection = { ...table, id: 's3', name: 'Perspective', role: 'concept', sentence: 'A sentence for the unit.' };
     const words: SheetSection = { id: 's4', name: 'Vocabulary', kind: 'table', role: 'vocab', columns: table.columns, lines: [

@@ -11,6 +11,8 @@ import { readJSON, writeJSON } from '@/quiz/dom';
 import { mountWorkSync, type WorkSyncHandle } from '@/student/work-sync';
 import { stepsLoader } from '@/student/next-step';
 import { mountLessonFooter, type LessonFooterHandle } from '@/student/lesson-footer';
+import { mountWhyRoute } from '@/student/why-route';
+import { mountLessonMap, type LessonMapHandle } from '@/student/lesson-map';
 import { mountOrganiserEndCard } from '@/organiser/lesson-end-card';
 import { classForPlainLesson, mountInitialsToken, type InitialsTokenHandle } from '@/student/initials-token';
 import { setVoiceClass } from '@/blocks/voice-client';
@@ -330,6 +332,8 @@ export function mountStudentLessonView(
   let footer: LessonFooterHandle | null = null;
   let token: InitialsTokenHandle | null = null;
   let endCard: { dispose(): void } | null = null;
+  let whyRoute: { dispose(): void } | null = null;
+  let lessonMap: LessonMapHandle | null = null;
   // Plain lessons only: the players and any live quiz round keep the page to themselves.
   const addEndCard = (content: HTMLElement, lesson: PublishedLesson, classId: string, from: string, before?: Node | null): void => {
     if (lecture || lesson.pedagogical_mode === 'quiz') return;
@@ -349,6 +353,10 @@ export function mountStudentLessonView(
     token = null;
     endCard?.dispose();
     endCard = null;
+    lessonMap?.dispose();
+    lessonMap = null;
+    whyRoute?.dispose();
+    whyRoute = null;
     lecture = renderPublishedLesson(content, lesson, extras);
     // Written answers go to the teacher as they're typed, for the class this lesson was opened in.
     const workClass = extras?.cls?.id ?? extras?.quizClassId;
@@ -366,7 +374,11 @@ export function mountStudentLessonView(
       const linkTo = (row: typeof prev) => (row && cls ? { href: `/s/classes/${cls.id}/lessons/${row.lesson_id}`, title: row.title } : null);
       footer = mountLessonFooter({ lessonId: lesson.lesson_id, classId: workClass, prev: linkTo(prev), next: linkTo(next), finish: lesson.pedagogical_mode !== 'quiz', work: () => work, onClaimed: () => token?.refresh() });
       content.append(footer.element);
-      addEndCard(content, lesson, workClass, cls ? `/s/classes/${cls.id}/lessons/${lesson.lesson_id}` : `/s/lessons/${lesson.lesson_id}?class=${workClass}`, footer.element);
+      // Plain lessons only: the section strip on the right and the checklist above the footer.
+      if (!lecture && lesson.pedagogical_mode !== 'quiz') lessonMap = mountLessonMap({ lessonId: lesson.lesson_id, classId: workClass, blocks: lesson.blocks, content, before: footer.element });
+      addEndCard(content, lesson, workClass, cls ? `/s/classes/${cls.id}/lessons/${lesson.lesson_id}` : `/s/lessons/${lesson.lesson_id}?class=${workClass}`, lessonMap?.card ?? footer.element);
+      // Why this matters: a compass by each section title, on plain lessons only (players draw their own pages).
+      if (!lecture) whyRoute = mountWhyRoute({ root: content, lesson, classId: workClass });
     } else {
       // A plain link: the token still finds its class, in its own time.
       void classForPlainLesson(lesson.lesson_id).then(
@@ -496,6 +508,10 @@ export function mountStudentLessonView(
       token = null;
       endCard?.dispose();
       endCard = null;
+      lessonMap?.dispose();
+      lessonMap = null;
+      whyRoute?.dispose();
+      whyRoute = null;
     }
   };
 }

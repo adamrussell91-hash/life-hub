@@ -4,6 +4,7 @@
   --ko-line: rgba(23, 55, 94, 0.14); --ko-wash: rgba(20, 43, 81, 0.04);
   --ko-success: #3d6b4a; --ko-peach: #fdf0e3; --ko-peach-ink: #8a5a24; --ko-card: #fff;
   --ko-r: 0.875rem; --ko-rxs: 0.375rem;
+  --ko-gold: #c9a227; --ko-gold-soft: var(--pastel-gold, #f1e2b6); --ko-gold-ink: var(--pastel-gold-ink, #6c581f);
   container-type: inline-size;
   display: grid; gap: 16px; min-width: 0; max-width: 100%; color: var(--ko-ink); font-size: 15px; line-height: 1.5;
 }
@@ -165,6 +166,34 @@
 .kos-quiet:hover { background: rgba(20, 43, 81, .05); color: var(--ko-navy); }
 .kos-quiet:focus-visible { outline: 3px solid var(--ko-wave); outline-offset: 1px; }
 .kos-stop .kos-new, .kos-pair .kos-new { margin-left: 5px; }
+/* Your week: three numbers, the known-for-good ring, a bar a day. */
+.kos-week { display: grid; gap: 12px; min-width: 0; }
+.kos-week__title { margin: 0; font-size: 16px; color: var(--ko-navy); }
+.kos-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.kos-stat { background: var(--ko-wash); border-radius: 10px; padding: 10px; display: grid; gap: 2px; align-content: start; min-width: 0; }
+.kos-stat__v { font-size: 24px; font-weight: 600; line-height: 1.2; color: var(--ko-navy); font-variant-numeric: tabular-nums; }
+.kos-stat__k { font-size: 12px; color: var(--ko-muted); }
+.kos-stat--ring { grid-template-columns: 52px minmax(0, 1fr); align-items: center; gap: 8px; background: var(--ko-gold-soft); }
+.kos-stat--ring .kos-stat__v { font-size: 18px; }
+.kos-stat--ring .kos-stat__k { color: var(--ko-gold-ink); }
+.kos-stat__words { display: grid; min-width: 0; }
+.kos-ring { width: 52px; height: 52px; }
+.kos-ring__track { stroke: var(--ko-card); }
+.kos-ring__fill { stroke: var(--ko-gold); }
+.kos-ring__pct { font-size: 12px; font-weight: 600; fill: var(--ko-navy); font-variant-numeric: tabular-nums; }
+.kos-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; align-items: end; min-height: 100px; }
+.kos-day { display: grid; gap: 4px; justify-items: center; align-self: end; min-width: 0; }
+.kos-day__bar { width: 100%; border-radius: 5px 5px 2px 2px; background: var(--ko-wave); }
+.kos-day__bar.is-done { background: var(--ko-success); }
+.kos-day__bar.is-zero { background: var(--ko-line); height: 3px; }
+.kos-day__n { font-size: 10px; color: var(--ko-muted); font-variant-numeric: tabular-nums; }
+.kos-day__name { font-size: 11px; color: var(--ko-muted); }
+.kos-week__foot { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; font-size: 12px; color: var(--ko-muted); }
+.kos-week__count { font-variant-numeric: tabular-nums; white-space: nowrap; }
+@container (max-width: 520px) {
+  .kos-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 760px) {
   .kos-sheet { grid-template-columns: minmax(0, 1fr); }
   .kos-quiet { padding: 10px 8px; }

@@ -1,0 +1,53 @@
+/* "Why this matters": compass button by a section title, route line, reason toast, class whys. Tokens only. */
+.wr-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.wr-head > :not(.wr-btn) { min-width: 0; }
+.wr-btn { width: 32px; height: 32px; min-width: 32px; min-height: 32px; aspect-ratio: 1; flex: none; align-self: center; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-full, 50%); background: var(--wave); color: #fff; cursor: pointer; transition: transform 0.15s; }
+.wr-btn:hover { transform: scale(1.06); }
+.wr-btn:focus-visible { outline: 3px solid var(--wave); outline-offset: 3px; }
+.wr-btn[aria-expanded='true'] { box-shadow: 0 0 0 4px color-mix(in srgb, var(--wave) 14%, transparent); }
+.wr-btn svg { width: 18px; height: 18px; }
+
+.wr-panel { display: grid; gap: 10px; margin: var(--space-2, 8px) 0 var(--space-3, 12px); overflow: hidden; }
+.wr-panel[hidden] { display: none; }
+
+.wr-route svg { display: block; width: 100%; max-width: 34rem; height: auto; overflow: visible; }
+.wr-route__track { stroke: var(--line); stroke-width: 4; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.wr-route__fill { stroke: var(--wave); stroke-width: 4; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.wr-route__stop { opacity: 0; transform-box: fill-box; transform-origin: center; transform: scale(0.4); }
+.wr-route__stop--done { fill: var(--sage, var(--success)); }
+.wr-route__stop--next { fill: var(--paper); stroke: var(--muted); stroke-width: 2; }
+.wr-route__stop--goal { fill: var(--warning); }
+.wr-route__stop--here { fill: var(--wave); }
+.wr-route__stop--hole { fill: var(--paper); }
+.wr-route__label { opacity: 0; font-size: 10px; font-family: inherit; fill: var(--muted); }
+.wr-route__label--here { font-weight: 600; fill: var(--wave); }
+.wr-route__label--goal { font-weight: 600; fill: var(--warning); }
+
+.wr-go .wr-route__track { transition: stroke-dashoffset 0.7s ease-out; stroke-dashoffset: 0; }
+.wr-go .wr-route__fill { transition: stroke-dashoffset 0.6s ease-out 0.55s; stroke-dashoffset: 0; }
+.wr-go .wr-route__stop, .wr-go .wr-route__label { opacity: 1; transform: scale(1); transition: opacity 0.25s, transform 0.25s cubic-bezier(0.3, 1.6, 0.6, 1); transition-delay: var(--d, 0s); }
+.wr-go .wr-route__label { transform: none; }
+
+.wr-toast { display: grid; gap: 8px; max-width: 34rem; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--wave); border-radius: var(--radius-md, 10px); background: var(--paper); box-shadow: var(--shadow-card, var(--shadow)); transform: translateY(-8px); opacity: 0; }
+.wr-toast.wr-in { transform: none; opacity: 1; transition: transform 0.3s ease-out 1.1s, opacity 0.3s ease-out 1.1s; }
+.wr-lab { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--wave); }
+.wr-lab--muted { color: var(--muted); }
+.wr-reason { margin: 0; font-size: var(--text-sm, 14px); color: var(--ink); }
+.wr-class { display: grid; gap: 2px; padding-top: 8px; border-top: 1px solid var(--line); }
+.wr-fade { margin: 0; min-height: 1.5em; font-size: var(--text-sm, 14px); font-style: italic; color: var(--ink); transition: opacity 0.6s; }
+.wr-fade--out { opacity: 0; }
+.wr-fade--mine { font-style: normal; font-weight: 600; color: var(--high-sea-ink); }
+
+/* Reduced motion: everything shown at once. */
+.wr--still .wr-route__track, .wr--still .wr-route__fill { stroke-dashoffset: 0; transition: none; }
+.wr--still .wr-route__stop, .wr--still .wr-route__label { opacity: 1; transform: none; transition: none; }
+.wr--still .wr-toast { transform: none; opacity: 1; transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .wr-btn, .wr-route *, .wr-toast, .wr-fade { transition: none !important; }
+}
+
+/* Phones and touch: a 44px round target, matching the block touch-target rule. */
+@media (max-width: 640px), (pointer: coarse) {
+  .wr-btn { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
+  .wr-btn svg { width: 22px; height: 22px; }
+}

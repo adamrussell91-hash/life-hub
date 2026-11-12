@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/organiser/print', () => ({ printOrganiser: vi.fn() }));
 import { renderProfile } from '@/student/profile-view';
+import { renderTodoPanel, type TodoPayload } from '@/student/todo-panel';
 import { pieceView, returnedList } from '@/student/returned-view';
 
 const unit = {
@@ -153,7 +154,7 @@ describe('progress page', () => {
     }
   });
   it('puts the soonest assessment countdown at the top, and says when its page is still closed', () => {
-    const todo = { countdowns: [{ title: 'Sprint step', lesson_id: 'l2', assessment: false, due_date: '2099-01-01', due_time: '', set_date: '', published: true }, { title: 'Viva task', lesson_id: 'l5', assessment: true, due_date: '2099-02-01', due_time: '13:24', set_date: '', published: false }], announcements: [], practice: null, back: [], waiting: [], started: [], todo: [], more: 0 };
+    const todo = { countdowns: [{ title: 'Sprint step', lesson_id: 'l2', assessment: false, due_date: '2099-01-01', due_time: '', set_date: '', published: true }, { title: 'Viva task', lesson_id: 'l5', assessment: true, due_date: '2099-02-01', due_time: '13:24', set_date: '', published: false }], announcements: [], practice: null, waiting: [], boxes: [], more: 0 };
     const h = renderProfile({ ...rich, unseen: 0, todo } as never, { classId: 'class1' });
     const panel = h.querySelector('.pg-panel')!;
     const top = panel.firstElementChild as HTMLElement;
@@ -276,5 +277,59 @@ describe('organiser tab', () => {
     expect(h.querySelector('.pm-claim')).toBeNull();
     expect(h.querySelector('.kos-title')!.textContent).toBe('Sample unit organiser');
     expect(h.querySelector('.kos-prac')).toBeNull();
+  });
+});
+
+describe('To do panel boxes', () => {
+  const lesson = (id: string, extra: Record<string, unknown> = {}) => ({ id, title: `Lesson ${id}`, kind: 'lesson' as const, role: 'core' as const, done: false, reason: 'Next in the unit', ...extra });
+  const base: TodoPayload = { countdowns: [], announcements: [], practice: null, waiting: [], boxes: [], more: 0 };
+
+  it('draws the boxes in order with dot headings, hints and reasons; empty boxes are left out', () => {
+    const panel = renderTodoPanel({ ...base, boxes: [
+      { key: 'now', items: [
+        lesson('s', { reason: 'Pick up where you left off', started: { activities: [{ id: 'a', title: 'Warm-up', done: true }, { id: 'b', title: 'Questions', done: false }] } }),
+        { id: 'w:1', title: 'Hinge', kind: 'feedback', done: false, reason: 'Your teacher asked for another go', feedback: { state: 'redraft', kind: 'answer', date: '5 Nov' } },
+        { id: 'w:2', title: 'Essay', kind: 'feedback', done: false, reason: 'Feedback is back. Have a read', feedback: { state: 'new', kind: 'written', date: '5 Nov' } }
+      ] },
+      { key: 'next', items: [] },
+      { key: 'challenge', items: [lesson('x', { role: 'extension', reason: 'Challenge lesson', kind: 'quiz' })] }
+    ] }, { classId: 'class1' });
+    const boxes = [...panel.querySelectorAll('.td-box')];
+    expect(boxes.map((b) => b.querySelector('.td-group__title')!.textContent)).toEqual(['Do now', 'Challenge']);
+    expect(boxes[0]!.querySelector('.td-box__hint')!.textContent).toBe('For your next test, or something to fix');
+    expect([...boxes[0]!.querySelectorAll('.td-item__why')].map((w) => w.textContent)).toEqual(['Pick up where you left off', 'Your teacher asked for another go', 'Feedback is back. Have a read']);
+    expect(boxes[0]!.querySelector('.td-acts')!.textContent).toContain('Warm-up');
+    expect(boxes[0]!.querySelector('.td-meter')).not.toBeNull();
+    expect([...boxes[0]!.querySelectorAll('.td-go')].map((g) => g.textContent)).toEqual(['Carry on →', 'Answer again →', 'Open →']);
+    expect(boxes[1]!.querySelector('.td-item__note')!.textContent).toBe('Quiz');
+    expect(panel.textContent).not.toContain('Keep going');
+    expect(panel.textContent).not.toContain('Still to do');
+  });
+
+  it('Back to you holds only work with the teacher', () => {
+    const panel = renderTodoPanel({ ...base, waiting: [{ title: 'Draft', lesson_id: 'l1', at: '2026-11-06T00:00:00Z' }] }, { classId: 'class1' });
+    const group = [...panel.querySelectorAll('.td-group')].find((g) => g.querySelector('.td-group__title')!.textContent === 'Back to you')!;
+    expect(group.textContent).toContain('With your teacher');
+  });
+
+  it('shows three rows not done; done-today rows stay ticked without a slot; Show more opens the rest', () => {
+    const items = [lesson('d', { done: true }), ...['a', 'b', 'c', 'e', 'f'].map((id) => lesson(id))];
+    const panel = renderTodoPanel({ ...base, boxes: [{ key: 'next', items }], more: 4 }, { classId: 'class1' });
+    const box = panel.querySelector('.td-box')!;
+    const visible = () => [...box.querySelectorAll('.td-item')].filter((r) => !r.closest('[hidden]')).map((r) => r.querySelector('.td-item__title')!.textContent);
+    expect(visible()).toEqual(['Lesson d', 'Lesson a', 'Lesson b', 'Lesson c']);
+    expect(box.querySelector('.td-mark--tick')).not.toBeNull();
+    expect(box.querySelector('.td-item__title.is-done')!.nextElementSibling?.classList.contains('td-item__why')).toBe(false);
+    const toggle = box.querySelector<HTMLButtonElement>('.td-morebtn')!;
+    expect(toggle.textContent).toBe('Show 2 more');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(box.querySelector(`#${toggle.getAttribute('aria-controls')}`)).not.toBeNull();
+    toggle.click();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(toggle.textContent).toBe('Show less');
+    expect(visible()).toEqual(['Lesson d', 'Lesson a', 'Lesson b', 'Lesson c', 'Lesson e', 'Lesson f']);
+    toggle.click();
+    expect(visible()).toHaveLength(4);
+    expect(panel.querySelector('.td-more')!.textContent).toBe('And 4 more on the map.');
   });
 });

@@ -108,6 +108,22 @@ function heldParts(lessonId: string): Array<[string, unknown]> {
   return found;
 }
 
+/**
+ * The writing this device holds for a lesson, by block then part (`answers`, `format.x`, ...), as text fields.
+ * Next-step picks are left out: they sit beside the writing but aren't any. The lesson map ticks sections from this.
+ */
+export function savedWorkByBlock(lessonId: string): Map<string, Record<string, Record<string, string>>> {
+  const out = new Map<string, Record<string, Record<string, string>>>();
+  for (const [key, value] of heldParts(lessonId)) {
+    const where = parseWorkKey(lessonId, key);
+    if (!where || where.part.startsWith('step.')) continue;
+    const fields = writtenFields(value);
+    if (!Object.keys(fields).length) continue;
+    out.set(where.blockId, { ...(out.get(where.blockId) ?? {}), [where.part]: fields });
+  }
+  return out;
+}
+
 export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): WorkSyncHandle {
   const { lessonId, classId } = options;
   const call = options.call ?? networkCall(lessonId, classId);

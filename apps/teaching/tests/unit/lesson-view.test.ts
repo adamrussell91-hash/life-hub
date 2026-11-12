@@ -3,6 +3,7 @@ import { mountStudentLessonView } from '@/student/lesson-view';
 
 vi.mock('@/api/client', () => ({
   apiGet: vi.fn(),
+  apiPost: vi.fn(async () => ({ route: null, reason: null, big_idea: null })),
   ApiClientError: class ApiClientError extends Error {
     code: string;
     constructor(opts: { code: string; message: string }) {

@@ -4,7 +4,7 @@ import { printOrganiser } from './print';
 import { mountPractice, nextCardsLine, type PracticeApi } from './practice';
 import { mountTestMyself, type TestMyselfHandle } from './test-myself';
 import { conceptColourAt, isIdeas, lineWords } from './editor-model';
-import type { OrganiserLoad, Sheet, SheetLine, SheetSection } from './types';
+import type { OrganiserLoad, PracticeWeek, Sheet, SheetLine, SheetSection } from './types';
 import './organiser-student.css';
 
 export type OrganiserPanelOptions = {
@@ -24,6 +24,75 @@ function weekday(date: string): string {
 export const minutesFor = (n: number): number => Math.max(1, Math.round((n * 2) / 3));
 /** How often each box comes round, as the server's GAPS. */
 const BOX_GAPS = ['every day', 'every 3 days', 'every week', 'every 2 weeks', 'every 4 weeks'];
+
+const SVG = 'http://www.w3.org/2000/svg';
+const svgEl = (name: string, attrs: Record<string, string>): SVGElement => {
+  const node = document.createElementNS(SVG, name);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  return node;
+};
+const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
+const shortDay = (date: string): string => {
+  const d = new Date(`${date}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? date : d.toLocaleDateString('en-AU', { weekday: 'short', timeZone: 'UTC' });
+};
+const BAR_MAX = 60;
+
+/** "Your week": three numbers, the cards known for good, and a bar a day (green when every ready card was done). */
+export function weekBlock(week: PracticeWeek): HTMLElement {
+  const block = el('section', 'kos-week');
+  block.setAttribute('aria-label', 'Your week');
+  block.append(el('h3', 'kos-week__title', 'Your week'));
+
+  const stats = el('div', 'kos-stats');
+  const stat = (value: string, label: string): HTMLElement => {
+    const tile = el('div', 'kos-stat');
+    tile.append(el('span', 'kos-stat__v', value), el('span', 'kos-stat__k', label));
+    return tile;
+  };
+  stats.append(
+    stat(String(week.streak), week.streak === 1 ? 'day in a row' : 'days in a row'),
+    stat(String(week.cards), week.cards === 1 ? 'card this week' : 'cards this week'),
+    stat(week.first_go === null ? '–' : `${week.first_go}%`, 'right first go')
+  );
+  const share = week.total ? week.known / week.total : 0;
+  const ring = el('div', 'kos-stat kos-stat--ring');
+  const svg = svgEl('svg', { class: 'kos-ring', viewBox: '0 0 52 52', role: 'img', 'aria-label': `${week.known} of ${plural(week.total, 'card', 'cards')} known for good` });
+  const round = 2 * Math.PI * 21;
+  svg.append(
+    svgEl('circle', { cx: '26', cy: '26', r: '21', fill: 'none', class: 'kos-ring__track', 'stroke-width': '7' }),
+    ...(share > 0 ? [svgEl('circle', { cx: '26', cy: '26', r: '21', fill: 'none', class: 'kos-ring__fill', 'stroke-width': '7', 'stroke-linecap': 'round', 'stroke-dasharray': `${(share * round).toFixed(1)} ${round.toFixed(1)}`, transform: 'rotate(-90 26 26)' })] : [])
+  );
+  const pct = svgEl('text', { x: '26', y: '30', 'text-anchor': 'middle', class: 'kos-ring__pct' });
+  pct.textContent = `${Math.round(share * 100)}%`;
+  svg.append(pct);
+  const words = el('div', 'kos-stat__words');
+  words.append(el('span', 'kos-stat__v', `${week.known}/${week.total}`), el('span', 'kos-stat__k', 'known for good'));
+  ring.append(svg, words);
+  stats.append(ring);
+  block.append(stats);
+
+  const top = Math.max(1, ...week.days.map((d) => Math.max(d.answered, d.ready ?? 0)));
+  const bars = el('div', 'kos-days');
+  bars.setAttribute('role', 'img');
+  bars.setAttribute(
+    'aria-label',
+    `Cards you did each day this week: ${week.days.map((d) => `${shortDay(d.d)} ${d.ready === null ? d.answered : `${d.answered} of ${d.ready}`}${d.done ? ', all done' : ''}`).join('; ')}`
+  );
+  for (const d of week.days) {
+    const day = el('div', 'kos-day');
+    day.setAttribute('aria-hidden', 'true');
+    const bar = el('div', `kos-day__bar${d.done ? ' is-done' : ''}${d.answered ? '' : ' is-zero'}`);
+    if (d.answered) bar.style.height = `${Math.max(4, Math.round((d.answered / top) * BAR_MAX))}px`;
+    day.append(el('small', 'kos-day__n', d.ready === null ? String(d.answered) : `${d.answered}/${d.ready}`), bar, el('span', 'kos-day__name', shortDay(d.d)));
+    bars.append(day);
+  }
+  block.append(bars);
+  const foot = el('div', 'kos-week__foot');
+  foot.append(el('span', undefined, 'Green means you did every card that was ready that day'), el('span', 'kos-week__count', `${week.done_days} of ${week.days.length} days`));
+  block.append(foot);
+  return block;
+}
 
 export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPanelOptions): HTMLElement {
   const root = el('div', 'kos-root');
@@ -169,6 +238,8 @@ export function renderOrganiserPanel(load: OrganiserLoad, options: OrganiserPane
   function showOverview(): void {
     stopAll();
     const parts: HTMLElement[] = [];
+    const week = load.need !== 'no_list' ? load.practice?.week : undefined;
+    if (week && (week.total > 0 || week.cards > 0)) parts.push(weekBlock(week));
     const head = el('div');
     head.append(el('h2', 'kos-title', sheet.title), el('p', 'kos-sub', 'Grows as your lessons come out.'));
     parts.push(head);
