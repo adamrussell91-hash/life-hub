@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { claimInitials, loadRoster } from '../../netlify/functions/_shared/class-claims.mjs';
 import { OrganiserError, organiserStudentAction, organiserTeacherAction, practiceToday, sendPiecesToBoxOne } from '../../netlify/functions/_shared/organiser.mjs';
 import { recordDone } from '../../netlify/functions/_shared/profile-done.mjs';
+import { deviceHash } from '../../netlify/functions/_shared/question-drop.mjs';
 import { ORGANISER_LIMITS } from '../../netlify/functions/_shared/organiser-model.mjs';
 
 // Store with etags, so the teacher endpoint's compare-and-set is exercised.
@@ -198,6 +199,35 @@ test('practice holds only lessons the student ticked off, as soon as they tick',
   out = await student(store, { action: 'load', class_token: token(1) });
   assert.equal(out.practice.cards.some((c) => c.cue === SECRET.nodate), true);
   assert.equal(out.practice.boxes[0], out.practice.cards.length);
+});
+
+/** The claimed student hands in (or only starts) a lesson's quiz, with no tick. */
+async function quizFor(store, lessonId, { handed = true, mode = 'quiz' } = {}) {
+  const roster = await loadRoster(store, 'class1');
+  const owner = deviceHash(`student:class1:${roster.students[0].id}`);
+  store.data.set(`lessons/${lessonId}`, { ...store.data.get(`lessons/${lessonId}`), pedagogical_mode: mode });
+  store.data.set(`quiz/${lessonId}/current`, { version: 'v1' });
+  store.data.set(`quiz/${lessonId}/attempts/${owner}/1`, { n: 1 });
+  if (handed) store.data.set(`quiz/${lessonId}/results/${owner}/1`, { submitted_at: '2026-11-04T01:00:00Z' });
+}
+
+test('a handed-in quiz counts as finishing the lesson, as on the progress map, so its cards join', async () => {
+  const store = await fixture([row('r7', 'nodate', '2026-11-10')]);
+  await seeded(store);
+  await quizFor(store, 'nodate', { handed: false });
+  let out = await student(store, { action: 'load', class_token: token(1) });
+  assert.equal(out.practice.cards.some((c) => c.cue === SECRET.nodate), false);
+  await quizFor(store, 'nodate');
+  out = await student(store, { action: 'load', class_token: token(1) });
+  assert.equal(out.practice.cards.some((c) => c.cue === SECRET.nodate), true);
+});
+
+test('a handed-in assessment quiz does not count: an assessment needs the teacher\'s mark', async () => {
+  const store = await fixture([row('r7', 'nodate', '2026-11-10')]);
+  await seeded(store);
+  await quizFor(store, 'nodate', { mode: 'assessment' });
+  const out = await student(store, { action: 'load', class_token: token(1) });
+  assert.equal(out.practice.cards.some((c) => c.cue === SECRET.nodate), false);
 });
 
 test('side lesson lines reach only the students that lesson is for', async () => {
