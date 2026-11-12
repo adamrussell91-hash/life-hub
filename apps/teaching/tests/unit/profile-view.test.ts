@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/organiser/print', () => ({ printOrganiser: vi.fn() }));
-import { renderProfile } from '@/student/profile-view';
+import { renderProfile, withPracticeFrom } from '@/student/profile-view';
+import { PRACTISED_EVENT } from '@/organiser/practice';
 import { renderTodoPanel, type TodoPayload } from '@/student/todo-panel';
 import { pieceView, returnedList } from '@/student/returned-view';
 
@@ -304,6 +305,31 @@ describe('To do panel boxes', () => {
     expect(boxes[1]!.querySelector('.td-item__note')!.textContent).toBe('Quiz');
     expect(panel.textContent).not.toContain('Keep going');
     expect(panel.textContent).not.toContain('Still to do');
+  });
+
+  it('the organiser row counts down as cards are practised and ticks off at none left', () => {
+    const panel = renderTodoPanel({ ...base, practice: { today: 3, answered: 0 } }, { classId: 'class1' });
+    document.body.append(panel);
+    const row = () => [...panel.querySelectorAll('.td-item')].find((r) => r.textContent!.includes('Practise your organiser'))!;
+    expect(row().querySelector('.td-mark--box')).not.toBeNull();
+    const practised = (classId: string, today: number) => document.dispatchEvent(new CustomEvent(PRACTISED_EVENT, { detail: { classId, today } }));
+    practised('class1', 1);
+    expect(row().textContent).toContain('1 card left');
+    practised('other', 0);
+    expect(row().querySelector('.td-mark--box')).not.toBeNull();
+    practised('class1', 0);
+    expect(row().querySelector('.td-mark--tick')).not.toBeNull();
+    expect(row().textContent).toContain('Done for today');
+    expect(row().querySelector('.td-go')).toBeNull();
+    panel.remove();
+  });
+
+  it('a reloaded organiser replaces the stale practice count', () => {
+    const p = { need: null, todo: { ...base, practice: { today: 5, answered: 0 } } };
+    const load = (practice: unknown) => ({ need: null, sheets: [], practice }) as never;
+    expect(withPracticeFrom(p as never, load({ today: 0, answered: 5, cards: [], next: null })).todo!.practice).toEqual({ today: 0, answered: 5 });
+    expect(withPracticeFrom(p as never, load(null)).todo!.practice).toBeNull();
+    expect(withPracticeFrom(p as never, null)).toBe(p);
   });
 
   it('Back to you holds only work with the teacher', () => {

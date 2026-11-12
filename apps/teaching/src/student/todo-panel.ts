@@ -6,6 +6,7 @@
 import { el } from '@/quiz/dom';
 import { studentAnchor } from '@/student/shell';
 import { minutesFor } from '@/organiser/student-panel';
+import { PRACTISED_EVENT } from '@/organiser/practice';
 import './todo-panel.css';
 
 export type TodoActivity = { id: string; title: string; done: boolean };
@@ -172,6 +173,17 @@ function item(mark: Mark, title: string, note: string, action?: HTMLElement, pil
 }
 
 /** A link that opens another tab of the progress page (Returned work, Organiser). */
+/** The daily practice row: an orange card with cards left, or a tick once today's are done. */
+function practiceRow(left: number, teacher: boolean): HTMLElement {
+  if (left <= 0) return item('tick', 'Practise your organiser', 'Done for today');
+  const minutes = minutesFor(left);
+  const note = `${left} ${left === 1 ? 'card' : 'cards'} left · about ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+  // Orange card so the daily practice stands out from the plain rows below it.
+  const row = item('box', 'Practise your organiser', note, teacher ? undefined : tabLink('Practise →', 'organiser', 'Practise your organiser'));
+  row.classList.add('td-item--practise');
+  return row;
+}
+
 function tabLink(label: string, tab: string, aria: string): HTMLButtonElement {
   const b = el('button', 'td-go', label);
   b.type = 'button';
@@ -319,16 +331,23 @@ export function renderTodoPanel(todo: TodoPayload, options: TodoOptions): HTMLEl
   const prac = todo.practice;
   if (prac && (prac.today > 0 || prac.answered > 0)) {
     const g = group('Today');
-    if (prac.today > 0) {
-      const minutes = minutesFor(prac.today);
-      const note = `${prac.today} ${prac.today === 1 ? 'card' : 'cards'} left · about ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
-      // Orange card so the daily practice stands out from the plain rows below it.
-      const row = item('box', 'Practise your organiser', note, options.teacher ? undefined : tabLink('Practise →', 'organiser', 'Practise your organiser'));
-      row.classList.add('td-item--practise');
-      g.append(row);
-    } else g.append(item('tick', 'Practise your organiser', 'Done for today'));
+    let row = practiceRow(prac.today, !!options.teacher);
+    g.append(row);
     panel.append(g);
     any = true;
+    // A practice round on the Organiser tab counts this row down and ticks it off when none are
+    // left, without reloading the page. The listener goes once the panel is redrawn away.
+    if (!options.teacher) {
+      const onPractised = (e: Event): void => {
+        if (!panel.isConnected) return document.removeEventListener(PRACTISED_EVENT, onPractised);
+        const d = (e as CustomEvent<{ classId?: string; today?: number }>).detail;
+        if (!d || d.classId !== options.classId || typeof d.today !== 'number') return;
+        const next = practiceRow(Math.max(0, d.today), false);
+        row.replaceWith(next);
+        row = next;
+      };
+      document.addEventListener(PRACTISED_EVENT, onPractised);
+    }
   }
 
   // Back to you holds only work still with the teacher; feedback to read or redo sits in Do now.
