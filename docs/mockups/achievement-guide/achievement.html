@@ -211,7 +211,6 @@
   /* Read */
   .stream { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; }
   .stream text { font-family: var(--font); }
-  .stream .fade { transition: stroke-width .28s var(--ease), opacity .2s; }
   .key { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 14px; line-height: 1.4; }
   .key span { display: inline-flex; gap: 6px; align-items: center; }
   .key i { display: inline-block; width: 18px; height: 8px; border-radius: 2px; }
@@ -410,10 +409,8 @@
     </div>
     <div class="card card--wide">
       <h4>The stream picture</h4>
-      <p>Widths are your read on a 0 to 10 scale, not a test score. The grey core inside each stream is last time, at its true width. The little pinch marks sit on whatever names the read.</p>
-      <svg class="anatomy" viewBox="0 0 340 196" role="img" aria-label="Anatomy of the stream picture">
-        <g id="anat"></g>
-      </svg>
+      <p>Widths are your read on a 0 to 10 scale, not a test score. Each stream bends into its share of the channel, so nothing overlaps. Dashed edges show last time, wherever the read moved. The word narrowest sits under whichever area names the read.</p>
+      <div id="anat"></div>
     </div>
     <div class="card">
       <h4>The shelf, side by side</h4>
@@ -550,7 +547,7 @@
   <div class="row">
     <div style="width:560px;max-width:100%">
       <div id="staticCard"></div>
-      <p class="cap" style="max-width:560px">The narrowest stream names the read and colours the card. The faint ribbons are the run from 15 October, so you can see Worth it widen. The key also lists what Ollie rated when they took their turn.</p>
+      <p class="cap" style="max-width:560px">The narrowest stream names the read and colours the card. The dashed edges are the run from 15 October, drawn only where the read moved, so you can see Worth it and Can I widen. The key also lists what Ollie rated when they took their turn.</p>
     </div>
   </div>
 
@@ -709,7 +706,6 @@ const THEIR = {
    The stream picture: one drawing used everywhere.
    =================================================================== */
 const NS = 'http://www.w3.org/2000/svg';
-const W = (v) => 2 + v * 2.3; // 0..10 -> 2..25 units
 const qn = (a) => a.short + '?';
 const geo = (a, b, c) => Math.cbrt(Math.max(0, a) * Math.max(0, b) * Math.max(0, c));
 
@@ -720,81 +716,169 @@ function svgEl(tag, attrs, text) {
   return n;
 }
 
-/** vals: {value, efficacy, env, reg} each 0..10 or null (not asked).
-    Labels sit in a left gutter and above the gate, so they never cross a ribbon. */
-function drawStream(g, vals, opts = {}) {
-  const { ghost = null, labels = true, top = 0 } = opts;
-  const pin = opts.pin || profileFor(vals); // the area that names the read, so picture and words agree
-  g.replaceChildren();
-  const ys = { value: top + 30, efficacy: top + 78, env: top + 126 };
-  const cy = top + 78;
-  const x0 = labels ? 88 : 10, xj = labels ? 200 : 170, xg = labels ? 262 : 246, xo = xg + 8, xe = 322;
-  const att = ['value', 'efficacy', 'env'];
-  const known = att.filter((k) => vals[k] != null);
-  const ch = known.length === 3 ? geo(vals.value, vals.efficacy, vals.env) : (known.length ? Math.min(...known.map((k) => vals[k])) : 0);
-  const reg = vals.reg;
-  const out = reg == null ? ch : Math.min(ch, reg);
-  const narrow = att.includes(pin) && vals[pin] != null ? pin : null;
-  const span = xj - x0;
-  const inflow = (k) => `M ${x0} ${ys[k]} C ${x0 + span * 0.6} ${ys[k]}, ${x0 + span * 0.72} ${cy}, ${xj} ${cy}`;
+/* The stream picture, drawn as filled ribbons like a Sankey diagram.
+   Each stream keeps its own width where it starts, then bends and narrows to its share of the
+   channel, so the three stack edge to edge with nothing overlapping. The channel's width is the
+   geometric mean of the three (our rule: a stream near zero closes it). It tapers into the gate,
+   whose opening is the Run it read, and turns blue on its way into the work.
+   Elements are made once; changes tween the numbers and repaint the same paths. */
+let streamSeq = 0;
+const SW = (v) => 3 + v * 2.1; // 0..10 -> 3..24 units, one stream
+const RIVER = 1.55; // the channel and gate use a wider scale: a healthy river is wider than any one stream
+const ATT = ['value', 'efficacy', 'env'];
+const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // channel first so the streams overlap it cleanly at the join
-  g.append(svgEl('path', { class: 'fade', d: `M ${xj - 2} ${cy} L ${xg} ${cy}`, fill: 'none', stroke: 'var(--channel)', 'stroke-width': W(ch) }));
-  for (const k of att) {
-    const a = AREA[k];
-    if (vals[k] == null) g.append(svgEl('path', { d: inflow(k), fill: 'none', stroke: a.col, 'stroke-opacity': '.5', 'stroke-width': 1.5, 'stroke-dasharray': '3 4' }));
-    else g.append(svgEl('path', { class: 'fade', d: inflow(k), fill: 'none', stroke: a.col, 'stroke-width': W(vals[k]) }));
+function streamGeometry(vals, labels) {
+  const cy = 74;
+  const ys = { value: cy - 46, efficacy: cy, env: cy + 46 };
+  const x0 = labels ? 92 : 8, xj = labels ? 204 : 168, xg = labels ? 262 : 250, xe = labels ? 318 : 322;
+  const known = ATT.filter((k) => vals[k] != null);
+  const ch = known.length === 3 ? geo(vals.value, vals.efficacy, vals.env) : known.length ? Math.min(...known.map((k) => vals[k])) : 0;
+  const C = SW(ch) * RIVER;
+  const reg = vals.reg;
+  const O = reg == null ? C : Math.min(C, SW(reg) * RIVER);
+  const G = reg == null ? C + 6 : SW(reg) * RIVER;
+  const total = known.reduce((sum, k) => sum + SW(vals[k]), 0);
+  let y = cy - C / 2;
+  const rib = {};
+  for (const k of ATT) {
+    if (vals[k] == null) { rib[k] = null; continue; }
+    const w = SW(vals[k]);
+    const share = total ? (C * w) / total : 0;
+    rib[k] = { lt: ys[k] - w / 2, lb: ys[k] + w / 2, rt: y, rb: y + share };
+    y += share;
   }
-  // gate posts: the opening is the regulation read
-  const gap = reg == null ? W(ch) + 4 : Math.max(W(reg), 3);
-  const postCol = reg == null ? '#9aa3ad' : AREA.reg.col;
-  g.append(svgEl('rect', { x: xg, y: cy - gap / 2 - 24, width: 8, height: 24, rx: 2.5, fill: postCol }));
-  g.append(svgEl('rect', { x: xg, y: cy + gap / 2, width: 8, height: 24, rx: 2.5, fill: postCol }));
-  const ow = W(out);
-  g.append(svgEl('path', { class: 'fade', d: `M ${xo} ${cy} L ${xe} ${cy}`, fill: 'none', stroke: AREA.reg.col, 'stroke-opacity': reg == null ? '.4' : '1', 'stroke-width': ow }));
-  g.append(svgEl('path', { d: `M ${xe} ${cy - ow / 2 - 5} L ${xe + 14} ${cy} L ${xe} ${cy + ow / 2 + 5} Z`, fill: AREA.reg.col, 'fill-opacity': reg == null ? '.4' : '1' }));
-  // last time: a grey core at its true width, laid over the current stream
-  if (ghost) {
-    const gch = geo(ghost.value, ghost.efficacy, ghost.env);
-    const gs = { stroke: '#1b2230', 'stroke-opacity': '.2', fill: 'none' };
-    for (const k of att) if (vals[k] != null) g.append(svgEl('path', { ...gs, d: inflow(k), 'stroke-width': W(ghost[k]) }));
-    g.append(svgEl('path', { ...gs, d: `M ${xj} ${cy} L ${xg} ${cy}`, 'stroke-width': W(gch) }));
-    g.append(svgEl('path', { ...gs, d: `M ${xo} ${cy} L ${xe} ${cy}`, 'stroke-width': W(Math.min(gch, ghost.reg)) }));
-  }
-  // pinch marks on the narrowest stream, on its flat start
-  if (narrow) {
-    const y = ys[narrow], hh = W(vals[narrow]) / 2, x = x0 + 16;
-    g.append(svgEl('path', { d: `M ${x - 4} ${y - hh - 7} L ${x} ${y - hh - 1.5} L ${x + 4} ${y - hh - 7} M ${x - 4} ${y + hh + 7} L ${x} ${y + hh + 1.5} L ${x + 4} ${y + hh + 7}`, fill: 'none', stroke: '#1b2230', 'stroke-width': 1.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
-  }
-  if (pin === 'reg' && reg != null) {
-    const x = xg + 4;
-    g.append(svgEl('path', { d: `M ${x - 4} ${cy - gap / 2 - 31} L ${x} ${cy - gap / 2 - 26} L ${x + 4} ${cy - gap / 2 - 31} M ${x - 4} ${cy + gap / 2 + 31} L ${x} ${cy + gap / 2 + 26} L ${x + 4} ${cy + gap / 2 + 31}`, fill: 'none', stroke: '#1b2230', 'stroke-width': 1.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
-  }
-  if (!labels) return;
-  for (const k of att) {
-    const a = AREA[k];
-    const t = svgEl('text', { x: x0 - 8, y: ys[k] + 4, 'font-size': 11.5, 'font-weight': 650, fill: a.ink, 'text-anchor': 'end' });
-    t.append(svgEl('tspan', {}, qn(a) + ' '));
-    t.append(svgEl('tspan', { 'font-weight': 400, fill: '#6b7380' }, vals[k] == null ? '·' : String(vals[k])));
-    g.append(t);
-    if (k === narrow) g.append(svgEl('text', { x: x0 - 8, y: ys[k] + 17, 'font-size': 10, 'font-weight': 700, fill: '#1b2230', 'text-anchor': 'end' }, 'narrowest'));
-  }
-  g.append(svgEl('text', { x: (xj + xg) / 2, y: cy + W(ch) / 2 + 14, 'font-size': 10.5, fill: '#6b7380', 'text-anchor': 'middle' }, 'together'));
-  const rt = svgEl('text', { x: xg + 4, y: cy - gap / 2 - 30, 'font-size': 11.5, 'font-weight': 650, fill: AREA.reg.ink, 'text-anchor': 'middle' });
-  rt.append(svgEl('tspan', {}, 'Run it? '));
-  rt.append(svgEl('tspan', { 'font-weight': 400, fill: '#6b7380' }, reg == null ? '·' : String(reg)));
-  g.append(rt);
-  if (pin === 'reg') g.append(svgEl('text', { x: xg + 4, y: cy - gap / 2 - 43, 'font-size': 10, 'font-weight': 700, fill: '#1b2230', 'text-anchor': 'middle' }, 'narrowest'));
-  g.append(svgEl('text', { x: xe + 14, y: cy - ow / 2 - 8, 'font-size': 10.5, fill: '#6b7380', 'text-anchor': 'end' }, 'into the work'));
+  return { cy, ys, x0, xj, xg, xe, C, O, G, rib };
 }
 
-function streamSvg(vals, opts = {}) {
-  const box = opts.labels === false ? '0 8 340 140' : '0 -4 340 156';
-  const svg = svgEl('svg', { class: 'stream', viewBox: box, role: 'img', 'aria-label': streamWords(vals) });
-  const g = svgEl('g', {});
-  svg.append(g);
-  drawStream(g, vals, opts);
-  return { svg, g };
+const ribbonD = (g, r) => {
+  const m = g.x0 + (g.xj - g.x0) * 0.56;
+  return `M ${g.x0} ${r.lt} C ${m} ${r.lt} ${m} ${r.rt} ${g.xj + 0.8} ${r.rt} L ${g.xj + 0.8} ${r.rb} C ${m} ${r.rb} ${m} ${r.lb} ${g.x0} ${r.lb} Z`;
+};
+const centreD = (g, k) => { const m = g.x0 + (g.xj - g.x0) * 0.56; return `M ${g.x0} ${g.ys[k]} C ${m} ${g.ys[k]} ${m} ${g.cy} ${g.xj} ${g.cy}`; };
+function channelD(g) {
+  const { xj, xg, xe, cy, C, O } = g;
+  const t1 = cy - C / 2, b1 = cy + C / 2, t2 = cy - O / 2, b2 = cy + O / 2;
+  const a = xg - 24, m = xg - 12, ah = O / 2 + 6;
+  return `M ${xj} ${t1} L ${a} ${t1} C ${m} ${t1} ${m} ${t2} ${xg} ${t2} L ${xe} ${t2} L ${xe} ${cy - ah} L ${xe + 15} ${cy} L ${xe} ${cy + ah} L ${xe} ${b2} L ${xg} ${b2} C ${m} ${b2} ${m} ${b1} ${a} ${b1} L ${xj} ${b1} Z`;
+}
+
+function makeStream(vals, opts = {}) {
+  const id = ++streamSeq;
+  const labels = opts.labels !== false;
+  const box = opts.box || (labels ? '0 0 340 150' : '0 10 340 128');
+  const svg = svgEl('svg', { class: 'stream', viewBox: box, role: 'img' });
+  const g0 = streamGeometry({ value: 5, efficacy: 5, env: 5, reg: 5 }, labels);
+  const defs = svgEl('defs', {});
+  const grad = (gid, x1, x2, stops) => {
+    const lg = svgEl('linearGradient', { id: gid, gradientUnits: 'userSpaceOnUse', x1, x2, y1: 0, y2: 0 });
+    for (const [off, col] of stops) lg.append(svgEl('stop', { offset: off, 'stop-color': col }));
+    defs.append(lg);
+  };
+  const CH = '#4a5466';
+  for (const k of ATT) grad(`sg${id}${k}`, g0.x0, g0.xj, [[0, AREA[k].col], [0.62, AREA[k].col], [1, CH]]);
+  grad(`sg${id}ch`, g0.xj, g0.xe + 15, [[0, CH], [(g0.xg - g0.xj) / (g0.xe + 15 - g0.xj), CH], [1, AREA.reg.col]]);
+  svg.append(defs);
+  const ribbons = {}, centres = {}, ghosts = {};
+  const channel = svgEl('path', { fill: `url(#sg${id}ch)` });
+  svg.append(channel);
+  for (const k of ATT) {
+    ribbons[k] = svgEl('path', { fill: `url(#sg${id}${k})` });
+    centres[k] = svgEl('path', { fill: 'none', stroke: AREA[k].col, 'stroke-opacity': '.55', 'stroke-width': 1.5, 'stroke-dasharray': '3 4' });
+    svg.append(ribbons[k], centres[k]);
+  }
+  const postT = svgEl('rect', { width: 6, height: 22, rx: 3, fill: AREA.reg.col });
+  const postB = svgEl('rect', { width: 6, height: 22, rx: 3, fill: AREA.reg.col });
+  svg.append(postT, postB);
+  if (opts.ghost) {
+    const gg = streamGeometry(opts.ghost, labels);
+    for (const k of ATT) {
+      // only where the read moved, and only the two long edges, so unchanged streams stay crisp
+      if (!gg.rib[k] || vals[k] == null || Math.abs(opts.ghost[k] - vals[k]) < 1) continue;
+      const r = gg.rib[k], m = gg.x0 + (gg.xj - gg.x0) * 0.56;
+      const edges = `M ${gg.x0} ${r.lt} C ${m} ${r.lt} ${m} ${r.rt} ${gg.xj} ${r.rt} M ${gg.x0} ${r.lb} C ${m} ${r.lb} ${m} ${r.rb} ${gg.xj} ${r.rb}`;
+      ghosts[k] = svgEl('path', { d: edges, fill: 'none', stroke: '#1b2230', 'stroke-opacity': '.55', 'stroke-width': 1.2, 'stroke-dasharray': '3 3' });
+      svg.append(ghosts[k]);
+    }
+  }
+  const text = {};
+  if (labels) {
+    for (const k of ATT) {
+      const tx = svgEl('text', { x: g0.x0 - 10, 'font-size': 11.5, 'font-weight': 650, fill: AREA[k].ink, 'text-anchor': 'end' });
+      const name = svgEl('tspan', {}, qn(AREA[k]) + ' ');
+      const num = svgEl('tspan', { 'font-weight': 400, fill: '#6b7380' });
+      tx.append(name, num);
+      const pin = svgEl('text', { x: g0.x0 - 10, 'font-size': 10, 'font-weight': 700, fill: '#1b2230', 'text-anchor': 'end' }, 'narrowest');
+      text[k] = { tx, num, pin };
+      svg.append(tx, pin);
+    }
+    const rt = svgEl('text', { x: g0.xg, 'font-size': 11.5, 'font-weight': 650, fill: AREA.reg.ink, 'text-anchor': 'middle' });
+    const rnum = svgEl('tspan', { 'font-weight': 400, fill: '#6b7380' });
+    rt.append(svgEl('tspan', {}, 'Run it? '), rnum);
+    const rpin = svgEl('text', { x: g0.xg, 'font-size': 10, 'font-weight': 700, fill: '#1b2230', 'text-anchor': 'middle' }, 'narrowest');
+    const out = svgEl('text', { x: g0.xe + 15, 'font-size': 10.5, fill: '#6b7380', 'text-anchor': 'end' }, 'into the work');
+    text.reg = { tx: rt, num: rnum, pin: rpin, out };
+    svg.append(rt, rpin, out);
+  }
+  const layer = svgEl('g', {});
+  svg.append(layer);
+
+  let shown = null, raf = 0, target = null, pinNow = null;
+  function paint(v) {
+    const g = streamGeometry(v, labels);
+    channel.setAttribute('d', channelD(g));
+    for (const k of ATT) {
+      const r = g.rib[k];
+      ribbons[k].style.display = r ? '' : 'none';
+      centres[k].style.display = r ? 'none' : '';
+      if (r) ribbons[k].setAttribute('d', ribbonD(g, r));
+      else centres[k].setAttribute('d', centreD(g, k));
+    }
+    const muted = v.reg == null;
+    for (const post of [postT, postB]) { post.setAttribute('x', g.xg - 3); post.setAttribute('fill', muted ? '#9aa3ad' : AREA.reg.col); }
+    postT.setAttribute('y', g.cy - g.G / 2 - 22);
+    postB.setAttribute('y', g.cy + g.G / 2);
+    if (labels) {
+      for (const k of ATT) {
+        text[k].tx.setAttribute('y', g.ys[k] + 4);
+        text[k].pin.setAttribute('y', g.ys[k] + 17);
+      }
+      text.reg.tx.setAttribute('y', g.cy - g.G / 2 - 29);
+      text.reg.pin.setAttribute('y', g.cy - g.G / 2 - 42);
+      text.reg.out.setAttribute('y', g.cy - g.O / 2 - 9);
+    }
+    return g;
+  }
+  function words(v) {
+    if (!labels) return;
+    for (const k of ATT) { text[k].num.textContent = v[k] == null ? '·' : String(v[k]); text[k].pin.style.display = pinNow === k ? '' : 'none'; }
+    text.reg.num.textContent = v.reg == null ? '·' : String(v.reg);
+    text.reg.pin.style.display = pinNow === 'reg' ? '' : 'none';
+  }
+  function set(next, o = {}) {
+    target = { ...next };
+    pinNow = o.pin || profileFor(target);
+    svg.setAttribute('aria-label', streamWords(target));
+    words(target);
+    cancelAnimationFrame(raf);
+    const from = shown;
+    const sameShape = from && ['value', 'efficacy', 'env', 'reg'].every((k) => (from[k] == null) === (target[k] == null));
+    if (!from || !sameShape || o.animate === false || reduceMotion()) { shown = { ...target }; return paint(shown); }
+    const t0 = performance.now(), dur = 280;
+    const step = (now) => {
+      const p = Math.min(1, Math.max(0, (now - t0) / dur));
+      const ease = 1 - Math.pow(1 - p, 3);
+      const cur = {};
+      for (const k of ['value', 'efficacy', 'env', 'reg']) cur[k] = target[k] == null ? null : from[k] + (target[k] - from[k]) * ease;
+      shown = cur;
+      paint(cur);
+      if (p < 1) raf = requestAnimationFrame(step);
+      else shown = { ...target };
+    };
+    raf = requestAnimationFrame(step);
+  }
+  set(vals, { pin: opts.pin, animate: false });
+  return { svg, set, layer, geometry: () => streamGeometry(target, labels) };
 }
 
 function streamWords(vals) {
@@ -804,16 +888,18 @@ function streamWords(vals) {
 
 /* Anatomy in the style section */
 (function anatomy() {
-  const g = document.getElementById('anat');
-  drawStream(g, { value: 3, efficacy: 6, env: 7, reg: 4 }, { ghost: { value: 2, efficacy: 4, env: 7, reg: 3 }, top: 4 });
-  const call = (x, y, tx, ty, label) => {
-    g.append(svgEl('line', { x1: x, y1: y, x2: tx, y2: ty - 4, stroke: '#1b2230', 'stroke-width': 1, 'stroke-dasharray': '2 2' }));
-    g.append(svgEl('text', { x: tx, y: ty + 6, 'font-size': 10.5, 'font-weight': 700, fill: '#1b2230', 'text-anchor': 'middle' }, label));
+  const st = makeStream({ value: 3, efficacy: 6, env: 7, reg: 4 }, { ghost: { value: 1, efficacy: 4, env: 7, reg: 3 }, box: '0 0 340 190' });
+  st.svg.classList.add('anatomy');
+  document.getElementById('anat').replaceWith(st.svg);
+  const g = st.geometry();
+  const call = (x, y, tx, label) => {
+    st.layer.append(svgEl('line', { x1: x, y1: y + 3, x2: tx, y2: 168, stroke: '#1b2230', 'stroke-width': 1, 'stroke-dasharray': '2 2' }));
+    st.layer.append(svgEl('text', { x: tx, y: 182, 'font-size': 10.5, 'font-weight': 700, fill: '#1b2230', 'text-anchor': 'middle' }, label));
   };
-  call(30, 140, 40, 178, '3 streams');
-  call(205, 92, 160, 178, 'channel');
-  call(248, 112, 248, 178, 'gate');
-  call(300, 92, 312, 178, 'out');
+  call(g.x0 + 14, g.ys.env + SW(7) / 2, 70, 'three streams');
+  call((g.xj + g.xg) / 2 - 8, g.cy + g.C / 2, 196, 'channel');
+  call(g.xg, g.cy + g.G / 2 + 22, 262, 'gate');
+  call(g.xe - 8, g.cy + g.O / 2, 318, 'out');
 })();
 
 /* ===================================================================
@@ -1062,7 +1148,8 @@ function scTheir() {
 function scRead() {
   const v = currentValues();
   const sug = suggested();
-  const { svg, g } = streamSvg(v, { pin: S.profile || undefined });
+  const st = makeStream(v, { pin: S.profile || undefined });
+  const svg = st.svg;
   const prof = S.profile || profileFor(v);
   const pa = AREA[prof];
   const theirVal = (k) => (S.their[k] == null ? null : Math.round(S.their[k] * 2.5));
@@ -1070,7 +1157,7 @@ function scRead() {
   const rows = AREAS.map((a) => {
     const off = v[a.id] == null;
     const out = h('output', {}, off ? '·' : String(v[a.id]));
-    const input = h('input', { type: 'range', min: 0, max: 10, step: 1, value: off ? 0 : v[a.id], disabled: off, style: `--p:${off ? 0 : v[a.id] * 10}%`, 'aria-label': `${a.short}, your read`, oninput: (e) => { S.values[a.id] = +e.target.value; S.touched[a.id] = true; S.profile = null; e.target.style.setProperty('--p', `${e.target.value * 10}%`); out.textContent = e.target.value; drawStream(g, S.values, {}); svg.setAttribute('aria-label', streamWords(S.values)); refreshReads(); } });
+    const input = h('input', { type: 'range', min: 0, max: 10, step: 1, value: off ? 0 : v[a.id], disabled: off, style: `--p:${off ? 0 : v[a.id] * 10}%`, 'aria-label': `${a.short}, your read`, oninput: (e) => { S.values[a.id] = +e.target.value; S.touched[a.id] = true; S.profile = null; e.target.style.setProperty('--p', `${e.target.value * 10}%`); out.textContent = e.target.value; st.set(S.values); refreshReads(); } });
     return h('div', { class: `sl ${a.cls} ${off ? 'sl--off' : ''}` },
       h('label', {}, h('span', { class: 'sw' }), a.short),
       h('div', { class: 'track' }, input,
@@ -1143,13 +1230,13 @@ function resultCard(data) {
   const prof = data.profile;
   const pa = AREA[prof];
   const p = PROFILES[prof];
-  const { svg } = streamSvg(data.values, { ghost: data.ghost, pin: prof });
+  const { svg } = makeStream(data.values, { ghost: data.ghost, pin: prof });
   const card = h('article', { class: 'result ' + (pa ? pa.cls : '') },
     h('div', { class: 'result__head' }, useEmblem(), h('div', {}, h('div', { class: 'k' }, `Achievement guide · ${data.date}`), h('div', { class: 't' }, data.context)), h('button', { class: 'btn btn--quiet edit', type: 'button' }, 'Edit')),
     h('div', { class: 'profile' }, h('div', {}, h('div', { class: 'pname' }, p.name), h('div', { class: 'pctx' }, p.line))),
     svg,
     h('div', { class: 'key' },
-      data.ghost ? h('span', {}, h('i', { style: 'background:#1b2230;opacity:.2;height:8px' }), `Grey core: last time, ${data.ghostDate}`) : h('span', {}, 'First run'),
+      data.ghost ? h('span', {}, h('i', { style: 'border:1.2px dashed #1b2230;opacity:.6;height:9px' }), `Dashed: ${data.ghostDate}, where it moved`) : h('span', {}, 'First run'),
       h('span', {}, 'Widths are your read, 0 to 10'),
       data.their ? h('span', {}, h('i', { style: 'width:10px;height:10px;border-radius:50%;border:2px solid var(--ink)' }), `Ollie rated: ${AREAS.map((a) => `${a.short} ${data.their[a.id]}/5`).join(', ')}`) : null),
     data.quotes.length ? h('div', { class: 'words' }, h('div', { class: 'r-h' }, 'Their words'), data.quotes.map(([k, q]) => h('blockquote', { class: AREA[k].cls }, `“${q}”`))) : null,
@@ -1254,7 +1341,7 @@ for (const m of [
   { ctx: 'English · Module B essay', when: '12 Nov · 2 runs', vals: { value: 3, efficacy: 6, env: 7, reg: 4 }, ghost: { value: 1, efficacy: 4, env: 7, reg: 3 }, narrow: 'value', line: 'Narrowest: Worth it · wider than 15 Oct' },
   { ctx: 'Maths', when: '3 Sep · 1 run', vals: { value: 7, efficacy: 8, env: 6, reg: 2 }, ghost: null, narrow: 'reg', line: 'Narrowest: Run it' }
 ]) {
-  const { svg } = streamSvg(m.vals, { labels: false, ghost: m.ghost });
+  const { svg } = makeStream(m.vals, { labels: false, ghost: m.ghost });
   svg.style.margin = '6px 0 4px';
   strip.append(h('a', { class: 'mini ' + AREA[m.narrow].cls, href: '#proto' }, h('b', {}, m.ctx), h('div', { class: 'd' }, m.when), svg, h('div', { class: 'n' }, h('span', { class: 'sw' }), m.line)));
 }
