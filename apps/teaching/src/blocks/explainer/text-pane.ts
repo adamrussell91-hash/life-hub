@@ -24,12 +24,14 @@ export type TextPane = {
   dispose: () => void;
 };
 
-function rel(r: DOMRect, base: DOMRect): InkRect {
+type Origin = { left: number; top: number };
+
+function rel(r: DOMRect, base: Origin): InkRect {
   return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
 }
 
 /** Word rectangles joined into one rectangle per visual line. */
-function lineRects(spans: HTMLElement[], base: DOMRect): InkRect[] {
+function lineRects(spans: HTMLElement[], base: Origin): InkRect[] {
   const out: InkRect[] = [];
   for (const span of spans) {
     for (const raw of Array.from(span.getClientRects())) {
@@ -111,13 +113,19 @@ export function createTextPane(text: AnnotationTextModel | undefined): TextPane 
     // Set the layout before measuring, because it moves the words.
     const wide = root.getBoundingClientRect().width >= NOTES_MARGIN_MIN_WIDTH;
     root.classList.toggle('is-wide', wide);
-    const base = root.getBoundingClientRect();
+    // The pane scrolls when the recorder fills the window. Ink, notes and the
+    // pointer sit in its scrolled content, so measure from the content's top
+    // corner, not the visible box, or every mark lands a scroll's height too high.
+    const box = root.getBoundingClientRect();
+    const base: Origin = { left: box.left - root.scrollLeft, top: box.top - root.scrollTop };
+    const inkW = Math.max(box.width, root.scrollWidth);
+    const inkH = Math.max(box.height, root.scrollHeight);
     svg.replaceChildren();
     notes.replaceChildren();
     onWord = new Map();
-    svg.setAttribute('width', String(base.width));
-    svg.setAttribute('height', String(base.height));
-    svg.setAttribute('viewBox', `0 0 ${Math.max(1, base.width)} ${Math.max(1, base.height)}`);
+    svg.setAttribute('width', String(inkW));
+    svg.setAttribute('height', String(inkH));
+    svg.setAttribute('viewBox', `0 0 ${Math.max(1, inkW)} ${Math.max(1, inkH)}`);
     const bodyLeft = body.getBoundingClientRect().left - base.left;
     const note = (id: string, range: [number, number]) => {
       for (let i = range[0]; i <= range[1]; i += 1) onWord.set(i, [...(onWord.get(i) ?? []), id]);
