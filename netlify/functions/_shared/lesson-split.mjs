@@ -476,6 +476,7 @@ export async function splitLesson(store, lessonId, body, { env, deps = {}, now =
       blocks,
       sequence: sequences[i],
       route_role: part.role,
+      split_from: lesson.id,
       ...(part.role === 'core' ? {} : { branch_from: lesson.id }),
       updated_at: at
     });

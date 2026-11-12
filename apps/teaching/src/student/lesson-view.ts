@@ -13,6 +13,7 @@ import { stepsLoader } from '@/student/next-step';
 import { mountLessonFooter, type LessonFooterHandle } from '@/student/lesson-footer';
 import { mountWhyRoute } from '@/student/why-route';
 import { mountLessonMap, type LessonMapHandle } from '@/student/lesson-map';
+import { carrySplitWork } from '@/student/split-carry';
 import { mountOrganiserEndCard } from '@/organiser/lesson-end-card';
 import { classForPlainLesson, mountInitialsToken, type InitialsTokenHandle } from '@/student/initials-token';
 import { setVoiceClass } from '@/blocks/voice-client';
@@ -357,6 +358,8 @@ export function mountStudentLessonView(
     lessonMap = null;
     whyRoute?.dispose();
     whyRoute = null;
+    // Sections split out of another lesson: bring this device's saved answers with them before the blocks read them.
+    carrySplitWork(lesson);
     lecture = renderPublishedLesson(content, lesson, extras);
     // Written answers go to the teacher as they're typed, for the class this lesson was opened in.
     const workClass = extras?.cls?.id ?? extras?.quizClassId;
