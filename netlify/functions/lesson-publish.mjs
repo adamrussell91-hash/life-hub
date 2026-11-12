@@ -115,6 +115,238 @@ async function materialisePublishedWhiteboards(blocks, store) {
   }));
 }
 
+const fail = (status, code, message, retryable) => ({ ok: false, status, code, message, retryable });
+
+/**
+ * Publishes a lesson's draft: the student snapshot, its stored-apart keys and
+ * a version checkpoint. `{ ok: true, student_path }` or `{ ok: false, status, code, message, retryable }`.
+ * The publish route and a lesson split (lesson-split.mjs) both run it.
+ */
+export async function publishLessonDraft(store, id, { env, deps = {} } = {}) {
+  // Strong read: the editor saves just before publishing, and an eventual
+  // read can still return the older draft, which would then be published
+  // and written back over the teacher's latest changes.
+  const draft = await getJSON(store, draftLessonKey(id), { consistency: 'strong' });
+  if (!draft || typeof draft !== 'object' || Array.isArray(draft)) {
+    return fail(404, 'not_found', 'Lesson not found', false);
+  }
+
+  const title = typeof draft.title === 'string' ? draft.title.trim() : '';
+  const unit_id = typeof draft.unit_id === 'string' ? draft.unit_id : '';
+  if (!title || !unit_id) {
+    return fail(400, 'validation_error', 'Lesson needs a title and unit_id to publish', false);
+  }
+
+  let studentBlocks;
+  try {
+    const resolved = await materialiseLinkedCompositions(filterBlocksForStudent(draft.blocks, { keepQuizQuestions: true }), store, id);
+    studentBlocks = filterBlocksForStudent(resolved, { keepQuizQuestions: true });
+  } catch (error) {
+    return fail(
+      error.status === 400 ? 400 : 503,
+      error.status === 400 ? 'validation_error' : 'composition_load_failed',
+      error.status === 400 ? error.message : 'Publish aborted: linked compositions could not be loaded.',
+      error.status !== 400
+    );
+  }
+
+  const publishedAt = new Date().toISOString();
+  try {
+    await writeCheckpoint(blobJsonStore(store), {
+      kind: 'lesson',
+      parentId: id,
+      snapshot: draft,
+      reason: 'publish',
+      now: publishedAt
+    });
+  } catch {
+    return fail(
+        500,
+        'checkpoint_failed',
+        'Publish aborted: version history checkpoint failed before writing the published snapshot.',
+        true
+      );
+  }
+
+  const outcomeIds = attachedOutcomeIds(draft);
+  let publishBlocks = studentBlocks;
+  if (containsWhiteboard(studentBlocks)) {
+    try {
+      const whiteboardStore = await (deps.getWhiteboardStore ?? defaultGetWhiteboardStore)(env);
+      publishBlocks = await materialisePublishedWhiteboards(studentBlocks, whiteboardStore);
+    } catch {
+      return fail(
+          503,
+          'whiteboard_snapshot_failed',
+          'Publish aborted: whiteboard content could not be frozen for students.',
+          true
+        );
+    }
+  }
+
+  // A design sprint: the body is public; groups, class and rules are stored apart (sprint.mjs).
+  if (draft.pedagogical_mode === 'design_sprint') {
+    const problems = sprintPublishProblems(draft);
+    if (problems.length > 0) return fail(400, 'validation_error', problems[0], false);
+    const sprint = prepareSprintPublish({ ...draft, sprint: SprintSettingsSchema.parse(draft.sprint) }, publishBlocks);
+    await storeSprintConfig(store, id, sprint.config);
+    await setJSON(store, publishedLessonKey(id), {
+      lesson_id: id,
+      title,
+      unit_id,
+      blocks: sanitizeBlocksDeep(sprint.snapshot.blocks),
+      published_at: publishedAt,
+      schema_version: 1,
+      ...(draft.cover ? { cover: draft.cover } : {}),
+      ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
+      ...(draft.feedback_off === true ? { feedback_off: true } : {}),
+      pedagogical_mode: 'design_sprint',
+      sprint: sprint.snapshot.sprint
+    });
+    await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
+    return { ok: true, student_path: `/s/lessons/${id}` };
+  }
+
+  // A case study: the body and a public case summary are public; documents, outcome, objections and transfer are stored apart (case-study.mjs).
+  if (draft.pedagogical_mode === 'case_study') {
+    const study = prepareCasePublish(draft);
+    if (study.problems.length > 0) return fail(400, 'validation_error', study.problems[0], false);
+    await storeCaseConfig(store, id, study.config);
+    await setJSON(store, publishedLessonKey(id), {
+      lesson_id: id,
+      title,
+      unit_id,
+      blocks: sanitizeBlocksDeep(publishBlocks),
+      published_at: publishedAt,
+      schema_version: 1,
+      ...(draft.cover ? { cover: draft.cover } : {}),
+      ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
+      ...(draft.feedback_off === true ? { feedback_off: true } : {}),
+      pedagogical_mode: 'case_study',
+      case: study.snapshot
+    });
+    await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
+    return { ok: true, student_path: `/s/lessons/${id}` };
+  }
+
+  // A station rotation: station blocks go public with their questions split; keys, hinge answers, the pretest and the lock answer are stored apart (rotation.mjs).
+  if (draft.pedagogical_mode === 'station_rotation') {
+    const rotation = prepareRotationPublish(draft, publishBlocks);
+    if (rotation.problems.length > 0) return fail(400, 'validation_error', rotation.problems[0], false);
+    await storeRotationConfig(store, id, rotation.config);
+    await setJSON(store, publishedLessonKey(id), {
+      lesson_id: id,
+      title,
+      unit_id,
+      blocks: sanitizeBlocksDeep(rotation.snapshot.blocks),
+      published_at: publishedAt,
+      schema_version: 1,
+      ...(draft.cover ? { cover: draft.cover } : {}),
+      ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
+      ...(draft.feedback_off === true ? { feedback_off: true } : {}),
+      pedagogical_mode: 'station_rotation',
+      rotation: rotation.snapshot.rotation
+    });
+    await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
+    return { ok: true, student_path: `/s/lessons/${id}` };
+  }
+
+  // A Game lesson: its games go public without answers; every game's keys are stored apart (games.mjs).
+  // Its own blocks ("Before you play") publish as usual, but quiz questions there would never run.
+  if (draft.pedagogical_mode === 'game') {
+    const games = prepareGamePublish(draft);
+    if (games.problems.length > 0) return fail(400, 'validation_error', games.problems[0], false);
+    const before = prepareQuizPublish(draft, publishBlocks);
+    if (before.dropped > 0) {
+      const n = before.dropped;
+      return fail(400, 'validation_error', `This lesson has ${n} quiz question${n === 1 ? '' : 's'} students would never see, because a Game plays through its own player. Put ${n === 1 ? 'it' : 'them'} in a game, or remove ${n === 1 ? 'it' : 'them'}.`, false);
+    }
+    await storeGameKeys(store, id, games.record);
+    await setJSON(store, publishedLessonKey(id), {
+      lesson_id: id,
+      title,
+      unit_id,
+      blocks: sanitizeBlocksDeep(before.blocks),
+      published_at: publishedAt,
+      schema_version: 1,
+      ...(draft.cover ? { cover: draft.cover } : {}),
+      ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
+      ...(draft.feedback_off === true ? { feedback_off: true } : {}),
+      pedagogical_mode: 'game',
+      game: games.snapshot
+    });
+    await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
+    return { ok: true, student_path: `/s/lessons/${id}` };
+  }
+
+  // A tutorial: Common is public; tabs and exit-check keys are stored apart (tutorial.mjs).
+  if (draft.pedagogical_mode === 'tutorial') {
+    const tutorial = prepareTutorialPublish(draft, publishBlocks);
+    if (tutorial.problems.length > 0) {
+      return fail(400, 'validation_error', `An exit check question isn’t finished: ${tutorial.problems[0]}`, false);
+    }
+    if (tutorial.quiz) await storeQuizKey(store, id, tutorial.quiz);
+    await storeTutorialTabs(store, id, { ...tutorial.tabs, groups: tutorial.tabs.groups.map((g) => ({ ...g, blocks: sanitizeBlocksDeep(g.blocks) })) });
+    const tutorialSnapshot = {
+      lesson_id: id,
+      title,
+      unit_id,
+      blocks: sanitizeBlocksDeep(tutorial.common),
+      published_at: publishedAt,
+      schema_version: 1,
+      ...(draft.cover ? { cover: draft.cover } : {}),
+      ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
+      ...(draft.feedback_off === true ? { feedback_off: true } : {}),
+      pedagogical_mode: 'tutorial',
+      ...(tutorial.quiz ? { quiz: tutorial.quiz.snapshot } : {})
+    };
+    await setJSON(store, publishedLessonKey(id), tutorialSnapshot);
+    await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
+    return { ok: true, student_path: `/s/lessons/${id}` };
+  }
+
+  // Quiz answers are split off here and stored apart; students only get the questions.
+  const quizPublish = prepareQuizPublish(draft, publishBlocks);
+  if (quizPublish.problems.length > 0) {
+    return fail(400, 'validation_error', `A quiz question isn’t finished: ${quizPublish.problems[0]}`, false);
+  }
+  // A lecture, design sprint or case study plays through its own player, which can't show quiz questions; never let them vanish without a word.
+  if (quizPublish.dropped > 0) {
+    const n = quizPublish.dropped;
+    return fail(
+        400,
+        'validation_error',
+        `This lesson has ${n} quiz question${n === 1 ? '' : 's'} students would never see, because a ${draft.pedagogical_mode === 'lecture' ? 'Lecture' : draft.pedagogical_mode === 'design_sprint' ? 'Design Sprint' : 'Case Study'} plays through its own player. Use a Question set block, or change the lesson type.`,
+        false
+      );
+  }
+  publishBlocks = quizPublish.blocks;
+  if (quizPublish.quiz) await storeQuizKey(store, id, quizPublish.quiz);
+
+  const snapshot = {
+    lesson_id: id,
+    title,
+    unit_id,
+    blocks: sanitizeBlocksDeep(publishBlocks),
+    published_at: publishedAt,
+    schema_version: 1,
+    ...(draft.cover ? { cover: draft.cover } : {}),
+    ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
+    ...(draft.feedback_off === true ? { feedback_off: true } : {}),
+    // Any lesson can carry quiz questions; only a Quiz lesson is published as one.
+    ...(quizPublish.quiz ? { quiz: quizPublish.quiz.snapshot, ...(draft.pedagogical_mode === 'quiz' ? { pedagogical_mode: 'quiz' } : {}) } : {}),
+    ...(!quizPublish.quiz && draft.pedagogical_mode === 'lecture' ? { pedagogical_mode: 'lecture' } : {})
+  };
+
+  await setJSON(store, publishedLessonKey(id), snapshot);
+  await setJSON(store, draftLessonKey(id), {
+    ...draft,
+    published_at: publishedAt,
+    updated_at: publishedAt
+  });
+  return { ok: true, student_path: `/s/lessons/${id}` };
+}
+
 export function createLessonPublishHandler(deps = {}) {
   return createOperatorHandler(async (request, context) => {
     const { env, store } = context;
@@ -127,248 +359,9 @@ export function createLessonPublishHandler(deps = {}) {
       return withCors(errorResponse(404, 'not_found', 'Lesson not found', false), request, env);
     }
 
-    // Strong read: the editor saves just before publishing, and an eventual
-    // read can still return the older draft, which would then be published
-    // and written back over the teacher's latest changes.
-    const draft = await getJSON(store, draftLessonKey(id), { consistency: 'strong' });
-    if (!draft || typeof draft !== 'object' || Array.isArray(draft)) {
-      return withCors(errorResponse(404, 'not_found', 'Lesson not found', false), request, env);
-    }
-
-    const title = typeof draft.title === 'string' ? draft.title.trim() : '';
-    const unit_id = typeof draft.unit_id === 'string' ? draft.unit_id : '';
-    if (!title || !unit_id) {
-      return withCors(
-        errorResponse(400, 'validation_error', 'Lesson needs a title and unit_id to publish', false),
-        request,
-        env
-      );
-    }
-
-    let studentBlocks;
-    try {
-      const resolved = await materialiseLinkedCompositions(filterBlocksForStudent(draft.blocks, { keepQuizQuestions: true }), store, id);
-      studentBlocks = filterBlocksForStudent(resolved, { keepQuizQuestions: true });
-    } catch (error) {
-      return withCors(errorResponse(
-        error.status === 400 ? 400 : 503,
-        error.status === 400 ? 'validation_error' : 'composition_load_failed',
-        error.status === 400 ? error.message : 'Publish aborted: linked compositions could not be loaded.',
-        error.status !== 400
-      ), request, env);
-    }
-
-    const publishedAt = new Date().toISOString();
-    try {
-      await writeCheckpoint(blobJsonStore(store), {
-        kind: 'lesson',
-        parentId: id,
-        snapshot: draft,
-        reason: 'publish',
-        now: publishedAt
-      });
-    } catch {
-      return withCors(
-        errorResponse(
-          500,
-          'checkpoint_failed',
-          'Publish aborted: version history checkpoint failed before writing the published snapshot.',
-          true
-        ),
-        request,
-        env
-      );
-    }
-
-    const outcomeIds = attachedOutcomeIds(draft);
-    let publishBlocks = studentBlocks;
-    if (containsWhiteboard(studentBlocks)) {
-      try {
-        const whiteboardStore = await (deps.getWhiteboardStore ?? defaultGetWhiteboardStore)(env);
-        publishBlocks = await materialisePublishedWhiteboards(studentBlocks, whiteboardStore);
-      } catch {
-        return withCors(
-          errorResponse(
-            503,
-            'whiteboard_snapshot_failed',
-            'Publish aborted: whiteboard content could not be frozen for students.',
-            true
-          ),
-          request,
-          env
-        );
-      }
-    }
-
-    // A design sprint: the body is public; groups, class and rules are stored apart (sprint.mjs).
-    if (draft.pedagogical_mode === 'design_sprint') {
-      const problems = sprintPublishProblems(draft);
-      if (problems.length > 0) return withCors(errorResponse(400, 'validation_error', problems[0], false), request, env);
-      const sprint = prepareSprintPublish({ ...draft, sprint: SprintSettingsSchema.parse(draft.sprint) }, publishBlocks);
-      await storeSprintConfig(store, id, sprint.config);
-      await setJSON(store, publishedLessonKey(id), {
-        lesson_id: id,
-        title,
-        unit_id,
-        blocks: sanitizeBlocksDeep(sprint.snapshot.blocks),
-        published_at: publishedAt,
-        schema_version: 1,
-        ...(draft.cover ? { cover: draft.cover } : {}),
-        ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
-        ...(draft.feedback_off === true ? { feedback_off: true } : {}),
-        pedagogical_mode: 'design_sprint',
-        sprint: sprint.snapshot.sprint
-      });
-      await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
-      return withCors(okResponse(200, { student_path: `/s/lessons/${id}` }), request, env);
-    }
-
-    // A case study: the body and a public case summary are public; documents, outcome, objections and transfer are stored apart (case-study.mjs).
-    if (draft.pedagogical_mode === 'case_study') {
-      const study = prepareCasePublish(draft);
-      if (study.problems.length > 0) return withCors(errorResponse(400, 'validation_error', study.problems[0], false), request, env);
-      await storeCaseConfig(store, id, study.config);
-      await setJSON(store, publishedLessonKey(id), {
-        lesson_id: id,
-        title,
-        unit_id,
-        blocks: sanitizeBlocksDeep(publishBlocks),
-        published_at: publishedAt,
-        schema_version: 1,
-        ...(draft.cover ? { cover: draft.cover } : {}),
-        ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
-        ...(draft.feedback_off === true ? { feedback_off: true } : {}),
-        pedagogical_mode: 'case_study',
-        case: study.snapshot
-      });
-      await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
-      return withCors(okResponse(200, { student_path: `/s/lessons/${id}` }), request, env);
-    }
-
-    // A station rotation: station blocks go public with their questions split; keys, hinge answers, the pretest and the lock answer are stored apart (rotation.mjs).
-    if (draft.pedagogical_mode === 'station_rotation') {
-      const rotation = prepareRotationPublish(draft, publishBlocks);
-      if (rotation.problems.length > 0) return withCors(errorResponse(400, 'validation_error', rotation.problems[0], false), request, env);
-      await storeRotationConfig(store, id, rotation.config);
-      await setJSON(store, publishedLessonKey(id), {
-        lesson_id: id,
-        title,
-        unit_id,
-        blocks: sanitizeBlocksDeep(rotation.snapshot.blocks),
-        published_at: publishedAt,
-        schema_version: 1,
-        ...(draft.cover ? { cover: draft.cover } : {}),
-        ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
-        ...(draft.feedback_off === true ? { feedback_off: true } : {}),
-        pedagogical_mode: 'station_rotation',
-        rotation: rotation.snapshot.rotation
-      });
-      await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
-      return withCors(okResponse(200, { student_path: `/s/lessons/${id}` }), request, env);
-    }
-
-    // A Game lesson: its games go public without answers; every game's keys are stored apart (games.mjs).
-    // Its own blocks ("Before you play") publish as usual, but quiz questions there would never run.
-    if (draft.pedagogical_mode === 'game') {
-      const games = prepareGamePublish(draft);
-      if (games.problems.length > 0) return withCors(errorResponse(400, 'validation_error', games.problems[0], false), request, env);
-      const before = prepareQuizPublish(draft, publishBlocks);
-      if (before.dropped > 0) {
-        const n = before.dropped;
-        return withCors(errorResponse(400, 'validation_error', `This lesson has ${n} quiz question${n === 1 ? '' : 's'} students would never see, because a Game plays through its own player. Put ${n === 1 ? 'it' : 'them'} in a game, or remove ${n === 1 ? 'it' : 'them'}.`, false), request, env);
-      }
-      await storeGameKeys(store, id, games.record);
-      await setJSON(store, publishedLessonKey(id), {
-        lesson_id: id,
-        title,
-        unit_id,
-        blocks: sanitizeBlocksDeep(before.blocks),
-        published_at: publishedAt,
-        schema_version: 1,
-        ...(draft.cover ? { cover: draft.cover } : {}),
-        ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
-        ...(draft.feedback_off === true ? { feedback_off: true } : {}),
-        pedagogical_mode: 'game',
-        game: games.snapshot
-      });
-      await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
-      return withCors(okResponse(200, { student_path: `/s/lessons/${id}` }), request, env);
-    }
-
-    // A tutorial: Common is public; tabs and exit-check keys are stored apart (tutorial.mjs).
-    if (draft.pedagogical_mode === 'tutorial') {
-      const tutorial = prepareTutorialPublish(draft, publishBlocks);
-      if (tutorial.problems.length > 0) {
-        return withCors(errorResponse(400, 'validation_error', `An exit check question isn’t finished: ${tutorial.problems[0]}`, false), request, env);
-      }
-      if (tutorial.quiz) await storeQuizKey(store, id, tutorial.quiz);
-      await storeTutorialTabs(store, id, { ...tutorial.tabs, groups: tutorial.tabs.groups.map((g) => ({ ...g, blocks: sanitizeBlocksDeep(g.blocks) })) });
-      const tutorialSnapshot = {
-        lesson_id: id,
-        title,
-        unit_id,
-        blocks: sanitizeBlocksDeep(tutorial.common),
-        published_at: publishedAt,
-        schema_version: 1,
-        ...(draft.cover ? { cover: draft.cover } : {}),
-        ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
-        ...(draft.feedback_off === true ? { feedback_off: true } : {}),
-        pedagogical_mode: 'tutorial',
-        ...(tutorial.quiz ? { quiz: tutorial.quiz.snapshot } : {})
-      };
-      await setJSON(store, publishedLessonKey(id), tutorialSnapshot);
-      await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
-      return withCors(okResponse(200, { student_path: `/s/lessons/${id}` }), request, env);
-    }
-
-    // Quiz answers are split off here and stored apart; students only get the questions.
-    const quizPublish = prepareQuizPublish(draft, publishBlocks);
-    if (quizPublish.problems.length > 0) {
-      return withCors(
-        errorResponse(400, 'validation_error', `A quiz question isn’t finished: ${quizPublish.problems[0]}`, false),
-        request,
-        env
-      );
-    }
-    // A lecture, design sprint or case study plays through its own player, which can't show quiz questions; never let them vanish without a word.
-    if (quizPublish.dropped > 0) {
-      const n = quizPublish.dropped;
-      return withCors(
-        errorResponse(
-          400,
-          'validation_error',
-          `This lesson has ${n} quiz question${n === 1 ? '' : 's'} students would never see, because a ${draft.pedagogical_mode === 'lecture' ? 'Lecture' : draft.pedagogical_mode === 'design_sprint' ? 'Design Sprint' : 'Case Study'} plays through its own player. Use a Question set block, or change the lesson type.`,
-          false
-        ),
-        request,
-        env
-      );
-    }
-    publishBlocks = quizPublish.blocks;
-    if (quizPublish.quiz) await storeQuizKey(store, id, quizPublish.quiz);
-
-    const snapshot = {
-      lesson_id: id,
-      title,
-      unit_id,
-      blocks: sanitizeBlocksDeep(publishBlocks),
-      published_at: publishedAt,
-      schema_version: 1,
-      ...(draft.cover ? { cover: draft.cover } : {}),
-      ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
-      ...(draft.feedback_off === true ? { feedback_off: true } : {}),
-      // Any lesson can carry quiz questions; only a Quiz lesson is published as one.
-      ...(quizPublish.quiz ? { quiz: quizPublish.quiz.snapshot, ...(draft.pedagogical_mode === 'quiz' ? { pedagogical_mode: 'quiz' } : {}) } : {}),
-      ...(!quizPublish.quiz && draft.pedagogical_mode === 'lecture' ? { pedagogical_mode: 'lecture' } : {})
-    };
-
-    await setJSON(store, publishedLessonKey(id), snapshot);
-    await setJSON(store, draftLessonKey(id), {
-      ...draft,
-      published_at: publishedAt,
-      updated_at: publishedAt
-    });
-    return withCors(okResponse(200, { student_path: `/s/lessons/${id}` }), request, env);
+    const result = await publishLessonDraft(store, id, { env, deps });
+    if (!result.ok) return withCors(errorResponse(result.status, result.code, result.message, result.retryable), request, env);
+    return withCors(okResponse(200, { student_path: result.student_path }), request, env);
   }, deps);
 }
 
