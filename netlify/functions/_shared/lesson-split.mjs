@@ -49,6 +49,7 @@ export const MESSAGES = {
   mode: 'This kind of lesson runs as one piece, so it can’t be split.',
   quiz: 'The quiz questions have to move together, so the quiz isn’t cut in two.',
   calendar: 'New lessons aren’t on the calendar yet. Drag them onto a day in the planner.',
+  returnLines: (n) => `${n === 1 ? 'A continuum line that returns to an earlier line ends up' : `${n} continuum lines that return to an earlier line end up`} in a different lesson from it. ${n === 1 ? 'It takes' : 'They take'} that line’s statements with ${n === 1 ? 'it' : 'them'}, but students won’t see their earlier placements beside the new ones.`,
   transcribing: 'Some viva recordings in these sections are still being transcribed. Try again in a few minutes.',
   markbook: (title) => `The markbook for ${title} couldn\u2019t be read, so its columns can\u2019t follow the moved sections.`,
   anonymous: 'Anonymous answers (like What, How, Why and hinge votes) come across for you to see, but students won’t see their own as theirs in the new lesson.'
@@ -397,6 +398,9 @@ export async function splitPreview(store, lessonId, body) {
   inv.lessonId = lesson.id;
   const notes = [MESSAGES.calendar];
   if (inv.blockMoves.some((m) => m.anonymous)) notes.push(MESSAGES.anonymous);
+  const parted = [lesson.blocks.filter((b) => !(isSection(b) && planned.parts.some((p) => p.section_ids.includes(b.id)))), ...planned.parts.map((p) => p.blocks)];
+  const crossing = parted.reduce((n, blocks) => n + inlineReturnLines(structuredClone(blocks), lesson.blocks), 0);
+  if (crossing) notes.push(MESSAGES.returnLines(crossing));
   return { problems, parts: out, counts: counts(inv), notes };
 }
 
@@ -449,7 +453,9 @@ export async function splitLesson(store, lessonId, body, { env, deps = {}, now =
   const saveRecord = () => setJSON(store, splitKey(lesson.id, splitId), record);
 
   // 1. Take the sections out of L, only if nobody saved L since it was read.
-  const remaining = lesson.blocks.filter((b) => !(isSection(b) && movedSections.has(b.id)));
+  // A copy: record.original_blocks keeps L exactly as it was, for Undo.
+  const remaining = structuredClone(lesson.blocks.filter((b) => !(isSection(b) && movedSections.has(b.id))));
+  inlineReturnLines(remaining, lesson.blocks);
   const nextLesson = { ...lesson, blocks: remaining, updated_at: at };
   await saveRecord();
   const wrote = etag ? await store.setJSON(draftLessonKey(lesson.id), nextLesson, { onlyIfMatch: etag }) : await setJSON(store, draftLessonKey(lesson.id), nextLesson);
@@ -471,6 +477,7 @@ export async function splitLesson(store, lessonId, body, { env, deps = {}, now =
     const created = await read(store, draftLessonKey(newIds[i]));
     const copied = Object.fromEntries(COPIED_FIELDS.filter((f) => lesson[f] !== undefined && lesson[f] !== null).map((f) => [f, structuredClone(lesson[f])]));
     const blocks = structuredClone(part.blocks).map((b) => fixComparativeSource(b, lesson.id, part.ids));
+    inlineReturnLines(blocks, lesson.blocks);
     await setJSON(store, draftLessonKey(newIds[i]), {
       ...created,
       ...copied,
@@ -603,6 +610,30 @@ export async function splitLesson(store, lessonId, body, { env, deps = {}, now =
   record.state = 'done';
   await saveRecord();
   return { split_id: splitId, new_lessons: record.new_lessons, published };
+}
+
+/**
+ * A Return continuum line shows an earlier line in the same lesson (continuum-line/shared.ts
+ * resolveReturnLine). When the split puts the earlier line in another lesson, the return line
+ * would show as missing, so it takes the earlier line's stimulus, scale and statements itself
+ * (as clone-blocks.ts does for copies). Statement ids stay the same, so placements still fit.
+ * Changes `blocks` in place; `allBlocks` is the whole lesson before the split. Returns how many changed.
+ */
+export function inlineReturnLines(blocks, allBlocks) {
+  const here = new Set([...walkBlocks(blocks)].map((b) => b.id));
+  const byId = new Map([...walkBlocks(allBlocks)].map((b) => [b.id, b]));
+  let changed = 0;
+  for (const b of walkBlocks(blocks)) {
+    const from = b.block_type === 'continuum_line' ? b.content?.returns_to : null;
+    if (!from || here.has(from)) continue;
+    const source = byId.get(from);
+    const { returns_to: _gone, ...own } = b.content;
+    b.content = source?.block_type === 'continuum_line' && !source.content?.returns_to
+      ? { ...structuredClone(source.content), pace: own.pace, replace: own.replace }
+      : own;
+    changed++;
+  }
+  return changed;
 }
 
 /** A moved Comparative Judgement block that judged "this lesson": its source stayed in L, so it now names L. */
