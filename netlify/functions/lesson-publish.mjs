@@ -333,6 +333,8 @@ export async function publishLessonDraft(store, id, { env, deps = {} } = {}) {
     ...(draft.cover ? { cover: draft.cover } : {}),
     ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
     ...(draft.feedback_off === true ? { feedback_off: true } : {}),
+    // A split lesson names its source, so a student's device can carry its saved answers across (student/split-carry.ts).
+    ...(typeof draft.split_from === 'string' && draft.split_from ? { split_from: draft.split_from } : {}),
     // Any lesson can carry quiz questions; only a Quiz lesson is published as one.
     ...(quizPublish.quiz ? { quiz: quizPublish.quiz.snapshot, ...(draft.pedagogical_mode === 'quiz' ? { pedagogical_mode: 'quiz' } : {}) } : {}),
     ...(!quizPublish.quiz && draft.pedagogical_mode === 'lecture' ? { pedagogical_mode: 'lecture' } : {})

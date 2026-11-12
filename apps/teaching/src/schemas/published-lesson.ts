@@ -21,6 +21,8 @@ export const PublishedLessonSchema = z.object({
   cover: CoverSchema.optional(),
   outcome_ids: z.array(z.string().min(1)).max(24).optional(),
   feedback_off: z.boolean().optional(),
+  /** A lesson made by splitting another: the lesson its sections came from, so a device's saved answers can follow them. */
+  split_from: z.string().min(1).max(80).optional(),
   /** Quiz lessons: the settings students may see, with the published version. */
   pedagogical_mode: z.enum(['quiz', 'lecture', 'tutorial', 'design_sprint', 'case_study', 'station_rotation', 'game']).optional(),
   sprint: PublicSprintSchema.optional(),

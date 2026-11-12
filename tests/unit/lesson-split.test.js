@@ -118,6 +118,8 @@ test('refusals: lesson kind, quiz cut in two, nothing left, bad ids', () => {
     assert.deepEqual(splitProblems({ ...lesson, pedagogical_mode: mode }, [{ name: 'A', role: 'core', section_ids: ['s_write'], whole_class: false }]), [MESSAGES.mode]);
   }
   assert.deepEqual(splitProblems({ ...lesson, rotation: { stations: [1] } }, [{ name: 'A', role: 'core', section_ids: ['s_write'] }]), [MESSAGES.mode]);
+  // A plain lesson with quiz settings for its in-lesson questions can still split.
+  assert.deepEqual(splitProblems({ ...lesson, pedagogical_mode: 'direct', quiz: { attempts: 1 } }, [{ name: 'A', role: 'core', section_ids: ['s_write'] }]), []);
   const half = { ...lesson, blocks: [...lesson.blocks, quizQ('qq_top')] };
   assert.ok(splitProblems(half, [{ name: 'A', role: 'core', section_ids: ['s_check'] }]).includes(MESSAGES.quiz));
   const twoQuiz = { blocks: [section('s1', 'One', [quizQ('a1')]), section('s2', 'Two', [quizQ('a2')]), section('s3', 'Three', [])] };
@@ -181,6 +183,8 @@ test('a split copies every kind of data, and undo puts the lesson back', async (
   assert.equal(w.branch_from, undefined);
   assert.equal(c.route_role, 'support');
   assert.equal(c.branch_from, L);
+  assert.equal(w.split_from, L);
+  assert.equal(c.split_from, L);
   assert.deepEqual(w.dot_points, ['geo:U1']);
   assert.deepEqual(c.focus_pieces, ['kp_aa11bb']);
   assert.equal(w.feedback_off, true);
@@ -235,6 +239,7 @@ test('a split copies every kind of data, and undo puts the lesson back', async (
 
   // Published: L without the moved sections, both new lessons, the quiz on the check part.
   assert.ok(store.data.get(publishedLessonKey(W)));
+  assert.equal(store.data.get(publishedLessonKey(W)).split_from, L);
   assert.ok(store.data.get(publishedLessonKey(C)).quiz);
   assert.equal(store.data.get(publishedLessonKey(L)).quiz, undefined);
   assert.equal(store.data.get(publishedLessonKey(L)).blocks.length, 1);
