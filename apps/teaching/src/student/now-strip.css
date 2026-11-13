@@ -185,13 +185,3 @@
   .ns-pointer__hole,
   .ns-pointer__arrow { animation: none; }
 }
-
-/* The colour pulse: the ring takes each colour in turn (now-strip.ts steps them). */
-.ns-strip.is-pulsing .ns-strip__in {
-  box-shadow: 0 0 0 4px var(--ns-pulse), 0 0 22px 4px color-mix(in srgb, var(--ns-pulse) 55%, transparent);
-  transition: box-shadow 0.6s ease;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ns-strip.is-pulsing .ns-strip__in { transition: none; }
-}

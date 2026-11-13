@@ -371,7 +371,7 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
   }
   // "Do this now" sits above the tabs, so it stays on every one. The teacher sees it as the
   // student does, without the pointer.
-  const strip = renderNowStrip(payload.todo, { classId: options.classId, pointer: !options.teacher && payload.pointer !== false, pointerOff: options.pointerOff, pulse: !options.teacher });
+  const strip = renderNowStrip(payload.todo, { classId: options.classId, pointer: !options.teacher && payload.pointer !== false, pointerOff: options.pointerOff });
   if (strip) root.append(strip);
   const map = withTodo(renderMap(payload.map, options.classId, payload), payload, options);
   const hasReturned = !!(payload.pieces?.length || payload.has_returned);

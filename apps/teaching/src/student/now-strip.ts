@@ -7,10 +7,6 @@
  * the page dims around the strip with an arrow and a few words. It comes up once per page load.
  * "Don't show this again" turns it off for good; the teacher can turn it back on from the class's
  * student list. The strip itself stays either way.
- *
- * The pulse: from the moment the page opens, the strip's ring pulses red and orange, and every ten
- * seconds another colour joins (yellow, green, purple…) until ten are cycling. It runs until the
- * student leaves the page, say by opening a lesson. Never on the teacher's view.
  */
 import { el } from '@/quiz/dom';
 import type { TodoBoxItem, TodoPayload } from '@/student/todo-panel';
@@ -20,17 +16,6 @@ export type NowThing = { key: string; what: string };
 
 /** Seconds on the page before the pointer comes up. */
 export const POINTER_DELAY_MS = 10_000;
-
-/** The pulse's colours, in the order they join: two to start, one more every PULSE_ADD_MS. */
-export const PULSE_COLOURS = ['#e5484d', '#f76b15', '#ffc53d', '#30a46c', '#8e4ec6', '#0090ff', '#d6409f', '#12a594', '#a3d10b', '#00c2d7'];
-export const PULSE_ADD_MS = 10_000;
-/** How long each colour holds before the ring moves to the next. */
-export const PULSE_STEP_MS = 700;
-
-/** How many colours are cycling `ms` after the page opened: 2, then one more every ten seconds, up to 10. */
-export function pulseCount(ms: number): number {
-  return Math.min(PULSE_COLOURS.length, 2 + Math.floor(Math.max(0, ms) / PULSE_ADD_MS));
-}
 
 function wordsFor(t: TodoBoxItem): string {
   if (t.feedback?.state === 'new') return `Read your feedback on ${t.title}`;
@@ -60,11 +45,11 @@ export function oneThing(todo: TodoPayload | undefined): NowThing | null {
 }
 
 /** What the strip remembers for the life of the page, so a redraw (organiser reload) keeps it. */
-type Memory = { hidden: boolean; used: boolean; pointed: boolean; openedAt: number };
+type Memory = { hidden: boolean; used: boolean; pointed: boolean };
 const memory = new Map<string, Memory>();
 const remember = (classId: string): Memory => {
   let m = memory.get(classId);
-  if (!m) memory.set(classId, (m = { hidden: false, used: false, pointed: false, openedAt: Date.now() }));
+  if (!m) memory.set(classId, (m = { hidden: false, used: false, pointed: false }));
   return m;
 };
 /** Tests only: forget every page's strip state. */
@@ -97,8 +82,6 @@ export type NowStripOptions = {
   pointer: boolean;
   /** "Don't show this again". */
   pointerOff?: () => void;
-  /** The colour pulse: the student's own page only. */
-  pulse?: boolean;
 };
 
 /** The strip, or null when there is nothing to do or the student hid it this visit. */
@@ -135,8 +118,6 @@ export function renderNowStrip(todo: TodoPayload | undefined, options: NowStripO
     strip.remove();
   });
 
-  if (options.pulse) startPulse(strip, mem.openedAt);
-
   if (options.pointer && !mem.pointed) {
     // A redraw drops this strip (the check above skips it) and the new strip starts its own clock.
     window.setTimeout(() => {
@@ -152,26 +133,6 @@ export function renderNowStrip(todo: TodoPayload | undefined, options: NowStripO
     }, POINTER_DELAY_MS);
   }
   return strip;
-}
-
-/** Steps the strip's ring through the colours, adding one every ten seconds; stops once the strip goes. */
-function startPulse(strip: HTMLElement, openedAt: number): void {
-  strip.classList.add('is-pulsing');
-  let step = 0;
-  const paint = (): void => {
-    const n = pulseCount(Date.now() - openedAt);
-    strip.style.setProperty('--ns-pulse', PULSE_COLOURS[step % n]!);
-    strip.dataset.colours = String(n);
-    step += 1;
-  };
-  paint();
-  const timer = window.setInterval(() => {
-    if (!strip.isConnected) {
-      window.clearInterval(timer);
-      return;
-    }
-    paint();
-  }, PULSE_STEP_MS);
 }
 
 /**

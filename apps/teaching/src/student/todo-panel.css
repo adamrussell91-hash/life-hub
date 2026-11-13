@@ -430,3 +430,25 @@
   .td-viva__pick { width: 100%; }
   .td-viva__opt { flex: 1 1 100%; justify-content: space-between; }
 }
+
+/* Do now's colour pulse: a ring round the box and its dot take each colour in turn (colour-pulse.ts). */
+.td-box--now.is-pulsing {
+  margin: var(--space-2) calc(var(--space-2) * -1) var(--space-1);
+  padding: var(--space-3) var(--space-2) var(--space-2);
+  border-top: 0;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 3px var(--pulse), 0 0 18px 2px color-mix(in srgb, var(--pulse) 45%, transparent);
+  transition: box-shadow 0.6s ease;
+}
+
+.td-box--now.is-pulsing .td-box__dot {
+  width: 10px;
+  height: 10px;
+  background: var(--pulse);
+  transition: background 0.6s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .td-box--now.is-pulsing,
+  .td-box--now.is-pulsing .td-box__dot { transition: none; }
+}
