@@ -11,6 +11,7 @@ import { readJSON, writeJSON } from '@/quiz/dom';
 import { mountWorkSync, type WorkSyncHandle } from '@/student/work-sync';
 import { stepsLoader } from '@/student/next-step';
 import { mountLessonFooter, type LessonFooterHandle } from '@/student/lesson-footer';
+import { mountWhatsNext, renderTodoHint, type WhatsNextHandle } from '@/student/whats-next';
 import { mountWhyRoute } from '@/student/why-route';
 import { mountLessonMap, type LessonMapHandle } from '@/student/lesson-map';
 import { carrySplitWork } from '@/student/split-carry';
@@ -331,6 +332,7 @@ export function mountStudentLessonView(
   };
   let work: WorkSyncHandle | null = null;
   let footer: LessonFooterHandle | null = null;
+  let whatsNext: WhatsNextHandle | null = null;
   let token: InitialsTokenHandle | null = null;
   let endCard: { dispose(): void } | null = null;
   let whyRoute: { dispose(): void } | null = null;
@@ -350,6 +352,8 @@ export function mountStudentLessonView(
     work = null;
     footer?.dispose();
     footer = null;
+    whatsNext?.dispose();
+    whatsNext = null;
     token?.dispose();
     token = null;
     endCard?.dispose();
@@ -375,8 +379,13 @@ export function mountStudentLessonView(
       header.append(token.element);
       const { prev, next } = cls ? scheduleNeighbors(cls.schedule, lesson.lesson_id) : { prev: null, next: null };
       const linkTo = (row: typeof prev) => (row && cls ? { href: `/s/classes/${cls.id}/lessons/${row.lesson_id}`, title: row.title } : null);
-      footer = mountLessonFooter({ lessonId: lesson.lesson_id, classId: workClass, prev: linkTo(prev), next: linkTo(next), finish: lesson.pedagogical_mode !== 'quiz', work: () => work, onClaimed: () => token?.refresh() });
+      const here = cls ? `/s/classes/${cls.id}/lessons/${lesson.lesson_id}` : `/s/lessons/${lesson.lesson_id}?class=${workClass}`;
+      // What's next: a card under the tick naming the next thing on their To do list, and a line under the title.
+      const wn = (whatsNext = mountWhatsNext({ classId: workClass, lessonId: lesson.lesson_id, from: here }));
+      footer = mountLessonFooter({ lessonId: lesson.lesson_id, classId: workClass, prev: linkTo(prev), next: linkTo(next), finish: lesson.pedagogical_mode !== 'quiz', work: () => work, onClaimed: () => token?.refresh(), onDone: (done, fresh) => wn.setDone(done, fresh) });
+      footer.element.append(wn.element);
       content.append(footer.element);
+      content.querySelector(':scope > .lesson-hero')?.after(renderTodoHint(workClass, here));
       // Plain lessons only: the section strip on the right and the checklist above the footer.
       if (!lecture && lesson.pedagogical_mode !== 'quiz') lessonMap = mountLessonMap({ lessonId: lesson.lesson_id, classId: workClass, blocks: lesson.blocks, content, before: footer.element });
       addEndCard(content, lesson, workClass, cls ? `/s/classes/${cls.id}/lessons/${lesson.lesson_id}` : `/s/lessons/${lesson.lesson_id}?class=${workClass}`, lessonMap?.card ?? footer.element);
@@ -507,6 +516,8 @@ export function mountStudentLessonView(
       work = null;
       footer?.dispose();
       footer = null;
+      whatsNext?.dispose();
+      whatsNext = null;
       token?.dispose();
       token = null;
       endCard?.dispose();

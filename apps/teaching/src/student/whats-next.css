@@ -1,0 +1,104 @@
+/* "What's next" under the lesson footer, and the to do line under the lesson title. See whats-next.ts. */
+
+.wn-hint {
+  margin: calc(-1 * var(--space-2)) 0 var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.wn-hint__link {
+  color: var(--wave);
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+}
+
+.wn-hint__link:hover,
+.wn-hint__link:focus-visible {
+  text-decoration: underline;
+}
+
+.wn-card {
+  display: grid;
+  gap: var(--space-1);
+  max-width: 34rem;
+  width: 100%;
+  justify-self: center;
+  margin: var(--space-4) auto 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 2px dashed color-mix(in srgb, var(--navy) 20%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.wn-card__kicker {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.wn-card__what {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  color: var(--navy);
+  overflow-wrap: anywhere;
+}
+
+.wn-card__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.wn-card__go,
+.wn-card__all {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+}
+
+.wn-card__go {
+  background: var(--navy);
+  color: var(--paper);
+}
+
+.wn-card__all {
+  border: 1px solid var(--line);
+  background: var(--surface, #fff);
+  color: var(--navy);
+}
+
+.wn-card__go:focus-visible,
+.wn-card__all:focus-visible {
+  outline: 3px solid var(--wave);
+  outline-offset: 2px;
+}
+
+/* Ticked done: the moment they ask "what now?". */
+.wn-card.is-ready {
+  border: 2px solid var(--navy);
+  background: var(--navy);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--navy) 25%, transparent);
+}
+
+.wn-card.is-ready .wn-card__kicker { color: var(--pastel-gold); }
+.wn-card.is-ready .wn-card__what { color: var(--paper); }
+.wn-card.is-ready .wn-card__go { background: var(--pastel-gold); color: var(--navy); }
+.wn-card.is-ready .wn-card__all { background: transparent; color: var(--paper); border-color: color-mix(in srgb, var(--paper) 35%, transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wn-card { transition: none; }
+}
+
+@media (max-width: 480px) {
+  .wn-card__go,
+  .wn-card__all { flex: 1 1 100%; justify-content: center; }
+}

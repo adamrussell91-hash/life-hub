@@ -32,6 +32,8 @@ export type LessonFooterOptions = {
   work?: () => WorkSyncHandle | null;
   /** Told when the student gives their initials here, so the top bar can show them. */
   onClaimed?: () => void;
+  /** Told each time the done state is drawn; `fresh` when the student ticked it just now. */
+  onDone?: (done: boolean, fresh: boolean) => void;
   /** Test seams. */
   calls?: FooterCalls;
   quiz?: () => LessonQuizHandle | null;
@@ -82,7 +84,8 @@ export function mountLessonFooter(options: LessonFooterOptions): LessonFooterHan
   row.append(link(options.prev, 'prev'), finish ? tick : el('span', 'lf__gap'), link(options.next, 'next'));
   root.append(panel, row, status);
 
-  function paintTick(): void {
+  function paintTick(fresh = false): void {
+    options.onDone?.(done, fresh);
     tick.setAttribute('aria-pressed', String(done));
     tick.setAttribute('aria-label', done ? 'Lesson completed. Press to untick' : 'Finish this lesson');
     tick.title = done ? 'Lesson completed' : 'Finish this lesson';
@@ -256,7 +259,7 @@ export function mountLessonFooter(options: LessonFooterOptions): LessonFooterHan
   function complete(): void {
     close();
     done = true;
-    paintTick();
+    paintTick(true);
     tick.focus();
   }
 
