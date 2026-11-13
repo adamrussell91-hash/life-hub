@@ -9,6 +9,8 @@
  *   class-claims/{class}/devices/{device}     { student_id, claimed_at }  lookup from a device
  *   class-claims/{class}/codes/{student}      { code, made_at }  the student's code; outlives a release
  *   class-claims/{class}/code-tries/{day}/{student}  { count }  wrong codes today
+ *   class-claims/{class}/pointer-off/{student}  { off_at }  the student said "Don't show this again"
+ *                                               to the progress page's pointer; the teacher can delete it
  *
  * `device` is a hash of a class-scoped token (deviceHash), never the token. `devices`
  * holds every device the student has added, newest last; `device` is the first.
@@ -28,6 +30,8 @@ const keys = (classId) => ({
   device: (device) => `class-claims/${classId}/devices/${device}`,
   code: (id) => `class-claims/${classId}/codes/${id}`,
   codeTries: (day, id) => `class-claims/${classId}/code-tries/${day}/${id}`,
+  pointerOff: (id) => `class-claims/${classId}/pointer-off/${id}`,
+  pointersOff: `class-claims/${classId}/pointer-off/`,
   ipDay: (day, ip) => `class-claims/${classId}/ip-day/${day}/${ip}`
 });
 
@@ -228,6 +232,24 @@ export async function listCodes(store, roster) {
   return out;
 }
 
+/** Whether the progress page's pointer still comes up for this student. On until they turn it off. */
+export async function pointerOn(store, classId, studentId) {
+  return !(await read(store, keys(classId).pointerOff(studentId)));
+}
+
+/** The student turns the pointer off ("Don't show this again"), or the teacher turns it back on. */
+export async function setPointer(store, classId, studentId, on) {
+  const key = keys(classId).pointerOff(studentId);
+  if (on) await deleteKey(store, key);
+  else await store.setJSON(key, { off_at: new Date().toISOString() });
+}
+
+/** Teacher: the students who have turned the pointer off. */
+export async function listPointerOff(store, classId) {
+  const found = await listBlobKeys(store, keys(classId).pointersOff);
+  return found.map((key) => key.slice(key.lastIndexOf('/') + 1)).sort();
+}
+
 /** Signs the student out of every computer. Their code stays the same. */
 export async function releaseClaim(store, classId, studentId) {
   const k = keys(classId);
@@ -242,7 +264,7 @@ export async function classClaimsAction(store, classId, body) {
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');
   const action = body.action ?? 'list';
-  if (!['list', 'release', 'new_code'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['list', 'release', 'new_code', 'pointer'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   if (action !== 'list') {
     if (typeof body.student_id !== 'string' || !STUDENT_ID_PATTERN.test(body.student_id)) reject(400, 'bad_request', 'Unknown student.');
     if (action === 'release') await releaseClaim(store, classId, body.student_id);
@@ -250,6 +272,11 @@ export async function classClaimsAction(store, classId, body) {
       if (!roster.students.some((s) => s.id === body.student_id)) reject(400, 'bad_request', 'Unknown student.');
       await newCodeFor(store, classId, body.student_id);
     }
+    if (action === 'pointer') {
+      if (!roster.students.some((s) => s.id === body.student_id)) reject(400, 'bad_request', 'Unknown student.');
+      if (typeof body.on !== 'boolean') reject(400, 'bad_request', 'Say whether the pointer is on.');
+      await setPointer(store, classId, body.student_id, body.on);
+    }
   }
-  return { claims: await listClaims(store, classId), codes: await listCodes(store, roster) };
+  return { claims: await listClaims(store, classId), codes: await listCodes(store, roster), pointer_off: await listPointerOff(store, classId) };
 }

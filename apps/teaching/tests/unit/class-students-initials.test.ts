@@ -95,4 +95,26 @@ describe('class list initials', () => {
     await vi.waitFor(() => expect(codes()).toEqual(['wren-77', 'oak-17']));
     expect(claims.newCode).toHaveBeenCalledWith('c1', bob!.id);
   });
+
+  it('shows Pointer off only for students who turned it off, and turns it back on', async () => {
+    const cls = classRecord('c1', '9ENG2', [{ name: 'Bob Brown' }, { name: 'Tom Tills' }]);
+    const [bob] = assignInitials(cls.students ?? []);
+    let off = [bob!.id];
+    const claims = {
+      ...fakeClaims(),
+      list: vi.fn(async () => ({ claims: {}, codes: {}, pointer_off: off })),
+      pointerOn: vi.fn(async () => {
+        off = [];
+        return { claims: {}, codes: {}, pointer_off: off };
+      })
+    };
+    const host = document.createElement('div');
+    mountClassStudents(host, cls, { save: async () => undefined, claims });
+    await vi.waitFor(() => expect(host.querySelectorAll('.class-students__pointer').length).toBe(1));
+    expect(host.querySelector('.class-students__pointer')!.closest('li')!.textContent).toContain('Bob Brown');
+    host.querySelector<HTMLButtonElement>('.class-students__pointer')!.click();
+    await vi.waitFor(() => expect(host.querySelectorAll('.class-students__pointer').length).toBe(0));
+    expect(claims.pointerOn).toHaveBeenCalledWith('c1', bob!.id);
+    expect(host.querySelector('.class-students__status')?.textContent).toMatch(/pointer is back on for Bob Brown/);
+  });
 });

@@ -1024,6 +1024,16 @@
   font: 600 var(--text-xs) / 1.2 var(--font-ui);
 }
 
+/* A student turned off their progress page's pointer: gold so it stands out in the list. */
+.class-students__pointer {
+  flex: none;
+  min-height: 0;
+  padding: 0.2rem 0.55rem;
+  font: 600 var(--text-xs) / 1.2 var(--font-ui);
+  color: var(--pastel-gold-ink);
+  background: var(--pastel-gold);
+}
+
 .class-students__skip {
   display: inline-flex;
   align-items: center;

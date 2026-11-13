@@ -80,12 +80,21 @@ const payload: ProfilePayload = {
     countdowns: [{ title: 'Coastal poetry viva', lesson_id: 'l9', assessment: true, due_date: day(13), due_time: '13:24', set_date: '', published: false }],
     announcements: [],
     practice: { today: 12, answered: 0 },
-    back: [{ id: 'w:l4:b', kind: 'written', title: 'Tidewater review Q3', date: '10 Nov', state: 'new' }],
     waiting: [],
-    started: [],
-    todo: [{ id: 'l3', title: 'Lighthouse talk', kind: 'lesson', done: false }, { id: 'l5', title: 'Inland roads', kind: 'lesson', done: false }],
+    boxes: [
+      {
+        key: 'now',
+        items: [
+          { id: 'w:l4:b', title: 'Tidewater review Q3', kind: 'feedback', done: false, reason: 'New feedback', feedback: { state: 'new', kind: 'written', date: '10 Nov' } },
+          { id: 'l3', title: 'Lighthouse talk', kind: 'lesson', done: false, reason: 'For your viva' }
+        ]
+      },
+      { key: 'next', items: [{ id: 'l5', title: 'Inland roads', kind: 'lesson', done: false, reason: 'Next in the unit' }] }
+    ],
     more: 0
-  }
+  },
+  // ?pointer=off: the student said "Don't show this again".
+  pointer: new URLSearchParams(location.search).get('pointer') !== 'off'
 };
 
 const teacher = new URLSearchParams(location.search).has('teacher');
@@ -94,6 +103,7 @@ document.getElementById('mount')!.append(
     classId: CLASS,
     ...(teacher ? { teacher: { name: 'Quinn Zephyr' } } : {}),
     loadReturned: () => Promise.resolve([]),
+    pointerOff: () => console.info('Preview: pointer turned off'),
     loadPiece: () => Promise.reject(new Error('Preview: no server.'))
   })
 );

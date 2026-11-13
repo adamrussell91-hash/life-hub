@@ -22,8 +22,8 @@ import { peekCurriculum, replaceCurriculum } from '@/app/curriculum-state';
 import { createClassFold } from '@/teacher/class-fold';
 import '@/blocks/classroom-tools/classroom-tools.css';
 
-/** When each student claimed, and each student's code, by student id. */
-type ClaimsReply = { claims: Record<string, string>; codes?: Record<string, string> };
+/** When each student claimed, each student's code, by student id, and who turned the pointer off. */
+type ClaimsReply = { claims: Record<string, string>; codes?: Record<string, string>; pointer_off?: string[] };
 
 type Options = {
   /** Test seam. Defaults to POST /api/classes/:id/claims. */
@@ -31,6 +31,7 @@ type Options = {
     list: (classId: string) => Promise<ClaimsReply>;
     release: (classId: string, studentId: string) => Promise<ClaimsReply>;
     newCode?: (classId: string, studentId: string) => Promise<ClaimsReply>;
+    pointerOn?: (classId: string, studentId: string) => Promise<ClaimsReply>;
   };
   /** Test seam. Defaults to PATCH /api/classes/:id. */
   save?: (classId: string, students: ClassStudent[]) => Promise<Class | void>;
@@ -61,18 +62,21 @@ export function mountClassStudents(host: HTMLElement, cls: Class, options: Optio
       rememberStudents(classId, students);
       return updated;
     });
-  const claimsCall = (classId: string, body: Record<string, string>) => apiPost<ClaimsReply>(`/api/classes/${encodeURIComponent(classId)}/claims`, body);
+  const claimsCall = (classId: string, body: Record<string, string | boolean>) => apiPost<ClaimsReply>(`/api/classes/${encodeURIComponent(classId)}/claims`, body);
   const claimsApi = options.claims ?? {
     list: (classId: string) => claimsCall(classId, { action: 'list' }),
     release: (classId: string, studentId: string) => claimsCall(classId, { action: 'release', student_id: studentId }),
-    newCode: (classId: string, studentId: string) => claimsCall(classId, { action: 'new_code', student_id: studentId })
+    newCode: (classId: string, studentId: string) => claimsCall(classId, { action: 'new_code', student_id: studentId }),
+    pointerOn: (classId: string, studentId: string) => claimsCall(classId, { action: 'pointer', student_id: studentId, on: true })
   };
   let students: ClassStudent[] = assignInitials((cls.students ?? []).map((s) => ({ ...s, skip_picker: Boolean(s.skip_picker) })));
   let claims: Record<string, string> | null = null;
   let codes: Record<string, string> = {};
+  let pointerOff = new Set<string>();
   const take = (reply: ClaimsReply) => {
     claims = reply.claims;
     codes = reply.codes ?? codes;
+    if (reply.pointer_off) pointerOff = new Set(reply.pointer_off);
   };
 
   // Folds shut so the page leads with the calendar; open at first when there is no list yet.
@@ -229,6 +233,26 @@ export function mountClassStudents(host: HTMLElement, cls: Class, options: Optio
             paint();
           });
           item.append(release);
+        }
+        // Only students who said "Don't show this again" to their progress page's pointer get this.
+        if (student.id && pointerOff.has(student.id) && claimsApi.pointerOn) {
+          const on = el('button', 'btn btn--ghost class-students__pointer', 'Pointer off · Turn on');
+          on.type = 'button';
+          on.title = 'They turned off the “Do this now” pointer on their progress page';
+          on.setAttribute('aria-label', `Turn the Do this now pointer back on for ${student.name}`);
+          const studentId = student.id;
+          const turnOn = claimsApi.pointerOn;
+          on.addEventListener('click', async () => {
+            on.disabled = true;
+            try {
+              take(await turnOn(cls.id, studentId));
+              say(`The pointer is back on for ${student.name}. It comes up next time they open their progress page.`);
+            } catch {
+              say('Not turned on. Check your connection and try again.', 'error');
+            }
+            paint();
+          });
+          item.append(on);
         }
         item.append(label);
         return item;
