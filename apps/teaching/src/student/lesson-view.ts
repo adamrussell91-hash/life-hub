@@ -12,6 +12,7 @@ import { mountWorkSync, type WorkSyncHandle } from '@/student/work-sync';
 import { stepsLoader } from '@/student/next-step';
 import { mountLessonFooter, type LessonFooterHandle } from '@/student/lesson-footer';
 import { mountWhatsNext, renderTodoHint, type WhatsNextHandle } from '@/student/whats-next';
+import { mountEdgeTab, type EdgeTabHandle } from '@/student/edge-tab';
 import { mountWhyRoute } from '@/student/why-route';
 import { mountLessonMap, type LessonMapHandle } from '@/student/lesson-map';
 import { carrySplitWork } from '@/student/split-carry';
@@ -333,6 +334,7 @@ export function mountStudentLessonView(
   let work: WorkSyncHandle | null = null;
   let footer: LessonFooterHandle | null = null;
   let whatsNext: WhatsNextHandle | null = null;
+  let edgeTab: EdgeTabHandle | null = null;
   let token: InitialsTokenHandle | null = null;
   let endCard: { dispose(): void } | null = null;
   let whyRoute: { dispose(): void } | null = null;
@@ -354,6 +356,8 @@ export function mountStudentLessonView(
     footer = null;
     whatsNext?.dispose();
     whatsNext = null;
+    edgeTab?.dispose();
+    edgeTab = null;
     token?.dispose();
     token = null;
     endCard?.dispose();
@@ -385,7 +389,13 @@ export function mountStudentLessonView(
       footer = mountLessonFooter({ lessonId: lesson.lesson_id, classId: workClass, prev: linkTo(prev), next: linkTo(next), finish: lesson.pedagogical_mode !== 'quiz', work: () => work, onClaimed: () => token?.refresh(), onDone: (done, fresh) => wn.setDone(done, fresh) });
       footer.element.append(wn.element);
       content.append(footer.element);
-      content.querySelector(':scope > .lesson-hero')?.after(renderTodoHint(workClass, here));
+      const hero = content.querySelector(':scope > .lesson-hero');
+      if (hero) {
+        hero.after(renderTodoHint(workClass, here));
+        // Plain lessons only (the players draw their own pages): the "What next?" tab on the right edge.
+        edgeTab = mountEdgeTab({ classId: workClass, from: here, card: wn });
+        if (edgeTab) document.body.append(edgeTab.element);
+      }
       // Plain lessons only: the section strip on the right and the checklist above the footer.
       if (!lecture && lesson.pedagogical_mode !== 'quiz') lessonMap = mountLessonMap({ lessonId: lesson.lesson_id, classId: workClass, blocks: lesson.blocks, content, before: footer.element });
       addEndCard(content, lesson, workClass, cls ? `/s/classes/${cls.id}/lessons/${lesson.lesson_id}` : `/s/lessons/${lesson.lesson_id}?class=${workClass}`, lessonMap?.card ?? footer.element);
@@ -518,6 +528,8 @@ export function mountStudentLessonView(
       footer = null;
       whatsNext?.dispose();
       whatsNext = null;
+      edgeTab?.dispose();
+      edgeTab = null;
       token?.dispose();
       token = null;
       endCard?.dispose();
