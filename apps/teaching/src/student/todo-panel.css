@@ -147,26 +147,39 @@
 .td-item__note { font-size: var(--text-xs); color: var(--muted); }
 
 .td-mark {
-  width: 16px;
-  height: 16px;
-  margin-top: 2px;
-  border-radius: 4px;
+  flex: none;
   box-sizing: border-box;
 }
 
-.td-mark--box { border: 2px solid var(--line); border-color: rgba(23, 55, 94, 0.3); }
-.td-mark--tick { position: relative; background: var(--pastel-sage-ink); }
-.td-mark--tick::after {
+/* Not a tick box: nothing on the list is ticked by hand, so a left item is a plain dot and a
+   finished one a green tick with no square round it. */
+.td-mark--todo {
+  width: 8px;
+  height: 8px;
+  margin: 6px 4px 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--td-box, var(--navy)) 55%, transparent);
+}
+
+.td-mark--done {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+
+.td-mark--done::after {
   content: "";
   position: absolute;
   left: 5px;
-  top: 1px;
-  width: 4px;
-  height: 9px;
-  border: solid #fff;
-  border-width: 0 2px 2px 0;
+  top: 0;
+  width: 5px;
+  height: 11px;
+  border: solid var(--pastel-sage-ink);
+  border-width: 0 2.5px 2.5px 0;
   transform: rotate(45deg);
 }
+
 .td-mark--new,
 .td-mark--redraft,
 .td-mark--wait { width: 10px; height: 10px; margin: 5px 0 0 3px; border-radius: 50%; }
@@ -247,7 +260,7 @@
   background: #fdebdc;
 }
 
-.td-item--practise .td-mark--box { margin-top: 0; border-color: #e8711f; background: #fff; }
+.td-item--practise .td-mark--todo { margin-top: 0; background: #e8711f; }
 .td-item--practise .td-item__title { color: #7a3510; }
 .td-item--practise .td-item__note { color: #8f4a1f; }
 

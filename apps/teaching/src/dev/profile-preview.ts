@@ -87,7 +87,8 @@ const payload: ProfilePayload = {
         key: 'now',
         items: [
           { id: 'w:l4:b', title: 'Tidewater review Q3', kind: 'feedback', done: false, reason: 'New feedback', feedback: { state: 'new', kind: 'written', date: '10 Nov' } },
-          { id: 'l3', title: 'Lighthouse talk', kind: 'lesson', done: false, reason: 'For your viva' }
+          { id: 'l3', title: 'Lighthouse talk', kind: 'lesson', done: false, reason: 'For your viva' },
+          { id: 'l2', title: 'Salt and stone', kind: 'lesson', done: true, reason: '' }
         ]
       },
       { key: 'next', items: [{ id: 'l5', title: 'Inland roads', kind: 'lesson', done: false, reason: 'Next in the unit' }] }

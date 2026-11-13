@@ -184,13 +184,17 @@ function group(title: string): HTMLElement {
   return g;
 }
 
-type Mark = 'box' | 'tick' | 'new' | 'redraft' | 'wait';
+/**
+ * The mark beside a row. None of them is a tick box: nothing on the list is ticked by hand.
+ * `todo` a plain dot, `done` a green tick (finished today), `new`/`redraft`/`wait` coloured dots.
+ */
+type Mark = 'todo' | 'done' | 'new' | 'redraft' | 'wait';
 function item(mark: Mark, title: string, note: string, action?: HTMLElement, pill?: [string, string]): HTMLElement {
   const row = el('div', 'td-item');
   const marker = el('span', `td-mark td-mark--${mark}`);
   marker.setAttribute('aria-hidden', 'true');
   const body = el('div', 'td-item__body');
-  const name = el('span', `td-item__title${mark === 'tick' ? ' is-done' : ''}`, title);
+  const name = el('span', `td-item__title${mark === 'done' ? ' is-done' : ''}`, title);
   if (pill) name.append(el('span', `td-pill td-pill--${pill[0]}`, pill[1]));
   body.append(name);
   if (note) body.append(el('span', 'td-item__note', note));
@@ -203,14 +207,14 @@ function item(mark: Mark, title: string, note: string, action?: HTMLElement, pil
 /** The daily practice row: an orange card with cards left, or a tick once today's are done. */
 function practiceRow(left: number, teacher: boolean): HTMLElement {
   if (left <= 0) {
-    const done = item('tick', 'Practise your organiser', 'Done for today');
+    const done = item('done', 'Practise your organiser', 'Done for today');
     done.dataset.todo = 'practice';
     return done;
   }
   const minutes = minutesFor(left);
   const note = `${left} ${left === 1 ? 'card' : 'cards'} left · about ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
   // Orange card so the daily practice stands out from the plain rows below it.
-  const row = item('box', 'Practise your organiser', note, teacher ? undefined : tabLink('Practise →', 'organiser', 'Practise your organiser'));
+  const row = item('todo', 'Practise your organiser', note, teacher ? undefined : tabLink('Practise →', 'organiser', 'Practise your organiser'));
   row.classList.add('td-item--practise');
   // The "Do this now" strip finds its row by this.
   row.dataset.todo = 'practice';
@@ -251,7 +255,7 @@ export const BOX_SHOWN = 3;
 function startedRow(t: TodoBoxItem, activities: TodoActivity[], classId: string): HTMLElement {
   const finished = activities.filter((a) => a.done).length;
   const total = activities.length;
-  const row = item('box', t.title, total ? `${finished} of ${total} ${total === 1 ? 'activity' : 'activities'} done` : 'Started', lessonLink(classId, t.id, 'Carry on →', t.title));
+  const row = item('todo', t.title, total ? `${finished} of ${total} ${total === 1 ? 'activity' : 'activities'} done` : 'Started', lessonLink(classId, t.id, 'Carry on →', t.title));
   if (total) {
     const meter = el('span', 'td-meter');
     meter.setAttribute('aria-hidden', 'true');
@@ -271,7 +275,7 @@ function startedRow(t: TodoBoxItem, activities: TodoActivity[], classId: string)
 }
 
 function feedbackRow(t: TodoBoxItem, f: NonNullable<TodoBoxItem['feedback']>): HTMLElement {
-  if (t.done || f.state === 'read') return item('tick', t.title, 'Feedback read today.');
+  if (t.done || f.state === 'read') return item('done', t.title, 'Feedback read today.');
   if (f.state === 'redraft') {
     return item('redraft', t.title, '', f.kind === 'answer' ? tabLink('Answer again →', 'returned', `Answer ${t.title} again`) : tabLink('Redraft →', 'returned', `Redraft ${t.title}`), ['again', 'Have another go']);
   }
@@ -281,9 +285,9 @@ function feedbackRow(t: TodoBoxItem, f: NonNullable<TodoBoxItem['feedback']>): H
 function boxRow(t: TodoBoxItem, classId: string): HTMLElement {
   let row: HTMLElement;
   if (t.feedback) row = feedbackRow(t, t.feedback);
-  else if (t.done) row = item('tick', t.title, 'Done today');
+  else if (t.done) row = item('done', t.title, 'Done today');
   else if (t.started) row = startedRow(t, t.started.activities, classId);
-  else row = item('box', t.title, KIND_NOTE[t.kind] ?? '', lessonLink(classId, t.id, 'Open →', t.title));
+  else row = item('todo', t.title, KIND_NOTE[t.kind] ?? '', lessonLink(classId, t.id, 'Open →', t.title));
   if (t.reason && !t.done) row.querySelector('.td-item__title')?.after(el('span', 'td-item__why', t.reason));
   return row;
 }
