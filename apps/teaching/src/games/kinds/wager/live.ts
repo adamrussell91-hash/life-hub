@@ -11,18 +11,23 @@ import './wager.css';
 /**
  * Wager live screens (spec §6.8; approved mockup docs/mockups/games/wager.html).
  *
- * Board: the question and its options; a timer ring; the pot on the right
- * with a pile of coins; dots for who has locked in. When answers close, each
- * option shows the points riding on it. Reveal: the right option lifts, the
- * wrong stacks fly into the pot as coins, the pot rolls up, then splits and
- * flies to the right option (or rolls over as a jackpot). Then the top five.
- * After the final question the teacher may open the calibration view
- * (initials, confidence against accuracy) before ending.
+ * No betting words anywhere students or the class see: no bets, pot, coins,
+ * house or jackpot. Students commit points to show how sure they are; points
+ * from wrong answers go "up for grabs"; nobody right means they carry over.
+ * (Internal names such as `bet`, `pot` and `house_bonus` stay: saved games use them.)
  *
- * Phone: answer buttons, then a bet slider snapping to 10s with Min / ¼ / ½ /
- * All in chips; "Lock in 80 points"; after the reveal, the change with its
- * parts: "+104", then "184 back (bet 80, bonus 40, pot share 64)" (the bet
- * was never taken, so the change is bonus + share).
+ * Board: the question and its options; a timer ring; "Up for grabs" on the
+ * right with a heap of counters; dots for who has locked in. When answers
+ * close, each option shows the points committed to it. Reveal: the right
+ * option lifts, counters fly from the wrong options into "Up for grabs", it
+ * counts up, then splits and flies to the right option (or carries over).
+ * Then the top five. After the final question the teacher may open the
+ * calibration view (initials, confidence against accuracy) before ending.
+ *
+ * Phone: answer buttons, then "How sure are you?" with a slider snapping to
+ * 10s and Min / ¼ / ½ / All chips; "Lock in 80 points"; after the reveal, the
+ * change with its parts: "+104", then "Kept your 80, plus a 40 bonus and a 64
+ * share" (the points were never taken, so the change is bonus + share).
  */
 
 type BoardKV = {
@@ -105,7 +110,7 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     const count = Math.min(14, Math.ceil(n / 60));
     p.replaceChildren(
       ...Array.from({ length: count }, (_, j) => {
-        const c = el('i');
+        const c = el('i', `wg-pile--${(j % 4) + 1}`);
         c.style.left = `calc(50% - 1.3em + ${((j % 3) - 1) * 2.1 + (j % 2) * 0.3}em)`;
         c.style.bottom = `${Math.floor(j / 3) * 0.65}em`;
         return c;
@@ -121,7 +126,7 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     root.replaceChildren();
     const it = k.item;
     const head = el('div', 'wg-head');
-    head.append(el('span', 'gl-eyebrow', k.final ? 'Final question · all in allowed · bonus doubled' : `Question ${k.index + 1} of ${k.of}`));
+    head.append(el('span', 'gl-eyebrow', k.final ? 'Final question · up to every point · bonus doubled' : `Question ${k.index + 1} of ${k.of}`));
     head.append(el('p', 'wg-q', it?.prompt ?? ''));
     if (it?.quote) head.append(el('p', 'wg-quote', it.quote));
     ring = createRing('wg-ring');
@@ -144,12 +149,12 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     });
     if (!options.length) opts.append(el('p', 'wg-typed', 'Typed answers: everyone writes theirs on the phone.'));
     const pot = el('aside', 'wg-pot');
-    pot.setAttribute('aria-label', 'The pot');
+    pot.setAttribute('aria-label', 'Points up for grabs');
     const num = el('span', 'wg-pot__num', fmt(k.carried));
     shownPot = k.carried;
-    pot.append(el('span', 'wg-pot__lbl', 'The pot'), num, el('span', 'wg-pot__sub', k.carried ? 'rolled over from last question' : 'fills with every wrong bet'), el('div', 'wg-pile'));
+    pot.append(el('span', 'wg-pot__lbl', 'Up for grabs'), num, el('span', 'wg-pot__sub', k.carried ? 'carried over from last question' : 'fills with points from wrong answers'), el('div', 'wg-pile'));
     const side = el('div', 'wg-side');
-    if (k.carried) side.append(el('span', 'wg-jackpot', `Jackpot carried over: ${fmt(k.carried)}`));
+    if (k.carried) side.append(el('span', 'wg-jackpot', `Carried over: ${fmt(k.carried)}`));
     side.append(pot);
     const locked = el('div', 'wg-locked');
     const count = el('span', 'wg-locked__n');
@@ -185,8 +190,8 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     });
   }
 
-  /** Coins from `from` to `to` (both elements), relative to the board root. */
-  function coins(fromEl: Element, toEl: Element, n: number, delay = 0): Promise<void> {
+  /** Counters from `from` to `to` (both elements), relative to the board root. */
+  function counters(fromEl: Element, toEl: Element, n: number, delay = 0): Promise<void> {
     if (api.calm()) return Promise.resolve();
     const box = root.getBoundingClientRect();
     const a = fromEl.getBoundingClientRect();
@@ -195,7 +200,7 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     const to = { x: b.left - box.left + b.width / 2, y: b.top - box.top + b.height / 2 };
     const flights: Promise<void>[] = [];
     for (let j = 0; j < n; j++) {
-      const c = el('i', 'wg-coin');
+      const c = el('i', `wg-dot wg-pile--${(j % 4) + 1}`);
       root.append(c);
       flights.push(
         sleep(delay + j * 70)
@@ -221,7 +226,7 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     const pot = root.querySelector('.wg-pot');
     const riding = k.riding ?? {};
     if (pot) {
-      await Promise.all(cards.filter((c) => !right.has(c.dataset.id ?? '') && (riding[c.dataset.id ?? ''] ?? 0) > 0).map((c, i) => coins(c, pot, 6, i * 120)));
+      await Promise.all(cards.filter((c) => !right.has(c.dataset.id ?? '') && (riding[c.dataset.id ?? ''] ?? 0) > 0).map((c, i) => counters(c, pot, 6, i * 120)));
     }
     if (mine !== token) return;
     const full = k.carried + (k.pot_in ?? 0);
@@ -232,11 +237,11 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     if (mine !== token) return;
     if (k.winners) {
       const target = cards.find((c) => right.has(c.dataset.id ?? '')) ?? root.querySelector('.wg-opts');
-      if (pot && target) void coins(pot, target, 10);
+      if (pot && target) void counters(pot, target, 10);
       setPot(0, full);
       api.sfx.right();
     } else {
-      if (sub) sub.textContent = full ? 'Nobody right: the pot rolls over' : 'Nobody right';
+      if (sub) sub.textContent = full ? 'Nobody right: the points carry over' : 'Nobody right';
       if (full) void pop(root.querySelector('.wg-pot'));
     }
   }
@@ -252,7 +257,7 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     box.append(lb.root);
     if (k.final && k.misconceptions?.length) {
       const m = k.misconceptions[0];
-      box.append(el('p', 'wg-note', `Most backed wrong answer: ${m.text} (${Math.round(m.share * 100)}% of the points on question ${m.index + 1})`));
+      box.append(el('p', 'wg-note', `Wrong answer the class was surest of: ${m.text} (${Math.round(m.share * 100)}% of the points on question ${m.index + 1})`));
     }
     root.append(box);
     const rows = k.standings ?? [];
@@ -275,7 +280,7 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     const plot = el('div', 'wg-plot');
     plot.setAttribute('role', 'img');
     plot.setAttribute('aria-label', 'Confidence against accuracy, one dot per student');
-    plot.append(el('span', 'wg-plot__diag'), el('span', 'wg-plot__under', 'Underconfident'), el('span', 'wg-plot__over', 'Overconfident'), el('span', 'wg-plot__x', 'Confidence (bet ÷ points held) →'), el('span', 'wg-plot__y', 'Accuracy →'));
+    plot.append(el('span', 'wg-plot__diag'), el('span', 'wg-plot__under', 'Underconfident'), el('span', 'wg-plot__over', 'Overconfident'), el('span', 'wg-plot__x', 'Confidence (share of points committed) →'), el('span', 'wg-plot__y', 'Accuracy →'));
     for (const r of k.calibration ?? []) {
       const a = avatar(r.initials, 'wg-plot__dot');
       a.style.left = `calc(${r.confidence * 100}% - 1.1em)`;
@@ -290,12 +295,12 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
       notes.append(n);
     };
     const mis = k.misconceptions ?? [];
-    note('Confident misconception', mis.length ? mis.slice(0, 2).map((m) => `Q${m.index + 1}: “${m.text}” drew ${Math.round(m.share * 100)}% of the points bet.`).join(' ') : 'No wrong answer drew 30% of the points on any question.');
+    note('Confident misconception', mis.length ? mis.slice(0, 2).map((m) => `Q${m.index + 1}: “${m.text}” drew ${Math.round(m.share * 100)}% of the points committed.`).join(' ') : 'No wrong answer drew 30% of the points on any question.');
     const bold = (k.calibration ?? []).filter((r) => r.big_wrong > 0).map((r) => r.initials);
-    note('Big bets, wrong (revisit)', bold.length ? `${bold.join(', ')} backed a wrong answer with half their points or more.` : 'Nobody backed a wrong answer with half their points.');
+    note('Very sure, but wrong (revisit)', bold.length ? `${bold.join(', ')} committed half their points or more to a wrong answer.` : 'Nobody committed half their points to a wrong answer.');
     const shy = (k.calibration ?? []).filter((r) => r.accuracy >= 0.8 && r.confidence <= 0.3).map((r) => r.initials);
-    note('Underselling themselves', shy.length ? `${shy.join(', ')}: right most of the time, but bet small.` : 'Nobody was right most of the time on small bets.');
-    note('Rescued players', 'Bets made after a rescue top-up stay out of this plot until the player is back above half the starting points.');
+    note('Underselling themselves', shy.length ? `${shy.join(', ')}: right most of the time, but committed few points.` : 'Nobody was right most of the time while committing few points.');
+    note('Rescued players', 'Answers given after a rescue top-up stay out of this plot until the player is back above half the starting points.');
     grid.append(plot, notes);
     wrap.append(grid);
     root.append(wrap);
@@ -307,7 +312,7 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     const prev = last;
     last = k;
     if (k.stage === 'idle') {
-      root.replaceChildren(el('p', 'wg-board-wait', 'Get ready to wager…'));
+      root.replaceChildren(el('p', 'wg-board-wait', 'Get ready: answer, then show how sure you are…'));
       return;
     }
     if (k.stage === 'standings') {
@@ -442,7 +447,7 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
 
   function renderAnswer(it: ShownItem) {
     root.append(head(), bar);
-    root.append(el('p', 'wg-ph-sub', 'Answer first, then bet'));
+    root.append(el('p', 'wg-ph-sub', 'Answer first, then say how sure you are'));
     root.append(el('p', 'wg-ph-prompt', it.prompt));
     if (it.quote) root.append(el('p', 'wg-ph-quote', it.quote));
     if (it.mode === 'text') {
@@ -471,7 +476,7 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
       list.append(...optionButtons(it));
       root.append(list);
     }
-    const next = el('button', 'btn btn--primary', 'Next: place your bet');
+    const next = el('button', 'btn btn--primary', 'Next: how sure are you?');
     next.type = 'button';
     next.disabled = it.mode === 'text' ? !typed.trim() : !pick;
     next.addEventListener('click', () => {
@@ -506,7 +511,7 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
     range.max = String(held());
     range.step = '10';
     range.value = String(bet);
-    range.setAttribute('aria-label', 'Bet');
+    range.setAttribute('aria-label', 'Points to commit');
     range.setAttribute('aria-valuetext', `${bet} points`);
     const paint = () => {
       amt.textContent = fmt(bet);
@@ -535,9 +540,9 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
     chip('Min', () => minBet());
     chip('¼', () => snap(held() / 4));
     chip('½', () => snap(held() / 2));
-    chip('All in', () => held(), 'is-allin');
+    chip('All', () => held(), 'is-allin');
     card.append(el('span', 'wg-ph-sub', 'How sure are you?'), amt, of, range, chips);
-    const rule = el('p', 'wg-ph-note', `Right: your bet back, plus ${bonusWords(k?.bonus ?? 0.5)}, plus a share of the pot. Wrong: you lose it.`);
+    const rule = el('p', 'wg-ph-note', `Right: keep these points, plus ${bonusWords(k?.bonus ?? 0.5)}, plus a share of what’s up for grabs. Wrong: you lose them.`);
     if (k?.you.rescued) root.append(el('p', 'wg-rescue', `Topped up to ${k.min_bet} so you can keep playing.`));
     root.append(mine, card, rule);
     const lock = el('button', 'btn btn--primary wg-lock', '');
@@ -585,14 +590,14 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
       breakdown.append(d);
     };
     if (p.correct) {
-      // The headline is the change in points; the line under it adds up to what came back (the bet was never taken).
-      root.append(waitCard('You were right', `+${fmt(p.change)}`, [`${fmt(p.bet + p.bonus + p.share)} back (bet ${fmt(p.bet)}, bonus ${fmt(p.bonus)}, pot share ${fmt(p.share)})`], 'is-good'));
-      row('Bet returned', fmt(p.bet));
-      row('House bonus', `+${fmt(p.bonus)}`);
-      row('Your share of the pot', `+${fmt(p.share)}`);
+      // The headline is the change in points: bonus + share. The points committed were never taken, so they are "kept", not added.
+      root.append(waitCard('You were right', `+${fmt(p.change)}`, [`Kept your ${fmt(p.bet)}, plus a ${fmt(p.bonus)} bonus and a ${fmt(p.share)} share`], 'is-good'));
+      row('Points kept', fmt(p.bet));
+      row('Bonus for being right', `+${fmt(p.bonus)}`);
+      row('Share of points up for grabs', `+${fmt(p.share)}`);
     } else {
       const right = (k?.right ?? []).map(choiceText).filter(Boolean).join(' or ');
-      root.append(waitCard(p.correct === null ? 'No answer' : 'Not this time', `−${fmt(p.bet)}`, [p.correct === null ? 'No answer: the minimum bet went into the pot.' : right ? `The answer was ${right}.` : 'Your answer wasn’t the one.'], 'is-bad'));
+      root.append(waitCard(p.correct === null ? 'No answer' : 'Not this time', `−${fmt(p.bet)}`, [p.correct === null ? 'No answer: the minimum went up for grabs.' : right ? `The answer was ${right}.` : 'Your answer wasn’t the one.'], 'is-bad'));
     }
     row('Points now', fmt(p.after), 'is-tot');
     if (p.after < (k?.min_bet ?? 10) && p.after >= 0) row('Rescue', `back to ${k?.min_bet ?? 10} next question`);
@@ -608,7 +613,7 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
       add('Questions right', `${s.right} of ${s.of}`);
       if (s.confidence !== null && s.accuracy !== null) {
         const gap = s.confidence - s.accuracy;
-        add('Your bets matched your accuracy', Math.abs(gap) <= 0.2 ? 'Well' : gap > 0 ? 'Bold: bet more than you got right' : 'Cautious: you knew more than you bet');
+        add('Your confidence matched your accuracy', Math.abs(gap) <= 0.2 ? 'Well' : gap > 0 ? 'Bold: more sure than right' : 'Cautious: you knew more than you showed');
       }
       if (k.you.rank) add('Place', `${k.you.rank} of ${k.you.of}`);
       root.append(sum);
@@ -639,7 +644,7 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
     if (k.stage === 'open') {
       if (k.you.locked) {
         const l = k.you.locked;
-        root.append(head(), bar, waitCard('Locked in', fmt(l.bet), [`on ${l.choice ? choiceText(l.choice) : `“${l.text ?? ''}”`}`, 'Eyes on the board.']));
+        root.append(head(), bar, waitCard('Locked in', fmt(l.bet), [`for ${l.choice ? choiceText(l.choice) : `“${l.text ?? ''}”`}`, 'Eyes on the board.']));
       } else if (step === 'bet') renderBet(it);
       else renderAnswer(it);
       timer();
@@ -647,7 +652,7 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
     }
     if (k.stage === 'closed') {
       const l = k.you.locked;
-      root.append(head(), waitCard('Answers closed', fmt(l?.bet ?? Math.min(k.min_bet, held())), [l ? `riding on ${l.choice ? choiceText(l.choice) : `“${l.text ?? ''}”`}` : 'No answer: the minimum bet goes into the pot.']));
+      root.append(head(), waitCard('Answers closed', fmt(l?.bet ?? Math.min(k.min_bet, held())), [l ? `for ${l.choice ? choiceText(l.choice) : `“${l.text ?? ''}”`}` : 'No answer: the minimum goes up for grabs.']));
       return;
     }
     const p = k.you.result;

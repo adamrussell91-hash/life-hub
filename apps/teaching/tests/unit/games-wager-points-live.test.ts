@@ -48,7 +48,7 @@ describe('wager live views', () => {
     expect(liveKind('points_rush')).toBeTruthy();
   });
 
-  it('phone: answer, then a bet that snaps to 10s with Min / ¼ / ½ / All in, then lock in', async () => {
+  it('phone: answer, then how sure (points snap to 10s with Min / ¼ / ½ / All), then lock in', async () => {
     const h = rulesHarness(wagerRules, WAGER, { seats: ['AB', 'CD'] });
     h.start();
     const host = document.createElement('div');
@@ -70,7 +70,7 @@ describe('wager live views', () => {
     range.dispatchEvent(new Event('input'));
     expect(host.querySelector('.wg-bet__amt')?.textContent).toBe('50');
     const chips = [...host.querySelectorAll<HTMLButtonElement>('.wg-chips button')];
-    expect(chips.map((c) => c.textContent)).toEqual(['Min', '¼', '½', 'All in']);
+    expect(chips.map((c) => c.textContent)).toEqual(['Min', '¼', '½', 'All']);
     chips[3].click();
     expect(a.actions[0].textContent).toBe('Lock in 100 points');
     chips[0].click();
@@ -87,7 +87,7 @@ describe('wager live views', () => {
     phone.dispose();
   });
 
-  it('phone: after the reveal shows the change, then a line that adds up: "184 back (bet, bonus, pot share)"', () => {
+  it('phone: after the reveal shows the change, then a line that adds up: "Kept your 80, plus a 40 bonus and a 64 share"', () => {
     const h = rulesHarness(wagerRules, WAGER, { seats: ['AB', 'CD'] });
     h.start();
     const kv = h.view('board', 'board') as { item: { options: Array<{ id: string; text: string }> } };
@@ -100,9 +100,10 @@ describe('wager live views', () => {
     const phone = liveKind('wager')!.phone(host, api());
     phone.update(view('wager', h.view('student', 'o_AB')));
     expect(host.querySelector('.wg-big')?.textContent).toBe('+104');
-    expect(host.textContent).toContain('184 back (bet 80, bonus 40, pot share 64)');
-    // Never a sum that doesn't add up: "+104 (bet 80, …)" read as 80 + 40 + 64.
-    expect(host.textContent).not.toContain('+104 (bet');
+    expect(host.textContent).toContain('+104');
+    expect(host.textContent).toContain('Kept your 80, plus a 40 bonus and a 64 share');
+    // Never a sum that doesn't add up: "+104 (80, …)" read as 80 + 40 + 64.
+    expect(host.textContent).not.toContain('+104 (');
     const lost = document.createElement('div');
     document.body.append(lost);
     const p2 = liveKind('wager')!.phone(lost, api({ owner: 'o_CD' }));
@@ -154,6 +155,91 @@ describe('wager live views', () => {
     expect(host.querySelectorAll('.wg-plot__dot').length).toBeGreaterThan(0);
     expect(host.textContent).toContain('Teacher only');
     board.dispose();
+  });
+
+  it('never uses betting words on the board, the phones, the ticker or the print sheet', async () => {
+    // Points, never gambling: no bets, pot, coins, house, jackpot or "all in". The question text itself is left out (it may say "house").
+    const BETTING = /\b(bets?|betting|pot|coins?|house|jackpot|all in|riding|backed|stakes?|gambl\w*|odds)\b/i;
+    const words = (n: Element, extra: HTMLElement[] = []) => {
+      const c = n.cloneNode(true) as Element;
+      c.querySelectorAll('.wg-q, .wg-quote, .wg-ph-prompt, .wg-ph-quote').forEach((p) => p.remove());
+      return [c.textContent ?? '', ...[...c.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label') ?? ''), ...extra.map((b) => b.textContent ?? '')].join(' ');
+    };
+    const seen: string[] = [];
+    const h = rulesHarness(wagerRules, WAGER, { seats: ['AB', 'CD', 'EF'] });
+    h.start();
+    const boardHost = document.createElement('div');
+    document.body.append(boardHost);
+    const board = liveKind('wager')!.board(boardHost, api({ owner: 'board' }));
+    const phones = ['AB', 'CD', 'EF'].map((ini) => {
+      const host = document.createElement('div');
+      document.body.append(host);
+      const a = api({ owner: `o_${ini}` });
+      return { ini, host, a, view: liveKind('wager')!.phone(host, a) };
+    });
+    const look = () => {
+      const bv = view('wager', h.view('board', 'board'));
+      board.update(bv);
+      seen.push(words(boardHost), ...(board.controls?.(bv) ?? []).map((c) => c.label));
+      for (const p of phones) {
+        p.view.update(view('wager', h.view('student', `o_${p.ini}`)));
+        seen.push(words(p.host, p.a.actions));
+      }
+    };
+    const id = (text: string) => (h.view('board', 'board') as { item: { options: Array<{ id: string; text: string }> } }).item.options.find((o) => o.text === text)!.id;
+    const answer = (ini: string, text: string, bet: number) => h.move(ini, { item: h.k.order[h.k.index], move: 'answer', response: { selected: [id(text)] }, extra: { bet } });
+
+    // Q1 open: AB walks the phone to the "how sure" step.
+    look();
+    const ab = phones[0];
+    [...ab.host.querySelectorAll<HTMLButtonElement>('.wg-ans')].find((b) => b.textContent?.includes('Personification'))!.click();
+    (ab.a.actions[0] as HTMLButtonElement).click();
+    seen.push(words(ab.host, ab.a.actions));
+    // AB right, CD wrong, EF never answers.
+    answer('AB', 'Personification', 80);
+    answer('CD', 'Metaphor', 40);
+    look();
+    h.control('close');
+    look();
+    h.control('reveal');
+    look();
+    await new Promise((r) => setTimeout(r, 200));
+    seen.push(words(boardHost));
+    h.control('standings');
+    look();
+    // Q2: nobody right, so the points carry over into Q3.
+    h.control('next');
+    answer('AB', 'Dramatic irony', 30);
+    answer('CD', 'Comic relief', 30);
+    h.control('close');
+    h.control('reveal');
+    look();
+    await new Promise((r) => setTimeout(r, 200));
+    seen.push(words(boardHost), ...h.ticker.map((t) => t.text));
+    h.control('standings');
+    h.control('next');
+    // Q3, the final question: carried-over points, then the summary and the teacher's calibration view.
+    look();
+    answer('AB', 'Unreliable narrator', 50);
+    answer('CD', 'Intrusive narrator', 20);
+    h.control('close');
+    h.control('reveal');
+    look();
+    h.control('standings');
+    look();
+    h.control('calibration');
+    look();
+    // The sheet without the invented content (its title and prompts mention the Lantern House).
+    const content = [WAGER.title, ...WAGER.items.map((i) => String((i.question as { prompt?: string }).prompt ?? ''))];
+    seen.push(content.reduce((t, c) => t.replaceAll(c, ''), renderWagerPrint(WAGER, { answers: true }).textContent ?? ''));
+
+    const all = seen.join('\n');
+    expect(all).toContain('Up for grabs');
+    expect(all).toContain('carry over');
+    expect(all).toContain('How sure are you?');
+    expect(all.match(BETTING)).toBeNull();
+    board.dispose();
+    phones.forEach((p) => p.view.dispose());
   });
 
   it('prints a question sheet and a key', () => {
