@@ -321,14 +321,14 @@ describe('To do panel boxes', () => {
     const panel = renderTodoPanel({ ...base, practice: { today: 3, answered: 0 } }, { classId: 'class1' });
     document.body.append(panel);
     const row = () => [...panel.querySelectorAll('.td-item')].find((r) => r.textContent!.includes('Practise your organiser'))!;
-    expect(row().querySelector('.td-mark--box')).not.toBeNull();
+    expect(row().querySelector('.td-mark--todo')).not.toBeNull();
     const practised = (classId: string, today: number) => document.dispatchEvent(new CustomEvent(PRACTISED_EVENT, { detail: { classId, today } }));
     practised('class1', 1);
     expect(row().textContent).toContain('1 card left');
     practised('other', 0);
-    expect(row().querySelector('.td-mark--box')).not.toBeNull();
+    expect(row().querySelector('.td-mark--todo')).not.toBeNull();
     practised('class1', 0);
-    expect(row().querySelector('.td-mark--tick')).not.toBeNull();
+    expect(row().querySelector('.td-mark--done')).not.toBeNull();
     expect(row().textContent).toContain('Done for today');
     expect(row().querySelector('.td-go')).toBeNull();
     panel.remove();
@@ -354,7 +354,7 @@ describe('To do panel boxes', () => {
     const box = panel.querySelector('.td-box')!;
     const visible = () => [...box.querySelectorAll('.td-item')].filter((r) => !r.closest('[hidden]')).map((r) => r.querySelector('.td-item__title')!.textContent);
     expect(visible()).toEqual(['Lesson d', 'Lesson a', 'Lesson b', 'Lesson c']);
-    expect(box.querySelector('.td-mark--tick')).not.toBeNull();
+    expect(box.querySelector('.td-mark--done')).not.toBeNull();
     expect(box.querySelector('.td-item__title.is-done')!.nextElementSibling?.classList.contains('td-item__why')).toBe(false);
     const toggle = box.querySelector<HTMLButtonElement>('.td-morebtn')!;
     expect(toggle.textContent).toBe('Show 2 more');
