@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/organiser/print', () => ({ printOrganiser: vi.fn() }));
 import { renderProfile } from '@/student/profile-view';
-import { oneThing, POINTER_DELAY_MS, PULSE_COLOURS, PULSE_STEP_MS, pulseCount, resetNowStrip } from '@/student/now-strip';
+import { oneThing, POINTER_DELAY_MS, resetNowStrip } from '@/student/now-strip';
+import { PULSE_COLOURS, PULSE_STEP_MS, pulseCount, resetColourPulse } from '@/student/colour-pulse';
 import type { TodoBoxItem, TodoPayload } from '@/student/todo-panel';
 
 const base: TodoPayload = { countdowns: [], announcements: [], practice: null, waiting: [], boxes: [], more: 0 };
@@ -119,23 +120,28 @@ describe('the Do this now strip', () => {
     expect(document.querySelector('.ns-pointer')).toBeNull();
   });
 
-  it('pulses two colours, adds one every ten seconds up to ten, and never on the teacher’s view', () => {
+  it('pulses the To do panel’s Do now box, not the strip: two colours, one more every ten seconds up to ten', () => {
+    resetColourPulse();
     expect([0, 9_999, 10_000, 30_000, 80_000, 500_000].map(pulseCount)).toEqual([2, 2, 3, 5, 10, 10]);
     const h = renderProfile(page(todo) as never, { classId: 'c1' });
     document.body.append(h);
-    const strip = h.querySelector<HTMLElement>('.ns-strip')!;
-    expect(strip.classList.contains('is-pulsing')).toBe(true);
+    expect(h.querySelector('.ns-strip')!.classList.contains('is-pulsing')).toBe(false);
+    const box = h.querySelector<HTMLElement>('.td-box--now')!;
+    expect(box.classList.contains('is-pulsing')).toBe(true);
     const seen = new Set<string>();
     for (let i = 0; i < 6; i++) {
-      seen.add(strip.style.getPropertyValue('--ns-pulse'));
+      seen.add(box.style.getPropertyValue('--pulse'));
       vi.advanceTimersByTime(PULSE_STEP_MS);
     }
     expect([...seen].sort()).toEqual(PULSE_COLOURS.slice(0, 2).sort());
     vi.advanceTimersByTime(80_000);
-    expect(strip.dataset.colours).toBe('10');
+    expect(box.dataset.colours).toBe('10');
+  });
 
-    resetNowStrip();
+  it('no pulse on the teacher’s view, or once everything in Do now is done', () => {
     const teacher = renderProfile(page(todo) as never, { classId: 'c2', teacher: { name: 'Student' } });
-    expect(teacher.querySelector('.ns-strip')!.classList.contains('is-pulsing')).toBe(false);
+    expect(teacher.querySelector('.td-box--now')!.classList.contains('is-pulsing')).toBe(false);
+    const done: TodoPayload = { ...base, boxes: [{ key: 'now', items: [lesson('a', { done: true })] }] };
+    expect(renderProfile(page(done) as never, { classId: 'c3' }).querySelector('.td-box--now')!.classList.contains('is-pulsing')).toBe(false);
   });
 });

@@ -7,6 +7,7 @@ import { el } from '@/quiz/dom';
 import { studentAnchor } from '@/student/shell';
 import { minutesFor } from '@/organiser/student-panel';
 import { PRACTISED_EVENT } from '@/organiser/practice';
+import { pageOpenedAt, startColourPulse } from '@/student/colour-pulse';
 import './todo-panel.css';
 
 export type TodoActivity = { id: string; title: string; done: boolean };
@@ -298,6 +299,8 @@ function boxGroup(box: TodoBox, options: TodoOptions): HTMLElement {
   dot.setAttribute('aria-hidden', 'true');
   title.append(dot, meta.title);
   g.append(title, el('p', 'td-box__hint', meta.hint));
+  // Do now pulses through colours (colour-pulse.ts) while anything in it is left: the student's own page only.
+  if (box.key === 'now' && !options.teacher && box.items.some((t) => !t.done)) startColourPulse(g, pageOpenedAt(options.classId));
   const hidden: HTMLElement[] = [];
   let shown = 0;
   for (const t of box.items) {
