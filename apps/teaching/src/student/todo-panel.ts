@@ -175,12 +175,18 @@ function item(mark: Mark, title: string, note: string, action?: HTMLElement, pil
 /** A link that opens another tab of the progress page (Returned work, Organiser). */
 /** The daily practice row: an orange card with cards left, or a tick once today's are done. */
 function practiceRow(left: number, teacher: boolean): HTMLElement {
-  if (left <= 0) return item('tick', 'Practise your organiser', 'Done for today');
+  if (left <= 0) {
+    const done = item('tick', 'Practise your organiser', 'Done for today');
+    done.dataset.todo = 'practice';
+    return done;
+  }
   const minutes = minutesFor(left);
   const note = `${left} ${left === 1 ? 'card' : 'cards'} left · about ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
   // Orange card so the daily practice stands out from the plain rows below it.
   const row = item('box', 'Practise your organiser', note, teacher ? undefined : tabLink('Practise →', 'organiser', 'Practise your organiser'));
   row.classList.add('td-item--practise');
+  // The "Do this now" strip finds its row by this.
+  row.dataset.todo = 'practice';
   return row;
 }
 
@@ -270,6 +276,7 @@ function boxGroup(box: TodoBox, options: TodoOptions): HTMLElement {
   let shown = 0;
   for (const t of box.items) {
     const row = boxRow(t, options.classId);
+    row.dataset.todo = t.id;
     if (!t.done && shown >= BOX_SHOWN) {
       hidden.push(row);
       continue;

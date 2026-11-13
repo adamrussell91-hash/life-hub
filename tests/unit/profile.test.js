@@ -250,3 +250,22 @@ test('the progress map carries only published lessons and nothing a student shou
   const text = JSON.stringify([out, ticked]);
   for (const leak of ['TEACHER ONLY RULE', 'secret label', 'PRIVATE', 'Unpublished surprise', 'secret']) assert.ok(!text.includes(leak), leak);
 });
+
+test('the Do this now pointer is on until the student turns it off, and the teacher turns it back on', async () => {
+  const s = await fixture();
+  const page = () => profileAction(s, 'class1', { action: 'progress', class_token: token(1) });
+  assert.equal((await page()).pointer, true);
+  assert.deepEqual(await profileAction(s, 'class1', { action: 'pointer_off', class_token: token(1) }), { ok: true });
+  assert.equal((await page()).pointer, false);
+  // An unclaimed device can't turn anyone's off.
+  assert.deepEqual(await profileAction(s, 'class1', { action: 'pointer_off', class_token: token(9) }), { need: 'initials' });
+  const roster = await loadRoster(s, 'class1');
+  const bob = roster.students.find((x) => x.initials === 'BB');
+  const { classClaimsAction } = await import('../../netlify/functions/_shared/class-claims.mjs');
+  assert.deepEqual((await classClaimsAction(s, 'class1', { action: 'list' })).pointer_off, [bob.id]);
+  const back = await classClaimsAction(s, 'class1', { action: 'pointer', student_id: bob.id, on: true });
+  assert.deepEqual(back.pointer_off, []);
+  assert.equal((await page()).pointer, true);
+  await assert.rejects(classClaimsAction(s, 'class1', { action: 'pointer', student_id: bob.id }), /Say whether/);
+  await assert.rejects(classClaimsAction(s, 'class1', { action: 'pointer', student_id: 'st_nobody00', on: true }), /Unknown student/);
+});

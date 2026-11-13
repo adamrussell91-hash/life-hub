@@ -9,7 +9,7 @@
  */
 import { isSafeId } from './class-examples.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
-import { claimFor, claimInitials, codeFor, loadRoster } from './class-claims.mjs';
+import { claimFor, claimInitials, codeFor, loadRoster, pointerOn, setPointer } from './class-claims.mjs';
 import { read, reject } from './question-drop.mjs';
 import { draftLessonKey, publishedLessonKey, SCHEDULED_LESSON_PREFIX, unitKey } from './teaching-blobs.mjs';
 import { unitMapPayload } from './profile-map.mjs';
@@ -69,7 +69,7 @@ async function unitLessons(store, unit) {
 export async function profileAction(store, classId, body, { now = new Date() } = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const action = body.action ?? 'status';
-  if (!['status', 'done', 'undone', 'claim', 'progress', 'returned', 'piece', 'seen', 'steps', 'token', 'skills'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['status', 'done', 'undone', 'claim', 'progress', 'returned', 'piece', 'seen', 'steps', 'token', 'skills', 'pointer_off'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');
   if (action === 'claim') return profileFor(store, roster, await claimInitials(store, roster, body.class_token, body.initials, body.code));
@@ -86,7 +86,12 @@ export async function profileAction(store, classId, body, { now = new Date() } =
     return { need: null, initials: student.initials, ticked: !!record && !record.partial };
   }
   // The student's own page shows their code, for getting in on another computer.
-  if (action === 'progress') return { ...(await progressPage(store, roster, student, now)), code: await codeFor(store, classId, student.id) };
+  // `pointer`: whether the "Do this now" pointer may come up; the student can turn it off for good.
+  if (action === 'progress') return { ...(await progressPage(store, roster, student, now)), code: await codeFor(store, classId, student.id), pointer: await pointerOn(store, classId, student.id) };
+  if (action === 'pointer_off') {
+    await setPointer(store, classId, student.id, false);
+    return { ok: true };
+  }
   if (action === 'returned') return { need: null, ...(await returnedFor(store, roster, student)) };
   // Writing boxes' next steps: every skill at once (a lesson is small), so `lesson_id` only has to be safe.
   if (action === 'steps') {

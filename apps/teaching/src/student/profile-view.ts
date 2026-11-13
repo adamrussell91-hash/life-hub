@@ -25,6 +25,7 @@ import type { ProgressPayload, ReturnedItem, TargetRow } from '@/progress/types'
 import { pieceView, returnedList, type NotePayload, type PiecePayload } from '@/student/returned-view';
 import type { RedraftApi } from '@/student/redraft-editor';
 import { countdownCard, renderTodoPanel, type TodoPayload } from '@/student/todo-panel';
+import { renderNowStrip } from '@/student/now-strip';
 import '@/progress/progress.css';
 import './profile.css';
 
@@ -46,6 +47,8 @@ export type ProfilePayload = Partial<Omit<ProgressPayload, 'need' | 'map'>> & {
   todo?: TodoPayload;
   /** The student's own code for getting in on another computer. Never on the teacher's view. */
   code?: string;
+  /** Whether the "Do this now" pointer may come up. False once the student turned it off. */
+  pointer?: boolean;
 };
 
 export type RenderProfileOptions = {
@@ -70,6 +73,8 @@ export type RenderProfileOptions = {
   tab?: string;
   /** Teacher only: builds the Over time tab's panel, the first time it opens. Ignored without `teacher`. */
   overTime?: () => HTMLElement;
+  /** The student's "Don't show this again" on the Do this now pointer. */
+  pointerOff?: () => void;
 };
 
 function seeHow(r?: { url: string; title?: string; kind: string; start?: number }): HTMLElement | null {
@@ -350,6 +355,10 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
       root.append(code);
     }
   }
+  // "Do this now" sits above the tabs, so it stays on every one. The teacher sees it as the
+  // student does, without the pointer.
+  const strip = renderNowStrip(payload.todo, { classId: options.classId, pointer: !options.teacher && payload.pointer !== false, pointerOff: options.pointerOff });
+  if (strip) root.append(strip);
   const map = withTodo(renderMap(payload.map, options.classId, payload), payload, options);
   const hasReturned = !!(payload.pieces?.length || payload.has_returned);
   const organiserPanel = organiser ? organizerPanelFor(organiser, options) : null;
@@ -476,7 +485,7 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
   renderStudentChrome(header, { brand: STUDENT_BRAND, links: lesson ? [{ href: lesson, label: 'Back to lesson' }] : [] });
   renderStudentStatus(content, 'Loading your progress…');
 
-  const call = <T = ProfilePayload>(action: 'progress' | 'claim' | 'returned' | 'piece' | 'seen', extra: Record<string, unknown> = {}): Promise<T> =>
+  const call = <T = ProfilePayload>(action: 'progress' | 'claim' | 'returned' | 'piece' | 'seen' | 'pointer_off', extra: Record<string, unknown> = {}): Promise<T> =>
     apiPost<T>(`/api/published/profile/${encodeURIComponent(classId)}`, { action, class_token: deviceToken(`class:${classId}`), ...extra });
 
   let organiser: OrganiserLoad | null = null;
@@ -517,6 +526,7 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
         loadReturned: () => call<{ items: ReturnedItem[] }>('returned').then((r) => r.items),
         loadPiece: (id) => call<PiecePayload | NotePayload>('piece', { item: id }),
         markSeen: (id) => void call('seen', { item: id }).catch(() => undefined),
+        pointerOff: () => void call('pointer_off').catch(() => undefined),
         redraft: (item) => {
           const [kind, lessonId = '', blockId = ''] = item.split(':');
           // A quiz answer asked again: its question, through the quiz.
