@@ -12,7 +12,9 @@ import { el } from '@/quiz/dom';
 import type { TodoBoxItem, TodoPayload } from '@/student/todo-panel';
 import './now-strip.css';
 
-export type NowThing = { key: string; what: string };
+/** Where the thing lives: a lesson to open, or a tab on the progress page. */
+export type NowGo = { lesson: string } | { tab: 'returned' | 'organiser' };
+export type NowThing = { key: string; what: string; go: NowGo };
 
 /** Seconds on the page before the pointer comes up. */
 export const POINTER_DELAY_MS = 10_000;
@@ -27,20 +29,22 @@ function wordsFor(t: TodoBoxItem): string {
 }
 
 const open = (t: TodoBoxItem): boolean => !t.done && t.feedback?.state !== 'read';
+const goFor = (t: TodoBoxItem): NowGo => (t.feedback ? { tab: 'returned' } : { lesson: t.id });
 
 /**
  * The one thing: the first open row in Do now, then today's organiser cards, then the first open
- * row in Do next. Null when none of those has anything left.
+ * row in Do next. Null when none of those has anything left. `skip`: a lesson to pass over (the
+ * one the student is on).
  */
-export function oneThing(todo: TodoPayload | undefined): NowThing | null {
+export function oneThing(todo: TodoPayload | undefined, skip?: string): NowThing | null {
   if (!todo) return null;
-  const box = (key: string) => todo.boxes.find((b) => b.key === key)?.items.find(open);
+  const box = (key: string) => todo.boxes.find((b) => b.key === key)?.items.find((t) => open(t) && (t.feedback || t.id !== skip));
   const now = box('now');
-  if (now) return { key: now.id, what: wordsFor(now) };
+  if (now) return { key: now.id, what: wordsFor(now), go: goFor(now) };
   const left = todo.practice?.today ?? 0;
-  if (left > 0) return { key: 'practice', what: `Practise your organiser: ${left} ${left === 1 ? 'card' : 'cards'}` };
+  if (left > 0) return { key: 'practice', what: `Practise your organiser: ${left} ${left === 1 ? 'card' : 'cards'}`, go: { tab: 'organiser' } };
   const next = box('next');
-  if (next) return { key: next.id, what: wordsFor(next) };
+  if (next) return { key: next.id, what: wordsFor(next), go: goFor(next) };
   return null;
 }
 

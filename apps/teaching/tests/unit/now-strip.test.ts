@@ -23,11 +23,13 @@ const todo: TodoPayload = { ...base, boxes: [{ key: 'now', items: [lesson('a', {
 
 describe('the one thing', () => {
   it('is the first open row in Do now, worded as what to do', () => {
-    expect(oneThing(todo)).toEqual({ key: 'b', what: 'Read your feedback on Poem paragraph' });
+    expect(oneThing(todo)).toEqual({ key: 'b', what: 'Read your feedback on Poem paragraph', go: { tab: 'returned' } });
   });
   it('falls back to today’s cards, then Do next', () => {
     expect(oneThing({ ...base, practice: { today: 15, answered: 0 }, boxes: [{ key: 'next', items: [lesson('c')] }] })?.what).toBe('Practise your organiser: 15 cards');
-    expect(oneThing({ ...base, boxes: [{ key: 'next', items: [lesson('c', { kind: 'quiz', title: 'Week 3' })] }] })).toEqual({ key: 'c', what: 'Do the quiz: Week 3' });
+    expect(oneThing({ ...base, boxes: [{ key: 'next', items: [lesson('c', { kind: 'quiz', title: 'Week 3' })] }] })).toEqual({ key: 'c', what: 'Do the quiz: Week 3', go: { lesson: 'c' } });
+    // The lesson the student is on is passed over.
+    expect(oneThing({ ...base, boxes: [{ key: 'now', items: [lesson('a'), lesson('d')] }] }, 'a')?.key).toBe('d');
   });
   it('is nothing when everything is done', () => {
     expect(oneThing({ ...base, boxes: [{ key: 'now', items: [lesson('a', { done: true })] }] })).toBeNull();

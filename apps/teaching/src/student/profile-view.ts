@@ -26,7 +26,7 @@ import type { ProgressPayload, ReturnedItem, TargetRow } from '@/progress/types'
 import { pieceView, returnedList, type NotePayload, type PiecePayload } from '@/student/returned-view';
 import type { RedraftApi } from '@/student/redraft-editor';
 import { countdownCard, renderTodoPanel, vivaPracticeLine, type TodoPayload } from '@/student/todo-panel';
-import { renderNowStrip } from '@/student/now-strip';
+import { oneThing, renderNowStrip, showOnList } from '@/student/now-strip';
 import '@/progress/progress.css';
 import './profile.css';
 
@@ -508,6 +508,8 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
   let organiser: OrganiserLoad | null = null;
   let latest: ProfilePayload | null = null;
   let startTab = new URLSearchParams(window.location.search).get('tab') ?? undefined;
+  // From a lesson's "My to do list": frame the To do list once the page is drawn, the first time only.
+  let showTodo = new URLSearchParams(window.location.search).get('show') === 'todo';
   // A failed organiser load leaves the rest of the page as it was.
   const loadOrganiser = (): Promise<OrganiserLoad | null> => studentOrganiserApi.load(classId).catch(() => null);
 
@@ -566,6 +568,15 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
         }
       })
     );
+    const page = content.querySelector('.pm-profile');
+    if (showTodo && page && payload.todo) {
+      showTodo = false;
+      const url = new URL(window.location.href);
+      url.searchParams.delete('show');
+      window.history.replaceState(window.history.state, '', url);
+      const key = oneThing(payload.todo)?.key ?? '';
+      window.requestAnimationFrame(() => showOnList(page, key));
+    }
   };
 
   void Promise.all([call('progress'), loadOrganiser()]).then(
