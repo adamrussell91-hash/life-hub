@@ -105,6 +105,19 @@
   display: none;
 }
 
+/* Returned work and feedback: skills and the feedback codes under the list, hidden while a piece is open. */
+.pg-returned,
+.pg-returned__extras {
+  display: grid;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.pg-returned__extras:empty,
+.pg-returned__extras[hidden] {
+  display: none;
+}
+
 .pg-learning,
 .pg-learning__list,
 .pg-codes-sec {

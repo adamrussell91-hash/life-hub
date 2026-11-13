@@ -79,6 +79,7 @@ const payload: ProfilePayload = {
   todo: {
     countdowns: [{ title: 'Coastal poetry viva', lesson_id: 'l9', assessment: true, due_date: day(13), due_time: '13:24', set_date: '', published: false }],
     announcements: [],
+    viva_practice: { spontaneous: { lesson_id: 'l7', title: 'Viva Voce Practice 2' }, prepared: { lesson_id: 'l6', title: 'Viva Voce Practice 1' } },
     practice: { today: 12, answered: 0 },
     waiting: [],
     boxes: [

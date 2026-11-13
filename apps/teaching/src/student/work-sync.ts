@@ -205,7 +205,7 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
       (error: unknown) => {
         if (disposed) return;
         const note = el('p', 'ws-back__error', `${errorText(error)} `);
-        note.append(studentAnchor(`/s/classes/${encodeURIComponent(classId)}/profile`, 'ws-handin__link', 'Open it in Returned work'));
+        note.append(studentAnchor(`/s/classes/${encodeURIComponent(classId)}/profile`, 'ws-handin__link', 'Open it in Returned work and feedback'));
         body.replaceChildren(note);
       }
     );
@@ -216,7 +216,7 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
     if (redrafts[blockId]) {
       const handin = el('div', 'ws-handin');
       const note = el('p', 'ws-handin__note', redrafts[blockId] === 'asked' ? 'Your teacher asked for a redraft. ' : 'Your redraft is with your teacher.');
-      if (redrafts[blockId] === 'asked') note.append(studentAnchor(`/s/classes/${encodeURIComponent(classId)}/profile`, 'ws-handin__link', 'Open it in Returned work'));
+      if (redrafts[blockId] === 'asked') note.append(studentAnchor(`/s/classes/${encodeURIComponent(classId)}/profile`, 'ws-handin__link', 'Open it in Returned work and feedback'));
       handin.append(note);
       return handin;
     }

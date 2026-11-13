@@ -2,6 +2,7 @@
  * The To do panel beside the unit map on a student's own progress page. Everything here is read
  * from records that already exist; nothing is stored, and nothing is ticked by hand.
  *
+ *   viva_practice  links to Viva Voce Practice 1 and 2 while an assessment counts down (vivaPracticeFrom)
  *   countdowns     every countdown block still due in the unit's published lessons, and the unit's
  *                  assessment lessons planned on the calendar for this class (published or not), soonest first
  *   announcements  the newest text announcements on the class page
@@ -299,6 +300,25 @@ export function boxesFor({ unit, lessons, rows, started = new Map(), doneToday =
   return { boxes: out, more };
 }
 
+const VIVA_PRACTICE = /^\s*viva\s+voce\s+practice\s*([12])\s*$/i;
+
+/**
+ * "Do a practice Viva Voce": while an assessment is counting down, the unit's published lessons
+ * titled Viva Voce Practice 1 (prepared: plan out a response) and Viva Voce Practice 2
+ * (spontaneous: like on the day). Null when there is no assessment coming or neither lesson is there.
+ */
+export function vivaPracticeFrom(lessons, countdowns) {
+  if (!countdowns.some((c) => c.assessment)) return null;
+  const out = {};
+  for (const l of lessons) {
+    const m = VIVA_PRACTICE.exec(String(l.title ?? ''));
+    if (!m) continue;
+    const key = m[1] === '1' ? 'prepared' : 'spontaneous';
+    if (!out[key]) out[key] = { lesson_id: l.id, title: String(l.title).trim() };
+  }
+  return out.prepared || out.spontaneous ? out : null;
+}
+
 /**
  * The panel for one student. `lessons`, `rows` and `done` are the student's own map and records
  * (lessonsForStudent, mapRows, listDone); `published` maps lesson id to its published copy; `view`
@@ -341,6 +361,7 @@ export async function todoFor(store, roster, student, { unit = null, lessons, ro
   return {
     countdowns,
     announcements: announcementsFrom(roster.cls),
+    viva_practice: vivaPracticeFrom(lessons, countdowns),
     practice: practice && (practice.today > 0 || practice.answered > 0) ? practice : null,
     waiting,
     boxes,
