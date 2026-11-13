@@ -23,7 +23,13 @@ export type WhatsNextOptions = {
   load?: () => Promise<{ need?: string | null; todo?: TodoPayload }>;
 };
 /** `fresh`: the student ticked it just now (not a revisit of a ticked lesson). */
-export type WhatsNextHandle = { element: HTMLElement; setDone(done: boolean, fresh?: boolean): void; dispose(): void };
+export type WhatsNextHandle = {
+  element: HTMLElement;
+  setDone(done: boolean, fresh?: boolean): void;
+  /** The next thing (reading the list if it hasn't yet): null when the list is empty, undefined when it couldn't be read. */
+  next(): Promise<NowThing | null | undefined>;
+  dispose(): void;
+};
 
 const profilePath = (classId: string, params: Record<string, string>): string =>
   `/s/classes/${encodeURIComponent(classId)}/profile?${new URLSearchParams(params).toString()}`;
@@ -31,7 +37,7 @@ const profilePath = (classId: string, params: Record<string, string>): string =>
 /** The progress page, framed on the To do list. */
 export const todoListHref = (classId: string, from: string): string => profilePath(classId, { show: 'todo', from });
 
-function thereHref(classId: string, thing: NowThing, from: string): string {
+export function thereHref(classId: string, thing: NowThing, from: string): string {
   if ('lesson' in thing.go) return `/s/classes/${encodeURIComponent(classId)}/lessons/${encodeURIComponent(thing.go.lesson)}`;
   return profilePath(classId, { tab: thing.go.tab, from });
 }
@@ -50,6 +56,7 @@ export function mountWhatsNext(options: WhatsNextOptions): WhatsNextHandle {
     (() => apiPost<{ need?: string | null; todo?: TodoPayload }>(`/api/published/profile/${encodeURIComponent(classId)}`, { action: 'progress', class_token: deviceToken(`class:${classId}`) }));
   let disposed = false;
   let asked: Promise<void> | null = null;
+  let found: NowThing | null | undefined;
 
   const card = el('section', 'wn-card');
   card.setAttribute('aria-label', 'What’s next');
@@ -76,7 +83,9 @@ export function mountWhatsNext(options: WhatsNextOptions): WhatsNextHandle {
       .then(
         (reply) => {
           // Not signed in to the class yet: the card keeps its plain words and the list link.
-          if (!disposed && !reply.need) paint(oneThing(reply.todo, lessonId));
+          if (disposed || reply.need) return;
+          found = oneThing(reply.todo, lessonId);
+          paint(found);
         },
         () => undefined
       ));
@@ -102,6 +111,7 @@ export function mountWhatsNext(options: WhatsNextOptions): WhatsNextHandle {
       // Just ticked: bring the card into view so they see where to go.
       if (fresh) card.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
     },
+    next: () => ask().then(() => found),
     dispose() {
       disposed = true;
       seen?.disconnect();
