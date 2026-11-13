@@ -63,10 +63,10 @@ const SETTINGS: Record<Game['kind'], SettingField[]> = {
   battles: [{ key: 'write_minutes', label: 'Writing minutes', type: 'num', min: 2, max: 8 }],
   wager: [
     { key: 'start', label: 'Starting points', type: 'num', min: 10, max: 10_000 },
-    { key: 'min_bet', label: 'Smallest bet', type: 'num', min: 1, max: 1000 },
+    { key: 'min_bet', label: 'Fewest points to commit', type: 'num', min: 1, max: 1000 },
     { key: 'seconds', label: 'Seconds a question', type: 'num', min: 10, max: 120 },
     { key: 'rescue', label: 'Rescue points at zero', type: 'bool' },
-    { key: 'final_all_in', label: 'Final round all in', type: 'bool' }
+    { key: 'final_all_in', label: 'Final round: every point allowed', type: 'bool' }
   ],
   connections: [{ key: 'mistakes', label: 'Mistakes allowed', type: 'num', min: 1, max: 8 }],
   articulate: [

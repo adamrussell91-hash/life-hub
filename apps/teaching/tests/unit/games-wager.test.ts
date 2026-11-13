@@ -92,7 +92,7 @@ describe('wager payouts', () => {
     h.control('next'); // close
     h.control('next'); // reveal
     expect((h.view('board', 'board') as View).pot).toBe(80);
-    expect(h.ticker[0].text).toMatch(/jackpot 80/);
+    expect(h.ticker[0].text).toMatch(/80 points carry over/);
     h.control('next'); // standings
     h.control('next'); // question 2
     const v = h.view('board', 'board') as View;

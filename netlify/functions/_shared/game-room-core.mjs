@@ -3773,7 +3773,7 @@ function reveal2(ctx, k) {
   k.pot = k.winners ? 0 : pot;
   const total = Object.values(k.riding ?? {}).reduce((n, v) => n + v, 0);
   k.log.push({ item: k.order[k.index], riding: { ...k.riding ?? {} }, right: [...k.right ?? []], total, winners: k.winners ?? 0, answered: Object.keys(k.picks).length });
-  if (!k.winners && pot > 0) ctx.ticker(`Nobody right: jackpot ${pot}`);
+  if (!k.winners && pot > 0) ctx.ticker(`Nobody right: ${pot} points carry over`);
 }
 var round2 = (n) => Math.round(n * 100) / 100;
 function step(ctx, k) {

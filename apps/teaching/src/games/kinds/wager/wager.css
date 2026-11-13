@@ -1,7 +1,8 @@
 /* Wager, live (spec §6.8; approved mockup docs/mockups/games/wager.html).
  * Board sizes are in em off the board's root size (live.css), so it fits
  * 1920×1080, 1280×720 and a 1024×768 projector. Phone sizes in px (R4:
- * inputs 16px, targets 44px). Points, never money. */
+ * inputs 16px, targets 44px). Points, never money: the heap and the flying
+ * points are round counters in the answer-key colours, not gold coins. */
 
 /* ── Board ───────────────────────────────────────────────────────── */
 .wg-board { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(9em, 13em); grid-template-rows: auto minmax(0, 1fr) auto; gap: 0.8em 1.4em; min-height: 0; min-width: 0; }
@@ -37,8 +38,11 @@
 .wg-pot__num { font-size: 3.6em; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
 .wg-pot__sub { font-size: 0.8em; color: var(--stage-muted); }
 .wg-pile { position: relative; width: 100%; height: 5em; margin-top: 0.4em; }
-.wg-pile i { position: absolute; width: 2.6em; height: 0.8em; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #ffe08a, #e0a92e 70%); box-shadow: 0 0.1em 0 #b07f16; }
-.wg-coin { position: absolute; left: 0; top: 0; z-index: 30; width: 1.4em; height: 1.4em; margin: -0.7em 0 0 -0.7em; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #ffe9a6, #e0a92e 70%); box-shadow: 0 0.08em 0 #b07f16, 0 0 0.6em rgba(242, 193, 78, 0.6); pointer-events: none; }
+.wg-pile i { position: absolute; width: 1.9em; height: 1.9em; margin-left: 0.35em; border-radius: 50%; background: var(--game-key-1); box-shadow: inset 0 -0.2em 0 rgba(0, 0, 0, 0.18), 0 0.1em 0.3em rgba(0, 0, 0, 0.25); }
+.wg-pile i.wg-pile--2, .wg-dot.wg-pile--2 { background: var(--game-key-2); }
+.wg-pile i.wg-pile--3, .wg-dot.wg-pile--3 { background: var(--game-key-3); }
+.wg-pile i.wg-pile--4, .wg-dot.wg-pile--4 { background: var(--game-key-4); }
+.wg-dot { position: absolute; left: 0; top: 0; z-index: 30; width: 1.2em; height: 1.2em; margin: -0.6em 0 0 -0.6em; border-radius: 50%; background: var(--game-key-1); box-shadow: inset 0 -0.15em 0 rgba(0, 0, 0, 0.18), 0 0 0.5em rgba(255, 255, 255, 0.35); pointer-events: none; }
 
 .wg-locked { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: center; gap: 0.7em; font-size: 0.85em; color: var(--stage-muted); flex-wrap: wrap; }
 .wg-locked b { color: var(--stage-ink); font-variant-numeric: tabular-nums; }

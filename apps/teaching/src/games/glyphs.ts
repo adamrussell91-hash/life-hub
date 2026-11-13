@@ -18,7 +18,7 @@ const SVG: Record<GameKind, { tone: 1 | 2 | 3 | 4; paths: string }> = {
   team_match: { tone: 2, paths: '<g fill="currentColor"><circle cx="10" cy="11" r="4"/><circle cx="22" cy="11" r="4"/><path d="M3 26c1-5 4-8 7-8s6 3 7 8zM15 26c1-5 4-8 7-8s6 3 7 8z"/></g>' },
   points_rush: { tone: 4, paths: '<path d="M18 3L7 18h8l-2 11 12-16h-8z" fill="currentColor"/>' },
   battles: { tone: 1, paths: '<g fill="currentColor"><rect x="4" y="7" width="10" height="16" rx="2"/><rect x="18" y="7" width="10" height="16" rx="2" opacity=".55"/></g>' },
-  wager: { tone: 3, paths: '<path d="M8 22a8 3 0 0 0 16 0M8 22v-4a8 3 0 0 0 16 0v4M8 18a8 3 0 0 1 16 0M8 14a8 3 0 0 0 16 0v-4a8 3 0 0 0-16 0z" fill="none" stroke="currentColor" stroke-width="2"/>' },
+  wager: { tone: 3, paths: '<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 23a11 11 0 0 1 22 0"/><path d="M16 23l6-7"/></g><circle cx="16" cy="23" r="2.4" fill="currentColor"/>' },
   connections: {
     tone: 4,
     paths: '<g fill="currentColor"><rect x="5" y="5" width="9" height="9" rx="2"/><rect x="18" y="5" width="9" height="9" rx="2"/><rect x="5" y="18" width="9" height="9" rx="2"/><rect x="18" y="18" width="9" height="9" rx="2" opacity=".5"/></g>'
@@ -37,7 +37,7 @@ export const GAME_KIND_BLURB: Record<GameKind, string> = {
   team_match: 'The answers are split across a team’s phones. Talk.',
   points_rush: 'Fast questions; misses come back.',
   battles: 'Write, then judge pairs of anonymous answers.',
-  wager: 'Answer, then bet points on it.',
+  wager: 'Answer, then commit points to show how sure you are.',
   connections: 'Sixteen tiles, four hidden groups.',
   articulate: 'Describe the term without the banned words.',
   pictionary: 'Draw a term or a moment; the class guesses.',
