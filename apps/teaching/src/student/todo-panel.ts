@@ -12,8 +12,12 @@ import './todo-panel.css';
 export type TodoActivity = { id: string; title: string; done: boolean };
 /** `published: false`: an assessment on the calendar whose task page is still closed, so there is nothing to open. */
 export type TodoCountdown = { title: string; lesson_id: string; assessment: boolean; due_date: string; due_time: string; set_date: string; published?: boolean };
+/** A published practice lesson the "Do a practice Viva Voce" line links to. */
+export type VivaPracticeLink = { lesson_id: string; title: string };
 export type TodoPayload = {
   countdowns: TodoCountdown[];
+  /** While an assessment counts down: Viva Voce Practice 1 (prepared) and 2 (spontaneous), whichever exist. */
+  viva_practice?: { prepared?: VivaPracticeLink; spontaneous?: VivaPracticeLink } | null;
   announcements: { id: string; text: string; at: string | null }[];
   /** Organiser cards left today and already answered today; null when there is nothing either way. */
   practice: { today: number; answered: number } | null;
@@ -149,6 +153,28 @@ export function countdownCard(c: TodoCountdown, options: CountdownOptions): HTML
     if (!box.isConnected || !draw()) window.clearInterval(timer);
   }, 30_000);
   return box;
+}
+
+/**
+ * "Do a practice Viva Voce": one slim line with a pill per practice lesson. `dark` sits under the
+ * navy countdown at the top of My progress; `light` is the orange row in the To do panel's Today.
+ * Null when neither lesson is there.
+ */
+export function vivaPracticeLine(vp: TodoPayload['viva_practice'], classId: string, tone: 'dark' | 'light'): HTMLElement | null {
+  if (!vp || (!vp.spontaneous && !vp.prepared)) return null;
+  const line = el('div', `td-viva td-viva--${tone}`);
+  const title = el('span', 'td-viva__title', 'Do a practice Viva Voce');
+  const pick = el('span', 'td-viva__pick');
+  const pill = (link: VivaPracticeLink, name: string, hint: string): HTMLAnchorElement => {
+    const a = studentAnchor(lessonHref(classId, link.lesson_id), 'td-viva__opt');
+    a.append(name, el('small', undefined, hint));
+    a.setAttribute('aria-label', `${name} practice, ${hint}: ${link.title}`);
+    return a;
+  };
+  if (vp.spontaneous) pick.append(pill(vp.spontaneous, 'Spontaneous', 'like on the day'));
+  if (vp.prepared) pick.append(pill(vp.prepared, 'Prepared', 'plan out my response'));
+  line.append(title, pick);
+  return line;
 }
 
 function group(title: string): HTMLElement {
@@ -336,19 +362,23 @@ export function renderTodoPanel(todo: TodoPayload, options: TodoOptions): HTMLEl
   }
 
   const prac = todo.practice;
-  if (prac && (prac.today > 0 || prac.answered > 0)) {
+  const hasPractice = !!prac && (prac.today > 0 || prac.answered > 0);
+  const viva = vivaPracticeLine(todo.viva_practice, options.classId, 'light');
+  if (hasPractice || viva) {
+    // Today: the organiser row first, then the practice Viva line.
     const g = group('Today');
-    let row = practiceRow(prac.today, !!options.teacher);
-    g.append(row);
+    let row = prac && hasPractice ? practiceRow(prac.today, !!options.teacher) : null;
+    if (row) g.append(row);
+    if (viva) g.append(viva);
     panel.append(g);
     any = true;
     // A practice round on the Organiser tab counts this row down and ticks it off when none are
     // left, without reloading the page. The listener goes once the panel is redrawn away.
-    if (!options.teacher) {
+    if (row && !options.teacher) {
       const onPractised = (e: Event): void => {
         if (!panel.isConnected) return document.removeEventListener(PRACTISED_EVENT, onPractised);
         const d = (e as CustomEvent<{ classId?: string; today?: number }>).detail;
-        if (!d || d.classId !== options.classId || typeof d.today !== 'number') return;
+        if (!d || d.classId !== options.classId || typeof d.today !== 'number' || !row) return;
         const next = practiceRow(Math.max(0, d.today), false);
         row.replaceWith(next);
         row = next;

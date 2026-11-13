@@ -3,7 +3,8 @@
  *
  * Two tabs: My progress (next steps, where each outcome and concept sits over time, skills,
  * the codes teachers keep writing, and the unit map with the student's To do panel beside it)
- * and Returned work (feedback on each piece).
+ * and Returned work and feedback (each returned piece, then the student's skills and what their
+ * feedback keeps saying).
  * Steps and stories come from the server already worded; the page never shows a mark or a score.
  */
 import { apiPost } from '@/api/client';
@@ -24,7 +25,7 @@ import { storyText, placeName } from '@/progress/story-text';
 import type { ProgressPayload, ReturnedItem, TargetRow } from '@/progress/types';
 import { pieceView, returnedList, type NotePayload, type PiecePayload } from '@/student/returned-view';
 import type { RedraftApi } from '@/student/redraft-editor';
-import { countdownCard, renderTodoPanel, type TodoPayload } from '@/student/todo-panel';
+import { countdownCard, renderTodoPanel, vivaPracticeLine, type TodoPayload } from '@/student/todo-panel';
 import { renderNowStrip } from '@/student/now-strip';
 import '@/progress/progress.css';
 import './profile.css';
@@ -162,7 +163,14 @@ function renderFeedback(p: ProfilePayload, onOpen: (pieceId: string) => void): H
 /** The soonest assessment's countdown, big, at the top of My progress. Other countdowns stay in To do. */
 function topCountdown(payload: ProfilePayload, options: RenderProfileOptions): HTMLElement | null {
   const first = payload.todo?.countdowns.find((c) => c.assessment);
-  return first ? countdownCard(first, { classId: options.classId, size: 'big' }) : null;
+  const card = first ? countdownCard(first, { classId: options.classId, size: 'big' }) : null;
+  if (!card) return null;
+  // The practice Viva line hangs under the card (the card can be a link, so it can't sit inside).
+  const viva = vivaPracticeLine(payload.todo?.viva_practice, options.classId, 'dark');
+  if (!viva) return card;
+  const wrap = el('div', 'td-count-wrap');
+  wrap.append(card, viva);
+  return wrap;
 }
 
 function renderLearning(p: ProfilePayload): HTMLElement {
@@ -263,7 +271,7 @@ function tabs(unseen: number, start: TabId, panels: Panels, onReturned: () => vo
     return tab;
   };
   const all: Array<[TabId, HTMLButtonElement]> = [['progress', make('progress', 'My progress')]];
-  if (panels.returned) all.push(['returned', make('returned', 'Returned work', unseen)]);
+  if (panels.returned) all.push(['returned', make('returned', 'Returned work and feedback', unseen)]);
   if (panels.organiser) all.push(['organiser', make('organiser', 'Organiser')]);
   if (panels['over-time']) all.push(['over-time', make('over-time', 'Over time')]);
   let first = true;
@@ -302,8 +310,13 @@ function dropBadge(root: Element | null): void {
   else badge.remove();
 }
 
-function returnedPanel(panel: HTMLElement, options: RenderProfileOptions): { showList: () => void; open: (id: string) => void } {
+/**
+ * The Returned work list, or one piece open, drawn into `panel`. `extras` (skills and feedback
+ * codes) sit under the list and hide while a piece is open.
+ */
+function returnedPanel(panel: HTMLElement, options: RenderProfileOptions, extras?: HTMLElement): { showList: () => void; open: (id: string) => void } {
   const showList = (): void => {
+    if (extras) extras.hidden = false;
     panel.replaceChildren(el('p', 'pm-empty', 'Loading…'));
     void (options.loadReturned?.() ?? Promise.resolve([] as ReturnedItem[])).then(
       (items) => panel.replaceChildren(returnedList(items, open)),
@@ -313,6 +326,7 @@ function returnedPanel(panel: HTMLElement, options: RenderProfileOptions): { sho
   const open = (id: string, wasNew = false): void => {
     void options.loadPiece?.(id).then(
       (piece) => {
+        if (extras) extras.hidden = true;
         const redraft = /^[wq]:/.test(id) && 'redraft' in piece && piece.redraft ? options.redraft?.(id) : undefined;
         panel.replaceChildren(pieceView(piece, showList, redraft ? { redraft, onSent: () => open(id) } : {}));
         options.markSeen?.(id);
@@ -357,7 +371,7 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
   }
   // "Do this now" sits above the tabs, so it stays on every one. The teacher sees it as the
   // student does, without the pointer.
-  const strip = renderNowStrip(payload.todo, { classId: options.classId, pointer: !options.teacher && payload.pointer !== false, pointerOff: options.pointerOff });
+  const strip = renderNowStrip(payload.todo, { classId: options.classId, pointer: !options.teacher && payload.pointer !== false, pointerOff: options.pointerOff, pulse: !options.teacher });
   if (strip) root.append(strip);
   const map = withTodo(renderMap(payload.map, options.classId, payload), payload, options);
   const hasReturned = !!(payload.pieces?.length || payload.has_returned);
@@ -389,8 +403,12 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
   }
   const returned = el('div', 'pg-panel');
   returned.setAttribute('role', 'tabpanel');
+  // The list (or an open piece) first, then skills and what the feedback keeps saying.
+  const listHost = el('div', 'pg-returned');
+  const extras = el('div', 'pg-returned__extras');
+  returned.append(listHost, extras);
   let loaded = false;
-  const returnedApi = returnedPanel(returned, options);
+  const returnedApi = returnedPanel(listHost, options, extras);
   // "Open this piece" in the feedback rows: over to Returned work, straight to that piece.
   const openPiece = (id: string): void => {
     loaded = true;
@@ -399,12 +417,11 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
     returnedApi.open(id);
     tab?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
   };
-  progress.append(renderNext(payload), renderLearning(payload));
+  progress.append(renderNext(payload), renderLearning(payload), map);
   const skills = renderSkills(payload);
-  if (skills) progress.append(skills);
+  if (skills) extras.append(skills);
   const feedback = renderFeedback(payload, openPiece);
-  if (feedback) progress.append(feedback);
-  progress.append(map);
+  if (feedback) extras.append(feedback);
   root.append(
     // A student with new feedback lands on it; a teacher looking in starts on the overview.
     tabs(

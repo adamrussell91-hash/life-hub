@@ -223,7 +223,7 @@ describe('mountWorkSync: a block with a redraft out', () => {
     const call: WorkCall = async () => ({ need: null, initials: 'BB', handin_blocks: ['qset1'], redrafts: { qset1: 'asked' } });
     const handle = mountWorkSync(root, { lessonId: lesson, classId: 'class1', call, delayMs: 5 });
     await settle();
-    expect(block.querySelector('.ws-handin__note')!.textContent).toBe('Your teacher asked for a redraft. Open it in Returned work');
+    expect(block.querySelector('.ws-handin__note')!.textContent).toBe('Your teacher asked for a redraft. Open it in Returned work and feedback');
     expect(block.querySelector('.ws-handin a')!.getAttribute('href')).toContain('/s/classes/class1/profile');
     expect(block.querySelector('button')).toBeNull();
     handle.dispose();

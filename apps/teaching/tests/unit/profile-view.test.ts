@@ -111,6 +111,16 @@ describe('progress page', () => {
     expect(host.querySelectorAll('.pg-skills .pg-sk__dot').length).toBe(4);
     expect(host.querySelector('.pg-fb .pg-fb__count')!.textContent).toBe('2 of last 2 · steady');
   });
+  it('keeps skills and the feedback codes on Returned work and feedback, under the list', () => {
+    const h = renderProfile(rich as never, { classId: 'class1', loadReturned: async () => [] });
+    const returnedPanel = h.querySelector('[data-tab="returned"]')!.getAttribute('aria-selected') === 'true' ? h.querySelectorAll('.pg-panel')[1]! : null;
+    expect(returnedPanel).toBeTruthy();
+    const extras = returnedPanel!.querySelector('.pg-returned__extras')!;
+    expect(extras.querySelector('.pg-skills')).toBeTruthy();
+    expect(extras.querySelector('.pg-fb')).toBeTruthy();
+    expect(h.querySelectorAll('.pg-panel')[0]!.querySelector('.pg-skills, .pg-fb')).toBeNull();
+    expect(h.querySelector('[data-tab="returned"]')!.textContent).toContain('Returned work and feedback');
+  });
   it('badges Returned work with the unseen count', () => {
     expect(host.querySelector('[data-tab="returned"] .pg-tab__badge')!.textContent).toBe('2');
   });
@@ -266,7 +276,7 @@ describe('organiser tab', () => {
   });
   it('adds the tab beside Returned work when work is returned', () => {
     const h = renderProfile({ ...payload, pieces: [], has_returned: true } as never, { classId: 'class1', organiser: organiser as never });
-    expect(tabNames(h)).toEqual(['My progress', 'Returned work', 'Organiser']);
+    expect(tabNames(h)).toEqual(['My progress', 'Returned work and feedback', 'Organiser']);
   });
   it('gives the teacher’s view no Organiser tab', () => {
     const h = renderProfile(payload as never, { classId: 'class1', organiser: organiser as never, teacher: { name: 'Ava Nguyen' } });
@@ -357,5 +367,31 @@ describe('To do panel boxes', () => {
     toggle.click();
     expect(visible()).toHaveLength(4);
     expect(panel.querySelector('.td-more')!.textContent).toBe('And 4 more on the map.');
+  });
+});
+
+describe('practice Viva line', () => {
+  const vp = { spontaneous: { lesson_id: 'lv2', title: 'Viva Voce Practice 2' }, prepared: { lesson_id: 'lv1', title: 'Viva Voce Practice 1' } };
+  const base: TodoPayload = { countdowns: [], announcements: [], practice: null, waiting: [], boxes: [], more: 0 };
+  it('sits in Today under the organiser row, Spontaneous to Practice 2 and Prepared to Practice 1', () => {
+    const panel = renderTodoPanel({ ...base, practice: { today: 5, answered: 0 }, viva_practice: vp }, { classId: 'class1' });
+    const today = panel.querySelector('.td-group')!;
+    expect(today.querySelector('.td-item--practise')!.compareDocumentPosition(today.querySelector('.td-viva')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const links = [...panel.querySelectorAll<HTMLAnchorElement>('.td-viva__opt')];
+    expect(links.map((a) => a.textContent)).toEqual(['Spontaneouslike on the day', 'Preparedplan out my response']);
+    expect(links[0]!.getAttribute('href')).toMatch(/\/s\/classes\/class1\/lessons\/lv2$/);
+    expect(links[1]!.getAttribute('href')).toMatch(/\/s\/classes\/class1\/lessons\/lv1$/);
+  });
+  it('makes a Today group of its own when there are no organiser cards, and nothing without lessons', () => {
+    expect(renderTodoPanel({ ...base, viva_practice: { prepared: vp.prepared } }, { classId: 'class1' }).querySelectorAll('.td-viva__opt').length).toBe(1);
+    expect(renderTodoPanel({ ...base, viva_practice: null }, { classId: 'class1' }).querySelector('.td-viva')).toBeNull();
+  });
+  it('hangs under the big countdown on My progress', () => {
+    const todo = { ...base, countdowns: [{ title: 'Viva task', lesson_id: 'l5', assessment: true, due_date: '2099-02-01', due_time: '13:24', set_date: '', published: true }], viva_practice: vp };
+    const h = renderProfile({ ...payload, todo } as never, { classId: 'class1' });
+    const wrap = h.querySelector('.td-count-wrap')!;
+    expect(wrap.querySelector('.td-count--big')).toBeTruthy();
+    expect(wrap.querySelector('.td-viva--dark .td-viva__opt')).toBeTruthy();
+    expect(wrap.querySelector('.td-count--big .td-viva')).toBeNull();
   });
 });

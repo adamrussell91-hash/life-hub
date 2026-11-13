@@ -107,7 +107,7 @@ describe('feedback card', () => {
     expect(buttons.length).toBe(1);
     buttons[0]!.click();
     expect(opened).toEqual(['w:l5:b']);
-    expect(card.textContent).toContain('Older pieces are under Returned work.');
+    expect(card.textContent).toContain('Older pieces are in the list above.');
     expect(card.querySelector('.pg-fb__hint')).toBeTruthy();
   });
 });

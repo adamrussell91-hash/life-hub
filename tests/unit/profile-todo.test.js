@@ -255,3 +255,13 @@ test('boxes: done-today rows stay and do not use a slot; the overflow past the b
   assert.equal(items.filter((i) => !i.done).length, 12, 'Do next keeps twelve of c3..c15');
   assert.equal(out.more, 1);
 });
+
+test('the practice Viva links come only while an assessment counts down, by lesson title', async () => {
+  const { vivaPracticeFrom } = await import('../../netlify/functions/_shared/profile-todo.mjs');
+  const lessons = [{ id: 'a', title: 'Viva Voce Practice 1' }, { id: 'b', title: ' viva voce practice 2 ' }, { id: 'c', title: 'Viva Voce Practice 3' }, { id: 'd', title: 'Ghost poem' }];
+  const due = [{ assessment: true }];
+  assert.deepEqual(vivaPracticeFrom(lessons, due), { prepared: { lesson_id: 'a', title: 'Viva Voce Practice 1' }, spontaneous: { lesson_id: 'b', title: 'viva voce practice 2' } });
+  assert.equal(vivaPracticeFrom(lessons, [{ assessment: false }]), null);
+  assert.equal(vivaPracticeFrom([{ id: 'd', title: 'Ghost poem' }], due), null);
+  assert.deepEqual(vivaPracticeFrom([lessons[1]], due), { spontaneous: { lesson_id: 'b', title: 'viva voce practice 2' } });
+});

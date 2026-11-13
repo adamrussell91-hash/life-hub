@@ -85,7 +85,7 @@ export function feedbackCard(feedback: FeedbackPayload, options: { onOpen?: (pie
       card.append(wrap);
     }
   }
-  card.append(el('p', 'pg-fb__foot', 'Older pieces are under Returned work.'));
+  card.append(el('p', 'pg-fb__foot', 'Older pieces are in the list above.'));
   if (rows.some((r) => r.cells.some((c) => c === null))) card.append(el('p', 'pg-hint pg-fb__hint', 'An outlined square is a piece this code doesn’t apply to.'));
   return card;
 }
