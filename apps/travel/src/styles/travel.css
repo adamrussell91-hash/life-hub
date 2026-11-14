@@ -35,6 +35,13 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .btn.ghost { background: var(--paper); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
 .btn.city { background: var(--city); color: #fff; }
 .btn svg { width: 16px; height: 16px; }
+/* The design kit's variants (chrome.css) lose to the .btn rule above, which loads
+   later with the same specificity, so every Cancel looked like Save. Restated here
+   in the kit's colours; borders are inset shadows so all variants keep one size. */
+.btn.btn--primary { background: var(--navy); color: #fff; }
+.btn.btn--secondary { background: rgba(255,255,255,.62); color: var(--marine); box-shadow: inset 0 0 0 1px var(--line), var(--elev-1); }
+.btn.btn--ghost { background: var(--glass, rgba(255,255,255,.7)); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.btn.btn--danger { background: #9b2c2c; color: #fff; box-shadow: none; }
 
 /* ---------- Shell (skip link + rail back link) ----------
  * Same skip link as Professional/Tasks hub.css: off-screen until focused.
