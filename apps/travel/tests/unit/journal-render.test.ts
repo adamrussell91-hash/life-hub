@@ -31,16 +31,17 @@ afterEach(() => {
 });
 
 describe('renderJournal', () => {
-  it('renders toolbar, two leg headings, and a transition', () => {
+  it('renders the cover, the day ribbon, two cities and the journey between them', () => {
     const root = document.createElement('div');
     renderJournal(root, { fixture: klIstanbulFixture() });
-    expect(root.querySelector('[data-journal-toolbar]')).toBeTruthy();
+    expect(root.querySelector('[data-story-cover]')).toBeTruthy();
+    expect(root.querySelector('[data-story-ribbon]')).toBeTruthy();
     expect(root.querySelectorAll('[data-journal-leg]')).toHaveLength(2);
     expect(root.querySelector('[data-journal-transition]')).toBeTruthy();
     expect(root.querySelector('[data-journal-timeline]')).toBeTruthy();
   });
 
-  it('renders day map preview after all moments in each day section', () => {
+  it('puts the day map under the day header, before that day\'s moments', () => {
     const root = document.createElement('div');
     renderJournal(root, { fixture: klIstanbulFixture() });
     for (const day of root.querySelectorAll('[data-journal-day]')) {
@@ -53,7 +54,8 @@ describe('renderJournal', () => {
       );
       if (mapIndex === -1) continue;
       expect(momentIndexes.length).toBeGreaterThan(0);
-      expect(mapIndex).toBeGreaterThan(Math.max(...momentIndexes));
+      expect(mapIndex).toBeLessThan(Math.min(...momentIndexes));
+      expect(children[mapIndex - 1]?.classList.contains('story-day')).toBe(true);
     }
   });
 
@@ -95,17 +97,56 @@ describe('renderJournal', () => {
     expect(root.querySelector('.journal-empty__photos')?.textContent).toBe('Add photos');
     expect(root.querySelector('.journal-empty__moment')?.textContent).toBe('Add moment');
     expect(root.querySelector('[data-journal-moment]')).toBeNull();
-    expect(root.querySelector('.journal-toolbar__title')?.textContent).toBe('Summer break');
+    expect(root.querySelector('.story-cover__title')?.textContent).toBe('Summer break');
+    expect(root.querySelector('.story-cover img')).toBeNull();
   });
 
-  it('uses toolbar h1 for trip title and enables Add moment', () => {
+  it('puts the trip title in the one h1, on the cover, and offers the dock', () => {
     const root = document.createElement('div');
     renderJournal(root, { fixture: klIstanbulFixture() });
-    const title = root.querySelector('.journal-toolbar__title');
-    expect(title?.tagName).toBe('H1');
-    const addBtn = root.querySelector('.journal-toolbar__add') as HTMLButtonElement | null;
-    expect(addBtn?.disabled).toBe(false);
-    expect(addBtn?.getAttribute('aria-label')).toBe('Add moment');
+    const headings = root.querySelectorAll('h1');
+    expect(headings).toHaveLength(1);
+    expect(headings[0]?.classList.contains('story-cover__title')).toBe(true);
+    const dock = root.querySelector('[data-story-dock]');
+    expect(dock?.querySelector('[aria-label="Add photos"]')).toBeTruthy();
+    expect(dock?.querySelector('[aria-label="Moment"]')).toBeTruthy();
+  });
+
+  it('offers only the views that are built', () => {
+    const root = document.createElement('div');
+    renderJournal(root, { fixture: klIstanbulFixture() });
+    const views = [...root.querySelectorAll('[data-story-view]')].map((b) => b.getAttribute('data-story-view'));
+    expect(views).toEqual(['story', 'photos']);
+    expect(root.textContent).not.toMatch(/Relive|noticed/i);
+  });
+
+  it('numbers days from the start of the trip and writes dates out in full', () => {
+    const root = document.createElement('div');
+    renderJournal(root, { fixture: klIstanbulFixture() });
+    const first = root.querySelector('.story-day__title');
+    expect(first?.textContent).toMatch(/^Day 1/);
+    expect(first?.textContent).not.toMatch(/\d{2}\/\d{2}\/\d{2}/);
+  });
+
+  it('never says how far anyone walked', () => {
+    const root = document.createElement('div');
+    renderJournal(root, { fixture: klIstanbulFixture() });
+    const written = [...root.querySelectorAll('.story-stitch, .story-day__facts, .story-cover__stats, .story-chapter__counts')];
+    expect(written.length).toBeGreaterThan(0);
+    for (const node of written) expect(node.textContent).not.toMatch(/walk|on foot/i);
+  });
+
+  it('switches to all photos and back without losing the story', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    renderJournal(root, { fixture: klIstanbulFixture() });
+    const moments = root.querySelectorAll('[data-journal-moment]').length;
+    (root.querySelector('[data-story-view="photos"]') as HTMLButtonElement).click();
+    expect(root.querySelector('[data-story-photos-view]')).toBeTruthy();
+    expect(root.querySelector('[data-journal-moment]')).toBeNull();
+    (root.querySelector('[data-story-view="story"]') as HTMLButtonElement).click();
+    expect(root.querySelectorAll('[data-journal-moment]')).toHaveLength(moments);
+    root.remove();
   });
 
   it('adds journal--pattern-off when patternOff option is true', () => {

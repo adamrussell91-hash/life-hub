@@ -8,6 +8,7 @@ import '../../design-kit/motion.css';
 import '../../design-kit/mobile.css';
 import '../styles/travel.css';
 import '../styles/journal.css';
+import '../styles/journal-story.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
@@ -98,6 +99,9 @@ async function bootApp(root: HTMLElement): Promise<void> {
     const route = parseRoute();
     const generation = ++routeGeneration;
     document.title = tabTitle(route);
+    // On a phone the journal's cover replaces the page header and the page runs edge to edge.
+    shell.pageHeader.classList.toggle('page-header--journal', route.name === 'journal');
+    shell.pageHeader.parentElement?.classList.toggle('hub-canvas--journal', route.name === 'journal');
 
     if (route.name !== 'journal') {
       journalHandle?.destroy();
@@ -174,7 +178,8 @@ async function bootApp(root: HTMLElement): Promise<void> {
           displayTitle,
           trip: tripForJournal,
           momentId: route.momentId,
-          patternOff: journalPatternOff()
+          patternOff: journalPatternOff(),
+          onRefresh: journalUseFixture() ? undefined : () => void paint({ refresh: true })
         });
         return;
       }
