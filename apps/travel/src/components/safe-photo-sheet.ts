@@ -1,5 +1,6 @@
 import type { Item } from '@/types';
 import { I } from '@/lib/icons';
+import { safeSaveErrorMessage } from '@/lib/safe-photo';
 
 export interface SafePhotoSheetOptions {
   item: Item;
@@ -117,7 +118,7 @@ export function renderSafePhotoSheet(host: HTMLElement, options: SafePhotoSheetO
     } catch (err) {
       setBusy(false);
       errorNote.hidden = false;
-      errorNote.textContent = err instanceof Error ? err.message : 'Could not save. Try again.';
+      errorNote.textContent = safeSaveErrorMessage(err);
       errorNote.scrollIntoView?.({ block: 'nearest' });
     }
   });

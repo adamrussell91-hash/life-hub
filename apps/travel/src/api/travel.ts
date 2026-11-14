@@ -73,11 +73,22 @@ export function addCheckin(
 export async function uploadTravelPhoto(tripId: string, file: File): Promise<{ photo_id: string }> {
   const form = new FormData();
   form.append('file', file);
-  const response = await fetch(`${getApiBaseUrl()}/api/travel-photo?trip=${encodeURIComponent(tripId)}`, {
-    method: 'POST',
-    body: form,
-    credentials: 'include'
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}/api/travel-photo?trip=${encodeURIComponent(tripId)}`, {
+      method: 'POST',
+      body: form,
+      credentials: 'include',
+      signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(60_000) : undefined
+    });
+  } catch (cause) {
+    // Safari rejects with a bare TypeError ("Load failed") when the connection drops.
+    const timedOut = cause instanceof DOMException && cause.name === 'TimeoutError';
+    throw new ApiClientError({
+      code: timedOut ? 'timeout' : 'network_error',
+      message: cause instanceof Error ? cause.message : 'Network request failed'
+    });
+  }
   const result = await parseApiResponse<{ photo_id: string }>(response);
   if (!result.ok) {
     throw new ApiClientError(result.error, response.status, result.data);
