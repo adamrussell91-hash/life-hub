@@ -10,6 +10,9 @@
 .lf__tick svg { width: 24px; height: 24px; }
 .lf__tick[aria-pressed='true'] { background: var(--success); border-color: var(--success); color: #fff; }
 .lf__tick:focus-visible { outline: 3px solid var(--wave); outline-offset: 3px; }
+.lf__finish { display: flex; align-items: center; justify-content: center; gap: var(--space-4); min-width: 0; }
+.lf__done { display: grid; justify-items: center; gap: var(--space-1); }
+.lf__finish > .wn-card { flex: 1 1 22rem; max-width: 30rem; margin: 0; }
 .lf__status { margin: 0; min-height: 1.4em; text-align: center; font-weight: 600; color: var(--success); }
 .lf__panel { display: grid; gap: var(--space-3); max-width: 34rem; width: 100%; justify-self: center; padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--paper); }
 .lf__panel[hidden], .lf__error[hidden] { display: none; }
@@ -34,6 +37,12 @@
 .lf__chip:has(input:focus-visible) { outline: 3px solid var(--wave); outline-offset: 2px; }
 .lf__chip:has(input:checked) { background: var(--wave); border-color: var(--wave); color: #fff; }
 .lf__unclear { width: 100%; font: inherit; font-size: 16px; }
+/* Phone or a narrow column: the tick and the card take their own row above previous and next. */
+@media (max-width: 720px) {
+  .lf__row:has(.wn-card:not([hidden])) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .lf__row:has(.wn-card:not([hidden])) .lf__finish { grid-column: 1 / -1; order: -1; flex-direction: column; }
+  .lf__finish > .wn-card { flex: none; width: 100%; }
+}
 @media (max-width: 480px) {
   .lf__row { gap: var(--space-2); }
   .lf__title { font-size: var(--text-sm); }

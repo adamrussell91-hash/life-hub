@@ -121,7 +121,6 @@ export function mountCardStackControls(
   if (cardEls.length === 0) return;
 
   let index = Math.min(Math.max(initialIndex, 0), cardEls.length - 1);
-  let wheelLock = false;
   const reduceMotion = prefersReducedMotion();
 
   const status = root.querySelector('.block-card-stack__status') as HTMLElement | null;
@@ -139,7 +138,13 @@ export function mountCardStackControls(
   const step = (delta: number) => {
     const nextIndex = index + delta;
     if (nextIndex < 0 || nextIndex >= cardEls.length) return false;
+    // Shuffle: going on, the top card slides off and tucks under the stack; going back, it slides back on top.
+    const moving = delta > 0 ? cardEls[index] : cardEls[nextIndex];
     index = nextIndex;
+    if (moving && !reduceMotion) {
+      moving.dataset.motion = delta > 0 ? 'out' : 'in';
+      moving.addEventListener('animationend', () => delete moving.dataset.motion, { once: true });
+    }
     sync();
     return true;
   };
@@ -152,49 +157,32 @@ export function mountCardStackControls(
   });
 
   root.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    if (event.key === 'ArrowRight') {
       if (step(1)) event.preventDefault();
-    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    } else if (event.key === 'ArrowLeft') {
       if (step(-1)) event.preventDefault();
     }
   });
 
-  root.addEventListener(
-    'wheel',
-    (event) => {
-      if (Math.abs(event.deltaY) < 8 || wheelLock) return;
-      const moved = step(event.deltaY > 0 ? 1 : -1);
-      if (!moved) return;
-      event.preventDefault();
-      wheelLock = true;
-      window.setTimeout(() => {
-        wheelLock = false;
-      }, 360);
-    },
-    { passive: false }
-  );
-
-  let touchStartY: number | null = null;
+  // A sideways swipe moves through the stack; up and down stay the page's scroll.
+  let touchStart: { x: number; y: number } | null = null;
   root.addEventListener(
     'touchstart',
     (event) => {
-      touchStartY = event.changedTouches[0]?.clientY ?? null;
+      const t = event.changedTouches[0];
+      touchStart = t ? { x: t.clientX, y: t.clientY } : null;
     },
     { passive: true }
   );
-  root.addEventListener(
-    'touchend',
-    (event) => {
-      if (touchStartY == null) return;
-      const endY = event.changedTouches[0]?.clientY;
-      if (endY == null) return;
-      const delta = touchStartY - endY;
-      touchStartY = null;
-      if (Math.abs(delta) < 36) return;
-      if (step(delta > 0 ? 1 : -1)) event.preventDefault();
-    },
-    { passive: false }
-  );
+  root.addEventListener('touchend', (event) => {
+    const t = event.changedTouches[0];
+    if (!touchStart || !t) return;
+    const dx = touchStart.x - t.clientX;
+    const dy = touchStart.y - t.clientY;
+    touchStart = null;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+    step(dx > 0 ? 1 : -1);
+  });
 
   sync();
 }
