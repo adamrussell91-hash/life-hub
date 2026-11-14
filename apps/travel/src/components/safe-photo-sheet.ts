@@ -79,7 +79,20 @@ export function renderSafePhotoSheet(host: HTMLElement, options: SafePhotoSheetO
   const saveBtn = document.createElement('button');
   saveBtn.type = 'submit';
   saveBtn.className = 'btn';
-  saveBtn.innerHTML = `${I.check}Save photo`;
+  const idleLabel = `${I.check}Save photo`;
+  saveBtn.innerHTML = idleLabel;
+
+  // On mobile data the upload takes seconds; a silent disabled button reads as frozen.
+  function setBusy(busy: boolean): void {
+    saveBtn.disabled = busy;
+    if (busy) {
+      saveBtn.textContent = 'Uploading…';
+      saveBtn.setAttribute('aria-busy', 'true');
+    } else {
+      saveBtn.innerHTML = idleLabel;
+      saveBtn.removeAttribute('aria-busy');
+    }
+  }
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
   cancelBtn.className = 'btn ghost';
@@ -97,14 +110,15 @@ export function renderSafePhotoSheet(host: HTMLElement, options: SafePhotoSheetO
       errorNote.textContent = 'Choose a photo to share.';
       return;
     }
-    saveBtn.disabled = true;
+    setBusy(true);
     try {
       await options.onConfirm(file);
       host.replaceChildren();
     } catch (err) {
-      saveBtn.disabled = false;
+      setBusy(false);
       errorNote.hidden = false;
       errorNote.textContent = err instanceof Error ? err.message : 'Could not save. Try again.';
+      errorNote.scrollIntoView?.({ block: 'nearest' });
     }
   });
 

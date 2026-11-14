@@ -302,8 +302,13 @@ export function createMockApi() {
       if (!tripOr404(tripId)) {
         return json(404, { ok: false, error: { code: 'not_found', message: 'Trip not found.' } });
       }
+      // Production refuses big bodies (the function caps photos at 4 MB and Netlify
+      // answers 413 above its own limit). Refuse them here too so local runs show it.
+      if (((body as { bytes?: number } | undefined)?.bytes ?? 0) > 4 * 1024 * 1024) {
+        return json(413, { ok: false, error: { code: 'payload_too_large', message: 'Photo is too big to upload.' } });
+      }
       const photoId = `tph_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
-      // Local mock: accept any multipart upload and return an id; GET serves a 1×1 png.
+      // Local mock: accept the upload and return an id; GET serves a 1×1 png.
       photoBytes.set(photoId, { tripId, mime: 'image/png' });
       return json(201, { ok: true, data: { photo_id: photoId } });
     }
@@ -467,7 +472,7 @@ export function createMockApi() {
       const rawBuf = Buffer.concat(chunks);
       const contentType = String(req.headers?.['content-type'] ?? '');
       if (contentType.includes('multipart/form-data')) {
-        requestBody = { multipart: true };
+        requestBody = { multipart: true, bytes: rawBuf.length };
       } else if (rawBuf.length) {
         try {
           requestBody = JSON.parse(rawBuf.toString('utf8'));

@@ -21,6 +21,7 @@ import { renderCityForm } from '@/components/city-form';
 import { renderDayLabelSheet } from '@/components/day-label-sheet';
 import { renderArrivalGuideSheet } from '@/components/arrival-guide-sheet';
 import { renderSafePhotoSheet } from '@/components/safe-photo-sheet';
+import { shrinkSafePhoto } from '@/lib/safe-photo';
 import { renderTakeMeHome } from '@/components/take-me-home';
 import { renderShareSheet } from '@/components/share-sheet';
 import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
@@ -545,7 +546,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       item,
       onClose: () => formHost.remove(),
       onConfirm: async (file) => {
-        const uploaded = await uploadTravelPhoto(tripId, file);
+        const uploaded = await uploadTravelPhoto(tripId, await shrinkSafePhoto(file));
         await markItemSafe(item, uploaded.photo_id);
         formHost.remove();
       }
