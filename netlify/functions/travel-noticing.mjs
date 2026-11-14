@@ -11,6 +11,20 @@ import {
   wishCards,
   wishesRequest
 } from './_shared/travel-noticing-wishes.mjs';
+import {
+  MIN_PHOTOS_FOR_A_LOOK,
+  PHOTOS_MODEL,
+  PHOTOS_SYSTEM,
+  dayPhotos,
+  parsePhotoNotices,
+  photoCards,
+  photosContent,
+  samplePhotos
+} from './_shared/travel-noticing-photos.mjs';
+import { travelJournalPresignGet } from './_shared/travel-journal-r2.mjs';
+
+/** A 320px copy is tens of kilobytes. Anything much larger is not what was asked for. */
+const MAX_SMALL_COPY_BYTES = 400_000;
 import { createTravelJournalRepository } from './_shared/travel-journal-repository.mjs';
 import { buildNoticingHistory } from './_shared/travel-noticing-history.mjs';
 
@@ -20,9 +34,10 @@ export const config = { path: '/api/travel-noticing' };
  * GET `?trip=`: what the journal's noticing cards need from outside the trip
  * in hand: a compact history of every other trip.
  * POST `?trip=` with `{ kind: 'wishes', day }`: which open bucket-list and
- * dreams-jar items that day of the trip fulfilled. Nothing is stored and
- * nothing in Tasks is changed here; the phone keeps the cards and ticking
- * one off is the owner's tap.
+ * dreams-jar items that day of the trip fulfilled. With `kind: 'photos'`:
+ * what runs across that day's photos. Nothing is stored and nothing in Tasks
+ * is changed here; the phone keeps the cards and ticking one off is the
+ * owner's tap.
  */
 export function createTravelNoticingHandler(deps = {}) {
   const loadTrips =
@@ -71,6 +86,42 @@ export function createTravelNoticingHandler(deps = {}) {
     return wishCards(parseWishMatches(raw, wishes, evidence), day);
   }
 
+  const loadPhotoBytes =
+    deps.loadPhotoBytes ??
+    (async (ctx, key) => {
+      const url = await travelJournalPresignGet(ctx.env, { key, signGet: deps.signGet });
+      const response = await (deps.fetchImpl ?? fetch)(url, { signal: AbortSignal.timeout(15000) });
+      if (!response.ok) return null;
+      const bytes = Buffer.from(await response.arrayBuffer());
+      return bytes.length > 0 && bytes.length <= MAX_SMALL_COPY_BYTES ? bytes.toString('base64') : null;
+    });
+
+  async function photosFor(ctx, tripId, day) {
+    const [{ trip }, journal] = await Promise.all([
+      ctx.repo.getTrip(tripId),
+      journalRepo(ctx).getJournal(tripId).then((r) => r.journal, () => null)
+    ]);
+    if (!journal || day < trip.start_date || day > trip.end_date) return [];
+    const all = dayPhotos(journal, day);
+    if (all.length < MIN_PHOTOS_FOR_A_LOOK) return [];
+    const chosen = samplePhotos(all);
+    const loaded = (
+      await Promise.all(chosen.map(async (photo) => ({ id: photo.id, data: await loadPhotoBytes(ctx, photo.key).catch(() => null) })))
+    ).filter((image) => image.data);
+    if (loaded.length < MIN_PHOTOS_FOR_A_LOOK) return [];
+    const raw = await (deps.complete ?? completeMessage)({
+      apiKey: ctx.env.ANTHROPIC_API_KEY,
+      fetchImpl: deps.fetchImpl,
+      model: PHOTOS_MODEL,
+      maxTokens: 500,
+      system: PHOTOS_SYSTEM,
+      messages: [{ role: 'user', content: photosContent(loaded) }],
+      signal: AbortSignal.timeout(50000)
+    });
+    const notices = parsePhotoNotices(raw, loaded.map((image) => image.id));
+    return photoCards(notices, { day, tripId, sent: loaded.length, total: all.length });
+  }
+
   return createTravelOperatorHandler(async (request, ctx) => {
     if (request.method !== 'GET' && request.method !== 'POST') {
       return errorResponse(405, 'method_not_allowed', 'Use GET or POST.', false, PRIVATE_CACHE);
@@ -82,7 +133,7 @@ export function createTravelNoticingHandler(deps = {}) {
     if (request.method === 'POST') {
       const body = await readJson(request);
       const day = typeof body?.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.day) ? body.day : '';
-      if (body?.kind !== 'wishes' || !day) {
+      if ((body?.kind !== 'wishes' && body?.kind !== 'photos') || !day) {
         return errorResponse(400, 'bad_request', 'A kind and a day are needed.', false, PRIVATE_CACHE);
       }
       if (!ctx.env.ANTHROPIC_API_KEY && !deps.complete) {
@@ -91,10 +142,11 @@ export function createTravelNoticingHandler(deps = {}) {
       const sessionKey = ctx.session?.token || ctx.session?.id || 'anon';
       checkRateLimit(`noticing:${sessionKey}`, { limit: 12, now: ctx.now() });
       try {
-        return okResponse(200, { cards: await wishesFor(ctx, tripId, day) }, PRIVATE_CACHE);
+        const cards = body.kind === 'photos' ? await photosFor(ctx, tripId, day) : await wishesFor(ctx, tripId, day);
+        return okResponse(200, { cards }, PRIVATE_CACHE);
       } catch (error) {
         if (error?.code === 'not_found' || error?.status === 404) throw error;
-        return errorResponse(503, 'upstream_unavailable', 'Could not check today against your lists.', true, PRIVATE_CACHE);
+        return errorResponse(503, 'upstream_unavailable', 'Could not look at today just now.', true, PRIVATE_CACHE);
       }
     }
     const [trips, journals] = await Promise.all([loadTrips(ctx), loadJournals(ctx)]);

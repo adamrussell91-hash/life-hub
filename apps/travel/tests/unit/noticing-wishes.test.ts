@@ -147,3 +147,46 @@ describe('bucket list and dreams jar in the journal', () => {
     expect(pill(root)!.textContent).toBe('1 thing noticed today'); // counting cards still work
   });
 });
+
+describe('seen in the photos', () => {
+  /** The fixture with eight more backed-up photos on 5 March. */
+  function busyDay() {
+    const j = lisbonPortoJournal(trip.id);
+    const moment = j.moments.find((m) => m.local_date === '2027-03-05' && m.lifecycle === 'live' && m.author !== 'partner')!;
+    const extra = Array.from({ length: 8 }, (_, i) => ({
+      id: `med_busy${i}`, lifecycle: 'live' as const, content_type: 'image/jpeg', width: 800, height: 600, upload_state: 'backed_up' as const,
+      url: '/api/mock-photo/ribeira.jpg',
+    }));
+    return {
+      ...j,
+      media: [...j.media, ...extra],
+      moments: j.moments.map((m) => (m.id === moment.id ? { ...m, media_ids: [...m.media_ids, ...extra.map((e) => e.id)] } : m)),
+    };
+  }
+  const seen: NoticeCard = {
+    key: 'photos:2027-03-05:med_busy0.med_busy1.med_busy2', kind: 'photos', source: 'photos', day: '2027-03-05',
+    headline: 'A yellow tram in four of today’s photos',
+    photos: [{ tripId: trip.id, mediaId: 'med_busy0' }, { tripId: trip.id, mediaId: 'med_busy1' }, { tripId: trip.id, mediaId: 'med_busy2' }],
+    basis: 'Seen in 4 of today’s 11 photos', score: 55,
+  };
+
+  it('asks about the photos after the wishes, only on a day with enough of them', async () => {
+    const quiet = await mount({ hour: 19, ask: vi.fn(async () => []) });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(quiet.ask.mock.calls.map((c) => c[0])).toEqual(['wishes']); // too few photos that day
+
+    const root = document.createElement('div');
+    document.body.append(root);
+    const ask = vi.fn(async (kind: string) => (kind === 'photos' ? [seen] : []));
+    renderJournal(root, { fixture: busyDay(), trip, today: '2027-03-05', localHour: 19, askNoticing: ask as never });
+    await vi.waitFor(() => expect(ask.mock.calls.map((c) => c[0])).toEqual(['wishes', 'photos']));
+    await vi.waitFor(() => expect(pill(root)?.textContent).toMatch(/things noticed today/));
+    pill(root)!.click();
+    // Best first: counting cards about the day may come before it; find the photos card.
+    for (let i = 0; i < 5 && dialog().querySelector('.notice-face__source')!.textContent !== 'Claude noticed in today’s photos'; i += 1) press('Next');
+    expect(dialog().querySelector('.notice-face__headline')!.textContent).toBe('A yellow tram in four of today’s photos');
+    expect(dialog().querySelector('.notice-face__basis')!.textContent).toBe('Seen in 4 of today’s 11 photos');
+    expect(dialog().querySelectorAll('.notice-face__photo img')).toHaveLength(3);
+    expect([...dialog().querySelectorAll('.notice__action')].map((b) => b.textContent)).toEqual(['Not right', 'Keep in the story']);
+  });
+});
