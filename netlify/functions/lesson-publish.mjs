@@ -233,7 +233,9 @@ export async function publishLessonDraft(store, id, { env, deps = {} } = {}) {
   if (draft.pedagogical_mode === 'station_rotation') {
     const rotation = prepareRotationPublish(draft, publishBlocks);
     if (rotation.problems.length > 0) return fail(400, 'validation_error', rotation.problems[0], false);
-    await storeRotationConfig(store, id, rotation.config);
+    // Locked blocks reach students through the rotation status, so they are cleaned like the snapshot.
+    const lockBlocks = Object.fromEntries(Object.entries(rotation.config.lock_blocks ?? {}).map(([station, locks]) => [station, Object.fromEntries(Object.entries(locks).map(([lock, blocks]) => [lock, sanitizeBlocksDeep(blocks)]))]));
+    await storeRotationConfig(store, id, { ...rotation.config, lock_blocks: lockBlocks });
     await setJSON(store, publishedLessonKey(id), {
       lesson_id: id,
       title,

@@ -2,7 +2,7 @@
 import { createPublicStudentHandler } from './_shared/public-student-gate.mjs';
 import { rotationAction, RotationError } from './_shared/rotation.mjs';
 import { errorResponse, guardRequestOrigin, okResponse, withCors, methodNotAllowed } from './_shared/http.mjs';
-import { createWritingChecker } from './_shared/rotation-writing.mjs';
+import { createLockChecker, createWritingChecker } from './_shared/rotation-writing.mjs';
 import { appendUsageLog, createAnthropicComplete, teachingModels } from './_shared/teaching-ai-job-run.mjs';
 
 /** The real written-gate checker: the standard lane, with cost logged like other Teaching AI jobs. Without a key, written gates go to the teacher. */
@@ -10,9 +10,14 @@ function liveChecker(env) {
   if (!env?.ANTHROPIC_API_KEY) return undefined;
   return createWritingChecker({ complete: createAnthropicComplete({ apiKey: env.ANTHROPIC_API_KEY }), models: teachingModels(env), logUsage: appendUsageLog });
 }
+/** The real lock check: the fast lane, cost logged and capped the same way. Without a key, lock checks go to the teacher. */
+function liveLockChecker(env) {
+  if (!env?.ANTHROPIC_API_KEY) return undefined;
+  return createLockChecker({ complete: createAnthropicComplete({ apiKey: env.ANTHROPIC_API_KEY }), models: teachingModels(env), logUsage: appendUsageLog });
+}
 export const config = { path: '/api/published/rotation/:id', rateLimit: { action: 'rate_limit', aggregateBy: ['ip', 'domain'], windowLimit: 900, windowSize: 60 } };
 const MAX_BODY = 40000;
-/** `deps.checkWriting` replaces the written-gate checker (tests and the local mock). */
+/** `deps.checkWriting` and `deps.checkLock` replace the written-gate and lock checkers (tests and the local mock). */
 export function createPublishedRotationHandler(deps = {}) {
   return createPublicStudentHandler(async (request, context) => {
     const { env, store } = context;
@@ -24,7 +29,7 @@ export function createPublishedRotationHandler(deps = {}) {
     try {
       const text = await request.text();
       if (text.length > MAX_BODY) throw new RotationError(413, 'too_large', 'That’s too long to send. Shorten it and try again.');
-      const result = await rotationAction(store, match?.[1], JSON.parse(text), { checkWriting: deps.checkWriting ?? liveChecker(env) });
+      const result = await rotationAction(store, match?.[1], JSON.parse(text), { checkWriting: deps.checkWriting ?? liveChecker(env), checkLock: deps.checkLock ?? liveLockChecker(env) });
       return withCors(okResponse(200, result, { 'cache-control': 'no-store' }), request, env);
     } catch (e) {
       if (e instanceof RotationError || e instanceof SyntaxError) return withCors(errorResponse(e.status ?? 400, e.code ?? 'bad_request', e instanceof SyntaxError ? 'Invalid request.' : e.message, false), request, env);

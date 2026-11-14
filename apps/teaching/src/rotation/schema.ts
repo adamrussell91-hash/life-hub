@@ -112,6 +112,45 @@ export const WrittenGateSchema = z.object({
 });
 export type WrittenGate = z.infer<typeof WrittenGateSchema>;
 
+/** Question kinds a rush round can mark on the spot. Short answers are marked exactly (no AI, no near misses). */
+export const RUSH_ITEM_KINDS = ['multiple_choice', 'true_false', 'odd_one_out', 'quote_technique', 'short_answer'] as const;
+export const MAX_STATION_LOCKS = 6;
+export const LOCK_CHECK_KINDS = ['rush', 'ai'] as const;
+export type LockCheckKind = (typeof LOCK_CHECK_KINDS)[number];
+export const LOCK_CHECK_LABELS: Record<LockCheckKind, string> = { rush: 'Rush', ai: 'AI check' };
+
+/** A rush round: get `streak` right in a row within `seconds`. Marked on the server; keys never reach the browser. */
+export const RushCheckSchema = z.object({
+  kind: z.literal('rush'),
+  /** Saved half-written while drafting; publish runs the full check. */
+  items: z.array(QuizQuestionDraftSchema).max(30).default([]),
+  streak: z.number().int().min(3).max(10).default(6),
+  seconds: z.number().int().min(30).max(300).default(90)
+});
+/** One or two sentences, judged by the fast lane against the teacher's model answer and criteria. Both stay on the server. */
+export const AiCheckSchema = z.object({
+  kind: z.literal('ai'),
+  prompt: z.string().max(500).default(''),
+  model_answer: z.string().max(1000).default(''),
+  criteria: z.array(z.string().max(200)).max(4).default([])
+});
+export const LockCheckSchema = z.discriminatedUnion('kind', [RushCheckSchema, AiCheckSchema]);
+export type LockCheck = z.infer<typeof LockCheckSchema>;
+
+/**
+ * One lock in a station's chain. Blocks belong to a lock through
+ * `block.settings.rotation_lock = lock.id`; a lock's blocks show once the lock
+ * before it is passed. The reward is a Viva Kit card the student keeps.
+ * (Not the finale's `LockQuestionSchema`.)
+ */
+export const StationLockSchema = z.object({
+  id: Id,
+  title: z.string().max(80).default(''),
+  check: LockCheckSchema,
+  reward: z.object({ title: z.string().max(80).default(''), text: z.string().max(400).default('') }).default({ title: '', text: '' })
+});
+export type StationLock = z.infer<typeof StationLockSchema>;
+
 export const StationSchema = z.object({
   id: Id,
   title: z.string().max(120).default(''),
@@ -136,7 +175,9 @@ export const StationSchema = z.object({
   /** The station's gate, when it is a written answer. A hinge gate is a block in the section instead. */
   written_gate: WrittenGateSchema.optional(),
   /** Teacher station only: what to say to a group sent here, per misconception. */
-  script: z.string().max(600).optional()
+  script: z.string().max(600).optional(),
+  /** Optional chain of locks. None: the station works as a plain card. */
+  locks: z.array(StationLockSchema).max(MAX_STATION_LOCKS).optional()
 });
 export type Station = z.infer<typeof StationSchema>;
 
@@ -193,9 +234,14 @@ export type RotationSettings = z.infer<typeof RotationSettingsSchema>;
 export const PublicWrittenGateSchema = WrittenGateSchema.pick({ prompt: true, passage: true, marks: true, idea: true, checks: true, different_techniques: true, pass_at: true, pass_at_support: true, max_checks: true });
 export type PublicWrittenGate = z.infer<typeof PublicWrittenGateSchema>;
 
-export const PublicStationSchema = StationSchema.omit({ written_gate: true, offline_code: true, script: true }).extend({
+/** A lock as the snapshot carries it: enough to draw the closed chain. Items, rewards and later blocks come from the server's status. */
+export const PublicLockSummarySchema = z.object({ id: Id, title: z.string(), kind: z.enum(LOCK_CHECK_KINDS) });
+export type PublicLockSummary = z.infer<typeof PublicLockSummarySchema>;
+
+export const PublicStationSchema = StationSchema.omit({ written_gate: true, offline_code: true, script: true, locks: true }).extend({
   written_gate: PublicWrittenGateSchema.optional(),
-  has_offline_code: z.boolean().optional()
+  has_offline_code: z.boolean().optional(),
+  locks: z.array(PublicLockSummarySchema).optional()
 });
 export type PublicStation = z.infer<typeof PublicStationSchema>;
 
@@ -276,4 +322,16 @@ export type RotationWork = {
   called_at?: string;
   hand_up_at?: string;
   finale: { lock_passed?: boolean; build?: string; format?: string; debrief?: Record<string, string> };
+  /** Station locks: station id → lock id → progress. */
+  locks?: Record<string, Record<string, StationLockWork>>;
+};
+/** One lock's progress as the server keeps it. */
+export type StationLockWork = {
+  passed_at?: string;
+  /** Set when the teacher opened it. */
+  teacher_at?: string;
+  rush?: { started_at?: string; streak: number; best: number; answered: number; last_at?: string; queue: string[] };
+  ai?: Array<{ text: string; at: string; outcome: 'passed' | 'not_yet' | 'teacher'; fix?: string; counted?: boolean; cost_usd?: number; capped?: boolean; flagged_text?: boolean; unavailable?: boolean }>;
+  /** Sent to the teacher: out of AI checks, the daily cap, or text that talked to the marker. */
+  flagged?: boolean;
 };

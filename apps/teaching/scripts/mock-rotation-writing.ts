@@ -3,7 +3,7 @@
  * feedback) with a stand-in model. It passes a point whose explanation names
  * the idea and fails the rest with a pointer; no request leaves the machine.
  */
-import { createWritingChecker } from '../../../netlify/functions/_shared/rotation-writing.mjs';
+import { createLockChecker, createWritingChecker } from '../../../netlify/functions/_shared/rotation-writing.mjs';
 
 type Request = { messages: Array<{ content: string }> };
 
@@ -19,3 +19,22 @@ async function fakeModel(request: Request) {
 }
 
 export const mockWritingChecker = createWritingChecker({ complete: fakeModel as never });
+
+/**
+ * The lock's AI check with a stand-in model: it passes an answer that uses
+ * the longest word of every criterion and otherwise asks for the first one it
+ * misses. Deterministic, and no request leaves the machine.
+ */
+export async function fakeLockModel(request: Request) {
+  const prompt = request.messages[0]?.content ?? '';
+  const answer = (/<answer>([\s\S]*?)<\/answer>/.exec(prompt)?.[1] ?? '').toLowerCase();
+  const criteria = [...prompt.matchAll(/<criterion>([\s\S]*?)<\/criterion>/g)].map((m) => m[1]!.trim());
+  const missing = criteria.find((c) => {
+    const word = c.toLowerCase().split(/[^a-z0-9]+/).sort((a, b) => b.length - a.length)[0] ?? '';
+    return word && !answer.includes(word);
+  });
+  const reply = missing ? { pass: false, fix: `Say more about this: ${missing}`.slice(0, 160) } : { pass: true, fix: '' };
+  return { model: 'claude-haiku-5-5', content: [{ type: 'text', text: JSON.stringify(reply) }], usage: { input_tokens: 400, output_tokens: 40 } };
+}
+
+export const mockLockChecker = createLockChecker({ complete: fakeLockModel as never });
