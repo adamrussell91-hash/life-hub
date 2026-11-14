@@ -594,7 +594,7 @@ describe('learning activity rendering', () => {
     expect(card.classList.contains('block-flashcards__card--flipped')).toBe(false);
   });
 
-  it('renders cloze inputs at answer width and a shuffled word bank with controls', () => {
+  it('renders cloze inputs at the longest answer width and a shuffled word bank with controls', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const block = BlockSchema.parse({
       ...baseBlock,
@@ -612,7 +612,7 @@ describe('learning activity rendering', () => {
     const bank = [...el.querySelectorAll('.block-cloze__word')].map((chip) => chip.textContent);
     const buttons = [...el.querySelectorAll<HTMLButtonElement>('.block-cloze__btn')];
 
-    expect(inputs.map((input) => input.style.width)).toEqual(['7ch', '5ch', '5ch']);
+    expect(inputs.map((input) => input.style.width)).toEqual(['calc(7ch + 1.5em)', 'calc(7ch + 1.5em)', 'calc(7ch + 1.5em)']);
     expect([...bank].sort()).toEqual(['Earth', 'Mercury', 'Venus']);
     expect(bank).not.toEqual(['Mercury', 'Venus', 'Earth']);
     expect(buttons.map((button) => button.textContent)).toEqual(['Check', 'Reveal', 'Reset']);

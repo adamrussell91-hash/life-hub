@@ -384,10 +384,9 @@ export function mountStudentLessonView(
       const { prev, next } = cls ? scheduleNeighbors(cls.schedule, lesson.lesson_id) : { prev: null, next: null };
       const linkTo = (row: typeof prev) => (row && cls ? { href: `/s/classes/${cls.id}/lessons/${row.lesson_id}`, title: row.title } : null);
       const here = cls ? `/s/classes/${cls.id}/lessons/${lesson.lesson_id}` : `/s/lessons/${lesson.lesson_id}?class=${workClass}`;
-      // What's next: a card under the tick naming the next thing on their To do list, and a line under the title.
+      // What's next: a card beside the tick naming the next thing on their To do list, and a line under the title.
       const wn = (whatsNext = mountWhatsNext({ classId: workClass, lessonId: lesson.lesson_id, from: here }));
-      footer = mountLessonFooter({ lessonId: lesson.lesson_id, classId: workClass, prev: linkTo(prev), next: linkTo(next), finish: lesson.pedagogical_mode !== 'quiz', work: () => work, onClaimed: () => token?.refresh(), onDone: (done, fresh) => wn.setDone(done, fresh) });
-      footer.element.append(wn.element);
+      footer = mountLessonFooter({ lessonId: lesson.lesson_id, classId: workClass, prev: linkTo(prev), next: linkTo(next), finish: lesson.pedagogical_mode !== 'quiz', work: () => work, onClaimed: () => token?.refresh(), onDone: (done, fresh) => wn.setDone(done, fresh), beside: wn.element });
       content.append(footer.element);
       const hero = content.querySelector(':scope > .lesson-hero');
       if (hero) {
