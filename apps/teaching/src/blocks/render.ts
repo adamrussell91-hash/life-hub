@@ -2001,6 +2001,7 @@ export function renderClozeBlock(
   let revealed = saved?.revealed ?? false;
   let scoreValue = saved?.score ?? null;
   let bankWords = shuffledOutOfSourceOrder(blanks.map((blank) => blank.answer));
+  const longestBlank = Math.max(0, ...blanks.map((blank) => blank.answer.length));
 
   for (const segment of segments) {
     if (segment.type === 'text') {
@@ -2010,7 +2011,8 @@ export function renderClozeBlock(
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'block-cloze__blank';
-    input.style.width = `${Math.max(segment.blank.answer.length, 3)}ch`;
+    // Every gap fits the longest answer, padding included, so no word is cut off and no box hints at its answer's length.
+    input.style.width = `calc(${Math.max(longestBlank, 3)}ch + 1.5em)`;
     input.setAttribute('aria-label', segment.blank.hint || `Blank ${segment.index + 1}`);
     input.placeholder = segment.blank.hint ?? '';
     input.value = saved?.answers[segment.index] ?? '';
