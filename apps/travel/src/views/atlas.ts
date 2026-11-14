@@ -1,5 +1,6 @@
 import { getTrip } from '@/api/travel';
 import { atlasAssetUrl, getAtlas, saveAtlasHome, type AtlasRead } from '@/api/travel-atlas';
+import { setApiImageSrc } from '@/api/config';
 import { atlasRoute, journalRoute } from '@/app/router';
 import {
   bigMacIndex,
@@ -62,7 +63,7 @@ function assetSlot(slot: string, fallback: HTMLElement, alt: string): HTMLElemen
     fallback.hidden = true;
   });
   img.addEventListener('error', () => img.remove());
-  img.src = atlasAssetUrl(slot);
+  setApiImageSrc(img, atlasAssetUrl(slot));
   wrap.append(fallback, img);
   return wrap;
 }

@@ -48,7 +48,33 @@ describe('renderDayList marked safe', () => {
     expect(img).toBeTruthy();
     expect(img!.src).toContain('tph_abc');
     expect(img!.src).toContain('token=share-token');
+    // The API refuses an <img> that does not name its origin (Safari sends Sec-Fetch-Site only).
+    expect(img!.crossOrigin).toBe('use-credentials');
     expect(host.querySelector('button[aria-label="Mark safe"]')).toBeNull();
+  });
+
+  it('loads the owner\'s safe photo with the session cookie and its origin', () => {
+    const host = document.createElement('div');
+    const item = stopItem();
+    const withPhoto: Trip = {
+      ...trip,
+      checkins: [
+        {
+          id: 'chk_1',
+          at: '2027-03-04T11:05:00.000Z',
+          city_id: item.city_id,
+          label: `Safe · ${item.title}`,
+          item_id: item.id,
+          photo_id: 'tph_owner1'
+        }
+      ]
+    };
+    renderDayList(host, withPhoto, item.city_id, item.date, { onMarkSafe: vi.fn(), cityTz: 'UTC' });
+    const img = host.querySelector('img.safe-mark__photo') as HTMLImageElement | null;
+    expect(img).toBeTruthy();
+    expect(img!.src).toContain('id=tph_owner1');
+    expect(img!.src).not.toContain('token=');
+    expect(img!.crossOrigin).toBe('use-credentials');
   });
 
   it('reads live check-ins for the owner without redacted fields', () => {
