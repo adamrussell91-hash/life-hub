@@ -8,7 +8,7 @@ const css = readFileSync(resolve(__dirname, '../../src/styles/travel.css'), 'utf
 const journalCss = readFileSync(resolve(__dirname, '../../src/styles/journal.css'), 'utf8');
 
 describe('capture sheet docked actions (R4)', () => {
-  it('keeps Save/Cancel outside the scroll region', () => {
+  it('keeps Discard and Done outside the scroll region', () => {
     const anchor = document.createElement('div');
     const fixture = klIstanbulFixture();
     const day = fixture.days.find((d) => d.empty_marker)!;
@@ -28,7 +28,7 @@ describe('capture sheet docked actions (R4)', () => {
     expect(form?.lastElementChild).toBe(actions);
 
     const labels = [...actions!.querySelectorAll('button')].map((b) => b.textContent);
-    expect(labels).toEqual(['Cancel', 'Save']);
+    expect(labels).toEqual(['Discard', 'Done']);
 
     handle.destroy();
   });

@@ -134,6 +134,12 @@ export function searchPlaces(q: string, lat?: number, lon?: number): Promise<{ p
   return apiGet(`/api/travel-places?${params.toString()}`);
 }
 
+/** A street or neighbourhood name for a spot, or null when the lookup has nothing sure to say. */
+export function reversePlaceName(lat: number, lon: number): Promise<{ name: string | null }> {
+  const params = new URLSearchParams({ reverse: '1', lat: String(lat), lon: String(lon) });
+  return apiGet(`/api/travel-places?${params.toString()}`);
+}
+
 export function getRate(from: string): Promise<{ from: string; to: 'AUD'; rate: number; date: string }> {
   return apiGet(`/api/travel-rates?from=${encodeURIComponent(from)}`);
 }
