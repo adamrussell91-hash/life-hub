@@ -34,16 +34,25 @@ export function renderSafePhotoSheet(host: HTMLElement, options: SafePhotoSheetO
   const grid = document.createElement('div');
   grid.className = 'fgrid';
 
-  const fileLabel = document.createElement('label');
-  fileLabel.className = 'full';
+  // A real button, not the browser's bare "Choose File" box (register I18).
+  const pick = document.createElement('div');
+  pick.className = 'full safe-photo-pick';
   const flabel = document.createElement('span');
   flabel.className = 'flabel';
   flabel.textContent = 'Photo';
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
   fileInput.accept = 'image/jpeg,image/png,image/webp,image/gif';
-  fileLabel.append(flabel, fileInput);
-  grid.append(fileLabel);
+  fileInput.hidden = true;
+  const chooseBtn = document.createElement('button');
+  chooseBtn.type = 'button';
+  chooseBtn.className = 'btn ghost safe-photo-choose';
+  chooseBtn.innerHTML = `${I.camera}Choose photo`;
+  chooseBtn.addEventListener('click', () => fileInput.click());
+  pick.append(flabel, chooseBtn, fileInput);
+  grid.append(pick);
+  let picked: File | null = null;
+  let previewUrl: string | null = null;
 
   const preview = document.createElement('img');
   preview.className = 'safe-photo-preview full';
@@ -58,16 +67,37 @@ export function renderSafePhotoSheet(host: HTMLElement, options: SafePhotoSheetO
   scroll.append(grid, errorNote);
   form.append(scroll);
 
-  fileInput.addEventListener('change', () => {
-    const file = fileInput.files?.[0];
+  function showPicked(file: File | null): void {
+    picked = file;
+    pick.querySelector('.safe-photo-picked')?.remove();
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    previewUrl = null;
+    chooseBtn.hidden = Boolean(file);
     if (!file) {
+      fileInput.value = '';
       preview.hidden = true;
       preview.removeAttribute('src');
       return;
     }
-    preview.src = URL.createObjectURL(file);
+    const row = document.createElement('div');
+    row.className = 'safe-photo-picked';
+    const name = document.createElement('span');
+    name.className = 'safe-photo-picked__name';
+    name.textContent = file.name;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'mini';
+    remove.textContent = 'Remove';
+    remove.addEventListener('click', () => showPicked(null));
+    row.append(name, remove);
+    pick.append(row);
+    previewUrl = URL.createObjectURL(file);
+    preview.src = previewUrl;
     preview.hidden = false;
-  });
+    errorNote.hidden = true;
+  }
+
+  fileInput.addEventListener('change', () => showPicked(fileInput.files?.[0] ?? null));
 
   function close(): void {
     host.replaceChildren();
@@ -105,7 +135,7 @@ export function renderSafePhotoSheet(host: HTMLElement, options: SafePhotoSheetO
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     errorNote.hidden = true;
-    const file = fileInput.files?.[0];
+    const file = picked;
     if (!file) {
       errorNote.hidden = false;
       errorNote.textContent = 'Choose a photo to share.';

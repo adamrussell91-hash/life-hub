@@ -27,6 +27,8 @@ export function createMockApi() {
   let authenticated = false;
   // Journals and the Arches Atlas, in memory. Invented sample rows only.
   const journals = new Map<string, { journal: Record<string, unknown>; version: number }>();
+  // Food Journal visits written through /api/travel-meal, keyed trip:moment.
+  const meals = new Map<string, { id: string; title: string; dishes: Record<string, unknown>[] }>();
   let atlasSettings: { home_big_mac_aud: number | null } = { home_big_mac_aud: null };
   let atlasVersion: string | null = null;
 
@@ -388,8 +390,85 @@ export function createMockApi() {
     }
 
     if (path === '/api/travel-meal' && method === 'GET') {
-      const entry = journals.get(url.searchParams.get('trip') ?? '');
-      return json(200, { ok: true, data: { visit: null, food_version: null, travel_version: `v${entry?.version ?? 1}` } });
+      const tripId = url.searchParams.get('trip') ?? '';
+      const entry = journals.get(tripId);
+      const visit = meals.get(`${tripId}:${url.searchParams.get('moment') ?? ''}`) ?? null;
+      return json(200, {
+        ok: true,
+        data: { visit, food_version: visit ? 'f1' : null, travel_version: `v${entry?.version ?? 1}` }
+      });
+    }
+
+    // Local stand-in for the meal link: keeps the visit and marks the moment.
+    if (path === '/api/travel-meal' && method === 'PUT') {
+      const tripId = url.searchParams.get('trip') ?? '';
+      const momentId = url.searchParams.get('moment') ?? '';
+      const entry = journals.get(tripId);
+      const payload = body as {
+        travel_version?: string;
+        food: { title: string; dishes: Record<string, unknown>[] };
+        extras?: Record<string, string>;
+      };
+      if (!entry) return json(404, { ok: false, error: { code: 'not_found', message: 'Journal not found.' } });
+      if (payload.travel_version !== `v${entry.version}`) {
+        return json(409, { ok: false, error: { code: 'conflict', message: 'This journal changed somewhere else.' } });
+      }
+      const key = `${tripId}:${momentId}`;
+      const visit = {
+        id: meals.get(key)?.id ?? `visit_${randomUUID().slice(0, 8)}`,
+        title: payload.food.title,
+        dishes: payload.food.dishes.map((d, i) => ({ id: (d.id as string) ?? `dish_${i}_${randomUUID().slice(0, 6)}`, ...d }))
+      };
+      meals.set(key, visit);
+      const moments = (entry.journal.moments as Record<string, unknown>[]) ?? [];
+      entry.journal = {
+        ...entry.journal,
+        moments: moments.map((m) => (m.id === momentId ? { ...m, meal: { food_visit_id: visit.id, ...(payload.extras ?? {}) } } : m))
+      };
+      entry.version += 1;
+      return json(200, {
+        ok: true,
+        data: { visit, travel: entry.journal, travel_version: `v${entry.version}`, food_version: 'f1' }
+      });
+    }
+
+    // Journal media: sign hands back a local upload URL; verify marks the row backed up.
+    if (path === '/api/travel-journal-media-sign' && method === 'POST') {
+      const input = body as {
+        trip_id: string;
+        media_id: string;
+        purpose: 'original' | 'derivative';
+        derivative_width?: number;
+        action?: string;
+      };
+      const key = `travel/journal/${input.trip_id}/${input.media_id}/${input.purpose === 'derivative' ? `w${input.derivative_width}` : 'original'}`;
+      if (input.action !== 'verify') {
+        return json(200, {
+          ok: true,
+          data: { upload_url: `/api/mock-upload?key=${encodeURIComponent(key)}`, headers: {}, key, expires_in: 300 }
+        });
+      }
+      const entry = journals.get(input.trip_id);
+      if (!entry) return json(404, { ok: false, error: { code: 'not_found', message: 'Journal not found.' } });
+      const media = (entry.journal.media as Record<string, unknown>[]) ?? [];
+      entry.journal = {
+        ...entry.journal,
+        media: media.map((m) => {
+          if (m.id !== input.media_id) return m;
+          if (input.purpose === 'derivative') {
+            return { ...m, derivative_keys: { ...((m.derivative_keys as object) ?? {}), [`w${input.derivative_width}`]: key } };
+          }
+          return { ...m, original_key: key, upload_state: 'backed_up' };
+        })
+      };
+      entry.version += 1;
+      return json(200, {
+        ok: true,
+        data: { upload_state: 'backed_up', journal: entry.journal, version: `v${entry.version}`, key }
+      });
+    }
+    if (path === '/api/mock-upload' && method === 'PUT') {
+      return json(200, { ok: true, data: { stored: true } });
     }
 
     if (path === '/api/travel-atlas' && method === 'GET') {

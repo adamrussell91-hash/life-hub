@@ -7,6 +7,7 @@ const LOCATION_SOURCES = new Set(['exif', 'inferred', 'manual', 'device']);
 const LIFECYCLES = new Set(['live', 'deleted', 'archived']);
 const TRANSITION_MODES = new Set(['flight', 'train', 'car', 'ferry', 'other']);
 const TRIP_ID_RE = /^trp_[a-z0-9_]{4,64}$/i;
+const ITEM_ID_RE = /^itm_[a-z0-9_]{4,64}$/i;
 const PREFIX_RE = {
   jrn: /^jrn_[a-z2-7]{4,64}$/,
   leg: /^leg_[a-z0-9_]{4,64}$/i,
@@ -202,6 +203,12 @@ function validateMoment(moment, path, legIds) {
   if (moment.place) validatePlace(moment.place, `${path}.place`);
   if (moment.coordinates) validateCoordinates(moment.coordinates, `${path}.coordinates`);
   if (moment.meal !== undefined && moment.meal !== null) validateMeal(moment.meal, `${path}.meal`);
+  // The itinerary stop a meal was logged from ("Log meal" on a food stop).
+  if (moment.item_id !== undefined && moment.item_id !== null) {
+    if (typeof moment.item_id !== 'string' || !ITEM_ID_RE.test(moment.item_id)) {
+      throw fail(`${path}.item_id`, `${path}.item_id must be a valid itm_ id`);
+    }
+  }
 }
 
 function validateDay(day, path, legIds) {

@@ -78,6 +78,8 @@ export interface JournalMoment extends JournalDeletedMeta {
   text?: string;
   author?: JournalMomentAuthor;
   meal?: JournalMomentMeal;
+  /** The itinerary stop this moment was logged from ("Log meal" on a food stop). */
+  item_id?: string;
 }
 
 export interface JournalDay extends JournalDeletedMeta {

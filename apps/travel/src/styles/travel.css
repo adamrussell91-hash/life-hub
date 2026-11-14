@@ -629,3 +629,51 @@ body.map-open { overflow: hidden; }
   .ticket .iata { font-size: 1.5rem; }
   .passport { height: min(42vh, 280px); }
 }
+
+/* Log meal: one short sheet. Dish and stars up front, the rest folded away. */
+.quick-meal .quick-meal__where { margin: 2px 0 12px; }
+.quick-meal__dishes { display: grid; gap: 8px; }
+.quick-meal__dish { display: grid; grid-template-columns: minmax(0, 1fr) auto 2.25rem; align-items: center; gap: 6px; }
+.quick-meal__stars { display: inline-flex; }
+.quick-meal__star {
+  width: 2rem; height: 2.75rem; border: 0; background: none; padding: 0;
+  font-size: 1.25rem; line-height: 1; color: var(--high-sea); cursor: pointer; touch-action: manipulation;
+}
+.quick-meal__star:focus-visible { outline: 2px solid var(--wave); border-radius: 6px; }
+.quick-meal__remove {
+  width: 2.25rem; height: 2.75rem; border: 0; background: none; color: var(--muted);
+  font-size: 1.1rem; cursor: pointer;
+}
+.quick-meal__add-dish,
+.quick-meal__add-photo {
+  min-height: 2.75rem; padding: 0 2px; border: 0; background: none; box-shadow: none;
+  color: var(--wave); font: 600 .875rem var(--font-ui); cursor: pointer;
+}
+.quick-meal__add-dish { justify-self: start; margin-top: 2px; }
+.quick-meal__photos { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.quick-meal__photos .journal-capture__thumbs:empty { display: none; }
+.quick-meal__more { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
+.quick-meal__more > summary {
+  min-height: 2.75rem; display: flex; align-items: center; cursor: pointer;
+  font: 600 .875rem var(--font-ui); color: var(--muted);
+}
+.quick-meal__field { display: grid; gap: 4px; margin-top: 8px; }
+
+/* Food stops: one quiet line under the card's meta. */
+.meal-log {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 2.75rem; padding: 0 2px;
+  border: 0; background: none; cursor: pointer; touch-action: manipulation;
+  font: 600 .8125rem var(--font-ui); color: var(--wave);
+}
+.meal-log svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.meal-log.is-logged { color: var(--muted); }
+.meal-log.is-logged svg { color: #2e7d4f; }
+.meal-log:focus-visible { outline: 2px solid var(--wave); border-radius: 6px; }
+
+/* Safe-mark photo: a real button and the chosen file's name, not "Choose File". */
+.safe-photo-pick { display: grid; gap: 6px; justify-items: start; }
+.safe-photo-choose { display: inline-flex; align-items: center; gap: 6px; min-height: 2.75rem; }
+.safe-photo-choose svg { width: 16px; height: 16px; }
+.safe-photo-picked { display: flex; align-items: center; gap: 10px; max-width: 100%; }
+.safe-photo-picked__name { font-size: .875rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
