@@ -226,7 +226,7 @@ test('journal story (390px): sheets cover the tab bar and Back closes them', { s
     assert.ok(metrics.barCovered, 'the tab bar is under the sheet, not over it');
     assert.ok(metrics.dockHidden, 'the dock is away while a sheet is open');
     const labels = await sheet.innerText();
-    for (const label of ['Search journal', 'Print', 'Export', 'Share', 'Trash', 'Refresh']) {
+    for (const label of ['Search journal', 'Souvenirs', 'Print', 'Export', 'Share', 'Trash', 'Refresh']) {
       assert.match(labels, new RegExp(label), `options sheet offers ${label}`);
     }
     assert.match(labels, /Partner/, 'Partner lines toggle is offered when the journal has them');

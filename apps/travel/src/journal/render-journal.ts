@@ -18,6 +18,7 @@ import { getActiveJournalDayMap } from '@/journal/map-expanded';
 import { openTrashView } from '@/journal/trash-view';
 import { openJournalSearch } from '@/journal/search-sheet';
 import { openJournalShareSheet } from '@/journal/share-sheet';
+import { openSouvenirsCollection } from '@/journal/souvenirs-sheet';
 import { runMomentAction, type MomentActionContext } from '@/journal/moment-actions';
 import { transitionForFromLeg } from '@/journal/transitions';
 import {
@@ -347,6 +348,28 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
       });
     }
     items.push(
+      {
+        label: 'Souvenirs',
+        paths: ICONS.keepsake,
+        onSelect: () =>
+          swap(
+            'souvenirs',
+            openSouvenirsCollection({
+              tripId: liveFixture.trip_id,
+              journal: journalDoc(),
+              version: liveVersion,
+              anchor: root,
+              onSaved: onJournalSaved,
+              onJumpToMoment: (id) => {
+                setView('story');
+                scrollToChapter(id, root, opts.onChapterJump);
+              },
+              onClose: () => {
+                overlays.souvenirs = null;
+              },
+            }),
+          ),
+      },
       {
         label: 'Print',
         paths: ICONS.print,
