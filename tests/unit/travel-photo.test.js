@@ -64,3 +64,23 @@ test('a trip share link opens that live trip\'s photos; a journal link or a dele
   assert.equal((await read(photoRequest('id=tph_d1&token=trip-token'))).status, 404, 'another trip\'s photo');
   assert.equal((await read(photoRequest('id=tph_a1&token=unknown'))).status, 404);
 });
+
+test('an <img> must name its origin: a bare same-site image load is refused, a credentialed CORS load is served', async () => {
+  const read = handler({ shares: {}, sessionValid: true });
+  // What a plain <img> on the hub sends to the API host: no Origin, only fetch metadata.
+  const bare = await read(new Request('https://api.example/api/travel-photo?id=tph_a1', {
+    headers: { cookie: 'life_hub_session=x', 'sec-fetch-site': 'same-site', 'sec-fetch-dest': 'image' }
+  }));
+  assert.equal(bare.status, 403);
+
+  // <img crossorigin="use-credentials">, as the Travel hub now sends it.
+  const cors = await read(photoRequest('id=tph_a1', {
+    cookie: 'life_hub_session=x',
+    'sec-fetch-site': 'same-site',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-dest': 'image'
+  }));
+  assert.equal(cors.status, 200);
+  assert.equal(cors.headers.get('access-control-allow-origin'), 'https://life-hub.adam-russell.com');
+  assert.equal(cors.headers.get('access-control-allow-credentials'), 'true');
+});

@@ -38,3 +38,15 @@ export function getApiBaseUrl(override?: string): string {
   if (typeof location !== 'undefined') return resolveApiBaseUrl(location.hostname);
   return API_BASE_URL;
 }
+
+/**
+ * Point an <img> at an API route. The API is another origin and refuses any request
+ * that does not name an allowed Origin. A plain <img> names none (Safari sends only
+ * Sec-Fetch-Site: same-site), so it gets a 403 and shows as broken. A credentialed
+ * CORS load sends the Origin and the session cookie. Set before src, or the plain
+ * request has already started.
+ */
+export function setApiImageSrc(img: HTMLImageElement, url: string): void {
+  img.crossOrigin = 'use-credentials';
+  img.src = url;
+}

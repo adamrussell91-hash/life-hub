@@ -1,5 +1,6 @@
 import type { Checkin, Hop, Item, Trip } from '@/types';
 import { travelPhotoUrl } from '@/api/travel';
+import { setApiImageSrc } from '@/api/config';
 import { formatAud } from '@/lib/money';
 import { formatShortRange, formatTicketMoment } from '@/lib/date-label';
 import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
@@ -111,7 +112,7 @@ function appendSafeMark(
       const img = document.createElement('img');
       img.className = 'safe-mark__photo';
       img.alt = `Photo from ${item.title}`;
-      img.src = travelPhotoUrl(safe.photoId, options.shareToken);
+      setApiImageSrc(img, travelPhotoUrl(safe.photoId, options.shareToken));
       img.loading = 'lazy';
       meta.append(img);
     } else if (!options.isPublic && options.onMarkSafe) {
