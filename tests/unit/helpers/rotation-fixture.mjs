@@ -77,10 +77,76 @@ export function rotationBlocks() {
   ];
 }
 
+// ---------------------------------------------------------------- a station with locks (opt-in)
+
+const tf = (id, prompt, answer) => ({ id, kind: 'true_false', prompt, marks: 1, answer });
+/** Station s4: three locks (rush, AI check, rush). Right MCQ answers are option 0. */
+export function rotationLockStation() {
+  return {
+    id: 's4', title: 'Rescue plan', kind: 'concepts', strand: 'science', outcomes: [], minutes: 12, seats: 6, piece: 'Cool water first, then the algae and the fish come back.', x: 50, y: 70,
+    locks: [
+      {
+        id: 'k1', title: 'Which parts matter?',
+        check: { kind: 'rush', streak: 3, seconds: 90, items: [
+          mcq('s4r1', 'What lives inside healthy coral?', ['Algae', 'Sand', 'Sharks'], 0),
+          mcq('s4r2', 'What colour is bleached coral?', ['White', 'Purple', 'Black'], 0),
+          tf('s4r3', 'Grazing fish eat algae.', true),
+          tf('s4r4', 'Bleached coral is always dead.', false)
+        ] },
+        reward: { title: 'The key parts', text: 'Coral, the algae inside it, and the fish that graze. Name all three when you explain the reef.' }
+      },
+      {
+        id: 'k2', title: 'Explain the chain',
+        check: { kind: 'ai', prompt: 'In one or two sentences, explain why warm water drives the fish away.', model_answer: 'MODEL-LOCK-SECRET warm water makes the coral bleach as it loses its algae, so the fish lose their food and shelter.', criteria: ['Links warm water to bleaching', 'Says the fish lose shelter'] },
+        reward: { title: 'The chain in one line', text: 'Warm water, then bleaching, then fewer fish. Say it in that order.' }
+      },
+      {
+        id: 'k3', title: 'Order the rescue',
+        check: { kind: 'rush', streak: 3, seconds: 60, items: [
+          mcq('s4r5', 'What should a rescue fix first?', ['The water temperature', 'The colour of the sand', 'The number of boats'], 0),
+          tf('s4r6', 'Algae can come back once the water cools.', true),
+          mcq('s4r7', 'Which comes back last?', ['The fish', 'The cool water', 'The algae'], 0)
+        ] },
+        reward: { title: 'Rescue order', text: 'Cool the water, let the algae return, then the fish follow.' }
+      }
+    ]
+  };
+}
+
+/** The right response for a published rush item, by its id, matched against the drafts above. */
+export function rushRightResponse(question) {
+  const draft = rotationLockStation().locks.flatMap((l) => (l.check.kind === 'rush' ? l.check.items : [])).find((q) => q.id === question.id);
+  if (draft.kind === 'true_false') return { value: draft.answer };
+  const text = draft.options.find((o) => o.id === draft.correct[0]).text;
+  return { selected: [question.options.find((o) => o.text === text).id] };
+}
+export function rushWrongResponse(question) {
+  const right = rushRightResponse(question);
+  if ('value' in right) return { value: !right.value };
+  return { selected: [question.options.find((o) => o.id !== right.selected[0]).id] };
+}
+
+function lockSection() {
+  const tag = (lock, extra = {}) => ({ rotation_lock: lock, ...extra });
+  return block('sec6', 'section', {
+    title: 'Rescue plan', rotation_station: 's4', blocks: [
+      rich('s4goal', '<p>Plan the reef rescue in the right order.</p>', { rotation_role: 'goal' }),
+      rich('s4k1a', '<p>Read the reef diagram: coral, algae, grazing fish.</p>', tag('k1')),
+      rich('s4k1b', '<p>Say each part out loud with a partner.</p>', tag('k1')),
+      rich('s4k2a', '<p>LOCKED-K2 Read the temperature chart for the last ten summers.</p>', tag('k2')),
+      rich('s4k2b', '<p>Find the summer the fish counts dropped.</p>', tag('k2')),
+      rich('s4k3a', '<p>LOCKED-K3 Sort the rescue cards into order.</p>', tag('k3')),
+      quiz('s4k3q', mcq('s4k3q', 'Which card goes first?', ['Cool the water', 'Count the fish', 'Paint the coral'], 0), tag('k3')),
+      rich('s4done', '<ul><li>Your plan starts with the water</li></ul>', { rotation_role: 'done' }),
+      quiz('s4exit', mcq('s4exit', 'Why cool the water first?', ['The algae can only return in cool water', 'Fish like cold water best', 'It is the cheapest step'], 0), tag('k3', { rotation_role: 'exit' }))
+    ]
+  });
+}
+
 /** Three questions a station. The first question of each station is a misconception. Right answer is always option 0. */
-export function rotationPretest() {
+export function rotationPretest(stations = ['s1', 's2', 's3']) {
   const out = [];
-  for (const s of ['s1', 's2', 's3']) {
+  for (const s of stations) {
     for (let i = 1; i <= 3; i++) {
       const id = `${s}p${i}`;
       out.push({ id, station: s, question: mcq(id, `Pretest ${s} question ${i}`, ['Right', 'Wrong', 'Also wrong'], 0), ...(i === 1 ? { misconception: true } : {}) });
@@ -104,6 +170,20 @@ export function rotationSettings(over = {}) {
   };
 }
 
-export function rotationLesson(over = {}) {
-  return { id: 'rot1', type: 'lesson', slug: 'reef-rescue', status: 'active', title: 'Reef rescue', unit_id: 'unit1', sequence: 1, pedagogical_mode: 'station_rotation', blocks: rotationBlocks(), rotation: rotationSettings(over), created_at: '2026-11-01T00:00:00.000Z', updated_at: '2026-11-01T00:00:00.000Z', schema_version: 1 };
+/**
+ * `opts.locks`: add station s4 with three locks (rush, AI check, rush), its
+ * section and pretest. The finale then asks for any 3 of the 4 stations, so
+ * the s1 to s3 walk still reaches it.
+ */
+export function rotationLesson(over = {}, opts = {}) {
+  const lesson = { id: 'rot1', type: 'lesson', slug: 'reef-rescue', status: 'active', title: 'Reef rescue', unit_id: 'unit1', sequence: 1, pedagogical_mode: 'station_rotation', blocks: rotationBlocks(), rotation: rotationSettings(over), created_at: '2026-11-01T00:00:00.000Z', updated_at: '2026-11-01T00:00:00.000Z', schema_version: 1 };
+  if (opts.locks) {
+    const r = lesson.rotation;
+    r.stations = [...r.stations.filter((s) => s.kind !== 'teacher'), rotationLockStation(), ...r.stations.filter((s) => s.kind === 'teacher')];
+    r.pretest = rotationPretest(['s1', 's2', 's3', 's4']);
+    if (!('path' in over)) { r.path = 'choose_n'; r.choose_n = 3; }
+    const finale = lesson.blocks.length - 1;
+    lesson.blocks = [...lesson.blocks.slice(0, finale), lockSection(), ...lesson.blocks.slice(finale)];
+  }
+  return lesson;
 }

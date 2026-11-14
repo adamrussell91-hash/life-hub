@@ -11,6 +11,9 @@ import {
   DIAL_TABLE,
   PRESETS,
   PRESET_INFO,
+  LOCK_CHECK_KINDS,
+  LOCK_CHECK_LABELS,
+  MAX_STATION_LOCKS,
   ROTATION_DIALS,
   ROTATION_DIAL_LABELS,
   ROTATION_FALLBACKS,
@@ -23,12 +26,16 @@ import {
   ROTATION_PATH_LABELS,
   ROTATION_ROLES,
   ROTATION_ROLE_LABELS,
+  RUSH_ITEM_KINDS,
   RotationSettingsSchema,
   WRITTEN_CHECKS,
   WRITTEN_CHECK_LABELS,
   WrittenGateSchema,
+  type LockCheck,
+  type LockCheckKind,
   type RotationSettings,
   type Station,
+  type StationLock,
   type WrittenGate
 } from './schema';
 import {
@@ -40,6 +47,9 @@ import {
   gateViewOf,
   isHingeGate,
   levelOf,
+  lockIssues,
+  lockOf,
+  locksOf,
   presetOf,
   roleOf,
   rotationIssues,
@@ -51,6 +61,7 @@ import { newPretestItems, newStation, stationSection, withRotationSections } fro
 import { CHECK_TOKENS, DEFAULT_LESSON_MINUTES, timeBudget, type TimeBudget } from './rules';
 import { createRotationTabs, stationTab, tabStation, type RotationTab } from './editor-tabs';
 import './rotation.css';
+import './editor-locks.css';
 
 export type RotationEditorOptions = {
   getLesson: () => Lesson;
@@ -89,6 +100,10 @@ export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHan
   });
   root.append(tabs.root, body);
   let confirmDelete: string | null = null;
+  /** A lock waiting on "Remove" being confirmed. */
+  let confirmLock: string | null = null;
+  /** The check a lock had before its kind was switched, so switching back restores it this session. */
+  const parkedChecks = new Map<string, LockCheck>();
 
   /** Settings change. `repaint` redraws the panel (structural changes); typing doesn't, so focus stays. */
   const put = (change: (draft: RotationSettings) => void, repaint = false): void => {
@@ -531,6 +546,7 @@ export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHan
     const blocks = sectionBlocks(findStationSection(o.getLesson().blocks, s.id));
     const list = el('div', 'rot-content');
     const others = r.stations.filter((x) => x.id !== s.id && x.kind !== 'teacher');
+    const locks = locksOf(s);
     blocks.forEach((b, bi) => {
       const row = el('div', 'rot-content__row');
       const role = roleOf(b);
@@ -548,6 +564,14 @@ export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHan
       }
       if (role === 'recall') {
         ctl.append(pick([['previous', 'From their last station'], ...others.map((x) => [x.id, `From ${x.title || x.id}`] as const)], arrivalFromOf(b), 'Recall from', (v) => updateSection(s.id, (bs) => bs.map((x, xi) => (xi === bi ? withSettings(x, { arrival_from: v === 'previous' ? undefined : v }) : x)))));
+      }
+      if (locks.length) {
+        const tag = lockOf(b);
+        const items: Array<readonly [string, string]> = locks.map((l, li) => [l.id, `Lock ${li + 1}${l.title.trim() ? `: ${l.title.trim().slice(0, 40)}` : ''}`] as const);
+        if (tag && !locks.some((l) => l.id === tag)) items.push([tag, 'A removed lock: pick another'] as const);
+        const sel = pick(items, tag ?? '', 'Which lock', (v) => updateSection(s.id, (bs) => bs.map((x, xi) => (xi === bi ? withSettings(x, { rotation_lock: v || undefined }) : x))), 'Before the locks');
+        sel.classList.add('rot-lock-pick');
+        ctl.append(sel);
       }
       row.append(ctl);
       list.append(row);
@@ -572,6 +596,165 @@ export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHan
     return panel('On the station card',
       el('p', 'rot-note', 'Students see these in card order: arrival recall, goal, steps, hints (one at a time), the gate, steps after the gate, done when, exit check. Tag a step with a level to show it only at that level.'),
       list, adds, el('p', 'rot-note', 'Edit each block’s content below, or add any block from the insert menu; new blocks are steps.'));
+  }
+
+  // ---- Locks
+
+  type RushCheck = Extract<LockCheck, { kind: 'rush' }>;
+  type AiCheck = Extract<LockCheck, { kind: 'ai' }>;
+  const lockName = (l: StationLock, li: number): string => l.title.trim() || `Lock ${li + 1}`;
+
+  /** A fresh check of one kind. */
+  const blankCheck = (kind: LockCheckKind): LockCheck => (kind === 'rush'
+    ? { kind: 'rush', items: [], streak: 6, seconds: 90 }
+    : { kind: 'ai', prompt: '', model_answer: '', criteria: [] });
+
+  /** Rush short answers are marked exactly on the server, never by AI. */
+  const rushItem = (q: RushCheck['items'][number]): RushCheck['items'][number] => (q.kind === 'short_answer' ? { ...q, ai_mark: false } : q);
+
+  /** Change one lock of station `i`, found by id so a reorder in between can't misfile the edit. */
+  const putLock = (i: number, lockId: string, change: (lock: StationLock) => void, repaint = false): void => put((d) => {
+    const lock = d.stations[i]?.locks?.find((l) => l.id === lockId);
+    if (lock) change(lock);
+  }, repaint);
+
+  function addLock(i: number): void {
+    put((d) => {
+      const st = d.stations[i]!;
+      const locks = st.locks ?? [];
+      if (locks.length >= MAX_STATION_LOCKS) return;
+      st.locks = [...locks, { id: o.idFactory(), title: '', check: blankCheck('rush'), reward: { title: '', text: '' } }];
+    }, true);
+  }
+
+  /** Removes a lock and clears its tag from the station's blocks, so they show before the locks again. */
+  function removeLock(s: Station, i: number, lockId: string): void {
+    confirmLock = null;
+    parkedChecks.delete(lockId);
+    const r = current();
+    const st = r.stations[i]!;
+    const left = locksOf(st).filter((l) => l.id !== lockId);
+    if (left.length) st.locks = left;
+    else delete st.locks;
+    const blocks = o.getLesson().blocks.map((b) => (b.block_type === 'section' && b.content.rotation_station === s.id
+      ? ({ ...b, content: { ...b.content, blocks: (b.content.blocks as Block[]).map((x) => (lockOf(x) === lockId ? withSettings(x, { rotation_lock: undefined }) : x)) } } as Block)
+      : b));
+    putBlocks(blocks, r);
+  }
+
+  function switchKind(i: number, lock: StationLock, kind: LockCheckKind): void {
+    if (lock.check.kind === kind) return;
+    putLock(i, lock.id, (l) => {
+      const parked = parkedChecks.get(l.id);
+      parkedChecks.set(l.id, structuredClone(l.check));
+      l.check = parked && parked.kind === kind ? parked : blankCheck(kind);
+    }, true);
+  }
+
+  function rushEditor(i: number, lock: StationLock, check: RushCheck): HTMLElement {
+    const box = el('div', 'rot-grid rot-lock__check');
+    const set = (change: (c: RushCheck) => void, repaint = false) => putLock(i, lock.id, (l) => { if (l.check.kind === 'rush') change(l.check); }, repaint);
+    const items = el('div', 'rot-grid rot-lock__items');
+    check.items.forEach((item, qi) => {
+      const wrap = el('div', 'rot-lock__item');
+      const head = el('div', 'rot-row rot-row--between');
+      const rm = btn('Remove', () => set((c) => { c.items = c.items.filter((q) => q.id !== item.id); }, true));
+      rm.setAttribute('aria-label', `Remove question ${qi + 1}`);
+      head.append(el('span', 'rot-eyebrow', `Question ${qi + 1}`), rm);
+      const builder = mountQuestionBuilder({
+        question: item,
+        audience: 'teacher',
+        kinds: RUSH_ITEM_KINDS,
+        marks: { min: 1, max: 1 },
+        onChange: (q) => set((c) => {
+          const k = c.items.findIndex((x) => x.id === item.id);
+          if (k >= 0) c.items[k] = rushItem(q);
+        })
+      });
+      wrap.append(head, builder.root);
+      items.append(wrap);
+    });
+    if (!check.items.length) items.append(el('p', 'rot-note', 'No questions yet.'));
+    const add = btn('+ Add a question', () => set((c) => { c.items = [...c.items, blankQuestion('multiple_choice', o.idFactory(), 1, o.idFactory)]; }, true));
+    add.disabled = check.items.length >= 30;
+    const nums = el('div', 'rot-fields');
+    nums.append(
+      field('Right in a row to open', num(check.streak, 3, 10, 'Right in a row to open the lock', (v) => set((c) => { c.streak = v ?? 6; }, true))),
+      field('Seconds', num(check.seconds, 30, 300, 'Seconds for the round', (v) => set((c) => { c.seconds = v ?? 90; }, true)))
+    );
+    box.append(
+      el('p', 'rot-note', `Rush: a fast round. They open the lock with ${check.streak} right in a row before the ${check.seconds} seconds run out. A wrong answer starts the run again, and that question comes back later.`),
+      nums,
+      items,
+      add,
+      el('p', 'rot-note', `Write at least ${check.streak} questions; a few more gives a wrong answer something else to come back to. Short answers are marked exactly, so list every spelling you accept.`)
+    );
+    return box;
+  }
+
+  function aiEditor(i: number, lock: StationLock, check: AiCheck): HTMLElement {
+    const box = el('div', 'rot-grid rot-lock__check');
+    const set = (change: (c: AiCheck) => void) => putLock(i, lock.id, (l) => { if (l.check.kind === 'ai') change(l.check); });
+    box.append(
+      el('p', 'rot-note', 'AI check: they write a sentence or two; it’s checked against your model answer and what it must do. They get a pass or one thing to fix. After six tries it comes to you.'),
+      field('Question', area(check.prompt, 500, 'AI check question', (v) => set((c) => { c.prompt = v; }), 2)),
+      field('Model answer (only you see it)', area(check.model_answer, 1000, 'AI check model answer', (v) => set((c) => { c.model_answer = v; }), 3), 'Never sent to students.'),
+      field('What it must do', area(check.criteria.join('\n'), 840, 'What the answer must do, one a line', (v) => set((c) => { c.criteria = v.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 4).map((x) => x.slice(0, 200)); }), 3), 'One to four lines, one a line, e.g. “Links warm water to bleaching”.')
+    );
+    return box;
+  }
+
+  function lockCard(s: Station, i: number, lock: StationLock, li: number, count: number): HTMLElement {
+    const card = el('div', 'rot-lock');
+    card.dataset.lock = lock.id;
+    const head = el('div', 'rot-lock__head');
+    const title = input(lock.title, 80, `Lock ${li + 1} title`, (v) => putLock(i, lock.id, (l) => { l.title = v; }));
+    title.placeholder = 'What this lock asks, e.g. “Which poem?”';
+    const tools = el('span', 'rot-lock__tools');
+    const swap = (a: number, b: number) => put((d) => { const ls = d.stations[i]!.locks!; if (ls[a] && ls[b]) [ls[a], ls[b]] = [ls[b]!, ls[a]!]; }, true);
+    const up = btn('Up', () => swap(li - 1, li));
+    up.disabled = li === 0;
+    up.setAttribute('aria-label', `Move ${lockName(lock, li)} up`);
+    const down = btn('Down', () => swap(li, li + 1));
+    down.disabled = li === count - 1;
+    down.setAttribute('aria-label', `Move ${lockName(lock, li)} down`);
+    const rm = btn('Remove', () => { confirmLock = lock.id; paint(); }, 'rot-btn rot-btn--small rot-btn--danger');
+    rm.setAttribute('aria-label', `Remove ${lockName(lock, li)}`);
+    tools.append(up, down, rm);
+    head.append(el('span', 'rot-lock__num', String(li + 1)), title, tools);
+    card.append(head);
+    if (confirmLock === lock.id) {
+      const row = el('div', 'rot-row rot-lock__confirm');
+      row.append(el('span', 'rot-small', `Remove ${lockName(lock, li)}? Its blocks go back to showing before the locks.`),
+        btn('Remove', () => removeLock(s, i, lock.id), 'rot-btn rot-btn--small rot-btn--danger'),
+        btn('Keep it', () => { confirmLock = null; paint(); }));
+      card.append(row);
+    }
+    card.append(field('How they open it', seg(LOCK_CHECK_KINDS.map((k) => [k, LOCK_CHECK_LABELS[k]] as const), lock.check.kind, `Lock ${li + 1} check`, (v) => switchKind(i, lock, v))));
+    card.append(lock.check.kind === 'rush' ? rushEditor(i, lock, lock.check) : aiEditor(i, lock, lock.check));
+    const reward = el('div', 'rot-grid rot-lock__reward');
+    reward.append(
+      el('p', 'rot-eyebrow', 'Viva Kit card'),
+      field('Card title', input(lock.reward.title, 80, `Lock ${li + 1} card title`, (v) => putLock(i, lock.id, (l) => { l.reward = { ...l.reward, title: v }; }))),
+      field('Card text', area(lock.reward.text, 400, `Lock ${li + 1} card text`, (v) => putLock(i, lock.id, (l) => { l.reward = { ...l.reward, text: v }; }), 2), 'Students keep this card once the lock opens. Write the line they should be able to say in their viva.')
+    );
+    card.append(reward);
+    return card;
+  }
+
+  function locksPanel(s: Station, i: number): HTMLElement {
+    const locks = locksOf(s);
+    const list = el('div', 'rot-grid rot-locks');
+    locks.forEach((l, li) => list.append(lockCard(s, i, l, li, locks.length)));
+    const add = btn(locks.length ? '+ Add a lock' : '+ Add the first lock', () => addLock(i));
+    add.disabled = locks.length >= MAX_STATION_LOCKS;
+    return panel('Locks',
+      el('p', 'rot-note', locks.length
+        ? 'Students open the locks in order. Lock 1’s blocks show from the start; each later lock’s blocks show once the lock before it opens. Pick each block’s lock under “On the station card”.'
+        : 'Optional. Locks turn the station into a chain: students open each lock to see the next part. Without locks, the card shows everything at once.'),
+      locks.length ? list : null,
+      add,
+      locks.length >= MAX_STATION_LOCKS ? el('p', 'rot-note', `${MAX_STATION_LOCKS} locks is the most a station takes.`) : null);
   }
 
   function deletePanel(s: Station): HTMLElement {
@@ -604,7 +787,7 @@ export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHan
     const details = stationDetails(s, i, r);
     details.insertBefore(stationChips(s), details.children[1] ?? null);
     main.append(details);
-    if (s.kind !== 'teacher') main.append(gatePanel(s, i), contentPanel(s, r));
+    if (s.kind !== 'teacher') main.append(gatePanel(s, i), locksPanel(s, i), contentPanel(s, r));
     main.append(deletePanel(s));
     return [main];
   }
@@ -707,7 +890,7 @@ export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHan
       if (s.kind === 'teacher') continue;
       if (r.pretest.filter((p) => p.station === s.id).length !== PRETEST_PER_STATION) out.add('pretest');
       const blocks = sectionBlocks(findStationSection(o.getLesson().blocks, s.id));
-      if (!blocks.some((b) => roleOf(b) === 'exit') || !blocks.some((b) => roleOf(b) === 'goal')) out.add(stationTab(s.id));
+      if (!blocks.some((b) => roleOf(b) === 'exit') || !blocks.some((b) => roleOf(b) === 'goal') || lockIssues(s, blocks).length) out.add(stationTab(s.id));
     }
     return out;
   }

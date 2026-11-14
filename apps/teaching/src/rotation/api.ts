@@ -1,7 +1,8 @@
 import { apiPost } from '@/api/client';
 import { deviceToken } from '@/quiz/dom';
 import type { MarkResult, PublicQuestion, QuestionKey, QuizResponse } from '@/quiz/core';
-import type { GateState, RotationLevel, WrittenCheck } from './schema';
+import type { Block } from '@/schemas/block';
+import type { GateState, LockCheckKind, RotationLevel, WrittenCheck } from './schema';
 
 // ---------------------------------------------------------------- student
 // POST /api/published/rotation/:lessonId  (netlify/functions/published-rotation.mjs → _shared/rotation.mjs)
@@ -25,13 +26,56 @@ export type PublicGate = {
   teacher?: { decision: 'pass' | 'keep'; at: string };
 };
 
+export type LockState = 'open' | 'passed' | 'locked';
+
+/** A lock's check as students see it: rush questions without keys; an AI check's question only. */
+export type PublicLockCheck =
+  | { kind: 'rush'; items: PublicQuestion[]; streak: number; seconds: number }
+  | { kind: 'ai'; prompt: string };
+
+/** One lock in a station's chain. A locked lock carries its id, title, kind and state only. */
+export type PublicStationLock = {
+  id: string;
+  title: string;
+  kind: LockCheckKind;
+  state: LockState;
+  /** Open or passed only. */
+  check?: PublicLockCheck;
+  /** Rush, open or passed: the round so far. Ask `next_item_id` next. */
+  rush?: { streak: number; best: number; answered: number; started_at: string | null; ends_at: string | null; next_item_id: string | null };
+  /** AI check, open or passed. */
+  ai?: { checks_left: number; last: { text: string; at: string; outcome: 'passed' | 'not_yet' | 'teacher'; fix: string | null } | null };
+  /** Sent to the teacher (out of checks, daily cap, or text that talked to the marker). */
+  flagged?: true;
+  /** Passed only: the Viva Kit card. */
+  reward?: { title: string; text: string };
+  /**
+   * Open or passed, every lock but the first: its blocks (questions split, no keys).
+   * The first lock's blocks are in the published snapshot, tagged settings.rotation_lock.
+   */
+  blocks?: Block[];
+};
+
+/** A reward the student has earned, in station then chain order. */
+export type VivaKitCard = { station: string; lock: string; title: string; text: string; at: string };
+
+/** Reply to lock_rush. `right` is null when the round timed out (that answer wasn't marked). Never carries the answer. */
+export type RushReply = { item_id: string | null; right: boolean | null; streak: number; need: number; passed: boolean; timed_out: boolean; next_item_id: string | null; ends_at: string | null };
+/** Reply to lock_ai. */
+export type LockCheckReply = { outcome: 'passed' | 'not_yet' | 'teacher'; pass: boolean; fix: string | null; message: string | null; checks_left: number };
+
 export type RotationStatus = {
   identity: { need: 'class' | 'initials' | null; initials: string | null };
   anonymous?: boolean;
   not_for_you?: boolean;
   pretest: { items: Array<{ id: string; station: string; question: PublicQuestion }>; results: Record<string, Marked> };
   levels: Record<string, { level: RotationLevel; source: 'pretest' | 'own' | 'default' }>;
+  /** Path locks: why a station can't be opened yet. (Not station locks.) */
   locks: Record<string, string>;
+  /** Station locks: station id → its chain. Only stations that have locks. */
+  station_locks: Record<string, PublicStationLock[]>;
+  /** The Viva Kit: every reward earned so far. */
+  kit: VivaKitCard[];
   gates: Record<string, PublicGate>;
   seats: Record<string, number>;
   recommend: string | null;
@@ -58,6 +102,8 @@ export type RotationStatus = {
   saved?: 'board';
   lock?: { right: boolean };
   writing?: { outcome: 'passed' | 'not_yet' | 'teacher'; message: string | null };
+  rush?: RushReply;
+  lock_check?: LockCheckReply;
 };
 
 export type RotationClient = {
@@ -81,6 +127,10 @@ export type RotationClient = {
   appeal(station: string): Promise<RotationStatus>;
   lock(optionId: string): Promise<RotationStatus>;
   finale(input: { build?: string; format?: string; debrief?: Record<string, string> }): Promise<RotationStatus>;
+  /** One rush answer, for the lock's `next_item_id`. */
+  lockRush(station: string, lock: string, itemId: string, response: QuizResponse): Promise<RotationStatus>;
+  /** A lock's AI check: one or two sentences. */
+  lockAi(station: string, lock: string, text: string): Promise<RotationStatus>;
 };
 
 export function rotationClient(lessonId: string, classId: string): RotationClient {
@@ -108,7 +158,9 @@ export function rotationClient(lessonId: string, classId: string): RotationClien
     checkWriting: (station, text) => call('check_writing', { station, text }),
     appeal: (station) => call('appeal', { station }),
     lock: (option_id) => call('finale_lock', { option_id }),
-    finale: (input) => call('finale_save', input)
+    finale: (input) => call('finale_save', input),
+    lockRush: (station, lock, item_id, response) => call('lock_rush', { station, lock, item_id, response }),
+    lockAi: (station, lock, text) => call('lock_ai', { station, lock, text })
   };
 }
 
@@ -133,6 +185,18 @@ export type LiveStudent = {
   hand_station: string | null;
   pieces_left: number;
   finale: { lock_passed: boolean; built: boolean };
+  /** Station locks: station id → each lock's progress. Only stations that have locks. */
+  locks: Record<string, LiveLock[]>;
+};
+export type LiveLock = { id: string; title: string; kind: LockCheckKind; state: LockState; flagged: boolean; best: number; checks: number; teacher: boolean };
+/** A lock's AI check waiting on the teacher. */
+export type LiveLockCheck = {
+  student_id: string;
+  name: string;
+  station: string;
+  lock: string;
+  title: string;
+  attempts: Array<{ text: string; at: string; outcome: 'passed' | 'not_yet' | 'teacher'; fix: string | null; flagged_text: boolean }>;
 };
 export type LiveGroup = {
   id: string;
@@ -164,6 +228,7 @@ export type RotationBoard = {
   heat: Record<string, { support: number; core: number; extend: number }>;
   gate_misses: Record<string, number>;
   writing: LiveWriting[];
+  lock_checks: LiveLockCheck[];
   done_share: number;
 };
 
@@ -173,6 +238,8 @@ export type RotationTeacherApi = {
   groupDone(group: string): Promise<RotationBoard>;
   tick(group: string, studentId: string, result: 'got_it' | 'needs_more'): Promise<RotationBoard>;
   openGate(studentId: string, station: string): Promise<RotationBoard>;
+  /** Opens this lock (and any before it still closed) for one student. */
+  openLock(studentId: string, station: string, lock: string): Promise<RotationBoard>;
   decide(studentId: string, station: string, decision: 'pass' | 'keep'): Promise<RotationBoard>;
   going(studentId: string): Promise<RotationBoard>;
   fallback(on: boolean): Promise<RotationBoard>;
@@ -187,6 +254,7 @@ export function rotationTeacherApi(lessonId: string): RotationTeacherApi {
     groupDone: (group) => call('group_done', { group }),
     tick: (group, student_id, result) => call('group_tick', { group, student_id, result }),
     openGate: (student_id, station) => call('open_gate', { student_id, station }),
+    openLock: (student_id, station, lock) => call('open_lock', { student_id, station, lock }),
     decide: (student_id, station, decision) => call('writing_decision', { student_id, station, decision }),
     going: (student_id) => call('going', { student_id }),
     fallback: (on) => call('fallback', { on })

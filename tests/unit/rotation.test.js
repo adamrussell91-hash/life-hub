@@ -7,12 +7,12 @@ import { filterBlocksForStudent } from '../../netlify/functions/_shared/teaching
 import { classKey, draftLessonKey, publishedLessonKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
 import { deviceHash } from '../../netlify/functions/_shared/question-drop.mjs';
 import { storeFor, who, INITIALS } from './helpers/sprint-store.js';
-import { rotationLesson, ROTATION_ROSTER } from './helpers/rotation-fixture.mjs';
+import { rotationLesson, ROTATION_ROSTER, rushRightResponse, rushWrongResponse } from './helpers/rotation-fixture.mjs';
 
-async function setup(over = {}) {
+async function setup(over = {}, opts = {}) {
   const store = storeFor();
   store.data.set(classKey('class1'), { id: 'class1', status: 'active', title: '8 Science', students: ROTATION_ROSTER });
-  const draft = rotationLesson(over);
+  const draft = rotationLesson(over, opts);
   const pub = prepareRotationPublish(draft, filterBlocksForStudent(draft.blocks, { keepQuizQuestions: true }));
   assert.deepEqual(pub.problems, []);
   store.data.set(draftLessonKey('rot1'), draft);
@@ -302,4 +302,257 @@ test('written gate through the student endpoint: not yet, appeal, then pass; the
   assert.equal(s.gates.s3.state, 'passed');
   // Gates never write a mark: nothing under quiz/ or a markbook key.
   assert.ok(![...store.data.keys()].some((k) => k.startsWith('quiz/') || k.includes('markbook')));
+});
+
+// ---------------------------------------------------------------- station locks (s4: rush k1, AI k2, rush k3)
+
+const lockSetup = (over = {}) => setup(over, { locks: true });
+const chain = (status) => status.station_locks.s4;
+const lockOfStatus = (status, id) => chain(status).find((l) => l.id === id);
+/** A clock the test moves by hand. */
+function clockAt(iso = '2026-11-09T10:00:00Z') {
+  let t = Date.parse(iso);
+  return { now: () => t, tick: (ms) => { t += ms; } };
+}
+/** Answers the rush lock's next item, right or wrong, 1 s apart. */
+async function rushAnswer(store, clock, lock, right) {
+  const status = await claim(store, 1);
+  const l = lockOfStatus(status, lock);
+  const item = l.check.items.find((q) => q.id === l.rush.next_item_id);
+  clock.tick(1000);
+  return act(store, 1, 'lock_rush', { station: 's4', lock, item_id: item.id, response: right ? rushRightResponse(item) : rushWrongResponse(item) }, { now: clock.now });
+}
+/** A stand-in model like the dev mock's: pass when every criterion's longest word is in the answer. */
+const lockModel = async (request) => {
+  const prompt = request.messages[0].content;
+  const answer = (/<answer>([\s\S]*?)<\/answer>/.exec(prompt)?.[1] ?? '').toLowerCase();
+  const criteria = [...prompt.matchAll(/<criterion>([\s\S]*?)<\/criterion>/g)].map((m) => m[1]);
+  const missing = criteria.find((c) => !answer.includes(c.toLowerCase().split(/[^a-z0-9]+/).sort((a, b) => b.length - a.length)[0]));
+  return { model: 'claude-haiku-5-5', content: [{ type: 'text', text: JSON.stringify(missing ? { pass: false, fix: `Say more about this: ${missing}` } : { pass: true, fix: '' }) }], usage: { input_tokens: 400, output_tokens: 40 } };
+};
+async function passRush(store, clock, lock, n) {
+  let s;
+  for (let i = 0; i < n; i++) s = await rushAnswer(store, clock, lock, true);
+  return s;
+}
+
+test('locks: publish keeps later locks’ blocks, rush keys, model answers and rewards off the snapshot', async () => {
+  const { pub } = await lockSetup();
+  const text = JSON.stringify(pub.snapshot);
+  assert.ok(!text.includes('LOCKED-K2') && !text.includes('LOCKED-K3'), 'later locks’ blocks');
+  assert.ok(!text.includes('MODEL-LOCK-SECRET'), 'AI model answer');
+  assert.ok(!text.includes('Links warm water to bleaching'), 'AI criteria');
+  assert.ok(!text.includes('The chain in one line') && !text.includes('Rescue order'), 'rewards');
+  assert.ok(!text.includes('What lives inside healthy coral?'), 'rush items come from the status');
+  const section = pub.snapshot.blocks.find((b) => b.content?.rotation_station === 's4');
+  assert.deepEqual(section.content.blocks.map((b) => b.id), ['s4goal', 's4k1a', 's4k1b', 's4done']);
+  const st = pub.snapshot.rotation.stations.find((s) => s.id === 's4');
+  assert.deepEqual(st.locks, [{ id: 'k1', title: 'Which parts matter?', kind: 'rush' }, { id: 'k2', title: 'Explain the chain', kind: 'ai' }, { id: 'k3', title: 'Order the rescue', kind: 'rush' }]);
+  // The server keeps them, questions split.
+  assert.deepEqual(pub.config.lock_blocks.s4.k3.map((b) => b.id), ['s4k3a', 's4k3q', 's4exit']);
+  assert.ok(!JSON.stringify(pub.config.lock_blocks).includes('"correct"'));
+  assert.ok(pub.config.keys.s4exit && pub.config.keys.s4k3q.lock === 'k3');
+  assert.equal(Object.keys(pub.config.rush_keys.s4.k1).length, 4);
+  assert.ok(!JSON.stringify(pub.config.rush_public).includes('"correct"') && !JSON.stringify(pub.config.rush_public).includes('"answer"'));
+});
+
+test('locks: publish problems for unfinished locks', () => {
+  const d = rotationLesson({}, { locks: true });
+  const s4 = d.rotation.stations.find((s) => s.id === 's4');
+  s4.locks[0].check.items = s4.locks[0].check.items.slice(0, 2);
+  s4.locks[1].check.criteria = [];
+  s4.locks[2].reward = { title: '', text: '' };
+  d.blocks.find((b) => b.content?.rotation_station === 's4').content.blocks[1].settings.rotation_lock = 'gone';
+  const problems = rotationPublishProblems(d).join(' | ');
+  assert.match(problems, /at least 3 finished rush questions/);
+  assert.match(problems, /AI check .* needs a question, a model answer/);
+  assert.match(problems, /Viva Kit card/);
+  assert.match(problems, /lock that is no longer there/);
+});
+
+test('locks: status shows the open lock, closes the rest, and holds rewards back', async () => {
+  const { store } = await lockSetup();
+  const s = await claim(store, 1);
+  assert.deepEqual(chain(s).map((l) => l.state), ['open', 'locked', 'locked']);
+  const [k1, k2, k3] = chain(s);
+  assert.equal(k1.check.items.length, 4);
+  assert.ok(k1.check.items.every((q) => !('correct' in q) && !('answer' in q)));
+  assert.equal(k1.rush.next_item_id, k1.check.items[0].id);
+  assert.equal(k1.blocks, undefined, 'the first lock’s blocks are in the snapshot');
+  assert.ok(!k1.reward);
+  assert.deepEqual(Object.keys(k2).sort(), ['id', 'kind', 'state', 'title']);
+  assert.deepEqual(Object.keys(k3).sort(), ['id', 'kind', 'state', 'title']);
+  assert.deepEqual(s.kit, []);
+  assert.ok(!JSON.stringify(s).includes('LOCKED-K2'));
+});
+
+test('locks: a rush streak within time passes, unlocks the next lock’s blocks and earns the reward; answers never shown', async () => {
+  const { store } = await lockSetup();
+  const clock = clockAt();
+  await claim(store, 1);
+  let s = await rushAnswer(store, clock, 'k1', true);
+  assert.deepEqual({ right: s.rush.right, streak: s.rush.streak, need: s.rush.need, passed: s.rush.passed }, { right: true, streak: 1, need: 3, passed: false });
+  assert.ok(s.rush.ends_at);
+  s = await rushAnswer(store, clock, 'k1', false);
+  assert.equal(s.rush.right, false);
+  assert.equal(s.rush.streak, 0, 'a wrong answer resets the streak');
+  for (const reply of [s.rush, ...chain(s).map((l) => l.rush ?? {})]) {
+    const t = JSON.stringify(reply);
+    assert.ok(!t.includes('"key"') && !t.includes('"answer"') && !t.includes('"correct"'), 'no answer in a rush reply');
+  }
+  assert.ok(!('result' in s));
+  s = await passRush(store, clock, 'k1', 3);
+  assert.equal(s.rush.passed, true);
+  assert.equal(s.rush.next_item_id, null);
+  assert.deepEqual(chain(s).map((l) => l.state), ['passed', 'open', 'locked']);
+  assert.deepEqual(lockOfStatus(s, 'k1').reward.title, 'The key parts');
+  assert.deepEqual(lockOfStatus(s, 'k2').blocks.map((b) => b.id), ['s4k2a', 's4k2b']);
+  assert.equal(lockOfStatus(s, 'k2').check.prompt, 'In one or two sentences, explain why warm water drives the fish away.');
+  assert.ok(!JSON.stringify(s).includes('MODEL-LOCK-SECRET'));
+  assert.deepEqual(s.kit.map((c) => [c.station, c.lock, c.title]), [['s4', 'k1', 'The key parts']]);
+  assert.ok(!JSON.stringify(s).includes('LOCKED-K3'), 'lock 3 stays closed');
+  // Another answer after passing changes nothing.
+  const again = await act(store, 1, 'lock_rush', { station: 's4', lock: 'k1', item_id: 'x', response: { value: true } }, { now: clock.now });
+  assert.equal(again.rush.passed, true);
+});
+
+test('locks: a missed item comes back later, and only the item on screen can be answered', async () => {
+  const { store } = await lockSetup();
+  const clock = clockAt();
+  const first = lockOfStatus(await claim(store, 1), 'k1').rush.next_item_id;
+  const s = await rushAnswer(store, clock, 'k1', false);
+  assert.notEqual(s.rush.next_item_id, first);
+  const items = lockOfStatus(s, 'k1').check.items;
+  const other = items.find((q) => q.id !== s.rush.next_item_id);
+  clock.tick(1000);
+  await rejects(act(store, 1, 'lock_rush', { station: 's4', lock: 'k1', item_id: other.id, response: rushRightResponse(other) }, { now: clock.now }), 'not_next');
+  // Round the queue: the missed item is the last of four.
+  let t = s;
+  for (let i = 0; i < 3; i++) t = await rushAnswer(store, clock, 'k1', false);
+  assert.equal(t.rush.next_item_id, first);
+});
+
+test('locks: running out of time resets the round; answers too fast are refused', async () => {
+  const { store } = await lockSetup();
+  const clock = clockAt();
+  await claim(store, 1);
+  await rushAnswer(store, clock, 'k1', true);
+  let s = await rushAnswer(store, clock, 'k1', true);
+  assert.equal(s.rush.streak, 2);
+  const next = lockOfStatus(s, 'k1').check.items.find((q) => q.id === s.rush.next_item_id);
+  clock.tick(200);
+  await rejects(act(store, 1, 'lock_rush', { station: 's4', lock: 'k1', item_id: next.id, response: rushRightResponse(next) }, { now: clock.now }), 'too_fast');
+  clock.tick(91_000);
+  s = await act(store, 1, 'lock_rush', { station: 's4', lock: 'k1', item_id: next.id, response: rushRightResponse(next) }, { now: clock.now });
+  assert.deepEqual({ timed_out: s.rush.timed_out, right: s.rush.right, streak: s.rush.streak, passed: s.rush.passed, ends_at: s.rush.ends_at }, { timed_out: true, right: null, streak: 0, passed: false, ends_at: null });
+  assert.equal(lockOfStatus(s, 'k1').rush.started_at, null);
+  // A fresh round starts the clock on its first answer and can still pass.
+  s = await passRush(store, clock, 'k1', 3);
+  assert.equal(s.rush.passed, true);
+});
+
+test('locks: a later lock can’t be answered, and collect needs every lock', async () => {
+  const { store, pub } = await lockSetup();
+  const clock = clockAt();
+  await claim(store, 1);
+  await act(store, 1, 'open_station', { station: 's4' });
+  await rejects(act(store, 1, 'lock_ai', { station: 's4', lock: 'k2', text: 'Warm water causes bleaching.' }), 'lock_closed');
+  await rejects(act(store, 1, 'lock_rush', { station: 's4', lock: 'k2', item_id: 'x', response: {} }), 'lock_closed');
+  const exit = pub.config.keys.s4exit;
+  assert.ok(exit);
+  const exitQ = pub.config.lock_blocks.s4.k3.find((b) => b.id === 's4exit').content.question;
+  await act(store, 1, 'exit_answer', { station: 's4', block_id: 's4exit', response: { selected: [optionId(exitQ, 'The algae can only return in cool water')] } });
+  await rejects(act(store, 1, 'collect', { station: 's4' }), 'locks');
+  await passRush(store, clock, 'k1', 3);
+  await rejects(act(store, 1, 'lock_rush', { station: 's4', lock: 'k2', item_id: 'x', response: {} }), 'bad_lock');
+  await teach(store, 'open_lock', { student_id: 'st_ann', station: 's4', lock: 'k2' });
+  await rejects(act(store, 1, 'collect', { station: 's4' }), 'locks');
+  clock.tick(5000);
+  const s = await passRush(store, clock, 'k3', 3);
+  assert.deepEqual(chain(s).map((l) => l.state), ['passed', 'passed', 'passed']);
+  assert.deepEqual(s.kit.map((c) => c.lock), ['k1', 'k2', 'k3']);
+  const done = await act(store, 1, 'collect', { station: 's4' });
+  assert.deepEqual(done.work.collected, ['s4']);
+});
+
+test('locks: the AI check passes or gives one fix, through the injected checker', async () => {
+  const { createLockChecker } = await import('../../netlify/functions/_shared/rotation-writing.mjs');
+  const { store } = await lockSetup();
+  const clock = clockAt();
+  const requests = [];
+  const checkLock = createLockChecker({ complete: async (r) => { requests.push(r); return lockModel(r); }, now: clock.now });
+  await claim(store, 1);
+  await passRush(store, clock, 'k1', 3);
+  let s = await act(store, 1, 'lock_ai', { station: 's4', lock: 'k2', text: 'Warm water causes bleaching.' }, { checkLock, now: clock.now });
+  assert.deepEqual({ outcome: s.lock_check.outcome, pass: s.lock_check.pass, left: s.lock_check.checks_left }, { outcome: 'not_yet', pass: false, left: 5 });
+  assert.match(s.lock_check.fix, /shelter/);
+  assert.ok(s.lock_check.fix.length <= 160);
+  assert.equal(requests[0].model, 'claude-haiku-5-5');
+  assert.equal(requests[0].effort, 'low');
+  assert.ok(requests[0].max_tokens <= 300);
+  assert.ok(requests[0].messages[0].content.includes('<model_answer>'), 'judged against the model answer');
+  assert.ok(!requests[0].messages[0].content.includes('Ann') && !requests[0].messages[0].content.includes('AB'), 'no names');
+  await rejects(act(store, 1, 'lock_ai', { station: 's4', lock: 'k2', text: 'Warm water causes  bleaching.' }, { checkLock, now: clock.now }), 'unchanged');
+  await rejects(act(store, 1, 'lock_ai', { station: 's4', lock: 'k2', text: 'Something else.' }, { checkLock, now: clock.now }), 'too_soon');
+  clock.tick(21_000);
+  s = await act(store, 1, 'lock_ai', { station: 's4', lock: 'k2', text: 'Warm water causes bleaching, so the fish lose shelter.' }, { checkLock, now: clock.now });
+  assert.equal(s.lock_check.pass, true);
+  assert.deepEqual(chain(s).map((l) => l.state), ['passed', 'passed', 'open']);
+  assert.equal(lockOfStatus(s, 'k2').reward.title, 'The chain in one line');
+  // The spend is counted against the class’s daily cap.
+  assert.ok([...store.data.keys()].some((k) => k.startsWith('rotation/rot1/spend/class1/')));
+});
+
+test('locks: out of AI checks goes to the teacher, who sees it and opens the lock', async () => {
+  const { createLockChecker } = await import('../../netlify/functions/_shared/rotation-writing.mjs');
+  const { store } = await lockSetup();
+  const clock = clockAt();
+  const checkLock = createLockChecker({ complete: lockModel, now: clock.now });
+  await claim(store, 1);
+  await passRush(store, clock, 'k1', 3);
+  await act(store, 1, 'open_station', { station: 's4' });
+  let s;
+  for (let i = 0; i < 6; i++) {
+    clock.tick(21_000);
+    s = await act(store, 1, 'lock_ai', { station: 's4', lock: 'k2', text: `Try number ${i + 1}: the reef changes.` }, { checkLock, now: clock.now });
+  }
+  assert.equal(s.lock_check.checks_left, 0);
+  assert.match(s.lock_check.message, /teacher/);
+  assert.equal(lockOfStatus(s, 'k2').flagged, true);
+  clock.tick(21_000);
+  await rejects(act(store, 1, 'lock_ai', { station: 's4', lock: 'k2', text: 'Warm water causes bleaching, so the fish lose shelter.' }, { checkLock, now: clock.now }), 'flagged');
+  let board = await teach(store, 'board');
+  const ann = board.students.find((x) => x.name === 'Ann Bell');
+  assert.deepEqual(ann.locks.s4.map((l) => [l.id, l.state, l.flagged]), [['k1', 'passed', false], ['k2', 'open', true], ['k3', 'locked', false]]);
+  assert.equal(ann.stuck, true);
+  assert.equal(board.lock_checks[0].name, 'Ann Bell');
+  assert.equal(board.lock_checks[0].attempts.length, 6);
+  board = await teach(store, 'open_lock', { student_id: 'st_ann', station: 's4', lock: 'k2' });
+  assert.equal(board.lock_checks.length, 0);
+  assert.equal(board.students.find((x) => x.name === 'Ann Bell').locks.s4[1].teacher, true);
+  s = await claim(store, 1);
+  assert.equal(lockOfStatus(s, 'k2').state, 'passed');
+  assert.equal(lockOfStatus(s, 'k3').state, 'open');
+  assert.deepEqual(lockOfStatus(s, 'k3').blocks.map((b) => b.id), ['s4k3a', 's4k3q', 's4exit']);
+});
+
+test('locks: with no checker (no key) the AI check goes to the teacher and doesn’t count', async () => {
+  const { store } = await lockSetup();
+  const clock = clockAt();
+  await claim(store, 1);
+  await passRush(store, clock, 'k1', 3);
+  const s = await act(store, 1, 'lock_ai', { station: 's4', lock: 'k2', text: 'Warm water causes bleaching.' });
+  assert.equal(s.lock_check.outcome, 'teacher');
+  assert.equal(s.lock_check.checks_left, 6);
+  assert.equal(lockOfStatus(s, 'k2').flagged, true);
+});
+
+test('locks: the teacher opening a later lock opens the ones before it', async () => {
+  const { store } = await lockSetup();
+  await claim(store, 1);
+  await teach(store, 'open_lock', { student_id: 'st_ann', station: 's4', lock: 'k3' });
+  const s = await claim(store, 1);
+  assert.deepEqual(chain(s).map((l) => l.state), ['passed', 'passed', 'passed']);
+  assert.equal(s.kit.length, 3);
+  await rejects(teach(store, 'open_lock', { student_id: 'st_ann', station: 's4', lock: 'nope' }), 'bad_lock');
 });

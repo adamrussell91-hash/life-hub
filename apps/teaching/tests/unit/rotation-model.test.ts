@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LessonSchema, PublishableLessonSchema } from '@/schemas/lesson';
-import { RotationSettingsSchema } from '@/rotation/schema';
-import { applyPreset, cardOrder, findStationSection, forLevel, presetOf, roleOf, rotationIssues, sectionBlocks } from '@/rotation/model';
+import { RotationSettingsSchema, StationLockSchema, StationSchema } from '@/rotation/schema';
+import { applyPreset, blocksForLock, cardOrder, findStationSection, forLevel, lockOf, locksOf, presetOf, roleOf, rotationIssues, sectionBlocks } from '@/rotation/model';
 import { newStation, seedRotation, withRotationSections } from '@/rotation/seed';
 import { rotationLesson } from '../../../../tests/unit/helpers/rotation-fixture.mjs';
 
@@ -153,5 +153,61 @@ describe('seeding and presets', () => {
     expect(p.stations).toBe(r.stations);
     expect(presetOf(p)).toBe('carousel');
     expect(presetOf({ ...p, evidence: 'board' })).toBeNull();
+  });
+});
+
+describe('station locks', () => {
+  const locked = () => LessonSchema.parse(rotationLesson({}, { locks: true }));
+  const s4 = (l: ReturnType<typeof locked>) => l.rotation!.stations.find((s) => s.id === 's4')!;
+
+  it('parses the fixture with a three-lock station and passes the publish checks', () => {
+    const l = locked();
+    expect(locksOf(s4(l)).map((k) => k.check.kind)).toEqual(['rush', 'ai', 'rush']);
+    expect(rotationIssues(l)).toEqual([]);
+  });
+
+  it('keeps a plain station plain, and caps a chain at six', () => {
+    expect(locksOf(StationSchema.parse({ id: 'x' }))).toEqual([]);
+    const lock = { id: 'k', title: 'T', check: { kind: 'ai' }, reward: { title: 'R', text: 'Text' } };
+    expect(StationSchema.safeParse({ id: 'x', locks: Array.from({ length: 6 }, (_, i) => ({ ...lock, id: `k${i}` })) }).success).toBe(true);
+    expect(StationSchema.safeParse({ id: 'x', locks: Array.from({ length: 7 }, (_, i) => ({ ...lock, id: `k${i}` })) }).success).toBe(false);
+    const rush = StationLockSchema.parse({ id: 'k', check: { kind: 'rush' } });
+    expect(rush.check.kind === 'rush' && [rush.check.streak, rush.check.seconds]).toEqual([6, 90]);
+    expect(StationLockSchema.safeParse({ id: 'k', check: { kind: 'rush', streak: 2 } }).success).toBe(false);
+    expect(StationLockSchema.safeParse({ id: 'k', check: { kind: 'rush', seconds: 301 } }).success).toBe(false);
+  });
+
+  it('reads which lock a block belongs to', () => {
+    const blocks = sectionBlocks(findStationSection(locked().blocks, 's4'));
+    expect(lockOf(blocks.find((b) => b.id === 's4goal')!)).toBeUndefined();
+    expect(lockOf(blocks.find((b) => b.id === 's4k2a')!)).toBe('k2');
+    expect(blocksForLock(blocks, 'k3').map((b) => b.id)).toEqual(['s4k3a', 's4k3q', 's4exit']);
+  });
+
+  it('names unfinished locks in the teacher’s words', () => {
+    const l = locked();
+    const [k1, k2, k3] = s4(l).locks!;
+    if (k1!.check.kind === 'rush') k1!.check.items = k1!.check.items.slice(0, 2);
+    if (k2!.check.kind === 'ai') { k2!.check.model_answer = ''; k2!.check.criteria = []; }
+    k3!.reward = { title: 'Rescue order', text: '' };
+    k3!.title = '';
+    const issues = rotationIssues(l).join('|');
+    expect(issues).toMatch(/needs at least 3 finished rush questions \(it has 2\)/);
+    expect(issues).toMatch(/needs a model answer/);
+    expect(issues).toMatch(/at least one thing the AI check looks for/);
+    expect(issues).toMatch(/Viva Kit card/);
+    expect(issues).toMatch(/Lock 3 at Rescue plan needs a title/);
+  });
+
+  it('refuses rush questions a rush can’t mark, and blocks tagged with a missing lock', () => {
+    const l = locked();
+    const k1 = s4(l).locks![0]!;
+    if (k1.check.kind === 'rush') k1.check.items.push({ id: 'm1', kind: 'matching', prompt: 'Match them', marks: 1, pairs: [{ id: 'p1', left: 'a', right: 'b' }, { id: 'p2', left: 'c', right: 'd' }] } as never);
+    const sec = findStationSection(l.blocks, 's4')!;
+    const blocks = sectionBlocks(sec);
+    (blocks[1]!.settings as Record<string, unknown>).rotation_lock = 'gone';
+    const issues = rotationIssues(l).join('|');
+    expect(issues).toMatch(/isn’t a kind a rush can mark/);
+    expect(issues).toMatch(/lock that is no longer there/);
   });
 });

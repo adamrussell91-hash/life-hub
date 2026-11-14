@@ -7085,6 +7085,29 @@ var WrittenGateSchema = z19.object({
   /** Daily cap per class in A$. At the cap, written gates become teacher checks for the rest of the day. */
   daily_cap_aud: z19.number().min(0).max(50).default(3)
 });
+var RUSH_ITEM_KINDS = ["multiple_choice", "true_false", "odd_one_out", "quote_technique", "short_answer"];
+var MAX_STATION_LOCKS = 6;
+var LOCK_CHECK_KINDS = ["rush", "ai"];
+var RushCheckSchema = z19.object({
+  kind: z19.literal("rush"),
+  /** Saved half-written while drafting; publish runs the full check. */
+  items: z19.array(QuizQuestionDraftSchema).max(30).default([]),
+  streak: z19.number().int().min(3).max(10).default(6),
+  seconds: z19.number().int().min(30).max(300).default(90)
+});
+var AiCheckSchema = z19.object({
+  kind: z19.literal("ai"),
+  prompt: z19.string().max(500).default(""),
+  model_answer: z19.string().max(1e3).default(""),
+  criteria: z19.array(z19.string().max(200)).max(4).default([])
+});
+var LockCheckSchema = z19.discriminatedUnion("kind", [RushCheckSchema, AiCheckSchema]);
+var StationLockSchema = z19.object({
+  id: Id3,
+  title: z19.string().max(80).default(""),
+  check: LockCheckSchema,
+  reward: z19.object({ title: z19.string().max(80).default(""), text: z19.string().max(400).default("") }).default({ title: "", text: "" })
+});
 var StationSchema = z19.object({
   id: Id3,
   title: z19.string().max(120).default(""),
@@ -7109,7 +7132,9 @@ var StationSchema = z19.object({
   /** The station's gate, when it is a written answer. A hinge gate is a block in the section instead. */
   written_gate: WrittenGateSchema.optional(),
   /** Teacher station only: what to say to a group sent here, per misconception. */
-  script: z19.string().max(600).optional()
+  script: z19.string().max(600).optional(),
+  /** Optional chain of locks. None: the station works as a plain card. */
+  locks: z19.array(StationLockSchema).max(MAX_STATION_LOCKS).optional()
 });
 var PretestItemSchema = z19.object({
   id: Id3,
@@ -7153,9 +7178,11 @@ var RotationSettingsSchema = z19.object({
   finish_at_home: z19.boolean().optional()
 });
 var PublicWrittenGateSchema = WrittenGateSchema.pick({ prompt: true, passage: true, marks: true, idea: true, checks: true, different_techniques: true, pass_at: true, pass_at_support: true, max_checks: true });
-var PublicStationSchema = StationSchema.omit({ written_gate: true, offline_code: true, script: true }).extend({
+var PublicLockSummarySchema = z19.object({ id: Id3, title: z19.string(), kind: z19.enum(LOCK_CHECK_KINDS) });
+var PublicStationSchema = StationSchema.omit({ written_gate: true, offline_code: true, script: true, locks: true }).extend({
   written_gate: PublicWrittenGateSchema.optional(),
-  has_offline_code: z19.boolean().optional()
+  has_offline_code: z19.boolean().optional(),
+  locks: z19.array(PublicLockSummarySchema).optional()
 });
 var PublicRotationSchema = z19.object({
   dial: z19.enum(ROTATION_DIALS),
@@ -7214,6 +7241,47 @@ function roleOf(b) {
   const role = settingOf(b, "rotation_role");
   return typeof role === "string" && ROTATION_ROLES.includes(role) ? role : "step";
 }
+var lockOf = (b) => {
+  const lock = settingOf(b, "rotation_lock");
+  return typeof lock === "string" && lock ? lock : void 0;
+};
+var locksOf = (s2) => s2.locks ?? [];
+function rushItemReady(q) {
+  const parsed = QuizQuestionSchema.safeParse(q);
+  if (!parsed.success) return false;
+  const kind = parsed.data.kind;
+  if (!RUSH_ITEM_KINDS.includes(kind)) return false;
+  return true;
+}
+function lockIssues(s2, blocks) {
+  const out = [];
+  const at = s2.title.trim() || "a station";
+  const locks = locksOf(s2);
+  const ids = new Set(locks.map((l) => l.id));
+  if (ids.size !== locks.length) out.push(`Two locks at ${at} share an id. Remove one and add it again.`);
+  locks.forEach((l, i) => {
+    const name2 = l.title.trim() ? `Lock \u201C${l.title.trim()}\u201D` : `Lock ${i + 1}`;
+    if (!filled2(l.title)) out.push(`${name2} at ${at} needs a title.`);
+    if (l.check.kind === "rush") {
+      const ready = l.check.items.filter(rushItemReady).length;
+      if (l.check.items.some((q) => !rushItemReady(q))) out.push(`${name2} at ${at} has a rush question that isn\u2019t finished, or isn\u2019t a kind a rush can mark.`);
+      if (ready < l.check.streak) out.push(`${name2} at ${at} needs at least ${l.check.streak} finished rush questions (it has ${ready}).`);
+    } else {
+      if (!filled2(l.check.prompt)) out.push(`${name2} at ${at} needs a question for the AI check.`);
+      if (!filled2(l.check.model_answer)) out.push(`${name2} at ${at} needs a model answer for the AI check.`);
+      if (!l.check.criteria.some((c) => filled2(c))) out.push(`${name2} at ${at} needs at least one thing the AI check looks for.`);
+    }
+    if (!filled2(l.reward.title) || !filled2(l.reward.text)) out.push(`${name2} at ${at} needs a Viva Kit card: a title and its text.`);
+  });
+  for (const b of blocks) {
+    const lock = lockOf(b);
+    if (lock && !ids.has(lock)) {
+      out.push(`A block at ${at} belongs to a lock that is no longer there. Pick another lock for it.`);
+      break;
+    }
+  }
+  return out;
+}
 var isHingeGate = (b) => b.block_type === "hinge_question" && roleOf(b) === "gate";
 var filled2 = (s2) => !!s2 && s2.trim().length > 0;
 var textOf = (b) => {
@@ -7271,6 +7339,7 @@ function rotationIssues(lesson) {
       if (g.checks.length === 0) out.push(`The written gate at ${name(s2)} needs at least one check.`);
       if (g.pass_at > g.marks || (g.pass_at_support ?? 0) > g.marks) out.push(`The written gate at ${name(s2)} can\u2019t pass at more marks than it has.`);
     }
+    out.push(...lockIssues(s2, blocks));
     const asked = r.pretest.filter((p) => p.station === s2.id);
     if (asked.length !== PRETEST_PER_STATION) out.push(`${name(s2)} needs exactly ${PRETEST_PER_STATION} pretest questions (it has ${asked.length}).`);
     else if (asked.some((p) => !QuizQuestionSchema.safeParse(p.question).success)) out.push(`A pretest question for ${name(s2)} isn\u2019t finished.`);

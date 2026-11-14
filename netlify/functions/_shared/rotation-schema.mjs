@@ -385,6 +385,30 @@ var WrittenGateSchema = z3.object({
   /** Daily cap per class in A$. At the cap, written gates become teacher checks for the rest of the day. */
   daily_cap_aud: z3.number().min(0).max(50).default(3)
 });
+var RUSH_ITEM_KINDS = ["multiple_choice", "true_false", "odd_one_out", "quote_technique", "short_answer"];
+var MAX_STATION_LOCKS = 6;
+var LOCK_CHECK_KINDS = ["rush", "ai"];
+var LOCK_CHECK_LABELS = { rush: "Rush", ai: "AI check" };
+var RushCheckSchema = z3.object({
+  kind: z3.literal("rush"),
+  /** Saved half-written while drafting; publish runs the full check. */
+  items: z3.array(QuizQuestionDraftSchema).max(30).default([]),
+  streak: z3.number().int().min(3).max(10).default(6),
+  seconds: z3.number().int().min(30).max(300).default(90)
+});
+var AiCheckSchema = z3.object({
+  kind: z3.literal("ai"),
+  prompt: z3.string().max(500).default(""),
+  model_answer: z3.string().max(1e3).default(""),
+  criteria: z3.array(z3.string().max(200)).max(4).default([])
+});
+var LockCheckSchema = z3.discriminatedUnion("kind", [RushCheckSchema, AiCheckSchema]);
+var StationLockSchema = z3.object({
+  id: Id2,
+  title: z3.string().max(80).default(""),
+  check: LockCheckSchema,
+  reward: z3.object({ title: z3.string().max(80).default(""), text: z3.string().max(400).default("") }).default({ title: "", text: "" })
+});
 var StationSchema = z3.object({
   id: Id2,
   title: z3.string().max(120).default(""),
@@ -409,7 +433,9 @@ var StationSchema = z3.object({
   /** The station's gate, when it is a written answer. A hinge gate is a block in the section instead. */
   written_gate: WrittenGateSchema.optional(),
   /** Teacher station only: what to say to a group sent here, per misconception. */
-  script: z3.string().max(600).optional()
+  script: z3.string().max(600).optional(),
+  /** Optional chain of locks. None: the station works as a plain card. */
+  locks: z3.array(StationLockSchema).max(MAX_STATION_LOCKS).optional()
 });
 var PretestItemSchema = z3.object({
   id: Id2,
@@ -453,9 +479,11 @@ var RotationSettingsSchema = z3.object({
   finish_at_home: z3.boolean().optional()
 });
 var PublicWrittenGateSchema = WrittenGateSchema.pick({ prompt: true, passage: true, marks: true, idea: true, checks: true, different_techniques: true, pass_at: true, pass_at_support: true, max_checks: true });
-var PublicStationSchema = StationSchema.omit({ written_gate: true, offline_code: true, script: true }).extend({
+var PublicLockSummarySchema = z3.object({ id: Id2, title: z3.string(), kind: z3.enum(LOCK_CHECK_KINDS) });
+var PublicStationSchema = StationSchema.omit({ written_gate: true, offline_code: true, script: true, locks: true }).extend({
   written_gate: PublicWrittenGateSchema.optional(),
-  has_offline_code: z3.boolean().optional()
+  has_offline_code: z3.boolean().optional(),
+  locks: z3.array(PublicLockSummarySchema).optional()
 });
 var PublicRotationSchema = z3.object({
   dial: z3.enum(ROTATION_DIALS),
@@ -489,15 +517,21 @@ var DIAL_TABLE = [
   { row: "Finale format", guided: "One format", standard: "Pick one of three", open: "Any format" }
 ];
 export {
+  AiCheckSchema,
   DEFAULT_DEBRIEF,
   DEFAULT_FINALE_FORMATS,
   DEFAULT_LINK_WORDS,
   DIAL_TABLE,
+  LOCK_CHECK_KINDS,
+  LOCK_CHECK_LABELS,
+  LockCheckSchema,
   LockOptionSchema,
   LockQuestionSchema,
+  MAX_STATION_LOCKS,
   PRESETS,
   PRESET_INFO,
   PretestItemSchema,
+  PublicLockSummarySchema,
   PublicRotationSchema,
   PublicStationSchema,
   PublicWrittenGateSchema,
@@ -514,8 +548,11 @@ export {
   ROTATION_ROLES,
   ROTATION_ROLE_LABELS,
   ROTATION_ROLE_ORDER,
+  RUSH_ITEM_KINDS,
   RotationFinaleSchema,
   RotationSettingsSchema,
+  RushCheckSchema,
+  StationLockSchema,
   StationSchema,
   WRITTEN_CHECKS,
   WRITTEN_CHECK_LABELS,

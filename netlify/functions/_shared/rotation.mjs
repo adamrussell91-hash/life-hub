@@ -14,7 +14,14 @@
  *   rotation/{lesson}/work/{owner}           one student's state (RotationWork + class_id, student_id, at)
  *   rotation/{lesson}/board/{owner}/pos      { station: { x, y } } evidence board positions
  *   rotation/{lesson}/board/{owner}/links    [{ from, to, word }] evidence board links
- *   rotation/{lesson}/spend/{class}/{day}    { aud } written-gate spend, for the daily cap
+ *   rotation/{lesson}/spend/{class}/{day}    { aud } written-gate and lock-check spend, for the daily cap
+ *
+ * Station locks: a station may hold a chain of locks (rush rounds and AI
+ * checks). Blocks tagged with any lock but the first stay out of the
+ * snapshot; they live in the config (`lock_blocks`, questions already split)
+ * and reach a student through the status once the lock before is passed.
+ * Rush keys, AI model answers and criteria, and the Viva Kit rewards stay
+ * here until earned.
  *
  * Positions and links are saved apart, so a drag on one device never wipes a
  * link made on another. Gates are practice only: nothing here writes a mark
@@ -28,7 +35,7 @@ import { listBlobKeys } from './blobs-list.mjs';
 import { QuizError, deviceHash, read, reject, validToken } from './question-drop.mjs';
 import { identify } from './quiz.mjs';
 import { checkQuestion, cleanResponse, hasAnswer, markResponse, splitQuestion } from './quiz-core.mjs';
-import { RotationSettingsSchema, PublicWrittenGateSchema, WrittenGateSchema } from './rotation-schema.mjs';
+import { RotationSettingsSchema, PublicWrittenGateSchema, WrittenGateSchema, RUSH_ITEM_KINDS } from './rotation-schema.mjs';
 import { levelAt, levelsFromPretest, lockReason, piecesLeft, recommend, routeChoiceOpen, unlockProblems } from './rotation-rules.mjs';
 
 export { QuizError as RotationError };
@@ -57,12 +64,27 @@ const roleOf = (b) => {
   const r = b?.settings?.rotation_role;
   return ['recall', 'goal', 'step', 'hint', 'gate', 'after', 'done', 'exit'].includes(r) ? r : 'step';
 };
+const lockOf = (b) => (typeof b?.settings?.rotation_lock === 'string' && b.settings.rotation_lock ? b.settings.rotation_lock : undefined);
+/** One answer a rush round per this long. */
+export const RUSH_RATE_MS = 600;
+/** AI checks a lock before it goes to the teacher. */
+export const MAX_LOCK_CHECKS = 6;
+/** A$ a class a day for written gates and lock checks together, when the station sets no cap. */
+export const LOCK_DAILY_CAP_AUD = 3;
 const isStationSection = (b) => b?.block_type === 'section' && typeof b.content?.rotation_station === 'string';
 const learning = (stations) => list(stations).filter((s) => s.kind !== 'teacher');
 
 // ---------------------------------------------------------------- publish
 
 const cryptoRandom = () => randomBytes(4).readUInt32BE(0) / 2 ** 32;
+function shuffle(items, random) {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
 export function rotationPublishProblems(draft) {
   const r = draft?.rotation;
@@ -88,12 +110,43 @@ export function rotationPublishProblems(draft) {
       const c = checkQuestion({ ...p.question, id: p.id });
       if (!c.ok) { problems.push(`A pretest question for ${st.title || 'a station'} isn’t finished: ${c.message}`); break; }
     }
+    problems.push(...lockProblems(st, blocks));
     const g = st.written_gate;
     if (g && (!clean(g.passage) || !clean(g.prompt) || !clean(g.idea) || !list(g.checks).length || g.pass_at > g.marks)) problems.push(`The written gate at ${st.title || 'a station'} isn’t finished.`);
   }
   if (s.path === 'choose_n' && (!s.choose_n || s.choose_n >= stations.length)) problems.push('“Choose some” needs a number smaller than the number of stations.');
   if (s.path === 'unlocks') problems.push(...unlockProblems(s.stations));
   if (s.stations.some((x) => clean(x.token)) && !(s.finale.lock && list(s.finale.lock.options).some((o) => o.id === s.finale.lock.correct_id))) problems.push('A breakout with letters needs a lock question with a right answer.');
+  return problems;
+}
+
+/** A rush item the server can mark on the spot: finished, an auto-marked kind. Returns the checked question or null. */
+function rushItem(q) {
+  const c = checkQuestion(q);
+  if (!c.ok || !RUSH_ITEM_KINDS.includes(c.question.kind)) return null;
+  return c.question;
+}
+
+function lockProblems(st, blocks) {
+  const locks = list(st.locks);
+  const problems = [];
+  const at = st.title || 'a station';
+  const ids = new Set(locks.map((l) => l.id));
+  if (ids.size !== locks.length) problems.push(`Two locks at ${at} share an id.`);
+  locks.forEach((l, i) => {
+    const name = clean(l.title) ? `Lock “${clean(l.title)}”` : `Lock ${i + 1}`;
+    if (!clean(l.title)) problems.push(`${name} at ${at} needs a title.`);
+    if (l.check.kind === 'rush') {
+      const items = list(l.check.items);
+      const ready = items.filter((q) => rushItem(q)).length;
+      if (ready < items.length) problems.push(`${name} at ${at} has a rush question that isn’t finished, or isn’t a kind a rush can mark.`);
+      if (ready < l.check.streak) problems.push(`${name} at ${at} needs at least ${l.check.streak} finished rush questions.`);
+    } else if (!clean(l.check.prompt) || !clean(l.check.model_answer) || !list(l.check.criteria).some((c) => clean(c))) {
+      problems.push(`The AI check for ${name} at ${at} needs a question, a model answer and at least one thing it looks for.`);
+    }
+    if (!clean(l.reward?.title) || !clean(l.reward?.text)) problems.push(`${name} at ${at} needs a Viva Kit card: a title and its text.`);
+  });
+  if (list(blocks).some((b) => lockOf(b) && !ids.has(lockOf(b)))) problems.push(`A block at ${at} belongs to a lock that is no longer there.`);
   return problems;
 }
 
@@ -117,9 +170,44 @@ export function prepareRotationPublish(draft, studentBlocks, random = cryptoRand
       return null;
     }
     const { question, key } = splitQuestion(checked.question, random);
-    keys[b.id] = { key, station, role: roleOf(b) };
+    keys[b.id] = { key, station, role: roleOf(b), ...(lockOf(b) ? { lock: lockOf(b) } : {}) };
     return { ...b, content: { question } };
   });
+  // Locks: blocks for every lock but the first leave the snapshot; rush items split into public questions and keys.
+  const lockBlocks = {};
+  const rushPublic = {};
+  const rushKeys = {};
+  for (const st of s.stations) {
+    const locks = list(st.locks);
+    if (!locks.length) continue;
+    const later = new Set(locks.slice(1).map((l) => l.id));
+    lockBlocks[st.id] = Object.fromEntries(locks.slice(1).map((l) => [l.id, []]));
+    for (const l of locks) {
+      if (l.check.kind !== 'rush') continue;
+      const items = [];
+      const lockKeys = {};
+      for (const q of l.check.items) {
+        const checked = rushItem(q);
+        if (!checked) { problems.push(`A rush question at ${st.title || 'a station'} isn’t finished.`); continue; }
+        // Exact marking only: a rush never waits on the AI marker.
+        const { question, key } = splitQuestion({ ...checked, ai_mark: false }, random);
+        const { ai: _ai, ...exact } = key;
+        items.push(question);
+        lockKeys[question.id] = exact;
+      }
+      rushPublic[st.id] = { ...obj(rushPublic[st.id]), [l.id]: shuffle(items, random) };
+      rushKeys[st.id] = { ...obj(rushKeys[st.id]), [l.id]: lockKeys };
+    }
+    const section = blocks.find((b) => isStationSection(b) && b.content.rotation_station === st.id);
+    if (!section) continue;
+    const kept = [];
+    for (const b of list(section.content.blocks)) {
+      const lock = lockOf(b);
+      if (lock && later.has(lock)) lockBlocks[st.id][lock].push(b);
+      else kept.push(b);
+    }
+    section.content.blocks = kept;
+  }
   const hinges = {};
   mapStationBlocks(draft.blocks, (b, station) => {
     if (b.block_type === 'hinge_question' && roleOf(b) === 'gate') {
@@ -138,10 +226,11 @@ export function prepareRotationPublish(draft, studentBlocks, random = cryptoRand
     pretestKeys[p.id] = key;
   }
   if (problems.length) return { snapshot: null, config: null, problems };
-  const publicStations = s.stations.map(({ written_gate, offline_code, script, ...st }) => ({
+  const publicStations = s.stations.map(({ written_gate, offline_code, script, locks, ...st }) => ({
     ...st,
     ...(written_gate ? { written_gate: PublicWrittenGateSchema.parse(written_gate) } : {}),
-    ...(offline_code ? { has_offline_code: true } : {})
+    ...(offline_code ? { has_offline_code: true } : {}),
+    ...(list(locks).length ? { locks: locks.map((l) => ({ id: l.id, title: l.title, kind: l.check.kind })) } : {})
   }));
   const lock = s.finale.lock ? { prompt: s.finale.lock.prompt, options: s.finale.lock.options } : undefined;
   return {
@@ -162,7 +251,7 @@ export function prepareRotationPublish(draft, studentBlocks, random = cryptoRand
         pretest_count: pretest.length
       }
     },
-    config: { ...s, version: Date.now().toString(36), keys, hinges, pretest_public: pretest, pretest_keys: pretestKeys }
+    config: { ...s, version: Date.now().toString(36), keys, hinges, pretest_public: pretest, pretest_keys: pretestKeys, lock_blocks: lockBlocks, rush_public: rushPublic, rush_keys: rushKeys }
   };
 }
 
@@ -201,8 +290,72 @@ function normaliseWork(raw, config) {
     exits: keep(w.exits),
     pretest: Object.fromEntries(Object.entries(obj(w.pretest)).filter(([id]) => list(config.pretest_public).some((p) => p.id === id))),
     current: ids.has(w.current) ? w.current : undefined,
-    finale: obj(w.finale)
+    finale: obj(w.finale),
+    locks: Object.fromEntries(list(config.stations).filter((s) => list(s.locks).length).map((s) => {
+      const lockIds = new Set(list(s.locks).map((l) => l.id));
+      return [s.id, Object.fromEntries(Object.entries(obj(obj(w.locks)[s.id])).filter(([id]) => lockIds.has(id)))];
+    }))
   };
+}
+
+// ---------------------------------------------------------------- station locks
+
+const locksAt = (config, stationId) => list(list(config.stations).find((s) => s.id === stationId)?.locks);
+const lockWork = (work, stationId, lockId) => obj(obj(work.locks?.[stationId])[lockId]);
+/** Every lock at a station with its state: passed, the one open, or locked behind it. */
+function lockStates(config, work, stationId) {
+  let before = true;
+  return locksAt(config, stationId).map((lock) => {
+    const w = lockWork(work, stationId, lock.id);
+    const state = w.passed_at ? 'passed' : before ? 'open' : 'locked';
+    if (!w.passed_at) before = false;
+    return { lock, state, w };
+  });
+}
+const allLocksPassed = (config, work, stationId) => lockStates(config, work, stationId).every((x) => x.state === 'passed');
+function setLockWork(work, stationId, lockId, change) {
+  const station = obj(work.locks?.[stationId]);
+  work.locks = { ...obj(work.locks), [stationId]: { ...station, [lockId]: { ...obj(station[lockId]), ...change } } };
+}
+const rushQueue = (config, stationId, lockId, r) => {
+  const ids = list(config.rush_public?.[stationId]?.[lockId]).map((q) => q.id);
+  const kept = list(r?.queue).filter((id) => ids.includes(id));
+  return [...kept, ...ids.filter((id) => !kept.includes(id))];
+};
+const rushEndsAt = (lock, r) => (r?.started_at ? new Date(Date.parse(r.started_at) + lock.check.seconds * 1000).toISOString() : null);
+
+/** A station's chain as the student sees it. Locked locks show their title only; rewards only once passed. */
+function publicLocks(config, work, stationId) {
+  const states = lockStates(config, work, stationId);
+  const first = states[0]?.lock.id;
+  return states.map(({ lock, state, w }) => {
+    const out = { id: lock.id, title: lock.title, kind: lock.check.kind, state };
+    if (state === 'locked') return out;
+    if (lock.check.kind === 'rush') {
+      out.check = { kind: 'rush', items: list(config.rush_public?.[stationId]?.[lock.id]), streak: lock.check.streak, seconds: lock.check.seconds };
+      const r = obj(w.rush);
+      out.rush = { streak: r.streak ?? 0, best: r.best ?? 0, answered: r.answered ?? 0, started_at: r.started_at ?? null, ends_at: rushEndsAt(lock, r), next_item_id: state === 'open' ? rushQueue(config, stationId, lock.id, r)[0] ?? null : null };
+    } else {
+      out.check = { kind: 'ai', prompt: lock.check.prompt };
+      const checks = list(w.ai);
+      const last = checks[checks.length - 1];
+      out.ai = { checks_left: Math.max(0, MAX_LOCK_CHECKS - checks.filter((a) => a.counted !== false).length), last: last ? { text: last.text, at: last.at, outcome: last.outcome, fix: last.fix ?? null } : null };
+    }
+    if (w.flagged) out.flagged = true;
+    if (state === 'passed') out.reward = { title: lock.reward.title, text: lock.reward.text };
+    // The first lock's blocks are in the snapshot; later locks' come from here.
+    if (lock.id !== first) out.blocks = list(config.lock_blocks?.[stationId]?.[lock.id]);
+    return out;
+  });
+}
+
+/** The Viva Kit: every reward earned, in station then chain order. */
+function vivaKit(config, work) {
+  const kit = [];
+  for (const s of list(config.stations)) {
+    for (const { lock, state, w } of lockStates(config, work, s.id)) if (state === 'passed') kit.push({ station: s.id, lock: lock.id, title: lock.reward.title, text: lock.reward.text, at: w.passed_at });
+  }
+  return kit;
 }
 
 const stationBlocks = (lesson, stationId) => list(list(lesson.blocks).find((b) => isStationSection(b) && b.content.rotation_station === stationId)?.content?.blocks);
@@ -288,11 +441,15 @@ async function buildStatus(store, lessonId, lesson, config, state, work, identit
   const recallResults = Object.fromEntries(Object.entries(work.recall).map(([sid, r]) => [sid, { block_id: r.block_id, mark: r.mark, key: config.keys[r.block_id]?.key ?? null }]));
   const pretestResults = Object.fromEntries(Object.entries(work.pretest).map(([id, r]) => [id, { mark: r.mark, key: config.pretest_keys?.[id] ?? null }]));
   const call = Object.values(obj(state.calls)).filter((c) => list(c.students).includes(work.student_id)).sort((a, b) => (a.at < b.at ? 1 : -1))[0] ?? null;
+  const stationLocks = {};
+  for (const s of learning(stations)) if (list(s.locks).length) stationLocks[s.id] = publicLocks(config, work, s.id);
   return {
     identity,
     pretest: { items: list(config.pretest_public).map(({ id, station, question }) => ({ id, station, question })), results: pretestResults },
     levels,
     locks,
+    station_locks: stationLocks,
+    kit: vivaKit(config, work),
     gates,
     seats: taken,
     recommend: recommend(settings, work, taken),
@@ -320,12 +477,13 @@ async function buildStatus(store, lessonId, lesson, config, state, work, identit
 
 // ---------------------------------------------------------------- student actions
 
-const ACTIONS = ['status', 'claim', 'pretest_answer', 'open_station', 'leave_station', 'level', 'hint', 'recall_answer', 'gate_answer', 'exit_answer', 'collect', 'offline_code', 'board_move', 'board_link', 'board_unlink', 'hand_up', 'hand_down', 'check_writing', 'appeal', 'finale_lock', 'finale_save'];
+const ACTIONS = ['status', 'claim', 'pretest_answer', 'open_station', 'leave_station', 'level', 'hint', 'recall_answer', 'gate_answer', 'exit_answer', 'collect', 'offline_code', 'board_move', 'board_link', 'board_unlink', 'hand_up', 'hand_down', 'check_writing', 'appeal', 'finale_lock', 'finale_save', 'lock_rush', 'lock_ai'];
 
 /**
  * `deps.checkWriting(input)` runs the written gate (rotation-writing.mjs); the
  * Netlify function passes the real one. Without it, a written gate goes to
- * the teacher.
+ * the teacher. `deps.checkLock(input)` is the same for a lock's AI check
+ * (createLockChecker). `deps.now()` (ms) is the clock for rush rounds.
  */
 export async function rotationAction(store, lessonId, body, deps = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
@@ -341,7 +499,7 @@ export async function rotationAction(store, lessonId, body, deps = {}) {
   }
   if (who.need === 'class') reject(403, 'need_class', 'Open this rotation from your class page.');
   const identity = { need: who.need, initials: who.student?.initials ?? null };
-  const blank = (extra = {}) => ({ identity, pretest: { items: [], results: {} }, levels: {}, locks: {}, gates: {}, seats: {}, recommend: null, route_open: false, pieces_left: 0, fallback_on: false, called: null, work: null, board: { pos: {}, links: [] }, ...extra });
+  const blank = (extra = {}) => ({ identity, pretest: { items: [], results: {} }, levels: {}, locks: {}, station_locks: {}, kit: [], gates: {}, seats: {}, recommend: null, route_open: false, pieces_left: 0, fallback_on: false, called: null, work: null, board: { pos: {}, links: [] }, ...extra });
   if (who.need === 'initials') {
     if (action !== 'status' && action !== 'claim') reject(403, 'need_initials', 'Type your initials first.');
     return blank();
@@ -362,6 +520,7 @@ export async function rotationAction(store, lessonId, body, deps = {}) {
   work.class_id = who.classId;
   work.student_id = who.student.id;
   const view = (extra) => buildStatus(store, lessonId, lesson, config, state, work, identity, owner, extra);
+  const clock = typeof deps.now === 'function' ? deps.now : Date.now;
   if (action === 'status' || action === 'claim') return view();
 
   const stations = list(config.stations);
@@ -481,6 +640,7 @@ export async function rotationAction(store, lessonId, body, deps = {}) {
     if (!gateOpen(config, work, s.id)) reject(409, 'gate', 'Get past the check first.');
     const all = exitIds(config, s.id);
     if (!all.every((id) => list(work.exits[s.id]?.answered).includes(id))) reject(409, 'exit', 'Answer the exit check first.');
+    if (!allLocksPassed(config, work, s.id)) reject(409, 'locks', 'Open every lock at this station first.');
     return collect(s.id);
   }
 
@@ -553,6 +713,65 @@ export async function rotationAction(store, lessonId, body, deps = {}) {
     return save({ writing: { outcome: attempt.outcome, message: outcome.message ?? null } });
   }
 
+  if (action === 'lock_rush' || action === 'lock_ai') {
+    const s = station();
+    const found = lockStates(config, work, s.id).find((x) => x.lock.id === body.lock);
+    if (!found) reject(400, 'bad_lock', 'That lock isn’t at this station.');
+    const { lock, state: lockState, w } = found;
+    if (lockState === 'locked') reject(409, 'lock_closed', 'Open the lock before this one first.');
+    const kind = action === 'lock_rush' ? 'rush' : 'ai';
+    if (lock.check.kind !== kind) reject(400, 'bad_lock', kind === 'rush' ? 'This lock isn’t a rush round.' : 'This lock isn’t a written check.');
+
+    if (action === 'lock_rush') {
+      const need = lock.check.streak;
+      const t = clock();
+      const at = new Date(t).toISOString();
+      const r = { streak: 0, best: 0, answered: 0, ...obj(w.rush) };
+      r.queue = rushQueue(config, s.id, lock.id, r);
+      const reply = (extra) => ({ rush: { item_id: body.item_id ?? null, right: null, streak: r.streak, need, passed: !!lockWork(work, s.id, lock.id).passed_at, timed_out: false, next_item_id: lockWork(work, s.id, lock.id).passed_at ? null : r.queue[0] ?? null, ends_at: rushEndsAt(lock, r), ...extra } });
+      if (lockState === 'passed') return view(reply({}));
+      if (r.last_at && t - Date.parse(r.last_at) < RUSH_RATE_MS) reject(429, 'too_fast', 'Slow down a little.');
+      if (r.started_at && t - Date.parse(r.started_at) > lock.check.seconds * 1000) {
+        // Out of time: the round starts again from nothing. This answer isn't marked.
+        delete r.started_at;
+        r.streak = 0;
+        r.last_at = at;
+        setLockWork(work, s.id, lock.id, { rush: r });
+        return save(reply({ timed_out: true }));
+      }
+      if (body.item_id !== r.queue[0]) reject(409, 'not_next', 'Answer the question on screen.');
+      const key = config.rush_keys?.[s.id]?.[lock.id]?.[body.item_id];
+      if (!key) reject(400, 'bad_item', 'That question isn’t in this round.');
+      const mark = markWith(key, body.response);
+      const right = mark.correct === true;
+      if (!r.started_at) r.started_at = at;
+      r.answered += 1;
+      r.streak = right ? r.streak + 1 : 0;
+      r.best = Math.max(r.best, r.streak);
+      r.last_at = at;
+      // Right or wrong, the item goes to the back: a missed one comes round again later.
+      r.queue = [...r.queue.slice(1), r.queue[0]];
+      const passed = r.streak >= need;
+      if (passed) delete r.started_at;
+      setLockWork(work, s.id, lock.id, { rush: r, ...(passed ? { passed_at: at } : {}) });
+      // Right or wrong only: the answer is never shown during a round.
+      return save(reply({ right, passed }));
+    }
+
+    if (lockState === 'passed') reject(409, 'open', 'This lock is already open.');
+    if (w.flagged) reject(409, 'flagged', 'Your teacher will check this one with you.');
+    const cap = Number(s.written_gate?.daily_cap_aud ?? LOCK_DAILY_CAP_AUD);
+    const outcome = await (deps.checkLock ?? lockTeacherOnly)({ store, lessonId, classId: who.classId, lock, checks: list(w.ai), text: body.text, capAud: cap });
+    const attempt = { at: now(), ...outcome.attempt };
+    const checks = [...list(w.ai), attempt];
+    const counted = checks.filter((a) => a.counted !== false).length;
+    const passed = attempt.outcome === 'passed';
+    const flagged = !passed && (attempt.outcome === 'teacher' || counted >= MAX_LOCK_CHECKS);
+    setLockWork(work, s.id, lock.id, { ai: checks, ...(passed ? { passed_at: attempt.at } : {}), ...(flagged ? { flagged: true } : {}) });
+    const message = outcome.message ?? (flagged && attempt.outcome !== 'teacher' ? 'You’ve used your checks. Your teacher will look at this one.' : null);
+    return save({ lock_check: { outcome: attempt.outcome, pass: passed, fix: attempt.fix ?? null, message, checks_left: Math.max(0, MAX_LOCK_CHECKS - counted) } });
+  }
+
   if (action === 'finale_lock' || action === 'finale_save') {
     if (piecesLeft(settings, work, fallbackOn(state)) > 0) reject(409, 'pieces', 'Collect your pieces first.');
     if (action === 'finale_lock') {
@@ -586,6 +805,12 @@ export async function rotationAction(store, lessonId, body, deps = {}) {
   reject(400, 'bad_action', 'Unknown action.');
 }
 
+/** No checker wired (no key): a lock's written check goes to the teacher and doesn't count. */
+async function lockTeacherOnly({ text }) {
+  if (typeof text !== 'string' || !text.trim()) reject(400, 'empty', 'Write your answer first.');
+  return { attempt: { text: clean(text, 600), outcome: 'teacher', counted: false }, message: 'Your teacher will look at this one.' };
+}
+
 /** No checker wired: a written answer goes to the teacher and doesn't count against the student. */
 async function teacherOnly({ text }) {
   return { attempt: { text: clean(text, 3000), outcome: 'teacher', rules: [], verdicts: [], feedback: [], counted: false }, message: 'Your teacher will look at this one.' };
@@ -593,7 +818,7 @@ async function teacherOnly({ text }) {
 
 // ---------------------------------------------------------------- teacher
 
-const TEACHER_ACTIONS = ['board', 'call_group', 'group_tick', 'group_done', 'open_gate', 'writing_decision', 'going', 'fallback', 'clear_student'];
+const TEACHER_ACTIONS = ['board', 'call_group', 'group_tick', 'group_done', 'open_gate', 'open_lock', 'writing_decision', 'going', 'fallback', 'clear_student'];
 
 async function allWork(store, lessonId, config) {
   const k = rotationKeys(lessonId);
@@ -639,7 +864,8 @@ async function teacherBoard(store, lessonId, draft, config, state) {
   const out = rows.map(({ student, work }) => {
     const hints = work.current ? work.hints[work.current] ?? 0 : 0;
     const gateMiss = work.current && ['backup', 'flagged'].includes(work.gates[work.current]?.state);
-    const stuck = !!work.hand_up_at || !!gateMiss || (!!work.current && hints >= 3 && !work.exits[work.current]);
+    const lockFlag = !!work.current && lockStates(config, work, work.current).some((x) => x.w.flagged && x.state !== 'passed');
+    const stuck = !!work.hand_up_at || !!gateMiss || lockFlag || (!!work.current && hints >= 3 && !work.exits[work.current]);
     const pretestScore = {};
     for (const s of learningStations) {
       const items = list(config.pretest_public).filter((p) => p.station === s.id);
@@ -662,7 +888,17 @@ async function teacherBoard(store, lessonId, draft, config, state) {
       hand_up_at: work.hand_up_at ?? null,
       hand_station: work.hand_station ?? null,
       pieces_left: piecesLeft(settings, work, fallbackOn(state)),
-      finale: { lock_passed: !!work.finale.lock_passed, built: !!clean(work.finale.build) }
+      finale: { lock_passed: !!work.finale.lock_passed, built: !!clean(work.finale.build) },
+      locks: Object.fromEntries(learningStations.filter((s) => list(s.locks).length).map((s) => [s.id, lockStates(config, work, s.id).map(({ lock, state: ls, w }) => ({
+        id: lock.id,
+        title: lock.title,
+        kind: lock.check.kind,
+        state: ls,
+        flagged: !!w.flagged && ls !== 'passed',
+        best: obj(w.rush).best ?? 0,
+        checks: list(w.ai).length,
+        teacher: !!w.teacher_at
+      }))]))
     };
   });
   const heat = {};
@@ -684,6 +920,15 @@ async function teacherBoard(store, lessonId, draft, config, state) {
       writing.push({ student_id: student.id, name: student.name, station: sid, appeal: !!g.appeal_at, state: g.state, attempts: written.map((a) => ({ text: a.text, at: a.at, outcome: a.outcome, feedback: list(a.feedback), rules: list(a.rules), verdicts: list(a.verdicts), points: list(a.points), flagged_text: !!a.flagged_text })) });
     }
   }
+  const lockChecks = [];
+  for (const { student, work } of rows) {
+    for (const s of learningStations) {
+      for (const { lock, state: ls, w } of lockStates(config, work, s.id)) {
+        if (!w.flagged || ls === 'passed') continue;
+        lockChecks.push({ student_id: student.id, name: student.name, station: s.id, lock: lock.id, title: lock.title, attempts: list(w.ai).map((a) => ({ text: a.text, at: a.at, outcome: a.outcome, fix: a.fix ?? null, flagged_text: !!a.flagged_text })) });
+      }
+    }
+  }
   const queue = out.filter((s) => s.hand_up_at).sort((a, b) => (a.hand_up_at < b.hand_up_at ? -1 : 1)).map((s) => ({ student_id: s.id, name: s.name, station: s.hand_station, at: s.hand_up_at }));
   const doneCount = out.reduce((n, s) => n + s.done.filter((id) => learningStations.some((x) => x.id === id)).length, 0);
   const possible = out.length * Math.max(1, learningStations.length);
@@ -699,6 +944,7 @@ async function teacherBoard(store, lessonId, draft, config, state) {
     heat,
     gate_misses: gateMisses,
     writing,
+    lock_checks: lockChecks,
     done_share: possible ? Math.round((doneCount / possible) * 100) : 0
   };
 }
@@ -754,6 +1000,20 @@ export async function rotationTeacherAction(store, lessonId, body) {
       work.gates = { ...work.gates, [sid]: { ...g, state: body.decision === 'pass' ? 'passed' : 'open', teacher: { decision: body.decision, at: now() }, ...(body.decision === 'keep' ? { written: list(g.written).map((a) => ({ ...a, counted: false })) } : {}) } };
     }
     await putWork(owner, raw, { gates: work.gates });
+  }
+  if (action === 'open_lock') {
+    // Opens this lock and any before it still closed; the student keeps the rewards.
+    const sid = String(body.station ?? '');
+    const locks = locksAt(config, sid);
+    const at = locks.findIndex((l) => l.id === body.lock);
+    if (at < 0) reject(400, 'bad_lock', 'That lock isn’t at this station.');
+    const { owner, work, raw } = await studentWork(body.student_id);
+    const stamp = now();
+    for (const l of locks.slice(0, at + 1)) {
+      const w = lockWork(work, sid, l.id);
+      if (!w.passed_at) setLockWork(work, sid, l.id, { passed_at: stamp, teacher_at: stamp, flagged: false });
+    }
+    await putWork(owner, raw, { locks: work.locks });
   }
   if (action === 'going') {
     const { owner, raw } = await studentWork(body.student_id);

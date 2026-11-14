@@ -5,12 +5,14 @@ import {
   ROTATION_KIND_INFO,
   ROTATION_ROLES,
   ROTATION_ROLE_ORDER,
+  RUSH_ITEM_KINDS,
   WrittenGateSchema,
   type RotationLevel,
   type RotationPreset,
   type RotationRole,
   type RotationSettings,
-  type Station
+  type Station,
+  type StationLock
 } from './schema';
 import { unlockProblems } from './rules';
 
@@ -55,6 +57,55 @@ export const arrivalFromOf = (b: Block): string => {
   const from = settingOf(b, 'arrival_from');
   return typeof from === 'string' && from ? from : 'previous';
 };
+
+/** The station lock a block belongs to (block.settings.rotation_lock); absent means it shows as today. */
+export const lockOf = (b: Block): string | undefined => {
+  const lock = settingOf(b, 'rotation_lock');
+  return typeof lock === 'string' && lock ? lock : undefined;
+};
+
+/** A station's locks in chain order; none for a plain station. */
+export const locksOf = (s: Pick<Station, 'locks'>): StationLock[] => s.locks ?? [];
+
+/** Blocks tagged with one lock, in section order. */
+export const blocksForLock = (blocks: Block[], lockId: string): Block[] => blocks.filter((b) => lockOf(b) === lockId);
+
+/** A rush item counts once it is finished, an auto-marked kind and (short answer) marked exactly. */
+export function rushItemReady(q: unknown): boolean {
+  const parsed = QuizQuestionSchema.safeParse(q);
+  if (!parsed.success) return false;
+  const kind = parsed.data.kind as string;
+  if (!(RUSH_ITEM_KINDS as readonly string[]).includes(kind)) return false;
+  return true;
+}
+
+/** Problems with one station's locks, in the teacher's words. */
+export function lockIssues(s: Station, blocks: Block[]): string[] {
+  const out: string[] = [];
+  const at = s.title.trim() || 'a station';
+  const locks = locksOf(s);
+  const ids = new Set(locks.map((l) => l.id));
+  if (ids.size !== locks.length) out.push(`Two locks at ${at} share an id. Remove one and add it again.`);
+  locks.forEach((l, i) => {
+    const name = l.title.trim() ? `Lock “${l.title.trim()}”` : `Lock ${i + 1}`;
+    if (!filled(l.title)) out.push(`${name} at ${at} needs a title.`);
+    if (l.check.kind === 'rush') {
+      const ready = l.check.items.filter(rushItemReady).length;
+      if (l.check.items.some((q) => !rushItemReady(q))) out.push(`${name} at ${at} has a rush question that isn’t finished, or isn’t a kind a rush can mark.`);
+      if (ready < l.check.streak) out.push(`${name} at ${at} needs at least ${l.check.streak} finished rush questions (it has ${ready}).`);
+    } else {
+      if (!filled(l.check.prompt)) out.push(`${name} at ${at} needs a question for the AI check.`);
+      if (!filled(l.check.model_answer)) out.push(`${name} at ${at} needs a model answer for the AI check.`);
+      if (!l.check.criteria.some((c) => filled(c))) out.push(`${name} at ${at} needs at least one thing the AI check looks for.`);
+    }
+    if (!filled(l.reward.title) || !filled(l.reward.text)) out.push(`${name} at ${at} needs a Viva Kit card: a title and its text.`);
+  });
+  for (const b of blocks) {
+    const lock = lockOf(b);
+    if (lock && !ids.has(lock)) { out.push(`A block at ${at} belongs to a lock that is no longer there. Pick another lock for it.`); break; }
+  }
+  return out;
+}
 
 export function withSettings(b: Block, change: Record<string, unknown>): Block {
   const settings = { ...((b.settings as Record<string, unknown>) ?? {}) };
@@ -147,6 +198,7 @@ export function rotationIssues(lesson: RotationLesson): string[] {
       if (g.checks.length === 0) out.push(`The written gate at ${name(s)} needs at least one check.`);
       if (g.pass_at > g.marks || (g.pass_at_support ?? 0) > g.marks) out.push(`The written gate at ${name(s)} can’t pass at more marks than it has.`);
     }
+    out.push(...lockIssues(s, blocks));
     const asked = r.pretest.filter((p) => p.station === s.id);
     if (asked.length !== PRETEST_PER_STATION) out.push(`${name(s)} needs exactly ${PRETEST_PER_STATION} pretest questions (it has ${asked.length}).`);
     else if (asked.some((p) => !QuizQuestionSchema.safeParse(p.question).success)) out.push(`A pretest question for ${name(s)} isn’t finished.`);

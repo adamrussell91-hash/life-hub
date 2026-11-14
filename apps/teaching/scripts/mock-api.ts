@@ -157,7 +157,7 @@ import { addDays, sydneyDay as organiserDay } from '../../../netlify/functions/_
 import { prepareSprintPublish, storeSprintConfig } from '../../../netlify/functions/_shared/sprint.mjs';
 import { prepareCasePublish, storeCaseConfig } from '../../../netlify/functions/_shared/case-study.mjs';
 import { prepareRotationPublish, storeRotationConfig } from '../../../netlify/functions/_shared/rotation.mjs';
-import { mockWritingChecker } from './mock-rotation-writing';
+import { mockLockChecker, mockWritingChecker } from './mock-rotation-writing';
 import { rotationLesson, ROTATION_ROSTER } from '../../../tests/unit/helpers/rotation-fixture.mjs';
 import { prepareGamePublish, storeGameKeys } from '../../../netlify/functions/_shared/games.mjs';
 import { gameLesson, GAME_ROSTER } from '../../../tests/unit/helpers/game-fixture.mjs';
@@ -738,7 +738,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
   /**
    * A walkable Station Rotation, dev walk and browser test: an invented Year 8 class and the invented
-   * reef lesson from the test fixture, published and scheduled. All invented.
+   * reef lesson from the test fixture, published and scheduled. All invented. Station s4 has three
+   * locks (rush, AI check, rush); the finale asks for any 3 of the 4 stations.
    * Walk: teacher `/lessons/lesson_rotation_reef`, student `/s/classes/class_2026_08sci/lessons/lesson_rotation_reef` (initials AB).
    */
   function seedStationRotation(): void {
@@ -754,7 +755,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       students: ROTATION_ROSTER.map((r) => ({ id: r.id, name: r.name, skip_picker: false })), current_scheduled_lesson_id: undefined
     });
     seedIds.classes.push(classId);
-    const lesson = { ...rotationLesson({ class_id: classId }), id: lessonId, slug: 'reef_rescue', unit_id: unit.id, sequence: unit.lesson_ids.length + 1, tags: [], syllabus_outcomes: [], outcome_ids: [] };
+    const lesson = { ...rotationLesson({ class_id: classId }, { locks: true }), id: lessonId, slug: 'reef_rescue', unit_id: unit.id, sequence: unit.lesson_ids.length + 1, tags: [], syllabus_outcomes: [], outcome_ids: [] };
     // The fixture's HTML is plain; the DOM sanitiser isn't loaded at seed time.
     const studentBlocks = filterBlocksForStudent(lesson.blocks as unknown as Block[]);
     const pub = prepareRotationPublish(lesson, studentBlocks);
@@ -4331,7 +4332,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       : /^\/api\/lessons\/[^/]+\/rotation$/.test(path)
         ? createRotationHandler(deps)
       : path.startsWith('/api/published/rotation/')
-        ? createPublishedRotationHandler({ ...deps, checkWriting: mockWritingChecker })
+        ? createPublishedRotationHandler({ ...deps, checkWriting: mockWritingChecker, checkLock: mockLockChecker })
       : /^\/api\/lessons\/[^/]+\/game$/.test(path)
         ? createGamesHandler(deps)
       : path.startsWith('/api/published/game/')

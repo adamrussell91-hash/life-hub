@@ -1,0 +1,16 @@
+/* Teacher editor: a station's lock chain (rotation/editor.ts locksPanel). Tokens only. */
+.rot-locks { gap: 12px; }
+.rot-lock { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
+.rot-lock__head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.rot-lock__num { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-full); background: var(--ink); color: var(--paper); font-weight: 700; font-size: var(--text-sm); }
+.rot-lock__tools { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.rot-lock__confirm { flex-wrap: wrap; }
+.rot-lock__check, .rot-lock__reward { gap: 8px; }
+.rot-lock__items { gap: 10px; }
+.rot-lock__item { border-top: 1px solid var(--line); padding-top: 8px; display: grid; gap: 6px; min-width: 0; }
+.rot-lock__reward { border-top: 1px dashed var(--line); padding-top: 10px; }
+.rot-lock-pick { max-width: 100%; }
+@media (max-width: 600px) {
+  .rot-lock__head { grid-template-columns: auto minmax(0, 1fr); }
+  .rot-lock__tools { grid-column: 1 / -1; }
+}
