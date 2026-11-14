@@ -373,6 +373,33 @@ export function createMockApi() {
       return json(200, { ok: true, data: { trip: publicTrip } });
     }
 
+    // An invented earlier trip, a year before the test trip, so the noticing cards have a past to draw on.
+    if (path === '/api/travel-noticing' && method === 'GET') {
+      const day = (date: string, city: string, photos: number, ids: string[], lat: number) => ({
+        trip_id: 'trp_testearlier1', date, city, country: 'Spain', photos, first_time: '08:40', last_time: '21:10',
+        north: { lat, place: city }, south: { lat: lat - 0.05, place: city }, photo_ids: ids,
+      });
+      return json(200, {
+        ok: true,
+        data: {
+          history: {
+            trips: [{
+              id: 'trp_testearlier1', title: 'Test Trip: Seville & Porto', start_date: '2026-03-03', end_date: '2026-03-06', days: 4,
+              cities: [
+                { name: 'Seville', country: 'Spain', start_date: '2026-03-03', end_date: '2026-03-05' },
+                { name: 'Porto', country: 'Portugal', start_date: '2026-03-05', end_date: '2026-03-06' },
+              ],
+            }],
+            days: [
+              day('2026-03-03', 'Seville', 9, ['med_lpstreet', 'med_lpcoffees', 'med_lprooftops'], 37.39),
+              day('2026-03-04', 'Seville', 14, ['med_lpsalad', 'med_lpdinner', 'med_lpstreet'], 37.38),
+              { ...day('2026-03-05', 'Porto', 11, ['med_lpribeira', 'med_lpsunset', 'med_lpnight'], 41.14), country: 'Portugal' },
+              { ...day('2026-03-06', 'Porto', 6, ['med_lpbeach', 'med_lpcoffee2', 'med_lpribeira'], 41.15), country: 'Portugal' },
+            ],
+          },
+        },
+      });
+    }
     if (path === '/api/travel-places' && method === 'GET' && url.searchParams.get('reverse') === '1') {
       // An invented street per spot, so local screenshots show named moments.
       const streets = ['Rua do Exemplo', 'Travessa Inventada', 'Largo da Amostra', 'Cais do Ensaio'];
@@ -501,8 +528,14 @@ export function createMockApi() {
       const variant = url.searchParams.get('variant') === 'derivative' ? `w${url.searchParams.get('width')}` : 'original';
       const key = `travel/journal/${url.searchParams.get('trip')}/${url.searchParams.get('id')}/${variant}`;
       const buffer = uploads.get(key);
-      if (!buffer) return json(404, { ok: false, error: { code: 'not_found', message: 'Not found.' } });
-      return { status: 200, body: null, raw: { contentType: 'image/jpeg', buffer } };
+      if (buffer) return { status: 200, body: null, raw: { contentType: 'image/jpeg', buffer } };
+      // Photos of the invented journals are named after their fixture files: med_lp<name>.
+      const fixtureName = `${(url.searchParams.get('id') ?? '').replace(/^med_lp/, '')}.jpg`;
+      const fixtureFile = nodePath.join(PHOTO_DIR, fixtureName);
+      if (PHOTO_NAME_RE.test(fixtureName) && existsSync(fixtureFile)) {
+        return { status: 200, body: null, raw: { contentType: 'image/jpeg', buffer: readFileSync(fixtureFile) } };
+      }
+      return json(404, { ok: false, error: { code: 'not_found', message: 'Not found.' } });
     }
 
     if (path === '/api/travel-atlas' && method === 'GET') {

@@ -11,7 +11,7 @@ What was already decided there, and still holds:
 - A noticing with nothing to show for it is not shown.
 - Ticking something off in Tasks happens only when Adam taps to do it.
 
-Two choices are new and marked **To confirm**.
+Adam confirmed two new choices on 14/11/26: the diary is a source, matched by exact words only and never sent to a model; and the wishes and photos requests both run automatically each evening of the trip. Books are matched by title only, the cautious default, which he has not been asked to change.
 
 ## What a noticing is
 
@@ -36,11 +36,11 @@ From this trip:
 
 | Card | Rule | Evidence |
 | --- | --- | --- |
-| New country | The trip's current country appears in no earlier trip | The count: "Country number 14" |
+| New country | The trip's current country appears in no earlier trip in Life Hub. The card says "new to your journal", never "your first time", because the journal only knows the trips recorded here | The count of countries journaled |
 | Back again | The current city appears in an earlier trip | "Last here in March 2025", with a photo from then |
 | Biggest day | Today has more photos than any other day of this trip (from day 3 on) | The count and three of the photos |
 | Earliest start, latest finish | Today's first moment is the earliest of the trip, or its last is the latest | The time and that moment's photo |
-| Furthest point | Today's moments reach further north, south, east or west than any journal before | The place name and the earlier record it beats |
+| Furthest point | Today's moments reach further north or south than any journal before, with at least three located days to beat. East and west are left out: across the date line "furthest east" has no honest meaning | The place name and the earlier record it beats |
 | Halfway | The middle day of the trip | Days, cities, photos and keepsakes so far |
 
 From past trips:
@@ -58,7 +58,7 @@ From the food journal:
 | Best thing so far | A dish rated higher than every other dish on this trip (needs three rated dishes) | The dish, the place, the rating |
 | Order again | A dish marked "order again" on an earlier visit to this city | The dish, the place, the date |
 
-From the diary. **To confirm.**
+From the diary. Confirmed 14/11/26: exact words only.
 
 | Card | Rule | Evidence |
 | --- | --- | --- |
@@ -82,7 +82,7 @@ From the diary. **To confirm.**
 - Each answer must list the photos it is about. The card shows those photos, so the claim can be checked at a glance.
 - An answer about a person's looks, body, health or identity is dropped. The prompt forbids it and the server checks for it.
 
-**Books.** **To confirm.**
+**Books.** Title matches only.
 
 - Exact only: a book on the shelf whose title names this city or country. Rare, but never wrong.
 - Not built: asking a model which books are "set in" a place. The shelf does not record settings, so the card would rest on the model's memory of the book and nothing Adam could check.
@@ -163,7 +163,7 @@ Tasks keeps its data in a different store from Travel. A Travel function reading
 1. The cards, the pill, keeping and "Not right", and the counting cards from this trip and past trips.
 2. Bucket list and dreams jar, with Tick it off in Tasks.
 3. Seen in the photos.
-4. Food journal cards, then diary and books if confirmed.
+4. Food journal cards, then the diary and books.
 
 Each step ships by itself and is useful without the next.
 

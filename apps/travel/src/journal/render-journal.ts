@@ -18,6 +18,21 @@ import {
 import { mountImportStrip, STRIP_HIDE_AFTER_MS, type ImportStripHandle } from '@/journal/story/import-strip';
 import { openUndatedSheet, type UndatedDayChoice } from '@/journal/undated-sheet';
 import { applyPlaceNames, lookUpPlaces, momentsNeedingPlace, type PlaceLookup } from '@/journal/place-lookup';
+import { getNoticingHistory } from '@/api/travel';
+import { openNoticeCards, type FillNoticePhoto } from '@/journal/noticing/cards';
+import { renderKeptBand } from '@/journal/noticing/kept-band';
+import {
+  cardsToOffer,
+  dismissCard,
+  keepCard,
+  keptForDay,
+  markSeen,
+  readNoticingState,
+  unkeepCard,
+  type NoticeCard,
+} from '@/journal/noticing/model';
+import { renderNoticePill } from '@/journal/noticing/pill';
+import { countingCards, noticingDay, type NoticingHistory } from '@/journal/noticing/rules';
 import { isJournalStoryEmpty, resolveCaptureContext } from '@/journal/capture-context';
 import { openCaptureSheet } from '@/journal/capture-sheet';
 import { openImportSheet } from '@/journal/import-sheet';
@@ -59,6 +74,7 @@ import {
   JOURNAL_MOMENT_PAGE_SIZE,
   attachMomentPrefetchObserver,
   computeInitialMomentWindow,
+  configureJournalImage,
   expandMomentWindowEarlier,
   expandMomentWindowLater,
   orderedLiveMoments,
@@ -110,6 +126,8 @@ export interface RenderJournalOptions {
   today?: string;
   /** Names a spot from its coordinates. Defaults to the server lookup on a saved journal; off in previews. */
   lookupPlace?: PlaceLookup;
+  /** Other trips, for the noticing cards. Defaults to the server's on a saved journal; none in previews. */
+  loadNoticingHistory?: () => Promise<NoticingHistory | null>;
 }
 
 function scrollBehaviorFor(root: ParentNode): ScrollBehavior {
@@ -466,6 +484,106 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     }
     const actions = skipped.inTrash ? [{ label: 'Open Trash', onSelect: openTrash }] : [];
     strip.message({ text: summary.headline, notes: summary.notes, actions, autoHideMs: STRIP_HIDE_AFTER_MS });
+  }
+
+  // ---- The journal notices things ---------------------------------------------------
+
+  /** Other trips, once loaded. Until then only cards about this trip are made. */
+  let noticingHistory: NoticingHistory | null = null;
+  const noticeHost = el('div', 'story-notice-host');
+
+  const fillNoticePhoto: FillNoticePhoto = (img, photo) => {
+    const own = photo.tripId === liveFixture.trip_id ? mediaById.get(photo.mediaId) : undefined;
+    configureJournalImage(img, {
+      tripId: photo.tripId,
+      // A photo from another trip is always one the server already holds.
+      media: own ?? { id: photo.mediaId, lifecycle: 'live', upload_state: 'backed_up' },
+      layout: 'pair',
+      eager: true,
+    });
+  };
+
+  /** Today's unseen cards, best first. Nothing before the trip, and nothing new once it is over. */
+  function noticesToOffer(): NoticeCard[] {
+    if (!liveTrip) return [];
+    const latest = orderedLiveMoments(liveFixture).filter((m) => m.author !== 'partner').at(-1);
+    const zone = (latest && legsById().get(latest.leg_id)?.timezone) || liveTrip.home_tz || 'UTC';
+    const day = noticingDay(journalDoc(), liveTrip, opts.today ?? todayIn(zone));
+    if (!day) return [];
+    const cards = countingCards({ journal: journalDoc(), trip: liveTrip, history: noticingHistory, day });
+    return cardsToOffer(cards, readNoticingState(journalDoc()));
+  }
+
+  function paintNoticePill(): void {
+    const pill = renderNoticePill(noticesToOffer().length, openNotices);
+    noticeHost.replaceChildren(...(pill ? [pill] : []));
+  }
+
+  /** Save a change to what was seen, kept or marked not right, and repaint without moving the reader. */
+  function saveNoticing(change: (journal: JournalDocument) => JournalDocument): void {
+    const next = change(journalDoc());
+    if (next === journalDoc()) {
+      paintNoticePill();
+      return;
+    }
+    void persistJournalPatch(liveFixture.trip_id, liveVersion, next).then(
+      (saved) => {
+        liveFixture = saved.journal;
+        liveVersion = saved.version;
+        repaintInPlace();
+      },
+      () =>
+        strip.message({
+          text: 'Could not save what you kept',
+          notes: ['Check your connection'],
+          tone: 'problem',
+          actions: [{ label: 'Try again', onSelect: () => (strip.hide(), saveNoticing(change)) }],
+        }),
+    );
+  }
+
+  function openNotices(): void {
+    const cards = noticesToOffer();
+    if (!cards.length) return;
+    // What was kept or marked not right is applied in one save when the cards close,
+    // to the journal as it is then: a sync may have landed while they were open.
+    const changes: Array<(journal: JournalDocument) => JournalDocument> = [];
+    swap(
+      'notices',
+      openNoticeCards({
+        anchor: root,
+        cards,
+        fillPhoto: fillNoticePhoto,
+        onKeep: (card) => changes.push((j) => keepCard(j, card)),
+        onNotRight: (card) => changes.push((j) => dismissCard(j, card.key)),
+        onClose: (seenKeys) => {
+          overlays.notices = null;
+          saveNoticing((j) => markSeen(changes.reduce((acc, change) => change(acc), j), seenKeys));
+        },
+      }),
+    );
+  }
+
+  function keptBands(cards: NoticeCard[]): HTMLElement[] {
+    return cards.map((card) =>
+      renderKeptBand({ card, fillPhoto: fillNoticePhoto, onRemove: (c) => saveNoticing((j) => unkeepCard(j, c.key)) }),
+    );
+  }
+
+  const loadNoticingHistory =
+    opts.loadNoticingHistory ??
+    (liveTrip && !isFixtureVersion(liveVersion)
+      ? () => getNoticingHistory(liveFixture.trip_id).then((r) => r.history, () => null)
+      : null);
+  if (loadNoticingHistory) {
+    void loadNoticingHistory().then(
+      (history) => {
+        if (!history) return;
+        noticingHistory = history;
+        paintNoticePill();
+      },
+      () => undefined,
+    );
   }
 
   // ---- Words edited in place ------------------------------------------------------
@@ -1000,6 +1118,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     }
 
     const firstVisibleId = orderedMoments[momentWindow.start]?.id;
+    const noticing = readNoticingState(journalDoc());
 
     liveLegs().forEach((leg, legIndex) => {
       const legSection = el('section', 'journal-leg story-leg');
@@ -1059,6 +1178,10 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
             ],
           }),
         );
+
+        const keptToday = keptForDay(noticing, day.local_date);
+        const momentIdsToday = new Set(moments.map((m) => m.id));
+        daySection.append(...keptBands(keptToday.filter((c) => !c.momentId || !momentIdsToday.has(c.momentId))));
 
         if (shouldShowDayMapPreview(moments)) {
           daySection.append(
@@ -1126,6 +1249,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
             }),
           );
           previous = moment;
+          daySection.append(...keptBands(keptToday.filter((c) => c.momentId === moment.id)));
           const linked = dayKeeps.filter((k) => k.momentId === moment.id);
           for (const k of linked) daySection.append(storyKeep(k));
           if (linked.length) previous = undefined;
@@ -1220,6 +1344,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     else refreshMomentWindow();
     coverHost.replaceChildren(buildCover());
     buildRibbon();
+    paintNoticePill();
     paintView();
     syncCurrentDay();
   }
@@ -1294,7 +1419,8 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
   paintView();
 
   const dock: DockHandle = mountDock({ onPhotos: pickPhotos, onMoment: () => openCapture(), onKeepsake: () => openKeep() });
-  root.append(coverHost, ribbonHost, timeline, strip.el, dock.el, photoPicker);
+  paintNoticePill();
+  root.append(coverHost, noticeHost, ribbonHost, timeline, strip.el, dock.el, photoPicker);
   cleanups.push(() => {
     strip.destroy();
     if (filedTimer) clearTimeout(filedTimer);

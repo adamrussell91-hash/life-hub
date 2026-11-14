@@ -1,0 +1,346 @@
+/* Travel journal noticing: the pill, the full-screen cards, and cards kept in the story. Kit tokens only. */
+
+/* ---- What a card shows --------------------------------------------------------- */
+
+.notice-face {
+  display: grid;
+  gap: var(--space-4);
+  align-content: center;
+}
+
+.notice-face__source {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.notice-face__headline {
+  margin: 0;
+  font-family: var(--font-fun);
+  font-weight: 800;
+  font-size: var(--text-xl);
+  line-height: 1.05;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.notice-face__photos {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-2) 0;
+}
+
+.notice-face__photo {
+  flex: 0 1 31%;
+  aspect-ratio: 4 / 5;
+  margin: 0 -2%;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  box-shadow: 0 10px 24px rgba(10, 21, 54, 0.32);
+}
+
+.notice-face__photo:nth-child(1) { transform: rotate(-4deg); }
+.notice-face__photo:nth-child(2) { transform: rotate(2deg) translateY(-6px); }
+.notice-face__photo:nth-child(3) { transform: rotate(5deg); }
+.notice-face__photos--1 .notice-face__photo { flex-basis: 62%; transform: rotate(-2deg); }
+.notice-face__photos--2 .notice-face__photo { flex-basis: 44%; }
+
+.notice-face__photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 2px;
+}
+
+.notice-face__stats {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.notice-face__stat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
+
+.notice-face__stat-value {
+  font-family: var(--font-fun);
+  font-weight: 800;
+  font-size: var(--text-2xl);
+  line-height: 1;
+}
+
+.notice-face__stat-label {
+  margin: 0;
+  font-size: var(--text-base);
+  opacity: 0.88;
+}
+
+.notice-face__body {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+  text-wrap: pretty;
+}
+
+.notice-face__basis {
+  margin: 0;
+  font-size: var(--text-sm);
+  opacity: 0.75;
+}
+
+/* ---- The pill under the cover ------------------------------------------------ */
+
+.notice-pill-row {
+  display: flex;
+  padding: var(--space-3) var(--story-gutter, var(--space-4)) 0;
+}
+
+.notice-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+  padding: 0 var(--space-4) 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--navy);
+  color: var(--on-dark);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+}
+
+.notice-pill__icon {
+  fill: currentColor;
+  stroke: none;
+}
+
+.notice-pill:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+/* ---- The cards, full screen ----------------------------------------------------- */
+
+.notice-back {
+  padding: 0;
+  place-items: stretch;
+}
+
+.notice {
+  --notice-bg: var(--navy);
+  --notice-fg: var(--on-dark);
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: 100%;
+  height: 100dvh;
+  padding: calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--space-5) calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+  background: var(--notice-bg);
+  color: var(--notice-fg);
+  overflow: hidden;
+}
+
+.notice--trip { --notice-bg: var(--sand); --notice-fg: var(--navy); }
+.notice--past { --notice-bg: var(--navy); --notice-fg: var(--on-dark); }
+.notice--food { --notice-bg: var(--shore); --notice-fg: var(--navy); }
+.notice--diary { --notice-bg: var(--pastel-blue); --notice-fg: var(--navy); }
+.notice--wishes { --notice-bg: var(--wave); --notice-fg: var(--on-dark); }
+.notice--photos { --notice-bg: var(--depth); --notice-fg: var(--on-dark); }
+.notice--books { --notice-bg: var(--paper); --notice-fg: var(--navy); }
+
+.notice__top {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+
+.notice__marks {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 4px;
+}
+
+.notice__mark {
+  flex: 1;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  opacity: 0.28;
+}
+
+.notice__mark.is-done,
+.notice__mark.is-on {
+  opacity: 1;
+}
+
+.notice__count {
+  margin: 0;
+  font-size: var(--text-sm);
+  opacity: 0.8;
+}
+
+.notice__close {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.notice__stage {
+  display: grid;
+  align-content: center;
+  min-height: 0;
+  overflow-y: auto;
+  padding-block: var(--space-4);
+}
+
+/* Tap the sides to move between cards. They sit under the top row and the actions. */
+.notice__zone {
+  position: absolute;
+  z-index: 1;
+  top: 5rem;
+  bottom: 6.5rem;
+  width: 30%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.notice__zone--prev { left: 0; }
+.notice__zone--next { right: 0; width: 70%; }
+.notice__zone:disabled { cursor: default; }
+
+.notice__zone:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -6px;
+  border-radius: var(--radius-md);
+}
+
+.notice__actions {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  gap: var(--space-2);
+}
+
+.notice__action {
+  flex: 1 1 0;
+  min-height: 3rem;
+  padding: 0 var(--space-3);
+  border: 1.5px solid currentColor;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+}
+
+.notice__action--keep {
+  flex-grow: 1.6;
+  border-color: var(--notice-fg);
+  background: var(--notice-fg);
+  color: var(--notice-bg);
+}
+
+.notice__action:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.notice :is(.notice__close, .notice__action):focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+/* ---- A card kept in the story ------------------------------------------------- */
+
+.story-noticed {
+  position: relative;
+  margin: var(--space-4) var(--story-gutter, var(--space-4));
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--navy);
+  color: var(--on-dark);
+}
+
+.story-noticed--trip { background: var(--sand); color: var(--navy); }
+.story-noticed--food { background: var(--shore); color: var(--navy); }
+.story-noticed--diary { background: var(--pastel-blue); color: var(--navy); }
+.story-noticed--wishes { background: var(--wave); color: var(--on-dark); }
+.story-noticed--photos { background: var(--depth); color: var(--on-dark); }
+.story-noticed--books { background: var(--paper); color: var(--navy); box-shadow: inset 0 0 0 1px var(--line); }
+
+.story-noticed .notice-face {
+  gap: var(--space-2);
+}
+
+.story-noticed .notice-face__headline {
+  font-size: var(--text-lg);
+}
+
+.story-noticed .notice-face__stat-value {
+  font-size: var(--text-xl);
+}
+
+.story-noticed .notice-face__photo {
+  flex-basis: 26%;
+  box-shadow: 0 6px 14px rgba(10, 21, 54, 0.28);
+}
+
+.story-noticed .notice-face__photos--1 .notice-face__photo { flex-basis: 44%; }
+.story-noticed .notice-face__photos--2 .notice-face__photo { flex-basis: 34%; }
+
+.story-noticed__remove {
+  min-height: 2.75rem;
+  margin-top: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-decoration: underline;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.story-noticed__remove:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+@media (min-width: 720px) {
+  .notice-back {
+    place-items: center;
+  }
+
+  .notice {
+    width: min(27rem, 100%);
+    height: min(46rem, calc(100dvh - 2 * var(--space-6)));
+    border-radius: var(--radius-lg);
+  }
+}
