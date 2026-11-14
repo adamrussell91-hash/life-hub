@@ -120,7 +120,7 @@ function jpegTakenAt(file, wall) {
 
 const ok = (data) => ({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data }) });
 
-async function openStory(engine, viewport, contextOptions = {}, mutate) {
+async function openStory(engine, viewport, contextOptions = {}, mutate, extras = {}) {
   const context = await engine.newContext({ viewport, ...contextOptions });
   const page = await context.newPage();
   const errors = [];
@@ -142,8 +142,18 @@ async function openStory(engine, viewport, contextOptions = {}, mutate) {
     return route.fulfill(ok({ journal, version }));
   });
   await page.route('**/api/travel-trip?*', (route) =>
-    route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ ok: false, error: { code: 'not_found', message: 'none' } }) })
+    extras.trip
+      ? route.fulfill(ok({ trip: extras.trip, version: 't1' }))
+      : route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ ok: false, error: { code: 'not_found', message: 'none' } }) })
   );
+  await page.route('**/api/travel-noticing?*', (route) =>
+    route.fulfill(ok({ history: extras.history ?? { trips: [], days: [] } }))
+  );
+  await page.route('**/api/travel-journal-media?*', (route) => {
+    if (route.request().method() !== 'GET') return route.fulfill({ status: 503, body: '' });
+    return route.fulfill({ status: 200, contentType: 'image/jpeg', body: fs.readFileSync(path.join(PHOTO_DIR, 'ribeira.jpg')) });
+  });
+  if (extras.now) await page.clock.setFixedTime(new Date(extras.now));
   const photos = fs.readdirSync(PHOTO_DIR).filter((name) => name.endsWith('.jpg')).sort();
   await page.route('**/spec-photo/*', (route) => {
     const index = Math.abs([...route.request().url()].reduce((sum, ch) => sum + ch.charCodeAt(0), 0)) % photos.length;
@@ -551,6 +561,98 @@ test('journal moment (390px): closing the sheet keeps the note', { skip: !hasTra
     assert.ok(!puts[1].moments.some((m) => m.text === 'Nobody on the pavement even looks up.' && m.lifecycle === 'live'));
   } finally {
     await context.close();
+  }
+});
+
+/** An invented trip around the story journal: 2 to 5 May 2026, four days, so day 2 is halfway. */
+function storyTrip() {
+  const city = (id, name, start, end) => ({
+    id, name, country: 'Portugal', tz: 'Europe/Lisbon', start_date: start, end_date: end, title: name, scene: 'generic',
+    accent: { color: '#2f62a8', soft: '#d9e6f5', ink: '#17375e' }, facts: [], center: { lat: 38.72, lon: -9.14 },
+    local_currency: 'EUR', directions_app: 'google'
+  });
+  return {
+    id: TRIP, schema_version: 1, title: 'Story spec trip', start_date: '2026-05-02', end_date: '2026-05-05', home_tz: 'Europe/Lisbon',
+    followers_label: '', cities: [city('lis', 'Lisbon', '2026-05-02', '2026-05-03'), city('opo', 'Porto', '2026-05-04', '2026-05-05')],
+    items: [], days: [], checkins: [], share: { enabled: false, created_at: null },
+    created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z'
+  };
+}
+
+test('journal noticing (390px): the pill, the cards, keeping one, and nothing when there is nothing', { skip: !hasTravelBuild }, async () => {
+  const history = {
+    trips: [{ id: 'trp_story_past', title: 'Invented north', start_date: '2025-05-01', end_date: '2025-05-05', days: 5,
+      cities: [{ name: 'Bergen', country: 'Norway', start_date: '2025-05-01', end_date: '2025-05-05' }] }],
+    days: [{ trip_id: 'trp_story_past', date: '2025-05-03', city: 'Bergen', country: 'Norway', photos: 7, first_time: '09:00',
+      last_time: '20:00', north: null, south: null, photo_ids: ['med_past_a', 'med_past_b', 'med_past_c'] }]
+  };
+  const { context, page, puts, errors } = await openStory(browser, { width: 390, height: 844 }, {}, undefined,
+    { trip: storyTrip(), history, now: '2026-05-03T17:00:00Z' });
+  try {
+    // Day 2 of 4: "a year ago today" from the past trip, and "halfway" from this one.
+    const pill = page.locator('[data-notice-pill]');
+    await pill.waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => document.querySelector('[data-notice-pill]')?.textContent === '2 things noticed today');
+    assert.ok((await box(page, '[data-notice-pill]')).height >= 44);
+    const hashBefore = await page.evaluate(() => location.hash);
+    await pill.click();
+    const cards = page.locator('.notice');
+    await cards.waitFor();
+    await page.waitForTimeout(400);
+    assert.equal(await cards.locator('.notice-face__headline').innerText(), 'A year ago today you were in Bergen');
+    assert.match(await cards.locator('.notice-face__source').innerText(), /from your past trips/i);
+    assert.match(await cards.locator('.notice-face__basis').innerText(), /7 photos from 3 May 2025, in your journal of Invented north/);
+    assert.equal(await cards.locator('.notice-face__photo img').count(), 3);
+    const look = await page.evaluate(() => {
+      const card = document.querySelector('.notice').getBoundingClientRect();
+      const actions = [...document.querySelectorAll('.notice__action, .notice__close')].map((b) => b.getBoundingClientRect());
+      const bar = document.querySelector('.hub-mobile-nav').getBoundingClientRect();
+      const top = document.elementFromPoint(bar.left + bar.width / 2, bar.top + bar.height / 2);
+      return {
+        fills: Math.abs(card.height - window.innerHeight) <= 1 && Math.abs(card.width - window.innerWidth) <= 1,
+        minTarget: Math.min(...actions.map((r) => Math.min(r.width, r.height))),
+        lowest: Math.max(...actions.map((r) => r.bottom)),
+        barCovered: !document.querySelector('.hub-mobile-nav').contains(top),
+      };
+    });
+    assert.ok(look.fills, 'the card fills the phone');
+    assert.ok(look.minTarget >= 44, `card controls are at least 44px (got ${look.minTarget})`);
+    assert.ok(look.lowest <= 844, 'the actions are on screen');
+    assert.ok(look.barCovered, 'the tab bar is under the cards');
+    assert.equal(await overflowX(page), 0);
+
+    // Keep the first, move on by tapping the right side, then Back closes without leaving the journal.
+    await cards.getByRole('button', { name: 'Keep in the story' }).click();
+    await page.mouse.click(330, 400);
+    assert.equal(await cards.locator('.notice-face__headline').innerText(), 'Halfway');
+    assert.equal(await overflowX(page), 0);
+    await page.goBack();
+    await cards.waitFor({ state: 'detached', timeout: 5000 });
+    assert.equal(await page.evaluate(() => location.hash), hashBefore);
+
+    // One save: the kept card whole, both marked seen. The band is in that day of the story.
+    await page.locator('[data-noticed]').waitFor({ timeout: 10000 });
+    assert.equal(puts.length, 1);
+    const state = puts[0].preferences.journal_noticing_v1;
+    assert.deepEqual(Object.values(state.kept).map((c) => c.headline), ['A year ago today you were in Bergen']);
+    assert.equal(state.seen.length, 2);
+    assert.equal(await page.locator('#day_a2 [data-noticed] h3').innerText(), 'A year ago today you were in Bergen');
+    assert.equal(await page.locator('h1').count(), 1);
+    assert.equal(await page.locator('[data-notice-pill]').count(), 0, 'nothing left to notice: no pill');
+    assert.equal(await overflowX(page), 0);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+
+  // Before the trip there is no pill, no empty state, no trace (P4).
+  const quiet = await openStory(browser, { width: 390, height: 844 }, {}, undefined, { trip: storyTrip(), history, now: '2026-04-20T10:00:00Z' });
+  try {
+    await quiet.page.waitForTimeout(800);
+    assert.equal(await quiet.page.locator('[data-notice-pill]').count(), 0);
+    assert.doesNotMatch(await quiet.page.locator('#app').innerText(), /noticed/i);
+  } finally {
+    await quiet.context.close();
   }
 });
 

@@ -121,6 +121,27 @@ test('keepsakes and their photos never reach a shared journal', () => {
   assert.deepEqual(findForbiddenSharePayloadKeys(payload), []);
 });
 
+test('noticing cards kept in the story never reach a shared journal', () => {
+  const journal = baseJournal();
+  journal.preferences = {
+    journal_noticing_v1: {
+      seen: ['on-this-day:2026-04-01:trp_other'],
+      dismissed: [],
+      kept: {
+        'on-this-day:2026-04-01:trp_other': {
+          key: 'on-this-day:2026-04-01:trp_other', kind: 'on-this-day', source: 'past', day: '2026-04-01',
+          headline: 'A year ago today you were in Invented Town', basis: '4 photos from 1 April 2025', score: 90,
+          photos: [{ tripId: 'trp_other', mediaId: 'med_other_trip' }]
+        }
+      }
+    }
+  };
+  const payload = buildSharedJournalPayload(journal, { moment_ids: [], leg_ids: ['leg_a'] });
+  const text = JSON.stringify(payload);
+  assert.equal(payload.preferences, undefined);
+  assert.ok(!text.includes('Invented Town') && !text.includes('med_other_trip') && !text.includes('noticing'));
+});
+
 test('collectSharedMomentIds expands legs but never defaults to all moments', () => {
   const journal = baseJournal();
   const fromLeg = collectSharedMomentIds({ moment_ids: [], leg_ids: ['leg_a'] }, journal);
