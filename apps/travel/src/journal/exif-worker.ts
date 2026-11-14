@@ -72,7 +72,8 @@ export async function inspectFile(file: File | Blob): Promise<InspectedPhoto> {
 
   let raw: Record<string, unknown> = {};
   try {
-    const parsed = await exifr.parse(file, { tiff: true, reviveValues: true });
+    // The bytes are already in memory for the checksum: parse those, not the file again.
+    const parsed = await exifr.parse(bytes, { tiff: true, reviveValues: true });
     if (parsed && typeof parsed === 'object') raw = parsed as Record<string, unknown>;
   } catch {
     raw = {};

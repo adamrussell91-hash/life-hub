@@ -5,7 +5,18 @@ import { tripRoute } from '@/app/router';
 import { prefersReducedMotion } from '../../design-kit/js/hub-motion.js';
 import { getPattern } from '@/journal/patterns/registry';
 import { shouldShowDayMapPreview } from '@/journal/layout';
-import { journalImportChecksums } from '@/journal/import-review';
+import { journalImportChecksums, loadImportProposal } from '@/journal/import-review';
+import {
+  fileImport,
+  filedSummary,
+  ImportSpaceError,
+  keepInterruptedImport,
+  readPhotos,
+  undoImport,
+  type ReadPhoto,
+} from '@/journal/import-run';
+import { mountImportStrip, STRIP_HIDE_AFTER_MS, type ImportStripHandle } from '@/journal/story/import-strip';
+import { openUndatedSheet, type UndatedDayChoice } from '@/journal/undated-sheet';
 import { isJournalStoryEmpty, resolveCaptureContext } from '@/journal/capture-context';
 import { openCaptureSheet } from '@/journal/capture-sheet';
 import { openImportSheet } from '@/journal/import-sheet';
@@ -264,6 +275,207 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     );
   }
 
+  // ---- Photos file themselves --------------------------------------------------
+
+  const strip: ImportStripHandle = mountImportStrip();
+  /** Moments filed a moment ago: they settle into the page once. */
+  let justFiled = new Set<string>();
+  let importing = false;
+
+  const photoPicker = el('input');
+  photoPicker.type = 'file';
+  photoPicker.accept = 'image/jpeg,image/png';
+  photoPicker.multiple = true;
+  photoPicker.hidden = true;
+  photoPicker.tabIndex = -1;
+  photoPicker.setAttribute('aria-hidden', 'true');
+  photoPicker.setAttribute('data-journal-photo-picker', '');
+  photoPicker.addEventListener('change', () => {
+    const files = photoPicker.files ? [...photoPicker.files] : [];
+    photoPicker.value = '';
+    if (files.length) void runImport(files);
+  });
+
+  /** The round button: straight to the phone's photo picker, inside the tap. */
+  function pickPhotos(): void {
+    if (importing) {
+      strip.message({ text: 'Still filing the last photos', autoHideMs: 3000 });
+      return;
+    }
+    photoPicker.click();
+  }
+
+  /** The first moment just filed. While set, repaints keep it on screen (a background sync repaints right after the save). */
+  let filedFocus: string | undefined;
+  let filedTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function showFiledFocus(): void {
+    if (!filedFocus) return;
+    // Straight there: the new moments settling in is the motion. A smooth scroll would be cut short by the next repaint.
+    chapterEl(root, filedFocus)?.scrollIntoView({ block: 'start', behavior: 'auto' });
+  }
+
+  function showFiled(momentIds: string[]): void {
+    justFiled = new Set(momentIds);
+    filedFocus = momentIds[0];
+    view = 'story';
+    rebuild(true, filedFocus);
+    showFiledFocus();
+    if (filedTimer) clearTimeout(filedTimer);
+    filedTimer = setTimeout(() => {
+      justFiled = new Set();
+      filedFocus = undefined;
+    }, 2500);
+  }
+
+  function undatedDays(): UndatedDayChoice[] {
+    const legs = legsById();
+    const days = liveFixture.days
+      .filter((d) => d.lifecycle === 'live' && legs.get(d.leg_id)?.lifecycle === 'live')
+      .sort((a, b) => b.local_date.localeCompare(a.local_date));
+    const today = resolveCaptureContext(liveFixture);
+    const choices: UndatedDayChoice[] = [];
+    const add = (legId: string, localDate: string, prefix: string): void => {
+      if (choices.some((c) => c.legId === legId && c.localDate === localDate)) return;
+      const n = dayNo(localDate);
+      choices.push({
+        legId,
+        localDate,
+        label: [prefix, n > 0 ? `Day ${n}` : '', longDate(localDate)].filter(Boolean).join(' · '),
+        hint: legs.get(legId)?.destination,
+      });
+    };
+    // Today first while the trip is on; then the days, latest first.
+    const todayDate = today ? (opts.today ?? todayIn(legs.get(today.legId)?.timezone || 'UTC')) : '';
+    if (today && today.localDate === todayDate) add(today.legId, today.localDate, 'Today');
+    for (const day of days) add(day.leg_id, day.local_date, '');
+    return choices;
+  }
+
+  function offerUndated(undated: ReadPhoto[], prior: { text: string; notes: string[]; undo?: () => void }): void {
+    const n = undated.length;
+    strip.message({
+      text: prior.text,
+      notes: [...prior.notes, n === 1 ? '1 photo has no date' : `${n} photos have no date`],
+      actions: [
+        ...(prior.undo ? [{ label: 'Undo', onSelect: prior.undo }] : []),
+        {
+          label: 'Choose a day',
+          onSelect: () =>
+            swap(
+              'undated',
+              openUndatedSheet({
+                anchor: root,
+                files: undated.map((item) => item.file),
+                days: undatedDays(),
+                onChoose: (day) => void commitImport(undated, { alreadyHere: 0, inTrash: 0, unreadable: 0 }, [], day),
+                onClose: () => {
+                  overlays.undated = null;
+                },
+              }),
+            ),
+        },
+      ],
+    });
+  }
+
+  async function commitImport(
+    ready: ReadPhoto[],
+    skipped: { alreadyHere: number; inTrash: number; unreadable: number },
+    undated: ReadPhoto[],
+    day?: { legId: string; localDate: string },
+  ): Promise<void> {
+    importing = true;
+    strip.reading(ready.length, ready.length);
+    try {
+      const filed = await fileImport({
+        tripId: liveFixture.trip_id,
+        journal: journalDoc(),
+        version: liveVersion,
+        tripTitle: title(),
+        items: ready,
+        day,
+      });
+      liveFixture = filed.envelope.journal;
+      liveVersion = filed.envelope.version;
+      showFiled(filed.momentIds);
+      const summary = filedSummary({ photos: filed.mediaIds.length, moments: filed.momentIds.length, ...skipped });
+      const undo = (): void => {
+        strip.hide();
+        void persistJournalPatch(liveFixture.trip_id, liveVersion, undoImport(journalDoc(), filed.momentIds)).then(
+          (saved) => {
+            onJournalSaved(saved);
+            strip.message({ text: 'Taken back. The photos are in Trash.', autoHideMs: 5000 });
+          },
+          () => strip.message({ text: 'Could not undo. Try again from the moment’s menu.', tone: 'problem' }),
+        );
+      };
+      const notes = filed.envelope.queued ? [...summary.notes, 'saved on this phone until you are back online'] : summary.notes;
+      if (undated.length) {
+        offerUndated(undated, { text: summary.headline, notes, undo });
+      } else {
+        const actions = [{ label: 'Undo', onSelect: undo }];
+        if (skipped.inTrash) actions.push({ label: 'Open Trash', onSelect: openTrash });
+        strip.message({ text: summary.headline, notes, actions, autoHideMs: STRIP_HIDE_AFTER_MS });
+      }
+    } catch (error) {
+      const full = error instanceof ImportSpaceError;
+      if (!full) await keepInterruptedImport(liveFixture.trip_id, journalDoc(), ready).catch(() => undefined);
+      strip.message({
+        text: full ? 'This phone is out of space for these photos' : 'Could not save. Your photos are safe on this phone.',
+        notes: full ? ['Nothing was filed. Free some space and try again.'] : [],
+        tone: 'problem',
+        actions: [{ label: 'Try again', onSelect: () => void commitImport(ready, skipped, undated, day) }],
+      });
+    } finally {
+      importing = false;
+    }
+  }
+
+  async function runImport(files: File[]): Promise<void> {
+    if (importing) return;
+    importing = true;
+    strip.reading(0, files.length);
+    const { knownChecksums, deletedChecksums } = journalImportChecksums(liveFixture);
+    let read;
+    try {
+      read = await readPhotos(files, {
+        knownChecksums,
+        deletedChecksums,
+        onProgress: (done, total) => strip.reading(done, total),
+      });
+    } finally {
+      importing = false;
+    }
+    const skipped = { alreadyHere: read.alreadyHere, inTrash: read.inTrash, unreadable: read.unreadable };
+    if (read.ready.length) {
+      await commitImport(read.ready, skipped, read.undated);
+      return;
+    }
+    const summary = filedSummary({ photos: 0, moments: 0, ...skipped });
+    if (read.undated.length) {
+      offerUndated(read.undated, { text: 'These photos need a day', notes: summary.notes });
+      return;
+    }
+    const actions = skipped.inTrash ? [{ label: 'Open Trash', onSelect: openTrash }] : [];
+    strip.message({ text: summary.headline, notes: summary.notes, actions, autoHideMs: STRIP_HIDE_AFTER_MS });
+  }
+
+  // An import that was cut short last time is still on the phone: offer to finish it.
+  if (!isFixtureVersion(liveVersion)) {
+    void loadImportProposal(liveFixture.trip_id).then(
+      (restored) => {
+        if (!restored || importing) return;
+        strip.message({
+          text: 'An import was interrupted',
+          notes: ['The photos are still on this phone'],
+          actions: [{ label: 'Finish', onSelect: () => (strip.hide(), openImport()) }],
+        });
+      },
+      () => undefined,
+    );
+  }
+
   function openCapture(dayId?: string): void {
     const ctx = resolveCaptureContext(liveFixture, dayId);
     if (!ctx) return;
@@ -277,7 +489,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
         tripTitle: title(),
         version: liveVersion,
         anchor: root,
-        onImportPhotos: (files) => openImport(files),
+        onImportPhotos: (files) => void runImport(files),
         onClose: () => {
           overlays.capture = null;
         },
@@ -353,6 +565,22 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
 
   // ---- Options sheet -------------------------------------------------------
 
+  function openTrash(): void {
+    swap(
+      'trash',
+      openTrashView({
+        tripId: liveFixture.trip_id,
+        journal: journalDoc(),
+        version: liveVersion,
+        anchor: root,
+        onSaved: onJournalSaved,
+        onClose: () => {
+          overlays.trash = null;
+        },
+      }),
+    );
+  }
+
   function openOptions(): void {
     const items: JournalOption[] = [{ label: 'Search journal', paths: ICONS.search, onSelect: openSearch }];
     if (journalHasPartnerMoments(journalDoc())) {
@@ -402,20 +630,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
       {
         label: 'Trash',
         paths: ICONS.trash,
-        onSelect: () =>
-          swap(
-            'trash',
-            openTrashView({
-              tripId: liveFixture.trip_id,
-              journal: journalDoc(),
-              version: liveVersion,
-              anchor: root,
-              onSaved: onJournalSaved,
-              onClose: () => {
-                overlays.trash = null;
-              },
-            }),
-          ),
+        onSelect: openTrash,
       },
     );
     if (opts.onRefresh) items.push({ label: 'Refresh', paths: ICONS.refresh, onSelect: opts.onRefresh });
@@ -659,7 +874,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     empty.append(el('p', 'journal-empty__lead', 'Your story starts here. Add photos or write a moment.'));
     const actions = el('div', 'journal-empty__actions');
     const photosBtn = button('btn btn--primary journal-empty__photos', 'Add photos');
-    photosBtn.addEventListener('click', () => openImport());
+    photosBtn.addEventListener('click', pickPhotos);
     const momentBtn = button('btn btn--secondary journal-empty__moment', 'Add moment');
     momentBtn.addEventListener('click', () => openCapture());
     actions.append(photosBtn, momentBtn);
@@ -803,6 +1018,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
               tripId: liveFixture.trip_id,
               photoIndexOf: (mediaId) => photoIndex.get(`${moment.id}|${mediaId}`) ?? -1,
               eager: moment.id === firstVisibleId,
+              isNew: justFiled.has(moment.id),
               onActions: (m) =>
                 swap(
                   'actions',
@@ -987,8 +1203,12 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
   buildRibbon();
   paintView();
 
-  const dock: DockHandle = mountDock({ onPhotos: () => openImport(), onMoment: () => openCapture(), onKeepsake: () => openKeep() });
-  root.append(coverHost, ribbonHost, timeline, dock.el);
+  const dock: DockHandle = mountDock({ onPhotos: pickPhotos, onMoment: () => openCapture(), onKeepsake: () => openKeep() });
+  root.append(coverHost, ribbonHost, timeline, strip.el, dock.el, photoPicker);
+  cleanups.push(() => {
+    strip.destroy();
+    if (filedTimer) clearTimeout(filedTimer);
+  });
   cleanups.push(() => dock.destroy());
   cleanups.push(mountJournalOfflineStatus(root));
   // Background sync finished (queued save or a media upload): adopt the
@@ -1034,6 +1254,13 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
   });
 
   function reconcile(envelope: JournalEnvelope): void {
+    if (filedFocus) {
+      liveFixture = envelope.journal;
+      liveVersion = envelope.version;
+      rebuild(true, filedFocus);
+      showFiledFocus();
+      return;
+    }
     const win = root.ownerDocument?.defaultView;
     const anchor = resolveEntranceTarget(root);
     const anchorTop = anchor?.getBoundingClientRect().top;

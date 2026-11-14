@@ -157,7 +157,17 @@ function pickLegForLocalDate(legs: JournalLeg[], localDate: string | null): stri
       return leg.id;
     }
   }
-  return ordered[0]?.id ?? null;
+  // Outside every city's dates (a photo from the flight, or the day after): the nearest city by date.
+  let nearest: { id: string; days: number } | null = null;
+  const day = Date.parse(`${localDate}T00:00:00Z`);
+  for (const leg of ordered) {
+    if (!leg.start_date || !leg.end_date || !Number.isFinite(day)) continue;
+    const start = Date.parse(`${leg.start_date}T00:00:00Z`);
+    const end = Date.parse(`${leg.end_date}T00:00:00Z`);
+    const days = day < start ? start - day : day - end;
+    if (!nearest || days < nearest.days) nearest = { id: leg.id, days };
+  }
+  return nearest?.id ?? ordered[0]?.id ?? null;
 }
 
 function representativeCoords(photos: InspectedPhoto[]): { lat: number; lon: number } | undefined {

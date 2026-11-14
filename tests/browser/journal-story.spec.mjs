@@ -102,6 +102,22 @@ function storyJournal() {
   };
 }
 
+/** A copy of a JPEG with a capture time written into it, as a camera would. */
+function jpegTakenAt(file, wall) {
+  const jpeg = fs.readFileSync(file);
+  const tiff = Buffer.concat([
+    Buffer.from([0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x08]), // big-endian TIFF, first IFD at 8
+    Buffer.from([0x00, 0x01, 0x87, 0x69, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x00, 0x00]), // IFD0: Exif IFD at 26
+    Buffer.from([0x00, 0x01, 0x90, 0x03, 0x00, 0x02, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00]), // DateTimeOriginal at 44
+    Buffer.from(`${wall}\0`, 'ascii')
+  ]);
+  const body = Buffer.concat([Buffer.from('Exif\0\0', 'ascii'), tiff]);
+  const head = Buffer.alloc(4);
+  head.writeUInt16BE(0xffe1, 0);
+  head.writeUInt16BE(body.length + 2, 2);
+  return Buffer.concat([jpeg.subarray(0, 2), head, body, jpeg.subarray(2)]);
+}
+
 const ok = (data) => ({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data }) });
 
 async function openStory(engine, viewport, contextOptions = {}) {
@@ -367,6 +383,83 @@ test('journal keepsakes (390px): kept in the story, on the board, and added from
     const card = page.locator('.journal-trash__card', { hasText: 'Gig flyer' });
     await card.getByRole('button', { name: 'Restore' }).click();
     await page.waitForFunction(() => document.querySelector('.keep-board__count')?.textContent === '2 kept');
+  } finally {
+    await context.close();
+  }
+});
+
+test('journal photos (390px): the round button files photos with no sheet', { skip: !hasTravelBuild }, async () => {
+  const { context, page, puts, errors } = await openStory(browser, { width: 390, height: 844 });
+  try {
+    const names = fs.readdirSync(PHOTO_DIR).filter((name) => name.endsWith('.jpg') && !name.startsWith('keep-')).sort();
+    const taken = (index, wall) => ({
+      name: `IMG_${index}.jpg`,
+      mimeType: 'image/jpeg',
+      buffer: jpegTakenAt(path.join(PHOTO_DIR, names[index]), wall)
+    });
+
+    // One tap opens the picker. No sheet appears before or after.
+    await page.locator('[data-story-view="photos"]').click();
+    const chooser = page.waitForEvent('filechooser');
+    await page.locator('.story-dock__main').click();
+    const picker = await chooser;
+    assert.equal(picker.isMultiple(), true);
+    assert.equal(await page.locator('.sheet-back').count(), 0, 'no sheet before the picker');
+    await picker.setFiles([
+      taken(0, '2026:05:03 14:05:00'),
+      taken(1, '2026:05:03 14:20:00'),
+      taken(2, '2026:05:04 09:00:00'),
+      { name: 'screenshot.jpg', mimeType: 'image/jpeg', buffer: fs.readFileSync(path.join(PHOTO_DIR, names[3])) }
+    ]);
+
+    const strip = page.locator('[data-import-strip]');
+    await page.waitForFunction(() => /^Filed 3 photos into 2 moments/.test(document.querySelector('.story-strip__headline')?.textContent ?? ''), null, { timeout: 15000 });
+    assert.equal(await page.locator('.sheet-back').count(), 0, 'no review sheet');
+    assert.match(await strip.locator('.story-strip__notes').innerText(), /1 photo has no date/);
+
+    // Filed by the time inside each photo: two together on 3 May, one on 4 May.
+    assert.equal(puts.length, 1);
+    const added = puts[0].moments.filter((m) => !['mom_arch', 'mom_two', 'mom_words', 'mom_partner', 'mom_bridge'].includes(m.id));
+    assert.deepEqual(
+      added.map((m) => [m.leg_id, m.local_date, m.local_time, m.media_ids.length]).sort(),
+      [['leg_a', '2026-05-03', '14:05', 2], ['leg_b', '2026-05-04', '09:00', 1]]
+    );
+    // The story is showing, whichever view the button was pressed from (V7).
+    assert.equal(await page.locator('[data-story-showing]').first().getAttribute('data-story-showing'), 'story');
+    assert.equal(await page.locator('#' + added[0].id).count(), 1);
+
+    // The strip sits above the dock and the tab bar, covers neither, and fits the phone.
+    await page.evaluate(() => window.scrollBy(0, -40));
+    await page.waitForTimeout(900);
+    const boxes = await page.evaluate(() => {
+      const r = (sel) => document.querySelector(sel).getBoundingClientRect();
+      const small = [...document.querySelectorAll('.story-strip button')].filter((b) => !b.hidden && (b.getBoundingClientRect().height < 43.5 || b.getBoundingClientRect().width < 43.5)).length;
+      return { strip: r('.story-strip'), dock: r('.story-dock'), bar: r('.hub-mobile-nav'), small };
+    });
+    assert.ok(boxes.strip.bottom <= boxes.dock.top + 1, `strip (${boxes.strip.bottom}) clears the dock (${boxes.dock.top})`);
+    assert.ok(boxes.strip.bottom <= boxes.bar.top, 'strip clears the tab bar');
+    assert.ok(boxes.strip.left >= 0 && boxes.strip.right <= 390, 'strip fits the phone');
+    assert.equal(boxes.small, 0, 'strip buttons are at least 44px');
+    assert.equal(await overflowX(page), 0);
+
+    // The undated one: choose a day, and it is filed there.
+    await strip.getByRole('button', { name: 'Choose a day' }).click();
+    const sheet = page.locator('.story-sheet');
+    await sheet.waitFor();
+    assert.match(await sheet.innerText(), /1 photo has no date/);
+    await page.goBack();
+    await sheet.waitFor({ state: 'detached', timeout: 5000 });
+    await strip.getByRole('button', { name: 'Choose a day' }).click();
+    await sheet.getByRole('button', { name: /Day 2/ }).click();
+    await page.waitForFunction(() => /^Filed 1 photo into 1 moment/.test(document.querySelector('.story-strip__headline')?.textContent ?? ''), null, { timeout: 15000 });
+    assert.equal(puts.length, 2);
+
+    // Undo takes back exactly that one.
+    const before = puts[1].moments.filter((m) => m.lifecycle === 'live').length;
+    await strip.getByRole('button', { name: 'Undo' }).click();
+    await page.waitForFunction(() => /^Taken back/.test(document.querySelector('.story-strip__headline')?.textContent ?? ''), null, { timeout: 15000 });
+    assert.equal(puts[2].moments.filter((m) => m.lifecycle === 'live').length, before - 1);
+    assert.deepEqual(errors, []);
   } finally {
     await context.close();
   }

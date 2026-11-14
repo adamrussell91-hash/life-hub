@@ -34,6 +34,8 @@ export function createMockApi() {
   let authenticated = false;
   // Journals and the Arches Atlas, in memory. Invented sample rows only.
   const journals = new Map<string, { journal: Record<string, unknown>; version: number }>();
+  /** Bytes PUT to /api/mock-upload, by storage key, so a photo filed locally can be shown again. */
+  const uploads = new Map<string, Buffer>();
   // Food Journal visits written through /api/travel-meal, keyed trip:moment.
   const meals = new Map<string, { id: string; title: string; dishes: Record<string, unknown>[] }>();
   let atlasSettings: { home_big_mac_aud: number | null } = { home_big_mac_aud: null };
@@ -489,6 +491,13 @@ export function createMockApi() {
     if (path === '/api/mock-upload' && method === 'PUT') {
       return json(200, { ok: true, data: { stored: true } });
     }
+    if (path === '/api/travel-journal-media' && method === 'GET') {
+      const variant = url.searchParams.get('variant') === 'derivative' ? `w${url.searchParams.get('width')}` : 'original';
+      const key = `travel/journal/${url.searchParams.get('trip')}/${url.searchParams.get('id')}/${variant}`;
+      const buffer = uploads.get(key);
+      if (!buffer) return json(404, { ok: false, error: { code: 'not_found', message: 'Not found.' } });
+      return { status: 200, body: null, raw: { contentType: 'image/jpeg', buffer } };
+    }
 
     if (path === '/api/travel-atlas' && method === 'GET') {
       const items = liveAtlasFrom(url.searchParams.get('trip') ?? undefined);
@@ -569,6 +578,10 @@ export function createMockApi() {
       let requestBody: unknown;
       const rawBuf = Buffer.concat(chunks);
       const contentType = String(req.headers?.['content-type'] ?? '');
+      if (req.method === 'PUT' && (req.url ?? '').startsWith('/api/mock-upload')) {
+        const key = new URL(req.url ?? '/', 'http://local').searchParams.get('key');
+        if (key) uploads.set(key, rawBuf);
+      }
       if (contentType.includes('multipart/form-data')) {
         requestBody = { multipart: true, bytes: rawBuf.length };
       } else if (rawBuf.length) {
