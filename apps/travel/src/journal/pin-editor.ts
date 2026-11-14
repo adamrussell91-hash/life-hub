@@ -1,4 +1,4 @@
-import { Map as MapLibreMap, NavigationControl } from 'maplibre-gl';
+import { Map as MapLibreMap, NavigationControl } from '@/lib/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { JournalCoordinates } from '@/journal/types';
 import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';

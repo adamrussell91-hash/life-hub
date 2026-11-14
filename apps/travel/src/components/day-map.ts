@@ -1,4 +1,4 @@
-import { Map as MapLibreMap, Marker, NavigationControl, LngLatBounds } from 'maplibre-gl';
+import { Map as MapLibreMap, Marker, NavigationControl, LngLatBounds } from '@/lib/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { City, IsoDate, Item } from '@/types';
 import { itemPlace, numberStops, orderDayItems } from '@/model/day';

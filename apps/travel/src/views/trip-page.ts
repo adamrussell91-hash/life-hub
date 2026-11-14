@@ -654,8 +654,8 @@ async function startWhereAmI(
     return zonedToInstant(item.date, item.time, city.tz) >= now;
   });
 
-  // Already loaded: the day map this runs against imported maplibre-gl.
-  const { Marker: MarkerCtor } = await import('maplibre-gl');
+  // Already loaded: the day map this runs against imported MapLibre.
+  const { Marker: MarkerCtor } = await import('@/lib/maplibre');
   let meMarker: Marker | null = null;
   const watchId = navigator.geolocation.watchPosition(
     (pos) => {

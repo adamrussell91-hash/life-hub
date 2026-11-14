@@ -4,7 +4,7 @@ import {
   NavigationControl,
   LngLatBounds,
   type GeoJSONSource,
-} from 'maplibre-gl';
+} from '@/lib/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { JournalMoment } from '@/journal/types';
 import {
