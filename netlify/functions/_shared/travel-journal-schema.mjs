@@ -18,6 +18,11 @@ const PREFIX_RE = {
   day: /^day_[a-z0-9_]{4,64}$/i
 };
 
+const SOUVENIRS_PREF_KEY = 'journal_souvenirs_v1';
+const COVER_PREF_KEY = 'cover_media_id';
+const KEEPSAKE_KINDS = new Set(['ticket', 'poster', 'round', 'other']);
+const KEEPSAKE_SOURCES = new Set(['photo', 'booking']);
+
 function fail(path, message) {
   const err = new Error(message);
   err.code = 'validation_error';
@@ -27,6 +32,47 @@ function fail(path, message) {
 
 function isObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+/**
+ * Keepsakes live in preferences as souvenir rows. Rows written before
+ * keepsakes carry none of the fields checked here, so they always pass.
+ */
+function validateKeepsakePreferences(preferences) {
+  const cover = preferences[COVER_PREF_KEY];
+  if (cover !== undefined && cover !== null && typeof cover !== 'string') {
+    throw fail(`preferences.${COVER_PREF_KEY}`, 'cover_media_id must be a media id');
+  }
+  const rows = preferences[SOUVENIRS_PREF_KEY];
+  if (rows === undefined || rows === null) return;
+  if (!isObject(rows)) throw fail(`preferences.${SOUVENIRS_PREF_KEY}`, 'keepsakes must be an object keyed by id');
+  for (const [id, row] of Object.entries(rows)) {
+    const path = `preferences.${SOUVENIRS_PREF_KEY}.${id}`;
+    if (!isObject(row)) throw fail(path, 'a keepsake must be an object');
+    if (row.kind !== undefined && !KEEPSAKE_KINDS.has(row.kind)) {
+      throw fail(`${path}.kind`, 'kind must be ticket, poster, round or other');
+    }
+    if (row.source !== undefined && !KEEPSAKE_SOURCES.has(row.source)) {
+      throw fail(`${path}.source`, 'source must be photo or booking');
+    }
+    for (const key of ['item_id', 'leg_id', 'media_id', 'moment_id']) {
+      if (row[key] !== undefined && row[key] !== null && typeof row[key] !== 'string') {
+        throw fail(`${path}.${key}`, `${key} must be a string`);
+      }
+    }
+    if (row.local_date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(String(row.local_date))) {
+      throw fail(`${path}.local_date`, 'local_date must be YYYY-MM-DD');
+    }
+    if (row.local_time !== undefined && !/^\d{2}:\d{2}$/.test(String(row.local_time))) {
+      throw fail(`${path}.local_time`, 'local_time must be HH:mm');
+    }
+    if (row.coordinates !== undefined) {
+      const c = row.coordinates;
+      const ok =
+        isObject(c) && Number.isFinite(c.lat) && Number.isFinite(c.lon) && Math.abs(c.lat) <= 90 && Math.abs(c.lon) <= 180;
+      if (!ok) throw fail(`${path}.coordinates`, 'coordinates must be a lat and lon');
+    }
+  }
 }
 
 function requireString(obj, key, path, { min = 1 } = {}) {
@@ -276,6 +322,7 @@ export function validateJournal(doc) {
   if (!Array.isArray(doc.leg_ids)) throw fail('leg_ids', 'leg_ids must be an array');
   if (!isObject(doc.preferences)) throw fail('preferences', 'preferences must be an object');
   validateAtlasPreference(doc.preferences[ATLAS_PREF_KEY]);
+  validateKeepsakePreferences(doc.preferences);
   for (const arrayKey of ['legs', 'days', 'moments', 'media', 'transitions', 'operations']) {
     if (!Array.isArray(doc[arrayKey])) throw fail(arrayKey, `${arrayKey} must be an array`);
   }

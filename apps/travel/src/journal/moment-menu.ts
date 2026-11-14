@@ -55,11 +55,11 @@ export function buildMomentMenuItems(
     },
     {
       action: 'souvenir',
-      label: 'Add souvenir',
+      label: 'Keep as a keepsake',
       disabled: !live,
       title: live
         ? 'Save a keepsake linked to this moment'
-        : 'Deleted moments cannot add souvenirs',
+        : 'A deleted moment cannot hold a keepsake',
     },
     {
       action: 'reorder',

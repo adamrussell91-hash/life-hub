@@ -9,7 +9,6 @@ import { openReorderSheet } from '@/journal/reorder-sheet';
 import { openSplitSheet } from '@/journal/split-sheet';
 import { openDeleteConfirmSheet } from '@/journal/delete-confirm-sheet';
 import { openPhotoAnnotationSheet } from '@/journal/annotation-sheet';
-import { openAddSouvenirSheet } from '@/journal/souvenirs-sheet';
 
 export interface MomentActionContext {
   fixture: JournalFixture;
@@ -19,6 +18,8 @@ export interface MomentActionContext {
   anchor: HTMLElement;
   trip?: Trip;
   onJournalSaved?: (envelope: { journal: JournalDocument; version: string }) => void;
+  /** Opens "Keep as a keepsake" for a moment. */
+  onKeep?: (moment: JournalMoment) => void;
 }
 
 /** Opens the sheet for one action on a moment. Returns its handle, or null when there is nothing to open. */
@@ -53,14 +54,8 @@ export function runMomentAction(
       });
     }
     case 'souvenir':
-      return openAddSouvenirSheet({
-        tripId: ctx.tripId,
-        journal: ctx.journal,
-        version: ctx.version,
-        moment,
-        anchor: ctx.anchor,
-        onSaved,
-      });
+      ctx.onKeep?.(moment);
+      return null;
     case 'reorder':
       return openReorderSheet(base);
     case 'split':

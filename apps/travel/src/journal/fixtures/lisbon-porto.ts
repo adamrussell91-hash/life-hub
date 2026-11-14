@@ -23,6 +23,13 @@ export const LISBON_PORTO_PHOTOS: Record<string, { width: number; height: number
   beach: { width: 960, height: 640 },
 };
 
+/** Drawn, invented keepsakes. Media rows only: no moment shows them. */
+export const LISBON_PORTO_KEEPSAKE_PHOTOS: Record<string, { width: number; height: number }> = {
+  'keep-ticket': { width: 760, height: 440 },
+  'keep-poster': { width: 600, height: 840 },
+  'keep-coaster': { width: 600, height: 600 },
+};
+
 const LEG_LISBON = 'leg_lplisbon01';
 const LEG_PORTO = 'leg_lpporto001';
 const SOUND_ID = 'med_lpsoundbells';
@@ -98,6 +105,17 @@ export function lisbonPortoJournal(tripId: string): JournalDocument {
     content_type: 'image/jpeg',
     upload_state: 'backed_up',
   }));
+  for (const [name, size] of Object.entries(LISBON_PORTO_KEEPSAKE_PHOTOS)) {
+    media.push({
+      id: photoId(name.replace('-', '')),
+      url: `/api/mock-photo/${name}.jpg`,
+      width: size.width,
+      height: size.height,
+      lifecycle: 'live',
+      content_type: 'image/jpeg',
+      upload_state: 'backed_up',
+    });
+  }
   media.push({
     id: SOUND_ID,
     url: silentWav(3),
@@ -139,7 +157,30 @@ export function lisbonPortoJournal(tripId: string): JournalDocument {
     revision: 1,
     lifecycle: 'live',
     leg_ids: [LEG_LISBON, LEG_PORTO],
-    preferences: {},
+    preferences: {
+      journal_souvenirs_v1: {
+        sv_lptramticket: {
+          id: 'sv_lptramticket', title: 'Tram 28 ticket', note: 'Still in my coat pocket.', kind: 'ticket', source: 'photo',
+          media_id: photoId('keepticket'), leg_id: LEG_LISBON, local_date: '2027-03-03', local_time: '11:20',
+          lifecycle: 'live', created_at: '2027-03-03T11:20:00.000Z',
+        },
+        sv_lpfadoflyer: {
+          id: 'sv_lpfadoflyer', title: 'Fado night flyer', kind: 'poster', source: 'photo',
+          media_id: photoId('keepposter'), moment_id: 'mom_lpfado001',
+          lifecycle: 'live', created_at: '2027-03-04T22:40:00.000Z',
+        },
+        sv_lpcoaster: {
+          id: 'sv_lpcoaster', title: 'Coaster from the tavern', kind: 'round', source: 'photo',
+          media_id: photoId('keepcoaster'), moment_id: 'mom_lpdinner1',
+          lifecycle: 'live', created_at: '2027-03-05T21:30:00.000Z',
+        },
+        // A record from before keepsakes: a name and nothing else.
+        sv_lpmagnet: {
+          id: 'sv_lpmagnet', title: 'Tile fridge magnet', moment_id: 'mom_lpmarket1',
+          lifecycle: 'live', created_at: '2027-03-06T13:30:00.000Z',
+        },
+      },
+    },
     legs: [
       { id: LEG_LISBON, trip_id: tripId, pattern_id: 'generic', destination: 'Lisbon', timezone: 'Europe/Lisbon', city_id: 'lis', start_date: '2027-03-03', end_date: '2027-03-05', order: 0, lifecycle: 'live' },
       { id: LEG_PORTO, trip_id: tripId, pattern_id: 'generic', destination: 'Porto', timezone: 'Europe/Lisbon', city_id: 'opo', start_date: '2027-03-05', end_date: '2027-03-07', order: 1, lifecycle: 'live' },

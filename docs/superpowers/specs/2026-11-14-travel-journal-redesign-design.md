@@ -153,17 +153,17 @@ Every photo of the trip in a three-column grid, grouped under "Day 1 · Lisbon".
 
 Existing souvenirs have none of these and read as `kind: other`, `source: photo`.
 
-**From bookings.** Every flight and train on the itinerary that passes `isVerifiedItineraryTicket` shows as a drawn ticket: carrier and number, from and to, date and departure time. The booking reference is never drawn. These are worked out when the journal renders and are not stored. Removing one stores a deleted souvenir row with its `item_id`, which hides it. Trash restores it.
+**From bookings.** Every flight and train on the itinerary that passes `isVerifiedItineraryTicket` shows as a drawn ticket: carrier and number, from and to, date and departure time. The booking reference is never drawn. These are worked out when the journal renders and are not stored. Removing one stores a deleted souvenir row with its `item_id`, which hides it. Trash restores it. Trash also lists keepsakes Adam removed, with Restore and Delete permanently (a hidden booked ticket has Restore only). A keepsake's own photo goes to Trash with it and comes back with it.
 
 **Arrival stamps.** One per city: country, city, arrival date. Worked out from the leg and the trip city. Shown on the chapter opener and the board. Not removable.
 
-**Keeping one.** The dock's Keepsake button opens a sheet with four choices: ticket or pass, poster or flyer, coaster or label, anything else. Choosing one opens the photo picker with `accept="image/*"`, so the phone offers camera or library. The photo goes through the existing outbox upload. The keepsake is filed under today's day in the current city, with the phone's location when it is available. "Keep as a keepsake" on a moment's action sheet replaces "Add souvenir" and links to that moment.
+**Keeping one.** The dock's Keepsake button opens a sheet with four choices: ticket or pass, poster or flyer, coaster or label, anything else. Choosing one opens the photo picker with `accept="image/*"`, so the phone offers camera or library. The photo goes through the existing outbox upload. The keepsake is filed under today's day in the current city, with the phone's location when it is available. "Keep as a keepsake" on a moment's action sheet replaces "Add souvenir" and links to that moment. From a moment with a photo, the keepsake uses that photo and no picker opens. A fifth, quieter choice keeps a name with no photo, as the old souvenir form could; it is drawn as a paper tag. After the photo is chosen the sheet shows it cut to its shape with an optional name and note, then "Keep it".
 
 **In the story.** A keepsake sits after the moment it is linked to, or in time order within its day. It is drawn at a slight angle with a strip of tape, beside "Kept: tram ticket" and its time and place. Booked tickets sit at the journey between cities, marked "Kept automatically from your booking".
 
 **The board.** The Keepsakes view. A heading with the count and a "Keep something" button, then one section per city: the arrival stamp, then that city's keepsakes laid out loosely at small angles. Tap one for a sheet with the keepsake large, its name, day, time, place and note, and "Go to that day".
 
-**Sharing.** Keepsakes and stamps are left out of the public share view and the export in this slice. They join after the same privacy review the journal share had.
+**Sharing.** Keepsakes and stamps are left out of the public share view in this slice, and the print edition does not draw them. They join after the same privacy review the journal share had. Export is Adam's own backup, so it keeps the stored keepsake records and their photos as data, as it already kept souvenirs.
 
 ### Sheets
 

@@ -152,7 +152,7 @@ export function impactConfirmCopy(target: DeleteTarget, impact: DeleteImpact): s
   if (target.kind === 'moment') {
     const souvenirLine =
       impact.souvenirs > 0
-        ? ` ${impact.souvenirs} linked souvenir${impact.souvenirs === 1 ? '' : 's'} leave your collection until you restore this moment.`
+        ? ` ${impact.souvenirs} linked keepsake${impact.souvenirs === 1 ? ' goes' : 's go'} with it until you restore this moment.`
         : '';
     return `Delete this moment? You can undo for 10 seconds or restore it from Trash.${souvenirLine}`;
   }

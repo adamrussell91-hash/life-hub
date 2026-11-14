@@ -34,7 +34,7 @@ describe('moment action sheet', () => {
     const host = anchor();
     openMomentActionSheet({ fixture: journal, moment, anchor: host, onAction: () => {} });
     const labels = [...host.querySelectorAll('.story-sheet__row-label')].map((n) => n.textContent);
-    expect(labels).toEqual(['Edit moment', 'Annotate photos', 'Add souvenir', 'Reorder', 'Split', 'Merge', 'Move', 'Delete']);
+    expect(labels).toEqual(['Edit moment', 'Annotate photos', 'Keep as a keepsake', 'Reorder', 'Split', 'Merge', 'Move', 'Delete']);
     expect(host.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Moment actions');
     expect(host.querySelector('.story-sheet__title')?.textContent).toBe('4:45 pm · Cais da Ribeira');
   });

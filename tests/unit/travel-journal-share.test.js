@@ -95,6 +95,32 @@ test('buildSharedJournalPayload keeps only selected moments and strips private f
   assert.deepEqual(findForbiddenSharePayloadKeys(payload), []);
 });
 
+test('keepsakes and their photos never reach a shared journal', () => {
+  const journal = baseJournal();
+  journal.media.push({ id: 'med_keepsake', lifecycle: 'live', width: 100, height: 60 });
+  journal.preferences = {
+    journal_souvenirs_v1: {
+      sv_ticket: {
+        id: 'sv_ticket', title: 'Funicular ticket stub', kind: 'ticket', source: 'photo', media_id: 'med_keepsake',
+        leg_id: 'leg_a', local_date: '2026-04-01', lifecycle: 'live', created_at: '2026-04-01T10:00:00.000Z'
+      },
+      sv_linked: {
+        id: 'sv_linked', title: 'Linked coaster', kind: 'round', source: 'photo', moment_id: 'mom_share',
+        lifecycle: 'live', created_at: '2026-04-01T11:00:00.000Z'
+      }
+    }
+  };
+  // Sharing the whole city still leaves the keepsakes out.
+  const payload = buildSharedJournalPayload(journal, { moment_ids: [], leg_ids: ['leg_a'] });
+  assert.equal(payload.preferences, undefined);
+  assert.deepEqual(payload.media.map((m) => m.id), ['med_share']);
+  const text = JSON.stringify(payload);
+  assert.ok(!text.includes('Funicular'), 'no keepsake title');
+  assert.ok(!text.includes('coaster'), 'no linked keepsake title');
+  assert.ok(!text.includes('med_keepsake'), 'no keepsake photo');
+  assert.deepEqual(findForbiddenSharePayloadKeys(payload), []);
+});
+
 test('collectSharedMomentIds expands legs but never defaults to all moments', () => {
   const journal = baseJournal();
   const fromLeg = collectSharedMomentIds({ moment_ids: [], leg_ids: ['leg_a'] }, journal);

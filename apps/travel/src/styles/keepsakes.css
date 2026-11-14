@@ -1,0 +1,535 @@
+/* Travel journal keepsakes: tickets, posters, coasters, stamps.
+ * Each object is sized in em, so one font-size on its parent scales it like a picture.
+ * The same facts are always written beside it in kit type. */
+
+.keepsake {
+  position: relative;
+  display: inline-block;
+  font-size: inherit;
+  line-height: 1.15;
+  color: var(--ink);
+  filter: drop-shadow(0 0.15em 0.2em rgba(10, 21, 54, 0.22)) drop-shadow(0 0.7em 1.1em rgba(10, 21, 54, 0.14));
+}
+
+.keepsake__in {
+  position: relative;
+  display: block;
+  overflow: hidden;
+}
+
+/* ---- A photo cut to its shape -------------------------------------------- */
+
+.keepsake--photo .keepsake__in {
+  padding: 0.5em;
+  background: var(--paper);
+}
+
+.keepsake--photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.keepsake--photo.is-ticket .keepsake__in {
+  width: 19em;
+  height: 11em;
+}
+
+.keepsake--photo.is-poster .keepsake__in {
+  width: 15em;
+  height: 21em;
+}
+
+.keepsake--photo.is-round .keepsake__in {
+  width: 12em;
+  height: 12em;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.keepsake--photo.is-other .keepsake__in {
+  width: 16em;
+  height: 13em;
+}
+
+/* Kept in words only. */
+.keepsake--tag .keepsake__in {
+  max-width: 16em;
+  padding: 1.1em 1.4em 1.1em 2.4em;
+  background: var(--sand);
+  font-family: var(--font-fun);
+  font-weight: 800;
+  font-size: 1.3em;
+  color: var(--navy);
+  clip-path: polygon(1.2em 0, 100% 0, 100% 100%, 1.2em 100%, 0 50%);
+}
+
+.keepsake--tag .keepsake__in::before {
+  content: '';
+  position: absolute;
+  left: 1.1em;
+  top: 50%;
+  width: 0.6em;
+  height: 0.6em;
+  margin-top: -0.3em;
+  border-radius: 50%;
+  background: var(--paper);
+}
+
+/* ---- A ticket drawn from a booking ----------------------------------------- */
+
+.keepsake--ticket .keepsake__in {
+  display: grid;
+  grid-template-columns: 22em 8em;
+  width: 30em;
+  min-height: 10em;
+  background: var(--paper);
+  -webkit-mask:
+    radial-gradient(circle 0.7em at 22em 0, transparent 97%, #000) top left / 100% 51% no-repeat,
+    radial-gradient(circle 0.7em at 22em 100%, transparent 97%, #000) bottom left / 100% 51% no-repeat;
+  mask:
+    radial-gradient(circle 0.7em at 22em 0, transparent 97%, #000) top left / 100% 51% no-repeat,
+    radial-gradient(circle 0.7em at 22em 100%, transparent 97%, #000) bottom left / 100% 51% no-repeat;
+}
+
+.keepsake__main {
+  display: block;
+  min-width: 0;
+  padding: 1.1em 1.3em;
+  border-top: 0.7em solid var(--navy);
+}
+
+.keepsake--flight .keepsake__main {
+  border-top-color: var(--wave);
+}
+
+.keepsake__stub {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.6em;
+  padding: 1.1em 0.9em;
+  border-top: 0.7em solid var(--high-sea);
+  border-left: 0.14em dashed var(--line);
+}
+
+.keepsake__k {
+  display: block;
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.keepsake__route {
+  display: block;
+  margin: 0.3em 0 0.6em;
+  font-family: var(--font-fun);
+  font-weight: 800;
+  font-size: 1.12em;
+  line-height: 1.12;
+  color: var(--navy);
+  overflow-wrap: anywhere;
+}
+
+.keepsake__facts {
+  display: flex;
+  gap: 1.6em;
+  font-size: 0.95em;
+  font-variant-numeric: tabular-nums;
+}
+
+.keepsake__field b {
+  display: block;
+  font-size: 1.15em;
+  white-space: nowrap;
+}
+
+.keepsake__codes b {
+  display: block;
+  font-family: var(--font-fun);
+  font-weight: 800;
+  font-size: 1.25em;
+  letter-spacing: 0.04em;
+  color: var(--navy);
+}
+
+.keepsake__bars {
+  display: block;
+  height: 2.4em;
+  opacity: 0.8;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--ink) 0 0.18em,
+    transparent 0.18em 0.4em,
+    var(--ink) 0.4em 0.5em,
+    transparent 0.5em 0.82em
+  );
+}
+
+/* ---- An arrival stamp: ink, not paper ------------------------------------ */
+
+.keepsake--stamp {
+  --keepsake-ink: var(--wave);
+  padding: 0.7em 1.2em 0.6em;
+  border: 0.26em solid currentColor;
+  border-radius: 0.9em;
+  outline: 0.1em solid currentColor;
+  outline-offset: 0.22em;
+  color: var(--keepsake-ink);
+  text-align: center;
+  line-height: 1.1;
+  opacity: 0.88;
+  filter: none;
+  transform: rotate(-4deg);
+}
+
+.keepsake__country {
+  display: block;
+  font-size: 0.8em;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.keepsake__city {
+  display: block;
+  margin: 0.12em 0;
+  font-family: var(--font-fun);
+  font-weight: 800;
+  font-size: 2.3em;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.keepsake__date {
+  display: block;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* ---- A keepsake in the story ------------------------------------------------ */
+
+.story-keep {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--story-gutter) var(--space-2);
+}
+
+.story-keep__object {
+  position: relative;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.5rem;
+  line-height: 0;
+  cursor: pointer;
+  transform: rotate(var(--keep-tilt, -3deg));
+  transition: transform 0.25s ease;
+}
+
+.story-keep__object--booking {
+  font-size: 0.42rem;
+}
+
+/* A strip of tape holding it to the page. */
+.story-keep__object::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: -0.55rem;
+  width: 2.9rem;
+  height: 1.05rem;
+  margin-left: -1.45rem;
+  background: rgba(250, 233, 181, 0.72);
+  box-shadow: 0 1px 2px rgba(10, 21, 54, 0.12);
+  transform: rotate(-4deg);
+}
+
+.story-keep__object:active {
+  transform: rotate(0deg) scale(1.03);
+}
+
+.story-keep__object:focus-visible,
+.keep-board__item:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 4px;
+}
+
+.story-keep__text {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.story-keep__text b {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.story-keep--booking {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+}
+
+.story-keep--booking .story-keep__object {
+  --keep-tilt: -1.5deg;
+}
+
+/* The stamp on a chapter opener. */
+.story-chapter__stamp {
+  position: absolute;
+  right: var(--story-gutter);
+  bottom: var(--space-4);
+  font-size: 0.5rem;
+  pointer-events: none;
+}
+
+/* ---- The board ------------------------------------------------------------- */
+
+.keep-board__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--story-gutter) var(--space-2);
+}
+
+.keep-board__title {
+  margin: 0;
+  font-family: var(--font-fun);
+  font-weight: 800;
+  font-size: var(--text-xl);
+  color: var(--navy);
+}
+
+.keep-board__count {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.keep-board__add {
+  flex: none;
+  min-height: 2.75rem;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--navy);
+  color: var(--on-dark);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+}
+
+.keep-board__add:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.keep-board__surface {
+  margin-top: var(--space-3);
+  padding: var(--space-5) var(--space-3) var(--space-8);
+  background-color: var(--sand);
+  background-image: radial-gradient(rgba(23, 55, 94, 0.09) 1px, transparent 1.4px);
+  background-size: 14px 14px;
+}
+
+.keep-board__city {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0 var(--space-1) var(--space-2);
+  padding-top: var(--space-3);
+}
+
+.keep-board__stamp {
+  flex: none;
+  font-size: 0.46rem;
+}
+
+.keep-board__city-text {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.keep-board__city-text b {
+  display: block;
+  font-size: var(--text-md);
+  color: var(--navy);
+}
+
+.keep-board__items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4) var(--space-3);
+  padding: var(--space-4) 0 var(--space-6);
+}
+
+.keep-board__item {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.56rem;
+  line-height: 0;
+  cursor: pointer;
+  transform: rotate(var(--keep-tilt, 0deg));
+  transition: transform 0.25s ease;
+}
+
+.keep-board__item--booking {
+  font-size: 0.5rem;
+}
+
+.keep-board__item:active {
+  transform: rotate(0deg) scale(1.04);
+}
+
+.keep-board__none {
+  margin: 0;
+  padding: var(--space-2) var(--space-1) var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.keep-board__empty {
+  padding: var(--space-6) var(--story-gutter);
+  font-size: var(--text-base);
+  color: var(--muted);
+}
+
+/* ---- Sheets ---------------------------------------------------------------- */
+
+.keep-view {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3) 0 var(--space-4);
+  text-align: center;
+}
+
+.keep-view__object {
+  margin: var(--space-3) 0 var(--space-5);
+  font-size: 0.85rem;
+  line-height: 0;
+  max-width: 100%;
+}
+
+.keep-view__object--booking {
+  font-size: 0.66rem;
+}
+
+.keep-view__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.keep-view__meta,
+.keep-view__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.keep-view__note {
+  margin-top: var(--space-2);
+  font-size: var(--text-base);
+  color: var(--ink);
+}
+
+.keep-form {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+
+.keep-form__preview {
+  justify-self: center;
+  margin: var(--space-3) 0 var(--space-4);
+  font-size: 0.7rem;
+  line-height: 0;
+}
+
+.keep-form label {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.keep-form input[type='text'] {
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-md);
+}
+
+.keep-form__status {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.keep-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+@media (min-width: 720px) {
+  .story-keep__object {
+    font-size: 0.58rem;
+  }
+
+  .story-keep__object--booking {
+    font-size: 0.5rem;
+  }
+
+  .keep-board__surface {
+    border-radius: var(--radius-lg);
+    padding-inline: var(--space-6);
+  }
+
+  .keep-board__item {
+    font-size: 0.66rem;
+  }
+
+  .story-chapter__stamp {
+    font-size: 0.6rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-keep__object,
+  .keep-board__item {
+    transition: none;
+  }
+}

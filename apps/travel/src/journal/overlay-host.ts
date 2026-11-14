@@ -115,12 +115,23 @@ function onPopState(ev: PopStateEvent): void {
   maybeRestoreScrollRestoration();
 }
 
+function isButtonLikeInput(field: HTMLElement): boolean {
+  if (!(field instanceof HTMLInputElement)) return false;
+  return ['checkbox', 'radio', 'button', 'submit', 'range', 'file', 'color'].includes(field.type);
+}
+
 function onKeyDown(ev: KeyboardEvent): void {
   if (ev.key !== 'Escape') return;
   const entry = top();
   if (!entry) return;
   ev.preventDefault();
   ev.stopPropagation();
+  // While typing, Escape leaves the field. It closes the overlay only from outside one.
+  const field = ev.target instanceof HTMLElement ? ev.target.closest('input, textarea, select') : null;
+  if (field instanceof HTMLElement && entry.back.contains(field) && !isButtonLikeInput(field)) {
+    field.blur();
+    return;
+  }
   entry.dismiss();
 }
 
