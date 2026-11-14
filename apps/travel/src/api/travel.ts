@@ -139,6 +139,20 @@ export function getNoticingHistory(tripId: string): Promise<{ history: import('@
   return apiGet(`/api/travel-noticing?trip=${encodeURIComponent(tripId)}`);
 }
 
+/** Ask the server which bucket-list and dreams-jar items one day of the trip fulfilled. */
+export function askNoticing(
+  tripId: string,
+  kind: 'wishes' | 'photos',
+  day: string,
+): Promise<{ cards: import('@/journal/noticing/model').NoticeCard[] }> {
+  return apiPost(`/api/travel-noticing?trip=${encodeURIComponent(tripId)}`, { kind, day });
+}
+
+/** Mark a Someday item done in Tasks. Only ever called from the owner's own tap. */
+export function tickOffTask(taskId: string): Promise<unknown> {
+  return apiPatch(`/api/tasks?id=${encodeURIComponent(taskId)}`, { status: 'done' });
+}
+
 /** A street or neighbourhood name for a spot, or null when the lookup has nothing sure to say. */
 export function reversePlaceName(lat: number, lon: number): Promise<{ name: string | null }> {
   const params = new URLSearchParams({ reverse: '1', lat: String(lat), lon: String(lon) });

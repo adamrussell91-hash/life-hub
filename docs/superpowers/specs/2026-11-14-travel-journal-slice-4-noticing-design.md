@@ -73,7 +73,8 @@ From the diary. Confirmed 14/11/26: exact words only.
 - Once a day of the trip, it gives a model those titles beside today's itinerary items, moment places and moment words, and asks which wishes today fulfils.
 - The model must point at the exact itinerary item or moment that fulfils each one. A match with no such pointer is thrown away by the server, not by the model.
 - The card reads, for an invented wish: "Ride a night train. You have wanted this since 2024." Under it, the evidence: the itinerary item or moment it matched, in Adam's own words.
-- The card offers **Tick it off in Tasks**. Tapping it marks that Someday item done and links back to the moment. Nothing is written to Tasks before that tap.
+- The card offers **Tick it off in Tasks**. Tapping it marks that Someday item done, and the card stays in the story marked "Ticked off in Tasks". Nothing is written to Tasks before that tap. Tasks has no field for a link back to the moment, so none is written.
+- A wish card is not used up by being looked at. It waits until it is ticked off or turned down.
 - It also offers **Not this one**, which stops that pairing being offered again.
 
 **Seen in the photos.**
@@ -100,10 +101,10 @@ From the diary. Confirmed 14/11/26: exact words only.
 ## How it is worked out
 
 - **Counting cards** are computed on the phone, by plain functions, from the journal in hand plus a compact history the server returns: for each earlier trip, its dates, cities and countries, and for each day its photo count, first and last moment times, extreme coordinates and up to three photo ids.
-- **Model cards** are made on the server, once per trip day, the first time the journal is opened after 5 pm local time in the trip's current city (or the next morning). The result is stored, so opening the journal again costs nothing.
+- **Model cards** are made on the server, once per trip day, the first time the journal is opened after 5 pm local time in the trip's current city (or the next morning). The server stores nothing and changes nothing: it returns the cards, and the phone keeps them in the journal with the days already asked about, so opening the journal again costs nothing.
 - **Stored in the journal** under `preferences.journal_noticing_v1`: the cards made so far, which were seen, kept or marked not right, and the days already checked. Preferences never leave in a shared journal. Export keeps them, as it keeps keepsakes.
 - **The model** is the small, fast one the food journal already uses for menus. Each day's request is a few dozen short lines of text, or a few dozen 320px images.
-- **Limits.** One wishes request and one photos request per trip day. A day's request that fails is tried once more on the next open, then left.
+- **Limits.** One wishes request and one photos request per trip day. A day's request that fails is tried once more on the next open, then left. A failed request shows no error: a missing noticing is not the reader's problem.
 
 ## What is sent where
 
