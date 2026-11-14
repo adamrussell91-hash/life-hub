@@ -16,6 +16,8 @@ export interface MomentCardOptions {
   photoIndexOf: (mediaId: string) => number;
   /** First moment on screen: load its lead photo straight away. */
   eager?: boolean;
+  /** Filed a moment ago: settles into the page once. */
+  isNew?: boolean;
   /** Opens the action sheet. Omitted in read-only previews. */
   onActions?: (moment: JournalMoment, trigger: HTMLElement) => void;
   /** Opens the meal for a moment that has one. */
@@ -64,6 +66,7 @@ export function renderMomentCard(options: MomentCardOptions): HTMLElement {
   const { fixture, moment, tripId } = options;
   const article = el('article', 'story-moment journal-moment');
   article.id = moment.id;
+  if (options.isNew) article.classList.add('story-moment--new');
   article.setAttribute('data-journal-moment', moment.id);
 
   const partner = resolveMomentAuthor(moment) === 'partner';

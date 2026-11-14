@@ -26,6 +26,8 @@ export interface JournalMediaUploadJob {
   mediaId: string;
   blob: Blob;
   contentType: string;
+  /** SHA-256 of the original, when it was already worked out (photo import). */
+  checksum?: string;
 }
 
 const RETRY_DELAYS_MS = [1000, 4000, 12000];
@@ -105,12 +107,13 @@ async function putAndVerify(
   base: Omit<JournalMediaSignInput, 'checksum' | 'byte_size' | 'content_type'>,
   blob: Blob,
   contentType: string,
+  knownChecksum?: string,
 ): Promise<JournalEnvelope> {
   const signInput: JournalMediaSignInput = {
     ...base,
     content_type: contentType,
     byte_size: blob.size,
-    checksum: await sha256Hex(blob),
+    checksum: knownChecksum ?? (await sha256Hex(blob)),
   };
   await withRetry(async () => {
     const sign = await signJournalMedia(signInput);
@@ -143,7 +146,7 @@ export async function backUpJournalMedia(job: JournalMediaUploadJob): Promise<Jo
       image.source.close();
     }
   }
-  return putAndVerify({ ...base, purpose: 'original' }, job.blob, job.contentType);
+  return putAndVerify({ ...base, purpose: 'original' }, job.blob, job.contentType, job.checksum);
 }
 
 export function makeMediaId(): string {
@@ -161,20 +164,32 @@ export async function buildJournalMediaRow(
   mediaId: string,
   blob: Blob,
   contentType: string,
-  extra: { durationS?: number } = {},
+  extra: {
+    durationS?: number;
+    /** Already worked out while reading the photo: skips a second hash. */
+    checksum?: string;
+    /** Pixel size as displayed, from the photo's own metadata: skips a decode. */
+    width?: number;
+    height?: number;
+  } = {},
 ): Promise<JournalMedia> {
   const row: JournalMedia = {
     id: mediaId,
     lifecycle: 'live',
     content_type: contentType,
     byte_size: blob.size,
-    checksum: await sha256Hex(blob),
+    checksum: extra.checksum ?? (await sha256Hex(blob)),
     upload_state: 'pending',
   };
   if (isAudioContentType(contentType)) {
     if (extra.durationS && Number.isFinite(extra.durationS)) {
       row.duration_s = Math.round(extra.durationS);
     }
+    return row;
+  }
+  if (extra.width && extra.height && extra.width > 0 && extra.height > 0) {
+    row.width = extra.width;
+    row.height = extra.height;
     return row;
   }
   try {
