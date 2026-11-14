@@ -387,7 +387,9 @@
   flex: 1;
 }
 
-.journal-map-panel__map-host {
+/* Two classes: maplibre-gl.css loads later and sets `.maplibregl-map { position: relative }`
+   on this element, which would collapse it to 0px and clip the whole map. */
+.journal-map-panel__map > .journal-map-panel__map-host {
   position: absolute;
   inset: 0;
 }
@@ -1277,7 +1279,8 @@ html.vv-keyboard-open .sheet.addform.journal-move-sheet {
   border: 1px solid var(--line);
 }
 
-.journal-pin-panel__map-host {
+/* Two classes, as for the Photo stops map: must outrank `.maplibregl-map`. */
+.journal-pin-panel__map > .journal-pin-panel__map-host {
   position: absolute;
   inset: 0;
 }
