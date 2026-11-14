@@ -21,7 +21,7 @@ import { renderCityForm } from '@/components/city-form';
 import { renderDayLabelSheet } from '@/components/day-label-sheet';
 import { renderArrivalGuideSheet } from '@/components/arrival-guide-sheet';
 import { renderSafePhotoSheet } from '@/components/safe-photo-sheet';
-import { shrinkSafePhoto } from '@/lib/safe-photo';
+import { safeSaveErrorMessage, shrinkSafePhoto } from '@/lib/safe-photo';
 import { renderTakeMeHome } from '@/components/take-me-home';
 import { renderShareSheet } from '@/components/share-sheet';
 import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
@@ -536,7 +536,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     // One-tap mark safe; photo opens the sheet.
     if (mode === 'mark') {
       void markItemSafe(item).catch((err) => {
-        window.alert(err instanceof Error ? err.message : 'Could not mark safe.');
+        window.alert(`Not marked safe. ${safeSaveErrorMessage(err)}`);
       });
       return;
     }
