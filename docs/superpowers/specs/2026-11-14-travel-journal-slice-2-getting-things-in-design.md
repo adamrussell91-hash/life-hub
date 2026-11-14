@@ -2,7 +2,7 @@
 
 Date: 14/11/26. Follows `2026-11-14-travel-journal-redesign-design.md`, which outlined this slice and fixed one decision: the dock's round button brings in photos from the camera roll, because Adam takes his photos in the Camera app and will not take them in the journal.
 
-Status: sections 1 and 2 follow that decision and are ready to build. Sections 3 to 5 carry new choices, marked **To confirm**.
+Status: sections 1 and 2 follow that decision. Sections 3 to 5 carried new choices, which Adam confirmed on 14/11/26: street-level place names, tap the words to edit, and the Moment sheet keeping what is in it on close.
 
 ## Problem
 
@@ -79,13 +79,13 @@ Measured before and after on Adam's iPhone with the same 30 photos: time from th
 
 ## 3. Places name themselves
 
-**To confirm: look places up automatically, at street and neighbourhood level.**
+**Confirmed 14/11/26: look places up automatically, at street and neighbourhood level.**
 
 A moment filed from a photo has coordinates and no name. After filing, the journal asks for a name for each new moment that has coordinates and no place.
 
 - The server's existing place search (`travel-places`, which already uses the Photon geocoder) gains a reverse lookup: coordinates in, a short name out.
 - The name is the street or the neighbourhood with the town: "Rua da Bica", "Ribeira, Porto". It is never a shop, restaurant or hotel. The nearest business to a photo is often the wrong one, and a wrong business name in a journal is worse than none (register D1).
-- Lookups run in the background after the save, one at a time. The names arrive in the story as they come back. A lookup that fails leaves the moment as it is and is tried again the next time the journal opens, a few moments per visit.
+- Lookups run in the background after the save, one at a time, at most 12 in a run (the server allows 30 place requests a minute). Photos taken within 50 metres of each other share one lookup. The names arrive in the story as they come back. A lookup that fails leaves the moment as it is and is tried again the next time the journal opens, a few moments per visit.
 - A looked-up name is marked as such in the data, shows like any other place, and is replaced by whatever Adam types in Edit moment. Typed names are never overwritten.
 - Coordinates go from the phone to Life Hub's own server and from there to the geocoder, as typed place searches already do. Nothing else about the moment is sent.
 
@@ -93,11 +93,12 @@ Alternative: no lookup, places stay blank until typed. Faster to build, but most
 
 ## 4. Words edited in place
 
-**To confirm: tap the words to edit them.**
+**Confirmed 14/11/26: tap the words to edit them.**
 
 - Tapping a moment's words turns them into a text field in the same place and type, with the keyboard up. A long entry opens fully first.
 - A moment with no words shows a quiet "Add a line" under its time and place. Only the owner sees it.
-- Leaving the field saves. A **Done** button sits above the keyboard. Escape puts the old words back.
+- Leaving the field saves. A **Done** button sits just above the field, where the keyboard cannot cover it. Escape puts the old words back.
+- While words are being typed, a background sync does not repaint the story. It is applied when the field closes.
 - A failed save keeps the field open with the new words in it and says why (register V5).
 - Partner's lines keep the rule the Edit moment sheet has today.
 - Date, time, place, photos, sound and meal stay in Edit moment.
@@ -106,13 +107,13 @@ Alternative: a small pencil beside the words instead of tapping them. Safer agai
 
 ## 5. Notes and sound without Save
 
-**To confirm: closing the sheet keeps what is in it.**
+**Confirmed 14/11/26: closing the sheet keeps what is in it.**
 
 The dock's Moment button opens the same sheet as today, with two changes.
 
 - There is no Save button. **Done**, a swipe down, Back or a tap outside all keep the moment, as long as it has words, a photo or a sound. An empty sheet just closes.
 - **Discard** is the one way to throw it away, and asks once.
-- After it closes, a toast says "Moment added" with **Undo**.
+- After it closes, the status strip says "Moment added" with **Undo**, and the story moves to the new moment.
 - Saving no longer waits for a location fix. The moment is saved at once with the fix it has. If a better one arrives within a few seconds it is added in a second save.
 
 The draft autosave stays, so a killed tab still loses nothing.

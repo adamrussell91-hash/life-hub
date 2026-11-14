@@ -23,6 +23,8 @@ export interface JournalCoordinates {
 
 export interface JournalPlace {
   name: string;
+  /** `lookup`: named from the photo's coordinates. Absent when the traveller named it. */
+  source?: 'lookup';
 }
 
 export interface JournalMedia extends JournalDeletedMeta {

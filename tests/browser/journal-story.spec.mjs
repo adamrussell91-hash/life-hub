@@ -120,14 +120,17 @@ function jpegTakenAt(file, wall) {
 
 const ok = (data) => ({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data }) });
 
-async function openStory(engine, viewport, contextOptions = {}) {
+async function openStory(engine, viewport, contextOptions = {}, mutate) {
   const context = await engine.newContext({ viewport, ...contextOptions });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (error) => errors.push(String(error)));
   let version = 'v1';
   let journal = storyJournal();
+  mutate?.(journal);
   const puts = [];
+  // Place names come from an invented street, never the network.
+  await page.route('**/api/travel-places?*', (route) => route.fulfill(ok({ name: 'Rua do Teste' })));
   await page.route('**/api/travel-journal-media*', (route) => route.fulfill({ status: 503, body: '' }));
   await page.route('**/api/travel-journal?*', async (route) => {
     if (route.request().method() === 'PUT') {
@@ -460,6 +463,92 @@ test('journal photos (390px): the round button files photos with no sheet', { sk
     await page.waitForFunction(() => /^Taken back/.test(document.querySelector('.story-strip__headline')?.textContent ?? ''), null, { timeout: 15000 });
     assert.equal(puts[2].moments.filter((m) => m.lifecycle === 'live').length, before - 1);
     assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test('journal places (390px): a located moment with no name is given its street', { skip: !hasTravelBuild }, async () => {
+  const { context, page, puts } = await openStory(browser, { width: 390, height: 844 }, {}, (journal) => {
+    const bridge = journal.moments.find((m) => m.id === 'mom_bridge');
+    bridge.coordinates = { lat: 41.14, lon: -8.6094 };
+    delete bridge.place;
+  });
+  try {
+    await page.waitForFunction(() => document.querySelector('#mom_bridge .story-moment__place')?.textContent?.includes('Rua do Teste'), null, { timeout: 15000 });
+    assert.equal(puts.length, 1);
+    assert.deepEqual(puts[0].moments.find((m) => m.id === 'mom_bridge').place, { name: 'Rua do Teste', source: 'lookup' });
+    // A name that was typed is left alone.
+    assert.equal(puts[0].moments.find((m) => m.id === 'mom_arch').place.name, 'Praça do Exemplo');
+  } finally {
+    await context.close();
+  }
+});
+
+test('journal words (390px): tap the words to edit them in place', { skip: !hasTravelBuild }, async () => {
+  const { context, page, puts } = await openStory(browser, { width: 390, height: 844 }, { hasTouch: true });
+  try {
+    await page.locator('#mom_arch .story-moment__words p').tap();
+    const field = page.locator('.story-words-edit__field');
+    await field.waitFor();
+    assert.equal(await field.evaluate((node) => node === document.activeElement), true, 'the field has the keyboard');
+    assert.equal(await field.inputValue(), 'Into the light off the airport metro.');
+    assert.equal(await page.locator('.sheet-back').count(), 0, 'no sheet');
+    const look = await page.evaluate(() => {
+      const done = document.querySelector('.story-words-edit__done').getBoundingClientRect();
+      const fieldBox = document.querySelector('.story-words-edit__field').getBoundingClientRect();
+      const dock = getComputedStyle(document.querySelector('.story-dock'));
+      return {
+        doneH: done.height, doneAbove: done.bottom <= fieldBox.top + 1,
+        fontPx: parseFloat(getComputedStyle(document.querySelector('.story-words-edit__field')).fontSize),
+        dockAway: dock.pointerEvents === 'none',
+      };
+    });
+    assert.ok(look.doneH >= 44, 'Done is at least 44px');
+    assert.ok(look.doneAbove, 'Done sits above the field, clear of the keyboard');
+    assert.ok(look.fontPx >= 16, 'no zoom on focus: the field is 16px or more');
+    assert.ok(look.dockAway, 'the dock is out of the way while typing');
+    assert.equal(await overflowX(page), 0);
+
+    await field.fill('Into the light, bags still on our backs.');
+    await page.locator('.story-words-edit__done').tap();
+    await page.waitForFunction(() => document.querySelector('#mom_arch .story-moment__words p')?.textContent === 'Into the light, bags still on our backs.');
+    assert.equal(puts.length, 1);
+    assert.equal(puts[0].moments.find((m) => m.id === 'mom_arch').text, 'Into the light, bags still on our backs.');
+    assert.equal(await page.locator('.story-words-edit').count(), 0);
+
+    // Escape puts the old words back and saves nothing.
+    await page.locator('#mom_arch .story-moment__words p').tap();
+    await field.fill('Never mind.');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('.story-words-edit').count(), 0);
+    assert.equal(await page.locator('#mom_arch .story-moment__words p').innerText(), 'Into the light, bags still on our backs.');
+    assert.equal(puts.length, 1);
+  } finally {
+    await context.close();
+  }
+});
+
+test('journal moment (390px): closing the sheet keeps the note', { skip: !hasTravelBuild }, async () => {
+  const { context, page, puts } = await openStory(browser, { width: 390, height: 844 });
+  try {
+    await page.locator('.story-dock button', { hasText: 'Moment' }).click();
+    const sheet = page.locator('.journal-capture-sheet');
+    await sheet.waitFor();
+    assert.deepEqual(await sheet.locator('.addform__actions button').allInnerTexts(), ['Discard', 'Done']);
+    await sheet.locator('textarea').fill('Nobody on the pavement even looks up.');
+    // Back is how a phone closes a sheet.
+    await page.locator('h1').first().evaluate(() => document.activeElement?.blur());
+    await page.goBack();
+    await sheet.waitFor({ state: 'detached', timeout: 10000 });
+    await page.waitForFunction(() => document.querySelector('.story-strip__headline')?.textContent === 'Moment added', null, { timeout: 10000 });
+    assert.equal(puts.length, 1);
+    assert.ok(puts[0].moments.some((m) => m.text === 'Nobody on the pavement even looks up.' && m.lifecycle === 'live'));
+    assert.match(await page.evaluate(() => location.hash), /\/journal/);
+
+    await page.locator('.story-strip__action', { hasText: 'Undo' }).click();
+    await page.waitForFunction(() => /^Taken back/.test(document.querySelector('.story-strip__headline')?.textContent ?? ''));
+    assert.ok(!puts[1].moments.some((m) => m.text === 'Nobody on the pavement even looks up.' && m.lifecycle === 'live'));
   } finally {
     await context.close();
   }

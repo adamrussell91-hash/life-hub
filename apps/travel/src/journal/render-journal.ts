@@ -17,6 +17,7 @@ import {
 } from '@/journal/import-run';
 import { mountImportStrip, STRIP_HIDE_AFTER_MS, type ImportStripHandle } from '@/journal/story/import-strip';
 import { openUndatedSheet, type UndatedDayChoice } from '@/journal/undated-sheet';
+import { applyPlaceNames, lookUpPlaces, momentsNeedingPlace, type PlaceLookup } from '@/journal/place-lookup';
 import { isJournalStoryEmpty, resolveCaptureContext } from '@/journal/capture-context';
 import { openCaptureSheet } from '@/journal/capture-sheet';
 import { openImportSheet } from '@/journal/import-sheet';
@@ -107,6 +108,8 @@ export interface RenderJournalOptions {
   onRefresh?: () => void;
   /** Today's date for tests. Defaults to the phone's date in each city's time zone. */
   today?: string;
+  /** Names a spot from its coordinates. Defaults to the server lookup on a saved journal; off in previews. */
+  lookupPlace?: PlaceLookup;
 }
 
 function scrollBehaviorFor(root: ParentNode): ScrollBehavior {
@@ -379,6 +382,18 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     });
   }
 
+  /** Undo for what was just added: it goes to Trash, where it can be restored. */
+  function undoMoments(momentIds: string[], done = 'Taken back. It is in Trash.'): void {
+    strip.hide();
+    void persistJournalPatch(liveFixture.trip_id, liveVersion, undoImport(journalDoc(), momentIds)).then(
+      (saved) => {
+        onJournalSaved(saved);
+        strip.message({ text: done, autoHideMs: 5000 });
+      },
+      () => strip.message({ text: 'Could not undo. Try again from the moment’s menu.', tone: 'problem' }),
+    );
+  }
+
   async function commitImport(
     ready: ReadPhoto[],
     skipped: { alreadyHere: number; inTrash: number; unreadable: number },
@@ -399,17 +414,9 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
       liveFixture = filed.envelope.journal;
       liveVersion = filed.envelope.version;
       showFiled(filed.momentIds);
+      void namePlaces(filed.momentIds);
       const summary = filedSummary({ photos: filed.mediaIds.length, moments: filed.momentIds.length, ...skipped });
-      const undo = (): void => {
-        strip.hide();
-        void persistJournalPatch(liveFixture.trip_id, liveVersion, undoImport(journalDoc(), filed.momentIds)).then(
-          (saved) => {
-            onJournalSaved(saved);
-            strip.message({ text: 'Taken back. The photos are in Trash.', autoHideMs: 5000 });
-          },
-          () => strip.message({ text: 'Could not undo. Try again from the moment’s menu.', tone: 'problem' }),
-        );
-      };
+      const undo = (): void => undoMoments(filed.momentIds, 'Taken back. The photos are in Trash.');
       const notes = filed.envelope.queued ? [...summary.notes, 'saved on this phone until you are back online'] : summary.notes;
       if (undated.length) {
         offerUndated(undated, { text: summary.headline, notes, undo });
@@ -461,6 +468,61 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     strip.message({ text: summary.headline, notes: summary.notes, actions, autoHideMs: STRIP_HIDE_AFTER_MS });
   }
 
+  // ---- Words edited in place ------------------------------------------------------
+
+  /** True while a moment's words are being typed. Repaints wait, so the field is not pulled from under the keyboard. */
+  let editingWords = false;
+  let repaintOwed = false;
+  function setEditingWords(editing: boolean): void {
+    editingWords = editing;
+    root.classList.toggle('story--editing-words', editing);
+    if (!editing && repaintOwed) {
+      repaintOwed = false;
+      repaintInPlace();
+    }
+  }
+
+  async function saveWords(moment: JournalMoment, text: string): Promise<void> {
+    const journal = journalDoc();
+    const next: JournalDocument = {
+      ...journal,
+      revision: journal.revision + 1,
+      moments: journal.moments.map((m) => (m.id === moment.id ? { ...m, text: text || undefined } : m)),
+    };
+    const saved = await persistJournalPatch(liveFixture.trip_id, liveVersion, next);
+    liveFixture = saved.journal;
+    liveVersion = saved.version;
+    repaintOwed = true; // painted when the field closes
+  }
+
+  // ---- Places name themselves ---------------------------------------------------
+
+  let namingPlaces = false;
+  /**
+   * Give moments that have a location and no name a street or neighbourhood,
+   * in the background. `ids` limits it to moments just filed; otherwise a few
+   * older ones are caught up on each visit.
+   */
+  async function namePlaces(ids?: string[]): Promise<void> {
+    if (namingPlaces || (!canSave() && !opts.lookupPlace)) return;
+    const waiting = momentsNeedingPlace(journalDoc(), ids);
+    if (!waiting.length) return;
+    namingPlaces = true;
+    try {
+      const names = await lookUpPlaces(ids ? waiting : waiting.slice(0, 5), opts.lookupPlace);
+      // The journal may have moved on while the names were fetched: apply to what is there now.
+      const next = applyPlaceNames(journalDoc(), names);
+      if (next === journalDoc()) return;
+      const saved = await persistJournalPatch(liveFixture.trip_id, liveVersion, next);
+      reconcile(saved);
+    } catch {
+      /* Left as they are; tried again on a later visit. */
+    } finally {
+      namingPlaces = false;
+    }
+  }
+  void namePlaces();
+
   // An import that was cut short last time is still on the phone: offer to finish it.
   if (!isFixtureVersion(liveVersion)) {
     void loadImportProposal(liveFixture.trip_id).then(
@@ -493,9 +555,35 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
         onClose: () => {
           overlays.capture = null;
         },
-        onSaved: (envelope) => {
+        onSaved: (envelope, momentId) => {
           overlays.capture = null;
-          onJournalSaved(envelope);
+          liveFixture = envelope.journal;
+          liveVersion = envelope.version;
+          showFiled([momentId]);
+          void namePlaces([momentId]);
+          strip.message({
+            text: 'Moment added',
+            notes: envelope.queued ? ['saved on this phone until you are back online'] : [],
+            actions: [{ label: 'Undo', onSelect: () => undoMoments([momentId]) }],
+            autoHideMs: STRIP_HIDE_AFTER_MS,
+          });
+        },
+        onLateLocation: (momentId, coordinates) => {
+          const journal = journalDoc();
+          const moment = journal.moments.find((m) => m.id === momentId && m.lifecycle === 'live');
+          if (!moment || moment.coordinates) return;
+          const next: JournalDocument = {
+            ...journal,
+            revision: journal.revision + 1,
+            moments: journal.moments.map((m) => (m.id === momentId ? { ...m, coordinates, location_source: 'device' as const } : m)),
+          };
+          void persistJournalPatch(liveFixture.trip_id, liveVersion, next).then(
+            (saved) => {
+              reconcile(saved);
+              void namePlaces([momentId]);
+            },
+            () => undefined,
+          );
         },
       }),
     );
@@ -1019,6 +1107,8 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
               photoIndexOf: (mediaId) => photoIndex.get(`${moment.id}|${mediaId}`) ?? -1,
               eager: moment.id === firstVisibleId,
               isNew: justFiled.has(moment.id),
+              onSaveWords: saveWords,
+              onEditingWords: setEditingWords,
               onActions: (m) =>
                 swap(
                   'actions',
@@ -1253,7 +1343,28 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     detachPrefetch?.();
   });
 
+  /** Repaint with what is in hand, keeping the reader where they are. */
+  function repaintInPlace(): void {
+    const win = root.ownerDocument?.defaultView;
+    const anchor = resolveEntranceTarget(root);
+    const anchorId = anchor?.id;
+    const anchorTop = anchor?.getBoundingClientRect().top;
+    rebuild(false);
+    if (!anchorId || anchorTop === undefined || !win) return;
+    const after = chapterEl(root, anchorId);
+    if (!after) return;
+    const delta = after.getBoundingClientRect().top - anchorTop;
+    if (Math.abs(delta) > 0.5) win.scrollBy(0, delta);
+  }
+
   function reconcile(envelope: JournalEnvelope): void {
+    if (editingWords) {
+      // Take the newer copy, but leave the page alone until the field closes.
+      liveFixture = envelope.journal;
+      liveVersion = envelope.version;
+      repaintOwed = true;
+      return;
+    }
     if (filedFocus) {
       liveFixture = envelope.journal;
       liveVersion = envelope.version;

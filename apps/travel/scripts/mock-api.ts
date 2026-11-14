@@ -373,6 +373,12 @@ export function createMockApi() {
       return json(200, { ok: true, data: { trip: publicTrip } });
     }
 
+    if (path === '/api/travel-places' && method === 'GET' && url.searchParams.get('reverse') === '1') {
+      // An invented street per spot, so local screenshots show named moments.
+      const streets = ['Rua do Exemplo', 'Travessa Inventada', 'Largo da Amostra', 'Cais do Ensaio'];
+      const seed = Math.abs(Math.round(Number(url.searchParams.get('lat')) * 1000 + Number(url.searchParams.get('lon')) * 1000));
+      return json(200, { ok: true, data: { name: streets[seed % streets.length] } });
+    }
     if (path === '/api/travel-places' && method === 'GET') {
       const q = url.searchParams.get('q') ?? '';
       if (!q) return json(200, { ok: true, data: { places: [] } });

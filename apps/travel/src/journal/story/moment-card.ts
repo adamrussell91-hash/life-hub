@@ -1,4 +1,5 @@
 import type { JournalFixture, JournalMedia, JournalMoment } from '@/journal/types';
+import { openInlineWords } from '@/journal/inline-words';
 import { reflectionLikelyOverflows } from '@/journal/layout';
 import { journalAudioSrc } from '@/journal/media-loading';
 import { resolveMomentAuthor } from '@/journal/partner-perspective';
@@ -22,6 +23,10 @@ export interface MomentCardOptions {
   onActions?: (moment: JournalMoment, trigger: HTMLElement) => void;
   /** Opens the meal for a moment that has one. */
   onMeal?: (moment: JournalMoment) => void;
+  /** Saves new words for the moment. When given, the words are edited by tapping them. */
+  onSaveWords?: (moment: JournalMoment, text: string) => Promise<void>;
+  /** Told while the words are being edited. */
+  onEditingWords?: (editing: boolean) => void;
 }
 
 /** Live photos and sound clips attached to a moment, in order. */
@@ -115,6 +120,34 @@ export function renderMomentCard(options: MomentCardOptions): HTMLElement {
   else {
     body.append(meta);
     if (words) body.append(words);
+  }
+
+  const saveWords = options.onSaveWords;
+  if (saveWords) {
+    const edit = (host: HTMLElement): void => {
+      openInlineWords({
+        host,
+        text: moment.text ?? '',
+        onSave: (text) => saveWords(moment, text),
+        onEditingChange: options.onEditingWords,
+      });
+    };
+    if (words) {
+      // Tap the words to edit them. A real button follows for keyboards and screen readers.
+      const paragraph = words.querySelector('p')!;
+      paragraph.classList.add('story-moment__words-text--editable');
+      paragraph.addEventListener('click', () => {
+        if (window.getSelection()?.toString()) return; // selecting text is not a tap
+        edit(words);
+      });
+      const editBtn = button('story-moment__edit-words', 'Edit words');
+      editBtn.addEventListener('click', () => edit(words));
+      words.append(editBtn);
+    } else {
+      const add = button('story-moment__add-line', 'Add a line');
+      add.addEventListener('click', () => edit(add));
+      body.append(add);
+    }
   }
 
   if (moment.meal) {

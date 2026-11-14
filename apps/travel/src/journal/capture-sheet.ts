@@ -12,7 +12,6 @@ import {
   queueJournalMedia,
 } from '@/journal/journal-outbox';
 import { rememberLocalJournalMedia } from '@/journal/media-loading';
-import { showHubToast } from '../../design-kit/js/hub-feedback.js';
 import {
   type CaptureDraftMode,
   type JournalCaptureDraft,
@@ -48,10 +47,16 @@ export interface OpenCaptureSheetOptions {
   version: string;
   tripTitle?: string;
   anchor: HTMLElement;
-  onSaved?: (envelope: { journal: JournalDocument; version: string }) => void;
+  /** The moment was kept. `envelope.queued` is set when it is waiting to go online. */
+  onSaved?: (envelope: PersistedJournal, momentId: string) => void;
   onClose?: () => void;
   /** Kept for callers; bulk import has its own toolbar entry. */
   onImportPhotos?: (files: File[]) => void;
+  /**
+   * The phone's location arrived just after the moment was saved without one.
+   * The caller adds it to that moment.
+   */
+  onLateLocation?: (momentId: string, coordinates: JournalCoordinates) => void;
 }
 
 export interface CaptureSaveInput {
@@ -70,8 +75,8 @@ export function isCaptureSaveEnabled(input: CaptureSaveInput): boolean {
 
 export { AMBIENT_AUDIO_CONSTRAINTS } from '@/journal/ambient-recorder';
 
-/** How long Save waits for a first location fix before saving without one. */
-const LOCATION_WAIT_ON_SAVE_MS = 4000;
+/** A location fix that arrives this soon after the sheet closes is still added to the moment. */
+export const LATE_LOCATION_WINDOW_MS = 8000;
 
 type PhotoSource = 'camera' | 'library';
 
@@ -154,7 +159,6 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
   let location: LocationState = { kind: 'locating' };
   /** A restored draft keeps the place it was captured, not where the phone is now. */
   let locationPinned = false;
-  let locationWaiters: (() => void)[] = [];
   let dirty = false;
   let destroyed = false;
   let discardOpen = false;
@@ -284,7 +288,7 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
   const keepEditingBtn = document.createElement('button');
   keepEditingBtn.type = 'button';
   keepEditingBtn.className = 'btn btn--secondary';
-  keepEditingBtn.textContent = 'Keep it';
+  keepEditingBtn.textContent = 'Keep writing';
   const discardBtn = document.createElement('button');
   discardBtn.type = 'button';
   discardBtn.className = 'btn btn--ghost';
@@ -296,8 +300,9 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
   actions.className = 'addform__actions';
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
-  cancelBtn.className = 'btn btn--secondary';
-  cancelBtn.textContent = 'Cancel';
+  // Quiet, so Done is the one button a thumb goes to.
+  cancelBtn.className = 'btn btn--ghost';
+  cancelBtn.textContent = 'Discard';
   const saveStatus = document.createElement('p');
   saveStatus.className = 'journal-sheet__status';
   saveStatus.setAttribute('role', 'alert');
@@ -305,15 +310,12 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
   const saveBtn = document.createElement('button');
   saveBtn.type = 'submit';
   saveBtn.className = 'btn btn--primary';
-  saveBtn.textContent = 'Save';
+  saveBtn.textContent = 'Done';
 
   // ---- Location -----------------------------------------------------------
 
   function settleLocation(next: LocationState): void {
     location = next;
-    const waiters = locationWaiters;
-    locationWaiters = [];
-    waiters.forEach((w) => w());
     renderStamp();
     if (next.kind === 'ok') markDirty(false);
   }
@@ -327,6 +329,12 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
     renderStamp();
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        if (lateFix && Date.now() <= lateFixUntil) {
+          const deliver = lateFix;
+          lateFix = null;
+          deliver({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+          return;
+        }
         if (destroyed || locationPinned) return;
         settleLocation({
           kind: 'ok',
@@ -342,16 +350,9 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
     );
   }
 
-  function waitForLocation(ms: number): Promise<void> {
-    if (location.kind !== 'locating') return Promise.resolve();
-    return new Promise((resolve) => {
-      const t = setTimeout(resolve, ms);
-      locationWaiters.push(() => {
-        clearTimeout(t);
-        resolve();
-      });
-    });
-  }
+  /** Set when a moment is saved while the phone is still finding itself. */
+  let lateFix: ((coords: JournalCoordinates) => void) | null = null;
+  let lateFixUntil = 0;
 
   function hasLiveCapture(): boolean {
     return Boolean(soundBlob) || recorder !== null || photos.some((p) => p.source === 'camera');
@@ -423,7 +424,9 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
   }
 
   function refreshSave(): void {
-    saveBtn.disabled = saving || (!hasContent() && recorder === null);
+    // Done always works: it keeps what is here, or just closes an empty sheet.
+    saveBtn.disabled = saving;
+    cancelBtn.disabled = saving;
   }
 
   function showNotice(message: string | null): void {
@@ -594,16 +597,29 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
 
   // ---- Close -----------------------------------------------------------------
 
-  function requestClose(after?: () => void): void {
-    if (destroyed || discardOpen) return;
-    if (dirty && (hasContent() || recorder)) {
-      showDiscard(after);
+  /**
+   * Swipe down, Back, a tap outside and Done all mean the same thing: keep
+   * what is here. Only Discard throws it away.
+   */
+  function requestClose(): void {
+    if (destroyed || discardOpen || saving) return;
+    if (hasContent() || recorder) {
+      void submitMoment();
       return;
     }
-    finishClose(after);
+    finishClose();
   }
 
-  function showDiscard(after?: () => void): void {
+  function requestDiscard(): void {
+    if (destroyed || discardOpen || saving) return;
+    if (hasContent() || recorder) {
+      showDiscard();
+      return;
+    }
+    void clearCaptureDraft(options.tripId, options.legId, options.localDate).then(() => finishClose());
+  }
+
+  function showDiscard(): void {
     discardOpen = true;
     discardBar.hidden = false;
     discardBar.scrollIntoView({ block: 'nearest' });
@@ -614,13 +630,11 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
     discardBtn.onclick = () => {
       discardOpen = false;
       discardBar.hidden = true;
-      void clearCaptureDraft(options.tripId, options.legId, options.localDate).then(() =>
-        finishClose(after),
-      );
+      void clearCaptureDraft(options.tripId, options.legId, options.localDate).then(() => finishClose());
     };
   }
 
-  function finishClose(after?: () => void): void {
+  function finishClose(): void {
     if (destroyed) return;
     destroyed = true;
     autosave.destroy();
@@ -630,10 +644,9 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
     if (soundUrl) URL.revokeObjectURL(soundUrl);
     overlay?.release();
     options.onClose?.();
-    after?.();
   }
 
-  cancelBtn.addEventListener('click', () => requestClose());
+  cancelBtn.addEventListener('click', () => requestDiscard());
 
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
@@ -653,13 +666,13 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
     if (!hasContent()) {
       saving = false;
       refreshSave();
+      finishClose();
       return;
     }
-    if (location.kind === 'locating' && hasLiveCapture()) {
-      saveBtn.textContent = 'Adding location…';
-      await waitForLocation(LOCATION_WAIT_ON_SAVE_MS);
-    }
-    saveBtn.textContent = originalLabel;
+    // Never wait for the phone to find itself. If the fix lands just after, it is added then.
+    // (Photos from the library carry their own place, so the phone's does not apply to them.)
+    const stillLocating = location.kind === 'locating' && (hasLiveCapture() || photos.length === 0);
+    saveBtn.textContent = 'Keeping…';
 
     const libraryMeta = await Promise.all(
       photos.filter((p) => p.source === 'library').map((p) => p.meta),
@@ -709,6 +722,7 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
       await dropQueuedJournalMedia(mediaRows.map((m) => m.id));
       saving = false;
       refreshSave();
+      saveBtn.textContent = originalLabel;
       saveStatus.hidden = false;
       saveStatus.textContent = 'This phone is out of space for the photos. Your draft is still here.';
       return;
@@ -747,22 +761,20 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
       await dropQueuedJournalMedia(mediaRows.map((m) => m.id));
       saving = false;
       refreshSave();
+      saveBtn.textContent = originalLabel;
       saveStatus.hidden = false;
       saveStatus.textContent = 'Could not save. Your draft is still here, so try again.';
       return;
     }
+    if (stillLocating && options.onLateLocation) {
+      lateFixUntil = Date.now() + LATE_LOCATION_WINDOW_MS;
+      lateFix = (coords) => options.onLateLocation?.(momentId, coords);
+    }
     attachments.forEach((a, i) => rememberLocalJournalMedia(mediaRows[i]!.id, a.blob));
     if (mediaRows.length) void flushJournalOutbox();
     await clearCaptureDraft(options.tripId, options.legId, options.localDate);
-    options.onSaved?.(envelope);
     finishClose();
-    if (envelope.queued) {
-      showHubToast('Saved on this phone. It will upload when you are back online.');
-    } else if (mediaRows.length) {
-      showHubToast(
-        mediaRows.length === 1 ? 'Saved. Uploading 1 file…' : `Saved. Uploading ${mediaRows.length} files…`,
-      );
-    }
+    options.onSaved?.(envelope, momentId);
   }
 
   // ---- Mount -----------------------------------------------------------------
