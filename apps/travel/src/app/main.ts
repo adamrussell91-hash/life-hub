@@ -8,6 +8,7 @@ import '../../design-kit/motion.css';
 import '../../design-kit/mobile.css';
 import '../styles/travel.css';
 import '../styles/journal.css';
+import '../styles/journal-story.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
@@ -20,7 +21,7 @@ import {
 } from '@/auth/gate';
 import { ApiClientError } from '@/api/client';
 import { renderHubShell, renderPageHeader, renderPrimaryNav, type HubShellRefs, type RailHighlight } from '@/shell/shell';
-import { journalPatternOff, parseRoute, tabTitle } from '@/app/router';
+import { journalHomeRoute, journalPatternOff, journalRoute, parseRoute, tabTitle } from '@/app/router';
 import { ensureJournal } from '@/api/journal';
 import { klIstanbulFixture } from '@/journal/fixtures/kl-istanbul';
 import type { JournalFixture } from '@/journal/types';
@@ -98,6 +99,9 @@ async function bootApp(root: HTMLElement): Promise<void> {
     const route = parseRoute();
     const generation = ++routeGeneration;
     document.title = tabTitle(route);
+    // On a phone the journal's cover replaces the page header and the page runs edge to edge.
+    shell.pageHeader.classList.toggle('page-header--journal', route.name === 'journal');
+    shell.pageHeader.parentElement?.classList.toggle('hub-canvas--journal', route.name === 'journal');
 
     if (route.name !== 'journal') {
       journalHandle?.destroy();
@@ -111,7 +115,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
         journalHandle &&
         !journalUseFixture()
       ) {
-        renderHighlight('trip');
+        renderHighlight('journal');
         renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: '' });
         const envelope = await ensureJournal(route.tripId);
         if (generation !== routeGeneration) return;
@@ -145,9 +149,21 @@ async function bootApp(root: HTMLElement): Promise<void> {
         return;
       }
 
+      if (route.name === 'journalHome') {
+        // The Journal tab with no trip open yet: go to the journal of the trip Today would pick.
+        renderHighlight('journal');
+        renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: 'Journal' });
+        const { trips } = await listTrips();
+        if (generation !== routeGeneration) return;
+        const primary = pickPrimaryTrip(trips);
+        history.replaceState(null, '', primary ? journalRoute(primary.id) : '#/');
+        await paint();
+        return;
+      }
+
       if (route.name === 'journal') {
         currentTripId = route.tripId;
-        renderHighlight('trip');
+        renderHighlight('journal');
         renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: '' });
         journalHandle?.destroy();
         let fixture: JournalFixture;
@@ -174,7 +190,8 @@ async function bootApp(root: HTMLElement): Promise<void> {
           displayTitle,
           trip: tripForJournal,
           momentId: route.momentId,
-          patternOff: journalPatternOff()
+          patternOff: journalPatternOff(),
+          onRefresh: journalUseFixture() ? undefined : () => void paint({ refresh: true })
         });
         return;
       }
@@ -204,6 +221,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
     const tripHref = currentTripId ? `#/trip/${encodeURIComponent(currentTripId)}` : '#/';
     renderPrimaryNav(shell, highlight, {
       tripHref,
+      journalHref: currentTripId ? journalRoute(currentTripId) : journalHomeRoute(),
       onAdd: () => {
         if (currentTripId) location.hash = `#/trip/${encodeURIComponent(currentTripId)}`;
       }

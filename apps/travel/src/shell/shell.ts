@@ -3,7 +3,7 @@ import { mountRailCollapse } from '../../../../packages/design-kit/js/hub-rail-c
 import { mountMobileChrome } from '../../../../packages/design-kit/js/mount-mobile-chrome.js';
 import { railIconFor, refreshIcon, RAIL_ICON_PATHS } from '@/shell/icons';
 
-export type RailHighlight = 'trip' | 'today' | 'trips' | null;
+export type RailHighlight = 'trip' | 'today' | 'journal' | 'trips' | null;
 
 export interface HubShellRefs {
   root: HTMLElement;
@@ -21,6 +21,8 @@ export interface HubShellOptions {
   onRefresh?: () => void | Promise<void>;
   onAdd?: () => void | Promise<void>;
   tripHref?: string;
+  /** Where the Journal tab goes. Defaults to the route that picks the primary trip. */
+  journalHref?: string;
 }
 
 function iconButton(label: string, icon: SVGSVGElement, onClick: () => void | Promise<void>): HTMLButtonElement {
@@ -140,10 +142,11 @@ interface NavItem {
   iconId: string;
 }
 
-function navItems(tripHref: string): NavItem[] {
+function navItems(tripHref: string, journalHref: string): NavItem[] {
   return [
     { id: 'trip', label: 'Trip', href: tripHref, iconId: 'trip' },
     { id: 'today', label: 'Today', href: '#/today', iconId: 'today' },
+    { id: 'journal', label: 'Journal', href: journalHref, iconId: 'journal' },
     { id: 'trips', label: 'Trips', href: '#/', iconId: 'trips' }
   ];
 }
@@ -157,9 +160,9 @@ function buildNavLink(item: NavItem, highlight: RailHighlight): HTMLAnchorElemen
   return link;
 }
 
-function syncMobileChrome(shellRoot: HTMLElement, active: RailHighlight, tripHref: string, onAdd?: () => void | Promise<void>): void {
-  // Trip · Today · Trips on the bar so the list is reachable with one holiday;
-  // Add + Public live in More (multi-trip home needs Trips as a first-class dest).
+function syncMobileChrome(shellRoot: HTMLElement, active: RailHighlight, tripHref: string, journalHref: string, onAdd?: () => void | Promise<void>): void {
+  // Trip · Today · Journal on the bar, so the journal is one tap from anywhere.
+  // Trips, Add and Public link live in More; Trips comes first there.
   // currentHub must NOT be 'life': Travel is a Life section at /travel/, and the
   // kit skips the current hub from More → Hubs. Using 'life' hid Home on phones
   // (desktop still has ← Life; the rail is display:none under 720px).
@@ -168,9 +171,10 @@ function syncMobileChrome(shellRoot: HTMLElement, active: RailHighlight, tripHre
     primary: [
       { id: 'trip', label: 'Trip', paths: RAIL_ICON_PATHS.trip, href: tripHref, current: active === 'trip' },
       { id: 'today', label: 'Today', paths: RAIL_ICON_PATHS.today, href: '#/today', current: active === 'today' },
-      { id: 'trips', label: 'Trips', paths: RAIL_ICON_PATHS.trips, href: '#/', current: active === 'trips' }
+      { id: 'journal', label: 'Journal', paths: RAIL_ICON_PATHS.journal, href: journalHref, current: active === 'journal' }
     ],
     more: [
+      { id: 'trips', label: 'Trips', paths: RAIL_ICON_PATHS.trips, href: '#/', current: active === 'trips' },
       {
         id: 'add',
         label: 'Add',
@@ -186,7 +190,8 @@ function syncMobileChrome(shellRoot: HTMLElement, active: RailHighlight, tripHre
 export function renderPrimaryNav(shell: HubShellRefs, active: RailHighlight, options: HubShellOptions = {}): void {
   const tripHref = options.tripHref ?? '#/';
   shell.railNav.replaceChildren();
-  const items = navItems(tripHref);
+  const journalHref = options.journalHref ?? '#/journal';
+  const items = navItems(tripHref, journalHref);
   shell.railNav.append(...items.map((item) => buildNavLink(item, active)));
 
   // Travel is not an umbrella hub id; do not mark Life as current or phones
@@ -194,7 +199,7 @@ export function renderPrimaryNav(shell: HubShellRefs, active: RailHighlight, opt
   appendHubSwitcher(hubSwitcherHost(shell.railNav), 'travel');
 
   const shellRoot = shell.railNav.closest('.hub-layout')?.parentElement ?? shell.railNav.ownerDocument.body;
-  if (shellRoot instanceof HTMLElement) syncMobileChrome(shellRoot, active, tripHref, options.onAdd);
+  if (shellRoot instanceof HTMLElement) syncMobileChrome(shellRoot, active, tripHref, journalHref, options.onAdd);
 }
 
 export interface PageHeaderConfig {
