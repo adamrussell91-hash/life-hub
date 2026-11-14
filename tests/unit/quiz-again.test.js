@@ -145,3 +145,26 @@ test('asking the blank ones again reaches only students who left it blank, once'
   assert.equal(answerRow(store, pipStudent, 'qb'), undefined);
   assert.equal((await quizTeacherAction(store, 'quiz1', { action: 'again_blank', question_id: 'qb', comment: '' })).asked, 0);
 });
+
+test('a pasted written answer reaches To mark with its typing record, so it can be replayed where it is marked', async () => {
+  const quiz = { id: 'quiz1', title: 'Week 5 check', unit_id: 'unit1', pedagogical_mode: 'quiz', quiz: {}, blocks: [qBlock('qa', short), qBlock('qb', essay)] };
+  const store = storeFixture([
+    ['lessons/quiz1', quiz],
+    ['classes/class1', { id: 'class1', type: 'class', title: '8 English', students: [{ name: 'Pip Quill' }] }]
+  ]);
+  const prepared = prepareQuizPublish(quiz, quiz.blocks);
+  await storeQuizKey(store, 'quiz1', prepared.quiz);
+  await store.setJSON('published/lessons/quiz1', { blocks: prepared.blocks, pedagogical_mode: 'quiz', quiz: prepared.quiz.snapshot });
+  const text = 'The town forgets its grief.';
+  await quizAction(store, 'quiz1', { ...pip, action: 'claim', initials: 'PQ' });
+  await quizAction(store, 'quiz1', { ...pip, action: 'start' });
+  await quizAction(store, 'quiz1', { ...pip, action: 'save', responses: { qb: { text } }, writing: { qb: { start: Date.now(), base: '', ms: 9_000, pastes: 1, away: 0, jumps: 0, steps: [[0, 0, 0, text]] } } });
+  await quizAction(store, 'quiz1', { ...pip, action: 'submit', responses: { qa: { text: 'Juliet' }, qb: { text } } });
+
+  const toMark = await toMarkAction(store, { action: 'quiz', class_id: 'class1', lesson_id: 'quiz1' });
+  const essayAnswer = toMark.questions.find(q => q.id === 'qb').answers[0];
+  assert.deepEqual(essayAnswer.writing.flags, ['Pasted once']);
+  assert.equal(essayAnswer.writing.log.steps.length, 1, 'the replay comes with it');
+  const shortAnswer = toMark.questions.find(q => q.id === 'qa')?.answers[0];
+  assert.equal(shortAnswer?.writing, undefined, 'short answers carry no typing record');
+});
