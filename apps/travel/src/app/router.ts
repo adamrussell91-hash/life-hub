@@ -2,6 +2,8 @@ export type Route =
   | { name: 'trips' }
   | { name: 'trip'; tripId: string; cityId?: string; date?: string }
   | { name: 'journal'; tripId: string; momentId?: string }
+  /** The Journal tab with no trip chosen yet: opens the journal of the trip Today would pick. */
+  | { name: 'journalHome' }
   | { name: 'today' }
   | { name: 'atlas'; tripId?: string };
 
@@ -29,6 +31,7 @@ export function parseRoute(hash: string = location.hash): Route {
 
   const segments = path.split('/').filter(Boolean);
   if (segments.length === 1 && segments[0] === 'today') return { name: 'today' };
+  if (segments.length === 1 && segments[0] === 'journal') return { name: 'journalHome' };
   if (segments.length === 1 && segments[0] === 'atlas') {
     const q = hash.indexOf('?');
     const trip = q === -1 ? null : new URLSearchParams(hash.slice(q + 1)).get('trip');
@@ -69,6 +72,7 @@ export function tabTitle(route: Route): string {
     case 'atlas':
       return 'Arches Atlas · Travel';
     case 'journal':
+    case 'journalHome':
       return 'Journal · Travel';
     case 'trip':
       return 'Travel';
@@ -91,6 +95,11 @@ export function atlasRoute(tripId?: string): string {
 export function tripRoute(tripId: string, cityId?: string, date?: string): string {
   if (cityId && date) return `#/trip/${encodeURIComponent(tripId)}/${encodeURIComponent(cityId)}/${date}`;
   return `#/trip/${encodeURIComponent(tripId)}`;
+}
+
+/** The Journal tab when no trip is open: resolves to the primary trip's journal. */
+export function journalHomeRoute(): string {
+  return '#/journal';
 }
 
 export function journalRoute(tripId: string, momentId?: string): string {

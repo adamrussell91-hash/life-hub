@@ -165,7 +165,7 @@ async function openEdit(page, text) {
   const article = page.locator('article', { hasText: text }).first();
   await article.waitFor({ timeout: 15000 });
   await article.locator('button[aria-label="Moment actions"]').click();
-  await page.getByRole('menuitem', { name: 'Edit moment' }).click();
+  await page.locator('.story-sheet').getByRole('button', { name: 'Edit moment' }).click();
   await page.locator('.journal-edit-moment-sheet').waitFor();
   await page.waitForTimeout(600);
 }

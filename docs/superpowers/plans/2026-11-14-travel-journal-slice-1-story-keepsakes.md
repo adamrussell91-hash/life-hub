@@ -145,7 +145,7 @@ Each module exports one `render…(options): HTMLElement` that takes plain data 
 **Files:** create `src/journal/photo-viewer.ts`, `src/journal/photos-view.ts`; tests `tests/unit/photo-viewer.test.ts`, `tests/unit/photos-view.test.ts`.
 
 - [ ] `tripPhotos(fixture, orderedMoments)` returns every live photo in story order with its moment and day number. Test it against the fixture.
-- [ ] `openPhotoViewer({ photos, index, from?, anchor, tripId, journal, onUseAsCover, onClose })`: scroll-snap track, count, caption, Previous and Next on pointer devices, tap to hide the chrome, drag down to close, pinch through `lib/zoomable.ts`, the photo notes toggle, and "Use as cover". Mounted through `presentJournalOverlay`.
+- [ ] `openPhotoViewer({ photos, index, from?, anchor, tripId, journal, onUseAsCover, onClose })`: scroll-snap track, count, caption, Previous and Next on pointer devices, tap to hide the chrome, drag down to close, pinch and double tap zoom handled in the viewer with pointer events, the photo notes toggle, and "Use as cover". Mounted through `presentJournalOverlay`.
 - [ ] `renderPhotosView({ photos, groups, onOpen })`: the three-column grid grouped by day.
 - [ ] Tests: opening at index 3 shows "4 of N"; Next and Previous move the count; Escape releases the overlay; the grid has one button per photo. Commit.
 

@@ -132,7 +132,7 @@ Every control in the current journal has a named new home (register I6, R5).
 - Shows the whole photo. Swipe sideways through every photo of the trip in story order. Previous and Next buttons show on devices with a pointer.
 - Drag down, the close button, Escape or Back closes it. It mounts through `presentJournalOverlay` so Back never leaves the journal (register R7).
 - Caption: "Day 3 · 4:45 pm · Cais da Ribeira" and the moment's words. Tap the photo to hide or show the caption and buttons.
-- Pinch to zoom, using `lib/zoomable.ts`, tested in WebKit as well as Chromium (register C4).
+- Pinch and double tap to zoom, handled inside the viewer with pointer events (`lib/zoomable.ts` is for SVG maps and does not fit a photo track). Tested in WebKit as well as Chromium (register C4).
 - One action: Use as cover.
 - The photo notes toggle moves here from the story.
 
@@ -167,7 +167,7 @@ Existing souvenirs have none of these and read as `kind: other`, `source: photo`
 
 ### Sheets
 
-The journal options sheet, the moment action sheet, the Keep something sheet and the keepsake sheet are bottom sheets mounted through `presentJournalOverlay`. Each has a drag handle, sits above the tab bar, has an opaque surface, and keeps rows at least 44px tall (register R4, R6, S3). Escape does not close a sheet while a text field in it has focus (register I8).
+The journal options sheet, the moment action sheet, the Keep something sheet and the keepsake sheet are bottom sheets mounted through `presentJournalOverlay`. Each has a drag handle, sits flush with the bottom of the screen and covers the tab bar, has an opaque surface, and keeps rows at least 44px tall (register R4, R6, S3). Escape does not close a sheet while a text field in it has focus (register I8).
 
 ### Journal tab
 
@@ -213,7 +213,7 @@ Each maps to an entry in `docs/CURSOR-UI-FAILURES.md`.
 | --- | --- |
 | R2 | At 390, `scrollWidth === innerWidth` in Story, Photos and Keepsakes, with a photo row scrolled sideways |
 | R3 | A 390 screenshot of each new piece: cover, ribbon, chapter opener, day header, each kind of moment, journey band, board, each sheet, viewer |
-| R4, R6 | Every sheet's bottom edge is above the tab bar, and every row and button is at least 44px tall |
+| R4, R6 | Every sheet covers the tab bar (nothing of the bar or the dock shows through or over it), its last row clears the home indicator, and every row and button is at least 44px tall |
 | R5, I6 | Every row of the "Nothing is lost" table is reachable by tapping at 390 |
 | R7 | With the viewer or a sheet open, `history.back()` closes it and leaves the hash unchanged |
 | L13 | The ⋯ button's box does not overlap the time, place or words of any moment |
