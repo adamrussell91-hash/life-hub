@@ -704,6 +704,34 @@
   box-shadow: inset 0 0 0 3px var(--paper);
 }
 
+.qz-choice[data-state] .qz-choice__mark {
+  display: grid;
+  place-items: center;
+  box-shadow: none;
+  color: var(--paper);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.qz-choice[data-state='right'] .qz-choice__mark {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.qz-choice[data-state='right'] .qz-choice__mark::after {
+  content: '\2713';
+}
+
+.qz-choice[data-state='wrong'] .qz-choice__mark {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.qz-choice[data-state='wrong'] .qz-choice__mark::after {
+  content: '\2715';
+}
+
 .qz-choice__text {
   min-width: 0;
   overflow-wrap: anywhere;
