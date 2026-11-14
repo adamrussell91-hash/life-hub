@@ -88,6 +88,16 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
   shell.append(hero, story, introHost, called, err, body);
   host.replaceChildren(shell);
 
+  /** Swapping a panel can drop the page back to the top (Safari has no scroll anchoring): put the scroll back. */
+  const keepScroll = (swap: () => void): void => {
+    const boxes: Array<[Element, number]> = [];
+    for (let n = host.parentElement; n; n = n.parentElement) if (n.scrollTop) boxes.push([n, n.scrollTop]);
+    const y = window.scrollY;
+    swap();
+    for (const [n, top] of boxes) n.scrollTop = top;
+    if (window.scrollY !== y) window.scrollTo?.({ top: y });
+  };
+
   const run = async (go: () => Promise<RotationStatus>): Promise<RotationStatus | null> => {
     if (!client) return null;
     const next = await go();
@@ -171,7 +181,9 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
     const q = el('div', 'rot-pt-q');
     const result = s.pretest.results[current.id];
     if (result) {
-      q.append(mountQuestionPlayer({ question: current.question, result: { mark: result.mark, key: result.key ?? null }, locked: true }));
+      // Same shuffle and the student's own pick, so the options stay put and their pick shows a tick or a cross.
+      const picked = drafts.pretest[current.id];
+      q.append(mountQuestionPlayer({ question: current.question, ...(picked ? { response: picked } : {}), result: { mark: result.mark, key: result.key ?? null }, locked: true, shuffle: true, seed: `${lesson.lesson_id}:${current.id}` }));
       q.append(el('p', 'rot-feedback', result.mark.correct ? 'Right.' : 'Not this time: the right answer is shown above.'));
       const next = el('button', 'rot-btn rot-btn--small rot-btn--primary', left.length ? 'Next question' : 'See your map');
       next.type = 'button';
@@ -191,7 +203,7 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
     skip.addEventListener('click', () => { skippedPretest = true; view = 'map'; paint(); });
     main.append(el('p', 'rot-note', 'Skip it and you start every station at Core. You can come back to it from the map.'), skip);
     grid.append(main, levelsAside(s));
-    body.replaceChildren(grid);
+    keepScroll(() => body.replaceChildren(grid));
   }
 
   // ------------------------------------------------------------ map, board, passport

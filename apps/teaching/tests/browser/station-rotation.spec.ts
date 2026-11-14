@@ -42,7 +42,11 @@ for (const [width, initials] of [[1280, 'AB'], [390, 'CD']] as const) {
     await expect(page.getByRole('heading', { name: 'Pretest', exact: true })).toBeVisible();
     await shot(page, `${width}-1-pretest`);
     for (let i = 0; i < 9; i++) {
+      const order = await page.locator('.rot-pt-q .qz-choice__text').allTextContents();
       await answer(page, '.rot-pt-q', i === 0 ? /^Wrong$/ : /^Right$/);
+      // The marked view keeps the same order and ticks or crosses the student's pick.
+      await expect(page.locator('.rot-pt-q .qz-choice__text')).toHaveText(order);
+      if (i === 0) await expect(page.locator('.rot-pt-q .qz-choice[data-state="wrong"]')).toHaveText('Wrong');
       await page.locator('.rot-pt-q button', { hasText: /Next question|See your map/ }).click();
     }
 
