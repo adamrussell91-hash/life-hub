@@ -6,6 +6,8 @@ export type EvidenceBoardOptions = {
   rotation: PublicRotation;
   client: RotationClient;
   run: (go: () => Promise<RotationStatus>) => Promise<RotationStatus | null>;
+  /** sessionStorage key for the cards already shown arriving, so each animates onto the board once. */
+  storageKey?: string;
 };
 export type EvidenceBoard = { root: HTMLElement; update(status: RotationStatus): void; dispose(): void };
 
@@ -33,6 +35,23 @@ export function labelSpot(a: { x: number; y: number }, b: { x: number; y: number
     if (!hits(p)) return p;
   }
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+/** Cards already seen arriving on this board, this browser session. Storage can be missing or blocked. */
+function readSeen(key: string | undefined): Set<string> | null {
+  if (!key) return null;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (raw === null) return null;
+    const list: unknown = JSON.parse(raw);
+    return new Set(Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : []);
+  } catch {
+    return null;
+  }
+}
+function writeSeen(key: string | undefined, seen: Set<string>): void {
+  if (!key) return;
+  try { window.sessionStorage.setItem(key, JSON.stringify([...seen])); } catch { /* storage blocked: the card just animates again next time */ }
 }
 
 /** Default positions: a grid in collection order, for cards never dragged. */
@@ -71,6 +90,11 @@ export function mountEvidenceBoard(o: EvidenceBoardOptions): EvidenceBoard {
   let dragging = false;
   let sig = '';
   const cardEls = new Map<string, HTMLElement>();
+  /** Null until the first update. */
+  let seen: Set<string> | null = null;
+  let fresh = new Set<string>();
+  let kit: RotationStatus['kit'] = [];
+  const kitLines = (id: string) => kit.filter((k) => k.station === id);
   const add = { from: '', to: '', word: '' };
 
   const label = (s: PublicStation | undefined) => s?.title || 'Station';
@@ -179,6 +203,14 @@ export function mountEvidenceBoard(o: EvidenceBoardOptions): EvidenceBoard {
     const head = el('b');
     head.append(el('i', '', s?.token || String(stations.filter((x) => x.kind !== 'teacher').findIndex((x) => x.id === id) + 1)), document.createTextNode(label(s)));
     card.append(head, document.createTextNode(s?.piece || 'Evidence collected.'));
+    const lines = kitLines(id);
+    if (lines.length) {
+      const ul = el('ul', 'rot-ev__kit');
+      ul.setAttribute('aria-label', 'Viva Kit cards');
+      for (const k of lines) ul.append(el('li', '', k.title));
+      card.append(ul);
+    }
+    if (fresh.has(id)) card.classList.add('rot-ev--new');
     const p = pos[id] ?? defaultPos(i);
     card.style.left = `${p.x}%`;
     card.style.top = `${p.y}%`;
@@ -235,6 +267,14 @@ export function mountEvidenceBoard(o: EvidenceBoardOptions): EvidenceBoard {
       const s = byId.get(id);
       const item = el('div', 'rot-bl-item');
       item.append(el('b', '', `${s?.token ? `${s.token} · ` : ''}${label(s)}`), el('span', '', s?.piece || 'Evidence collected.'));
+      const lines = kitLines(id);
+      if (lines.length) {
+        const ul = el('ul', 'rot-ev__kit');
+        ul.setAttribute('aria-label', 'Viva Kit cards');
+        for (const k of lines) { const li = el('li'); li.append(el('b', '', `${k.title}: `), document.createTextNode(k.text)); ul.append(li); }
+        item.append(ul);
+      }
+      if (fresh.has(id)) item.classList.add('rot-ev--new');
       list.append(item);
     }
     for (const l of links) {
@@ -300,10 +340,20 @@ export function mountEvidenceBoard(o: EvidenceBoardOptions): EvidenceBoard {
       status = next;
       if (dragging) return;
       const nextCollected = (status.work?.collected ?? []).filter((id) => byId.get(id)?.kind !== 'teacher');
-      const nextSig = JSON.stringify([nextCollected, status.board]);
+      const nextKit = status.kit ?? [];
+      const nextSig = JSON.stringify([nextCollected, status.board, nextKit.map((k) => `${k.station}:${k.lock}`)]);
       if (nextSig === sig) { requestAnimationFrame(drawLinks); return; }
       sig = nextSig;
       collected = nextCollected;
+      kit = nextKit;
+      // A card animates in the first time this board sees it, once per browser session.
+      if (!seen) {
+        // No record yet this session: what is already on the board when it first loads doesn't animate.
+        seen = readSeen(o.storageKey) ?? new Set(collected);
+        writeSeen(o.storageKey, seen);
+      }
+      fresh = new Set(collected.filter((id) => !seen!.has(id)));
+      if (fresh.size) { for (const id of fresh) seen.add(id); writeSeen(o.storageKey, seen); }
       pos = { ...status.board.pos };
       links = status.board.links;
       if (selected && !collected.includes(selected)) selected = null;

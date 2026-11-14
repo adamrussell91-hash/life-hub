@@ -5,7 +5,8 @@ import { mountQuestionPlayer } from '@/quiz/player';
 import { renderBlock } from '@/blocks/render';
 import { studentUnitAnthology } from '@/blocks/anthology-load';
 import { ROTATION_KIND_INFO, ROTATION_LEVELS, ROTATION_LEVEL_LABELS, WRITTEN_CHECK_LABELS, type PublicRotation, type PublicStation, type RotationLevel } from './schema';
-import { arrivalFromOf, cardOrder, forLevel, gateViewOf, roleOf } from './model';
+import { arrivalFromOf, cardOrder, forLevel, gateViewOf, lockOf, roleOf } from './model';
+import { allLocksPassed, kitCard, kitFor, lockExitBlocks, mountLockChain } from './lock-chain';
 import type { Marked, RotationClient, RotationStatus } from './api';
 
 export type StationCardOptions = {
@@ -20,9 +21,11 @@ export type StationCardOptions = {
   /** Runs a client call and applies the status; rejects with a readable message. */
   run: (go: () => Promise<RotationStatus>) => Promise<RotationStatus | null>;
   onBack: () => void;
+  /** Swaps content without the page jumping (the player's keepScroll). */
+  keepScroll?: (swap: () => void) => void;
 };
 
-export type StationCard = { root: HTMLElement; update(status: RotationStatus): void };
+export type StationCard = { root: HTMLElement; update(status: RotationStatus): void; dispose(): void };
 
 const LOCK_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 
@@ -38,7 +41,9 @@ function seeded<T extends { id: string }>(list: T[], seed: string): T[] {
 
 export function mountStationCard(o: StationCardOptions): StationCard {
   const s = o.station;
-  const ordered = cardOrder(o.blocks);
+  const hasLocks = (s.locks?.length ?? 0) > 0;
+  // Blocks that belong to a lock live in the lock chain; the rest work as today.
+  const ordered = cardOrder(o.blocks.filter((b) => !lockOf(b)));
   const byRole = (role: string) => ordered.filter((b) => roleOf(b) === role);
   const hinge = byRole('gate').find((b) => b.block_type === 'hinge_question');
   const written = s.written_gate ?? null;
@@ -68,9 +73,12 @@ export function mountStationCard(o: StationCardOptions): StationCard {
 
   const aside = el('aside', 'rot-grid');
   const about = el('div', 'rot-panel');
+  const kitBox = el('div', 'rot-panel');
+  kitBox.hidden = true;
   const help = el('div', 'rot-panel');
-  aside.append(about, help);
-  root.append(main, aside);
+  aside.append(about, kitBox, help);
+  const completeBox = el('div', 'rot-complete-host');
+  root.append(main, aside, completeBox);
 
   const act = async (go: () => Promise<RotationStatus>, btn?: HTMLButtonElement): Promise<RotationStatus | null> => {
     err.textContent = '';
@@ -367,12 +375,12 @@ export function mountStationCard(o: StationCardOptions): StationCard {
     if (done.length) { const { box, body } = sect('', 'Done when'); body.append(blockList(done)); afterBox.append(box); }
   }
   function paintExit(st: RotationStatus): void {
-    const exits = byRole('exit').filter((b) => b.block_type === 'quiz_question');
+    const exits = [...byRole('exit').filter((b) => b.block_type === 'quiz_question'), ...(hasLocks ? lockExitBlocks(s, st, o.blocks) : [])];
     const g = st.gates[s.id];
     const open = !hasGate || g?.state === 'passed' || g?.state === 'unlocked';
     const results = st.work?.results[s.id] ?? {};
     const hiddenUntilOpen = exits.some((b) => gateViewOf(b) === 'hidden') && !open;
-    const sig = JSON.stringify([open, Object.keys(results), hiddenUntilOpen]);
+    const sig = JSON.stringify([open, Object.keys(results), hiddenUntilOpen, exits.map((b) => b.id)]);
     if (sigs.exit !== sig) {
       sigs.exit = sig;
       exitBox.replaceChildren();
@@ -384,6 +392,7 @@ export function mountStationCard(o: StationCardOptions): StationCard {
     }
     const answered = exits.every((b) => results[b.id]);
     const collected = st.work?.collected.includes(s.id) ?? false;
+    if (hasLocks) { paintComplete(st, answered && open, collected); return; }
     const csig = JSON.stringify([answered, collected, open]);
     if (sigs.collect === csig) return;
     sigs.collect = csig;
@@ -401,6 +410,63 @@ export function mountStationCard(o: StationCardOptions): StationCard {
     } else text.append(el('b', '', 'Answer the exit check to collect'), el('br'), el('span', 'rot-small', 'Your evidence card goes onto your board.'));
     card.append(tok, text);
     collectBox.replaceChildren(card);
+  }
+
+  // ---- station complete (stations with locks): a full-width panel in place of the small collect card
+  function paintComplete(st: RotationStatus, ready: boolean, collected: boolean): void {
+    const passed = allLocksPassed(s, st);
+    const kit = kitFor(st, s.id);
+    const sig = JSON.stringify([passed, ready, collected, kit.map((k) => k.lock)]);
+    if (sigs.complete === sig) return;
+    sigs.complete = sig;
+    if (!passed && !collected) { completeBox.replaceChildren(); return; }
+    const panel = el('section', 'rot-complete');
+    panel.dataset.collected = String(collected);
+    const tok = el('div', 'rot-complete__tok', collected ? s.token || '✓' : '✓');
+    tok.setAttribute('aria-hidden', 'true');
+    const head = el('div', 'rot-complete__head');
+    const words = el('div');
+    words.append(el('h2', '', collected ? 'Station complete' : 'All locks open'));
+    if (collected) words.append(el('p', 'rot-complete__piece', s.piece || 'Your evidence card is on your board.'));
+    else if (ready) words.append(el('p', '', `Collect this station to put its piece${s.token ? ' and letter' : ''} on your board.`));
+    else words.append(el('p', '', 'Answer the exit check above, then collect this station.'));
+    head.append(tok, words);
+    panel.append(head);
+    if (kit.length) {
+      panel.append(el('p', 'rot-eyebrow', 'Your Viva Kit cards from this station'));
+      const cards = el('div', 'rot-kit-list rot-kit-list--wide');
+      for (const k of kit) cards.append(kitCard(k));
+      panel.append(cards);
+    }
+    const row = el('div', 'rot-row');
+    if (collected) {
+      const back = el('button', 'rot-btn rot-btn--primary', 'Back to the map');
+      back.type = 'button';
+      back.addEventListener('click', o.onBack);
+      row.append(back);
+    } else {
+      const b = el('button', 'rot-btn rot-btn--primary', 'Collect this station');
+      b.type = 'button';
+      b.disabled = !ready;
+      b.addEventListener('click', () => void act(() => o.client.collect(s.id), b));
+      row.append(b);
+    }
+    panel.append(row);
+    (o.keepScroll ?? ((swap: () => void) => swap()))(() => completeBox.replaceChildren(panel));
+  }
+
+  function paintKit(st: RotationStatus): void {
+    if (!hasLocks) return;
+    const kit = kitFor(st, s.id);
+    const sig = JSON.stringify(kit.map((k) => k.lock));
+    if (sigs.kit === sig) return;
+    sigs.kit = sig;
+    kitBox.hidden = false;
+    kitBox.replaceChildren(el('p', 'rot-eyebrow', 'Your Viva Kit · this station'));
+    if (!kit.length) { kitBox.append(el('p', 'rot-note', 'Open a lock to earn a card. Your cards stay with you for the viva.')); return; }
+    const list = el('div', 'rot-kit-list');
+    for (const k of kit) list.append(kitCard(k));
+    kitBox.append(list);
   }
 
   // ---- the side panel
@@ -448,12 +514,28 @@ export function mountStationCard(o: StationCardOptions): StationCard {
     }
   }
 
-  steps.append(recallBox, goalBox, stepsBox);
+  const chain = hasLocks ? mountLockChain({
+    station: s,
+    lessonId: o.lessonId,
+    blocks: o.blocks,
+    render,
+    client: o.client,
+    act,
+    quiet: async (go) => { try { return await o.run(go); } catch { return null; } },
+    ...(o.keepScroll ? { keepScroll: o.keepScroll } : {}),
+    onAllOpen: () => window.setTimeout(() => (completeBox.firstElementChild ?? exitBox).scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 420)
+  }) : null;
+  // A station with locks shows its steps box only when it has plain steps or hints of its own.
+  const plainSteps = !hasLocks || byRole('step').length > 0 || byRole('hint').length > 0;
+  steps.append(recallBox, goalBox);
+  if (plainSteps) steps.append(stepsBox);
+  if (chain) steps.append(chain.root);
   if (s.kind !== 'teacher') {
+    const end = hasLocks ? [afterBox, exitBox] : [afterBox, exitBox, collectBox];
     if (hasGate) {
-      inner.append(afterBox, exitBox, collectBox);
+      inner.append(...end);
       steps.append(gateBox, gated);
-    } else steps.append(afterBox, exitBox, collectBox);
+    } else steps.append(...end);
   } else {
     steps.append(el('p', 'rot-note', 'Your teacher runs this station. Go back to the map when you are done.'));
   }
@@ -465,10 +547,13 @@ export function mountStationCard(o: StationCardOptions): StationCard {
       paintRecall(status);
       paintSteps(status);
       if (s.kind === 'teacher') { paintAside(status); return; }
+      chain?.update(status);
+      paintKit(status);
       paintGate(status);
       paintAfter(status);
       paintExit(status);
       paintAside(status);
-    }
+    },
+    dispose(): void { chain?.dispose(); }
   };
 }

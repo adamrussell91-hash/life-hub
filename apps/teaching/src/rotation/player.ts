@@ -10,6 +10,7 @@ import { isRotationFinale, rotationStationOf, sectionBlocks } from './model';
 import type { RotationClient, RotationStatus } from './api';
 import { mountStationCard, type StationCard } from './station-card';
 import { mountEvidenceBoard } from './board';
+import { kitCard } from './lock-chain';
 import './rotation.css';
 
 export type RotationPlayerOptions = {
@@ -228,8 +229,19 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
     b.style.top = `${at.y}%`;
     const top = el('span', 'rot-node__top');
     top.append(el('span', 'rot-node__num', teacher ? 'Teacher' : `Station ${numberOf(st.id)}${st.token && s.work?.collected.includes(st.id) ? ` · ${st.token}` : ''}`));
+    if (state === 'done') {
+      // Collected: filled, a big tick and the piece the student took away. No level, no seats.
+      const tick = el('span', 'rot-node__tick');
+      tick.setAttribute('aria-hidden', 'true');
+      tick.textContent = '✓';
+      top.append(tick);
+      b.setAttribute('aria-label', `Station ${numberOf(st.id)}, ${st.title}: collected. ${st.piece ?? ''}`);
+      b.append(top, el('span', 'rot-node__title', st.title), el('span', 'rot-node__piece', st.piece || 'Collected.'), el('span', 'rot-node__got', 'Collected'));
+      b.addEventListener('click', () => void openStation(st.id));
+      return b;
+    }
     if (!teacher) top.append(levelChip(s.levels[st.id]?.level));
-    const words = { done: 'Done', rec: 'Go here next', full: 'Full', locked: s.locks[st.id] ?? 'Locked', open: st.id === s.work?.current ? 'You’re here' : '' }[state];
+    const words = { rec: 'Go here next', full: 'Full', locked: s.locks[st.id] ?? 'Locked', open: st.id === s.work?.current ? 'You’re here' : '' }[state];
     b.append(top, el('span', 'rot-node__title', st.title), el('span', 'rot-node__sub', teacher ? (s.called ? 'Your teacher is calling you' : 'When your teacher calls you') : `${ROTATION_KIND_INFO[st.kind].label} · ${st.minutes} min`));
     const foot = el('span', 'rot-node__foot');
     const seats = el('span', 'rot-seats');
@@ -237,7 +249,7 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
     for (let i = 0; i < st.seats; i++) seats.append(el('i', i < (s.seats[st.id] ?? 0) ? 'on' : ''));
     foot.append(seats, el('span', '', words));
     b.append(foot);
-    const guidedLock = !s.route_open && !teacher && state !== 'done' && state !== 'rec' && st.id !== s.work?.current;
+    const guidedLock = !s.route_open && !teacher && state !== 'rec' && st.id !== s.work?.current;
     if (state === 'locked' || guidedLock) b.setAttribute('aria-disabled', 'true');
     b.addEventListener('click', () => {
       if (state === 'locked') { mapMsg = s.locks[st.id]!; sigs.map = ''; paint(); return; }
@@ -252,6 +264,7 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
     const next = await act(() => client!.open(id));
     if (!next) return;
     stationId = id;
+    card?.dispose();
     card = null;
     view = 'station';
     paint();
@@ -272,6 +285,19 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
     }
     p.append(list);
     return p;
+  }
+
+  /** "Your Viva Kit": every reward card earned, full text, grouped under its station. Only when a station has locks. */
+  function vivaKit(s: RotationStatus): HTMLElement[] {
+    if (!learning.some((st) => st.locks?.length)) return [];
+    const p = el('div', 'rot-panel rot-kit');
+    p.append(el('p', 'rot-eyebrow', 'Your Viva Kit'));
+    const kit = s.kit ?? [];
+    if (!kit.length) { p.append(el('p', 'rot-note', 'Open the locks at a station to earn cards. Bring them to your viva.')); return [p]; }
+    const list = el('div', 'rot-kit-list');
+    for (const k of kit) list.append(kitCard(k, r.stations.find((x) => x.id === k.station)?.title));
+    p.append(list);
+    return [p];
   }
 
   let board: ReturnType<typeof mountEvidenceBoard> | null = null;
@@ -310,7 +336,7 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
     mapHost.hidden = tab !== 'map';
     boardHost.hidden = tab !== 'board';
     if (showBoard) {
-      if (!board) { board = mountEvidenceBoard({ rotation: r, client: client!, run }); boardHost.append(board.root); }
+      if (!board) { board = mountEvidenceBoard({ rotation: r, client: client!, run, storageKey: `rot-board-seen:${lesson.lesson_id}` }); boardHost.append(board.root); }
       board.update(s);
     }
     const sig = JSON.stringify([s.locks, s.recommend, s.seats, s.levels, s.work?.collected, s.work?.current, s.called, s.pieces_left, s.route_open, mapMsg, pretestLeft(s).length, skippedPretest]);
@@ -359,10 +385,10 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
       fin.addEventListener('click', () => { if (ready) { view = 'finale'; paint(); window.scrollTo?.({ top: 0 }); } else { mapMsg = `Collect ${s.pieces_left} more piece${s.pieces_left === 1 ? '' : 's'} to open the finale.`; sigs.map = ''; paint(); } });
       map.append(fin);
       const legend = el('div', 'rot-legend');
-      for (const [label, style] of [['Done', 'background:var(--pastel-sage)'], ['Go here next', 'background:#fff;box-shadow:0 0 0 2px var(--wave)'], ['Teacher station', 'background:var(--pastel-gold)'], ['Locked', 'background:var(--cotton);border:1px dashed var(--muted)']] as const) {
+      for (const [label, kind] of [['Collected', 'done'], ['Go here next', 'rec'], ['Teacher station', 'teacher'], ['Can’t open yet', 'locked']] as const) {
         const span = el('span');
-        const sw = el('b');
-        sw.setAttribute('style', style);
+        const sw = el('b', `rot-legend__sw rot-legend__sw--${kind}`);
+        if (kind === 'done') sw.textContent = '✓';
         span.append(sw, document.createTextNode(label));
         legend.append(span);
       }
@@ -370,8 +396,8 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
       parts.push(map, legend);
       mapHost.replaceChildren(...parts);
     }
-    const psig = JSON.stringify(s.work?.collected);
-    if (sigs.passport !== psig) { sigs.passport = psig; mapAside.replaceChildren(passport(s)); }
+    const psig = JSON.stringify([s.work?.collected, s.kit?.map((k) => `${k.station}:${k.lock}`)]);
+    if (sigs.passport !== psig) { sigs.passport = psig; mapAside.replaceChildren(passport(s), ...vivaKit(s)); }
   }
 
   // ------------------------------------------------------------ station
@@ -390,7 +416,8 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
         pageBlocks,
         client: client!,
         run,
-        onBack: () => { card = null; view = 'map'; stationId = null; sigs.map = ''; paint(); window.scrollTo?.({ top: 0 }); }
+        keepScroll,
+        onBack: () => { card?.dispose(); card = null; view = 'map'; stationId = null; sigs.map = ''; paint(); window.scrollTo?.({ top: 0 }); }
       });
       body.replaceChildren(card.root);
     }
@@ -616,6 +643,7 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
       disposed = true;
       window.clearInterval(poll);
       board?.dispose();
+      card?.dispose();
       host.replaceChildren();
     }
   };
