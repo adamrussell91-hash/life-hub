@@ -99,6 +99,13 @@ const takes = new Map(['vs_js', 'vs_rk'].map((id, i) => {
 const question = (id: string, kind: string, marks: number, prompt: string, answers: Record<string, unknown>[]) => ({ id, kind, marks, prompt, answers });
 const answer = (s: number, text: string, extra: Record<string, unknown> = {}) => ({ attempt_id: `${'a'.repeat(23)}${s}~1`, student_id: roster[s]!.id, initials: roster[s]!.initials, name: roster[s]!.name, submitted_at: '2026-11-01T01:00:00Z', response: { text }, awarded: null, by: null, ai_ready: true, ...extra });
 const WRITTEN = 'Bode says the road is “clearly” a colonial symbol, and that challenges readers who see roads as neutral. Using “clearly” shows she is sure. The poem makes a similar point because the talking never stops, so the past is still being dealt with now.';
+// A typing record with one paste, so the replay shows beside the answer.
+const PASTED = WRITTEN.slice(WRITTEN.indexOf('Using'));
+const TYPED = WRITTEN.slice(0, WRITTEN.indexOf('Using'));
+const typing = {
+  typed_s: 74, pastes: 1, away: 2, jumps: 1, flags: ['Pasted once', 'A chunk of text appeared at once', 'Left the page twice'],
+  log: { start: 0, base: '', ms: 74_000, pastes: 1, away: 2, jumps: 1, steps: [...TYPED.match(/.{1,12}/g)!.map((chunk, n) => [n * 30, n * 12, 0, chunk]), [400, TYPED.length, 0, PASTED]] }
+};
 let aiDone = false;
 const quiz = () => ({
   lesson_id: 'lesson_quiz', title: 'Week 3 Review',
@@ -118,7 +125,7 @@ const quiz = () => ({
     { ...question('q_short2', 'short_answer', 1, 'Which word tells you the speaker is certain?', [answer(1, 'surely'), answer(2, 'the word clearly shows she is sure', { again: { state: 'sent', asked_at: '2026-11-03T00:00:00Z', sent_at: '2026-11-04T00:00:00Z', comment: 'Have a go: find the word in the claim.', first: { text: '' } } })]), accepted: ['clearly'], looking_for: 'The judging word in the critic’s claim.' },
     question('q_form', 'extended_response', 8, FORM_PROMPT, [answer(1, FORM_ANSWER, aiDone ? { ai_ready: false, ai: { marks: null, suggested: 6, reason: 'Links the form to the idea, with two specific moments.' } } : {})]),
     question('q_written', 'extended_response', 4, 'Justify how the critic’s claims affirm or challenge a reader’s relationship with the past.', [
-      answer(0, WRITTEN, aiDone ? { ai_ready: false, ai: { marks: null, suggested: 3, reason: 'Uses a judging word and links to the poem. The link to the reader stays general.', feedback: 'You name a judging word and show what it does. Next, say what this asks of the reader.', tags: [{ code_id: 'comp_e', quote: 'Using “clearly” shows she is sure', why: 'Names the judging word and what it does' }, { code_id: 'comp_ar', quote: 'the past is still being dealt with now', why: 'Close to the question, but says no more about the reader' }] } } : {})
+      answer(0, WRITTEN, aiDone ? { ai_ready: false, ai: { marks: null, suggested: 3, reason: 'Uses a judging word and links to the poem. The link to the reader stays general.', feedback: 'You name a judging word and show what it does. Next, say what this asks of the reader.', tags: [{ code_id: 'comp_e', quote: 'Using “clearly” shows she is sure', why: 'Names the judging word and what it does' }, { code_id: 'comp_ar', quote: 'the past is still being dealt with now', why: 'Close to the question, but says no more about the reader' }] }, writing: typing } : { writing: typing })
     ])
   ]
 });

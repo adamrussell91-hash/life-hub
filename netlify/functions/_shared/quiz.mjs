@@ -1312,6 +1312,13 @@ export async function quizAnswersToMark(store, lessonId, classId, students) {
     const [start, result, marks, aiMarks] = await Promise.all([read(store, k.attempt(device, n)), read(store, k.result(device, n)), read(store, k.marks(device, n)), read(store, k.aiMarks(device, n))]);
     if (!start || !result) return;
     const rec = narrow(await recordFor(store, lessonId, start.version, record), start.student_id);
+    // How a written answer was typed, so a flag can be checked where it is marked.
+    const logs = result.writing && Object.keys(result.writing).length ? await read(store, k.writing(device, n)) : null;
+    const typed = (id) => {
+      const summary = result.writing?.[id];
+      const log = cleanWritingLog(logs?.[id]);
+      return summary ? { writing: { ...summary, ...(log ? { log } : {}) } } : {};
+    };
     for (const row of scoreAttempt(rec, result, marks, aiMarks).rows) {
       if (row.awarded !== null && row.by !== 'ai') continue;
       const { question, key } = rec.questions[row.id];
@@ -1326,7 +1333,7 @@ export async function quizAnswersToMark(store, lessonId, classId, students) {
       }
       questions.get(row.id).answers.push({
         attempt_id: a.attempt_id, student_id: a.student, initials: who.get(a.student).initials, name: who.get(a.student).name, submitted_at: a.submitted_at,
-        response: row.response, awarded: row.awarded, by: row.by, ai_ready: waitsForAi(row) && hasAnswer(row.response), ...(row.ai ? { ai: row.ai } : {}), ...(row.comment ? { comment: row.comment } : {}), ...(row.again ? { again: row.again } : {})
+        response: row.response, awarded: row.awarded, by: row.by, ai_ready: waitsForAi(row) && hasAnswer(row.response), ...(row.ai ? { ai: row.ai } : {}), ...(row.comment ? { comment: row.comment } : {}), ...(row.again ? { again: row.again } : {}), ...typed(row.id)
       });
     }
   });

@@ -14,6 +14,8 @@ import { openAddWriting, unitFromApp, writingApi, type AddedSettings } from './a
 import { runAiRead, type AiReadTarget } from './ai-read';
 import { FLOW_LABEL, aiReadCount, flowItems, flowLabel, isStacked, type FlowItem, type FlowKind, type PassagePart, type QuizAnswer, type QuizLoad, type QuizQuestion, type QuizResponse } from './to-mark-items';
 import { ageText, loadQueue, type ToMarkTask } from './to-mark-view';
+import { writingPanel } from '@/quiz/writing-replay';
+import '@/quiz/quiz.css';
 import './marking.css';
 
 /**
@@ -153,6 +155,8 @@ async function writtenAnswerCard(item: FlowItem): Promise<Card> {
   // A tagged question's mark sits in its rubric, suggested from the rungs.
   if (!rubric) aside.append(el('h3', 'mk-side__title', 'Mark'), ticks);
   if (answer.ai) aside.append(el('p', 'mk-ai', `AI suggests ${fromAi ?? 'no mark'}: ${answer.ai.reason} Return keeps it unless you ${rubric ? 'change it' : 'press another'}.`));
+  // A flagged answer can be watched being written right here, not only in Results.
+  if (answer.writing) aside.append(el('h3', 'mk-side__title', 'How it was written'), writingPanel(answer.writing, answer.writing.log, text));
   if (answer.again?.state === 'sent') aside.append(firstGo(answer.again));
   // Another go: the mark stands until their new answer comes back, then that one is marked.
   const againBox = el('label', 'tf-again-line');
@@ -648,6 +652,7 @@ export function mountToMarkPage(canvas: HTMLElement, load: () => Promise<FlowLoa
         const b = el('button', `tf-item${i === current() ? ' is-on' : ''}${isDone ? ' is-done' : ''}`);
         b.type = 'button';
         b.append(el('span', 'tf-who', isDone ? '✓' : i.who), el('span', `tm-kind tm-kind--${i.task.kind ?? 'piece'}`, flowLabel(i)));
+        if (!isDone && i.answer?.writing?.flags.length) b.append(el('span', 'tf-item__flag', 'Check writing'));
         if (!isDone && (i.row?.ai_read || i.answer?.ai || i.question?.answers.some((a) => a.ai))) b.append(el('span', 'tf-item__ai', 'AI read'));
         b.addEventListener('click', () => goTo(items.indexOf(i)));
         g.append(b);

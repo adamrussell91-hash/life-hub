@@ -1,3 +1,4 @@
+import type { WritingLog, WritingSummary } from '@/quiz/writing';
 import type { ToMarkTask } from './to-mark-view';
 
 /**
@@ -24,6 +25,8 @@ export type QuizAnswer = {
   comment?: string;
   /** Asked for another go: `sent` once the new answer is back, with the first one. */
   again?: { state: 'asked' | 'sent'; asked_at: string; sent_at?: string; comment: string; first?: QuizResponse };
+  /** How it was typed, when the quiz's writing check was on. */
+  writing?: WritingSummary & { log?: WritingLog };
 };
 /** A gap passage piece: plain text, or a gap with its accepted answers. */
 export type PassagePart = { text: string } | { gap: string; answers: string[] };
