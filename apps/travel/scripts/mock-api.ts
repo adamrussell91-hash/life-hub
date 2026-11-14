@@ -3,8 +3,15 @@
  * vitest. Serves the invented fixture trip only — no production data.
  */
 import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import nodePath from 'node:path';
+import { fileURLToPath } from 'node:url';
 import fixtureTrip from '../fixtures/test-trip.json' with { type: 'json' };
 import type { Item, ItemDraft, Trip } from '@/types';
+import { lisbonPortoJournal } from '@/journal/fixtures/lisbon-porto';
+
+const PHOTO_DIR = nodePath.resolve(nodePath.dirname(fileURLToPath(import.meta.url)), '../fixtures/journal-photos');
+const PHOTO_NAME_RE = /^[a-z0-9-]+\.jpg$/;
 
 const LOCAL_PASSPHRASE = 'travel-hub-local';
 
@@ -33,6 +40,8 @@ export function createMockApi() {
   let atlasVersion: string | null = null;
 
   function seedJournal(tripId: string) {
+    // The test trip gets the full invented journal, photos and all.
+    if (tripId === fixtureTrip.id) return lisbonPortoJournal(tripId) as unknown as Record<string, unknown>;
     const trip = trips.get(tripId);
     const city = trip?.cities[0];
     const legId = 'leg_mocklisbon1';
@@ -369,6 +378,16 @@ export function createMockApi() {
         ok: true,
         data: { places: [{ name: `${q} (mock result)`, lat: -33.87, lon: 151.21 }] }
       });
+    }
+
+    // Photos for the invented journal, read from fixtures/journal-photos.
+    if (path.startsWith('/api/mock-photo/') && method === 'GET') {
+      const name = path.slice('/api/mock-photo/'.length);
+      const file = nodePath.join(PHOTO_DIR, name);
+      if (!PHOTO_NAME_RE.test(name) || !existsSync(file)) {
+        return json(404, { ok: false, error: { code: 'not_found', message: 'Not found.' } });
+      }
+      return { status: 200, body: null, raw: { contentType: 'image/jpeg', buffer: readFileSync(file) } };
     }
 
     if (path === '/api/travel-journal') {
