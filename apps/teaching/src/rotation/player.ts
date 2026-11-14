@@ -99,6 +99,12 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
     if (window.scrollY !== y) window.scrollTo?.({ top: y });
   };
 
+  /** A new view starts at the top of the rotation, not the top of the page (the hero and intro sit above it). */
+  const toBody = (): void => {
+    const top = body.getBoundingClientRect().top + window.scrollY - 96;
+    window.scrollTo?.({ top: Math.max(0, top) });
+  };
+
   const run = async (go: () => Promise<RotationStatus>): Promise<RotationStatus | null> => {
     if (!client) return null;
     const next = await go();
@@ -268,7 +274,7 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
     card = null;
     view = 'station';
     paint();
-    window.scrollTo?.({ top: 0 });
+    toBody();
   }
 
   function passport(s: RotationStatus): HTMLElement {
@@ -382,7 +388,7 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
       const ready = s.pieces_left === 0;
       fin.append(el('span', 'rot-node__num', 'Finale'), el('span', 'rot-node__title', r.story?.title ? `${r.story.title}: the finale` : 'The finale'), el('span', 'rot-node__sub', ready ? 'Open: every piece collected' : `${s.pieces_left} piece${s.pieces_left === 1 ? '' : 's'} left`));
       if (!ready) fin.setAttribute('aria-disabled', 'true');
-      fin.addEventListener('click', () => { if (ready) { view = 'finale'; paint(); window.scrollTo?.({ top: 0 }); } else { mapMsg = `Collect ${s.pieces_left} more piece${s.pieces_left === 1 ? '' : 's'} to open the finale.`; sigs.map = ''; paint(); } });
+      fin.addEventListener('click', () => { if (ready) { view = 'finale'; paint(); toBody(); } else { mapMsg = `Collect ${s.pieces_left} more piece${s.pieces_left === 1 ? '' : 's'} to open the finale.`; sigs.map = ''; paint(); } });
       map.append(fin);
       const legend = el('div', 'rot-legend');
       for (const [label, kind] of [['Collected', 'done'], ['Go here next', 'rec'], ['Teacher station', 'teacher'], ['Can’t open yet', 'locked']] as const) {
@@ -417,7 +423,7 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
         client: client!,
         run,
         keepScroll,
-        onBack: () => { card?.dispose(); card = null; view = 'map'; stationId = null; sigs.map = ''; paint(); window.scrollTo?.({ top: 0 }); }
+        onBack: () => { card?.dispose(); card = null; view = 'map'; stationId = null; sigs.map = ''; paint(); toBody(); }
       });
       body.replaceChildren(card.root);
     }
