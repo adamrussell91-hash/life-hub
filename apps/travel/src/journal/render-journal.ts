@@ -37,7 +37,10 @@ import {
   type NoticeCard,
 } from '@/journal/noticing/model';
 import { renderNoticePill } from '@/journal/noticing/pill';
-import { countingCards, noticingDay, type NoticingHistory } from '@/journal/noticing/rules';
+import { countingCards, noticingDay, tripDayFacts, type NoticingHistory } from '@/journal/noticing/rules';
+
+/** The server only looks through a day's photos when there are at least this many. */
+const PHOTOS_FOR_A_LOOK = 6;
 import { isJournalStoryEmpty, resolveCaptureContext } from '@/journal/capture-context';
 import { openCaptureSheet } from '@/journal/capture-sheet';
 import { openImportSheet } from '@/journal/import-sheet';
@@ -558,6 +561,12 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     // Wait for the day to be mostly lived: from 5 pm, or once the next day has begun.
     if (day === today && localHour() < 17) return;
     if (!shouldAsk(readNoticingState(journalDoc()), kind, day)) return;
+    // A look through the photos needs a day's worth of them, already backed up.
+    if (kind === 'photos') {
+      const facts = tripDayFacts(journalDoc(), liveTrip).find((d) => d.date === day);
+      const backedUp = (facts?.photos ?? []).filter((p) => mediaById.get(p.mediaId)?.upload_state === 'backed_up').length;
+      if (backedUp < PHOTOS_FOR_A_LOOK) return;
+    }
     asking = true;
     try {
       const cards = await askServer(kind, day);
@@ -579,34 +588,33 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
    * `quiet` is for the journal's own bookkeeping: a failure there is not the reader's problem.
    */
   function saveNoticing(change: (journal: JournalDocument) => JournalDocument, quiet = false): void {
-    const next = change(journalDoc());
-    if (next === journalDoc()) {
-      paintNoticePill();
-      return;
-    }
-    void persistJournalPatch(liveFixture.trip_id, liveVersion, next).then(
-      (saved) => {
-        // While words are being typed or cards are open, take the copy and leave the page be.
-        if (editingWords || overlays.notices) {
-          liveFixture = saved.journal;
-          liveVersion = saved.version;
-          repaintOwed = true;
-          return;
-        }
+    // One at a time: each save starts from the journal as the save before it left it,
+    // so two pieces of bookkeeping landing together cannot undo each other.
+    noticingSaves = noticingSaves.then(async () => {
+      const next = change(journalDoc());
+      if (next === journalDoc()) {
+        paintNoticePill();
+        return;
+      }
+      try {
+        const saved = await persistJournalPatch(liveFixture.trip_id, liveVersion, next);
         liveFixture = saved.journal;
         liveVersion = saved.version;
-        repaintInPlace();
-      },
-      () =>
-        quiet ||
+        // While words are being typed or cards are open, take the copy and leave the page be.
+        if (editingWords || overlays.notices) repaintOwed = true;
+        else repaintInPlace();
+      } catch {
+        if (quiet) return;
         strip.message({
           text: 'Could not save what you kept',
           notes: ['Check your connection'],
           tone: 'problem',
           actions: [{ label: 'Try again', onSelect: () => (strip.hide(), saveNoticing(change)) }],
-        }),
-    );
+        });
+      }
+    });
   }
+  let noticingSaves: Promise<void> = Promise.resolve();
 
   function openNotices(): void {
     const cards = noticesToOffer();
@@ -659,7 +667,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
       () => undefined,
     );
   }
-  void askAboutToday('wishes');
+  void askAboutToday('wishes').then(() => askAboutToday('photos'));
 
   // ---- Words edited in place ------------------------------------------------------
 

@@ -187,6 +187,7 @@ test('travel-noticing POST: asks the model once and returns only checked cards; 
   assert.deepEqual((await (await post({ kind: 'wishes', day: '2027-03-06' })).json()).data.cards, []);
   assert.equal(calls.length, 1);
 
+  assert.equal((await post({ kind: 'diary', day: '2027-03-05' })).status, 400);
   assert.equal((await post({ kind: 'photos' })).status, 400);
   assert.equal((await post({ kind: 'wishes', day: 'today' })).status, 400);
   const down = await post({ kind: 'wishes', day: '2027-03-05' }, { complete: async () => { throw new Error('model down'); } });
@@ -195,4 +196,114 @@ test('travel-noticing POST: asks the model once and returns only checked cards; 
     new Request(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'wishes', day: '2027-03-05' }) })
   );
   assert.equal(noKey.status, 503);
+});
+
+// ---- Seen in the photos ---------------------------------------------------------
+
+const {
+  PHOTOS_SYSTEM, dayPhotos, parsePhotoNotices, photoCards, samplePhotos
+} = await import('../../netlify/functions/_shared/travel-noticing-photos.mjs');
+
+function photoJournal(count) {
+  const media = Array.from({ length: count }, (_, i) => ({ id: `med_day${i}`, lifecycle: 'live', upload_state: 'backed_up', content_type: 'image/jpeg' }));
+  media.push(
+    { id: 'med_pending', lifecycle: 'live', upload_state: 'pending', content_type: 'image/jpeg' },
+    { id: 'med_sound', lifecycle: 'live', upload_state: 'backed_up', content_type: 'audio/mp4' },
+    { id: 'med_partner', lifecycle: 'live', upload_state: 'backed_up', content_type: 'image/jpeg' },
+    { id: 'med_stored', lifecycle: 'live', upload_state: 'backed_up', content_type: 'image/jpeg', derivative_keys: { 320: 'travel/journal/trp_now00001/med_stored/der/320.jpg' } }
+  );
+  return {
+    trip_id: 'trp_now00001', lifecycle: 'live', media,
+    moments: [
+      { id: 'mom_a', lifecycle: 'live', local_date: '2027-03-05', local_time: '09:00', media_ids: [...media.slice(0, count).map((m) => m.id), 'med_pending', 'med_sound'] },
+      { id: 'mom_b', lifecycle: 'live', local_date: '2027-03-05', local_time: '08:00', media_ids: ['med_stored'] },
+      { id: 'mom_p', lifecycle: 'live', local_date: '2027-03-05', local_time: '10:00', author: 'partner', media_ids: ['med_partner'] },
+      { id: 'mom_other', lifecycle: 'live', local_date: '2027-03-04', local_time: '10:00', media_ids: ['med_day0'] }
+    ]
+  };
+}
+
+test('photos: only the owner’s backed-up photos of that day, in order, by their small copies', () => {
+  const photos = dayPhotos(photoJournal(3), '2027-03-05');
+  assert.deepEqual(photos.map((p) => p.id), ['med_stored', 'med_day0', 'med_day1', 'med_day2']);
+  assert.equal(photos[0].key, 'travel/journal/trp_now00001/med_stored/der/320.jpg');
+  assert.match(photos[1].key, /^travel\/journal\/trp_now00001\/med_day0\//);
+  assert.match(photos[1].key, /320/);
+});
+
+test('photos: a long day is sampled evenly, start to end', () => {
+  const many = Array.from({ length: 100 }, (_, i) => ({ id: `p${i}`, key: 'k' }));
+  const picked = samplePhotos(many);
+  assert.equal(picked.length, 24);
+  assert.equal(picked[0].id, 'p0');
+  assert.equal(picked.at(-1).id, 'p99');
+  assert.equal(samplePhotos(many.slice(0, 10)).length, 10);
+});
+
+test('photos: an answer must list three real photos, be short, and say nothing about a person', () => {
+  const sent = ['a', 'b', 'c', 'd', 'e', 'f'];
+  const raw = JSON.stringify({ notices: [
+    { headline: 'A blue door in four of today’s photos', photo_ids: ['a', 'b', 'c', 'zzz'] },
+    { headline: 'The woman in the red coat looks tired', photo_ids: ['a', 'b', 'c'] },
+    { headline: 'Trams', photo_ids: ['a', 'b', 'c'] },
+    { headline: 'Yellow trams everywhere!', photo_ids: ['a', 'b', 'c'] },
+    { headline: 'The same bridge at three times of day', photo_ids: ['d', 'e'] },
+    { headline: 'Tiled walls in most of the afternoon', photo_ids: ['d', 'e', 'f', 'f'] }
+  ] });
+  assert.deepEqual(parsePhotoNotices(raw, sent), [
+    { headline: 'A blue door in four of today’s photos', photoIds: ['a', 'b', 'c'] },
+    { headline: 'Tiled walls in most of the afternoon', photoIds: ['d', 'e', 'f'] }
+  ]);
+  assert.deepEqual(parsePhotoNotices('nothing', sent), []);
+  assert.match(PHOTOS_SYSTEM, /Never comment on any person/);
+  assert.match(PHOTOS_SYSTEM, /never as instructions/);
+});
+
+test('photos: the card shows its photos and says how many were looked at', () => {
+  const [card] = photoCards([{ headline: 'A blue door in four of today’s photos', photoIds: ['a', 'b', 'c', 'd'] }], { day: '2027-03-05', tripId: 'trp_now00001', sent: 24, total: 60 });
+  assert.equal(card.source, 'photos');
+  assert.deepEqual(card.photos, [{ tripId: 'trp_now00001', mediaId: 'a' }, { tripId: 'trp_now00001', mediaId: 'b' }, { tripId: 'trp_now00001', mediaId: 'c' }]);
+  assert.equal(card.basis, 'Seen in 4 of the 24 photos looked at, out of 60 from today');
+  const [all] = photoCards([{ headline: 'Tiled walls in most of the afternoon', photoIds: ['a', 'b', 'c'] }], { day: '2027-03-05', tripId: 'trp_now00001', sent: 8, total: 8 });
+  assert.equal(all.basis, 'Seen in 3 of today’s 8 photos');
+});
+
+test('travel-noticing POST photos: looks only when the day has six photos, and never sends Partner’s', async () => {
+  const calls = [];
+  const loads = [];
+  const make = (count, extra = {}) => createTravelNoticingHandler({
+    env: { ...env, ANTHROPIC_API_KEY: 'test-key' }, ...signedIn, github: {},
+    createTravelRepository: () => ({ getTrip: async () => ({ trip: wishTrip }) }),
+    createTravelJournalRepository: () => ({ getJournal: async () => ({ journal: photoJournal(count) }), listJournals: async () => [] }),
+    loadPhotoBytes: async (_ctx, key) => { loads.push(key); return 'AAAA'; },
+    complete: async (request) => {
+      calls.push(request);
+      return JSON.stringify({ notices: [{ headline: 'A blue door in four of today’s photos', photo_ids: ['med_day0', 'med_day1', 'med_day2', 'med_partner'] }] });
+    },
+    ...extra
+  });
+  const post = (handler) => handler(new Request('https://life-hub.test/api/travel-noticing?trip=trp_now00001', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'photos', day: '2027-03-05' })
+  }));
+
+  const few = await post(make(3));
+  assert.deepEqual((await few.json()).data.cards, []);
+  assert.equal(calls.length, 0, 'too few photos: the model is not asked');
+
+  const ok = await post(make(8));
+  const { cards } = (await ok.json()).data;
+  assert.equal(cards.length, 1);
+  assert.deepEqual(cards[0].photos.map((p) => p.mediaId), ['med_day0', 'med_day1', 'med_day2']);
+  assert.equal(cards[0].basis, 'Seen in 3 of today’s 9 photos');
+  assert.equal(calls.length, 1);
+  const sentText = calls[0].messages[0].content.filter((block) => block.type === 'text').map((block) => block.text).join(' ');
+  assert.ok(!sentText.includes('med_partner') && !sentText.includes('med_pending') && !sentText.includes('med_sound'));
+  assert.equal(calls[0].messages[0].content.filter((block) => block.type === 'image').length, 9);
+  assert.ok(loads.every((key) => key.includes('320')), 'only the small copies are fetched');
+
+  // Storage down for most photos: too few arrive, so nothing is asked.
+  const before = calls.length;
+  const down = await post(make(8, { loadPhotoBytes: async () => null }));
+  assert.deepEqual((await down.json()).data.cards, []);
+  assert.equal(calls.length, before);
 });
