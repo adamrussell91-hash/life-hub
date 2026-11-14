@@ -1,11 +1,17 @@
 import type { JournalDocument } from '@/api/journal';
-import type { JournalDeletedMeta, JournalLifecycle, JournalMoment } from '@/journal/types';
+import type { JournalCoordinates, JournalDeletedMeta, JournalLifecycle, JournalMoment } from '@/journal/types';
 
 /** Object-moment collection — derived records, not burned into media bytes. */
 export const JOURNAL_SOUVENIRS_PREF_KEY = 'journal_souvenirs_v1';
 
 export const SOUVENIR_MOMENT_DELETE_RULE =
-  'Deleting a moment also removes souvenirs linked to that moment (or its photos) from your collection. Restore the moment from Trash to bring them back. Souvenirs with no moment link stay in the collection.';
+  'Deleting a moment also removes the keepsakes linked to it. Restore the moment from Trash to bring them back.';
+
+/** The shape a keepsake photo is cut to. */
+export type KeepsakeKind = 'ticket' | 'poster' | 'round' | 'other';
+export const KEEPSAKE_KINDS: readonly KeepsakeKind[] = ['ticket', 'poster', 'round', 'other'];
+/** `photo`: photographed by the traveller. `booking`: made from an itinerary item. */
+export type KeepsakeSource = 'photo' | 'booking';
 
 export interface JournalSouvenir extends JournalDeletedMeta {
   id: string;
@@ -15,6 +21,17 @@ export interface JournalSouvenir extends JournalDeletedMeta {
   media_id?: string;
   lifecycle: JournalLifecycle;
   created_at: string;
+  /** Absent on records made before keepsakes: read as `other`. */
+  kind?: KeepsakeKind;
+  /** Absent on records made before keepsakes: read as `photo`. */
+  source?: KeepsakeSource;
+  /** The itinerary item a booking keepsake stands for. A deleted row hides that ticket. */
+  item_id?: string;
+  /** Where and when, for a keepsake with no linked moment. */
+  leg_id?: string;
+  local_date?: string;
+  local_time?: string;
+  coordinates?: JournalCoordinates;
 }
 
 export type JournalSouvenirsMap = Record<string, JournalSouvenir>;
@@ -50,6 +67,17 @@ export function parseJournalSouvenir(raw: unknown): JournalSouvenir | null {
     typeof row.moment_id === 'string' && row.moment_id.trim() ? row.moment_id.trim() : undefined;
   const media_id =
     typeof row.media_id === 'string' && row.media_id.trim() ? row.media_id.trim() : undefined;
+  const text = (value: unknown): string | undefined =>
+    typeof value === 'string' && value.trim() ? value.trim() : undefined;
+  const kind = KEEPSAKE_KINDS.includes(row.kind as KeepsakeKind) ? (row.kind as KeepsakeKind) : undefined;
+  const source = row.source === 'booking' || row.source === 'photo' ? row.source : undefined;
+  const local_date = /^\d{4}-\d{2}-\d{2}$/.test(String(row.local_date ?? '')) ? String(row.local_date) : undefined;
+  const local_time = /^\d{2}:\d{2}$/.test(String(row.local_time ?? '')) ? String(row.local_time) : undefined;
+  const rawCoords = row.coordinates as { lat?: unknown; lon?: unknown } | undefined;
+  const coordinates =
+    rawCoords && typeof rawCoords.lat === 'number' && typeof rawCoords.lon === 'number'
+      ? { lat: rawCoords.lat, lon: rawCoords.lon }
+      : undefined;
   const deleted_at = typeof row.deleted_at === 'string' ? row.deleted_at : undefined;
   const deleted_with =
     typeof row.deleted_with === 'string' && row.deleted_with.trim()
@@ -65,6 +93,13 @@ export function parseJournalSouvenir(raw: unknown): JournalSouvenir | null {
     created_at,
     deleted_at,
     deleted_with,
+    ...(kind ? { kind } : {}),
+    ...(source ? { source } : {}),
+    ...(text(row.item_id) ? { item_id: text(row.item_id) } : {}),
+    ...(text(row.leg_id) ? { leg_id: text(row.leg_id) } : {}),
+    ...(local_date ? { local_date } : {}),
+    ...(local_time ? { local_time } : {}),
+    ...(coordinates ? { coordinates } : {}),
   };
 }
 
@@ -119,20 +154,23 @@ function writeSouvenirsMap(journal: JournalDocument, map: JournalSouvenirsMap): 
   };
 }
 
-export function defaultJournalSouvenir(partial: {
-  title: string;
-  note?: string;
-  moment_id?: string;
-  media_id?: string;
-}): JournalSouvenir {
+export function defaultJournalSouvenir(
+  partial: { title: string } & Partial<
+    Pick<
+      JournalSouvenir,
+      'note' | 'moment_id' | 'media_id' | 'kind' | 'source' | 'item_id' | 'leg_id' | 'local_date' | 'local_time' | 'coordinates'
+    >
+  >,
+): JournalSouvenir {
+  const { title, note, ...rest } = partial;
+  const extras = Object.fromEntries(Object.entries(rest).filter(([, value]) => value !== undefined));
   return {
     id: newSouvenirId(),
-    title: partial.title.trim(),
-    note: partial.note?.trim() || undefined,
-    moment_id: partial.moment_id,
-    media_id: partial.media_id,
+    title: title.trim(),
+    note: note?.trim() || undefined,
     lifecycle: 'live',
     created_at: new Date().toISOString(),
+    ...extras,
   };
 }
 
@@ -160,6 +198,23 @@ export function softDeleteJournalSouvenir(
     deleted_at: new Date().toISOString(),
     ...(cascadeParentId ? { deleted_with: cascadeParentId } : {}),
   };
+  return writeSouvenirsMap(journal, map);
+}
+
+/** Take a row out of the collection for good. */
+export function dropJournalSouvenir(journal: JournalDocument, souvenirId: string): JournalDocument {
+  const map = { ...readSouvenirsMap(journal) };
+  if (!map[souvenirId]) return journal;
+  delete map[souvenirId];
+  return writeSouvenirsMap(journal, map);
+}
+
+/** Bring a removed row back. */
+export function restoreJournalSouvenir(journal: JournalDocument, souvenirId: string): JournalDocument {
+  const map = { ...readSouvenirsMap(journal) };
+  const row = map[souvenirId];
+  if (!row || row.lifecycle !== 'deleted') return journal;
+  map[souvenirId] = reviveSouvenir(row);
   return writeSouvenirsMap(journal, map);
 }
 

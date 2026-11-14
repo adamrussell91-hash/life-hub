@@ -9,9 +9,15 @@ import {
   PERMANENT_DELETE_EXPLAINER,
   type DeleteTarget,
 } from '@/journal/delete-flow';
+import { listTrashedKeepsakes, purgeKeepsake, restoreKeepsake } from '@/journal/keepsakes/model';
 
 export interface TrashRow {
-  target: DeleteTarget;
+  /** A moment, day, city or the whole journal. Absent for a keepsake. */
+  target?: DeleteTarget;
+  /** A keepsake the traveller removed. */
+  keepsakeId?: string;
+  /** A booked ticket hidden from keepsakes: it can only be restored. */
+  restoreOnly?: boolean;
   label: string;
   detail: string;
 }
@@ -42,6 +48,14 @@ export function listTrashRows(journal: JournalDocument): TrashRow[] {
       target: { kind: 'leg', id: leg.id },
       label: leg.destination,
       detail: 'Leg',
+    });
+  }
+  for (const kept of listTrashedKeepsakes(journal)) {
+    rows.push({
+      keepsakeId: kept.id,
+      restoreOnly: kept.booking,
+      label: kept.title,
+      detail: kept.booking ? 'Booked ticket, removed from keepsakes' : 'Keepsake',
     });
   }
   if (journal.lifecycle === 'deleted') {
@@ -158,7 +172,10 @@ export function openTrashView(options: OpenTrashViewOptions): { destroy(): void 
       restoreBtn.className = 'btn btn--secondary';
       restoreBtn.textContent = 'Restore';
       restoreBtn.addEventListener('click', () => {
-        void runRowAction(() => applyRestore(journal, row.target), 'Could not restore. Try again.');
+        void runRowAction(
+          () => (row.keepsakeId ? restoreKeepsake(journal, row.keepsakeId) : applyRestore(journal, row.target!)),
+          'Could not restore. Try again.',
+        );
       });
       const purgeBtn = document.createElement('button');
       purgeBtn.type = 'button';
@@ -194,11 +211,12 @@ export function openTrashView(options: OpenTrashViewOptions): { destroy(): void 
       });
       forgetBtn.addEventListener('click', () => {
         void runRowAction(
-          () => applyPermanentDelete(journal, row.target).journal,
+          () => (row.keepsakeId ? purgeKeepsake(journal, row.keepsakeId) : applyPermanentDelete(journal, row.target!).journal),
           'Could not delete permanently. Try again.',
         );
       });
-      rowActions.append(restoreBtn, purgeBtn);
+      if (row.restoreOnly) rowActions.append(restoreBtn);
+      else rowActions.append(restoreBtn, purgeBtn);
       card.append(title, meta, rowActions, confirmRow);
       list.append(card);
     }

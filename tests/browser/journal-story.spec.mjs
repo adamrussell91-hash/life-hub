@@ -61,7 +61,14 @@ function storyJournal() {
     revision: 1,
     lifecycle: 'live',
     leg_ids: ['leg_a', 'leg_b'],
-    preferences: {},
+    preferences: {
+      journal_souvenirs_v1: {
+        sv_spec_ticket: {
+          id: 'sv_spec_ticket', title: 'Funicular ticket', kind: 'ticket', source: 'photo', media_id: 'med_keep',
+          leg_id: 'leg_a', local_date: '2026-05-02', local_time: '10:30', lifecycle: 'live', created_at: '2026-05-02T10:30:00.000Z'
+        }
+      }
+    },
     operations: [],
     legs: [
       { id: 'leg_a', trip_id: TRIP, pattern_id: 'kul', destination: 'Lisbon', timezone: 'Europe/Lisbon',
@@ -88,7 +95,8 @@ function storyJournal() {
       photo('med_arch', 'arch', 1200, 800),
       photo('med_tram', 'tram', 1200, 800),
       photo('med_cafe', 'cafe', 800, 1200),
-      photo('med_bridge', 'bridge', 1200, 800)
+      photo('med_bridge', 'bridge', 1200, 800),
+      photo('med_keep', 'keep', 760, 440)
     ],
     transitions: []
   };
@@ -103,9 +111,12 @@ async function openStory(engine, viewport, contextOptions = {}) {
   page.on('pageerror', (error) => errors.push(String(error)));
   let version = 'v1';
   let journal = storyJournal();
+  const puts = [];
+  await page.route('**/api/travel-journal-media*', (route) => route.fulfill({ status: 503, body: '' }));
   await page.route('**/api/travel-journal?*', async (route) => {
     if (route.request().method() === 'PUT') {
       journal = route.request().postDataJSON().journal;
+      puts.push(journal);
       version = `${version}x`;
       return route.fulfill(ok({ journal, version }));
     }
@@ -126,7 +137,7 @@ async function openStory(engine, viewport, contextOptions = {}) {
   await page.evaluate((hash) => { location.hash = hash; }, `#/trip/${TRIP}/journal`);
   await page.locator('.story-cover').waitFor({ timeout: 15000 });
   await page.locator('#mom_arch').waitFor({ timeout: 15000 });
-  return { context, page, errors };
+  return { context, page, errors, puts };
 }
 
 const overflowX = (page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -162,7 +173,7 @@ test('journal story (390px): cover, ribbon, dock and tab bar fit the phone', { s
 
     // Every control on the cover and ribbon is a 44px target (R6).
     const small = await page.evaluate(() => [...document.querySelectorAll(
-      '.story-cover button, .story-cover a, .story-ribbon button, .story-dock button, .story-moment__more'
+      '.story-cover button, .story-cover a, .story-ribbon button, .story-dock button, .story-moment__more, .story-keep__object'
     )].filter((node) => {
       const r = node.getBoundingClientRect();
       return r.width > 0 && (r.width < 43.5 || r.height < 43.5);
@@ -178,6 +189,7 @@ test('journal story (390px): cover, ribbon, dock and tab bar fit the phone', { s
     const sizes = await page.evaluate(() => {
       const found = new Set();
       for (const node of document.querySelectorAll('.journal.story *, .story-dock *')) {
+        if (node.closest('.keepsake')) continue;
         if (node.childNodes.length && [...node.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim())) {
           found.add(getComputedStyle(node).fontSize);
         }
@@ -226,7 +238,7 @@ test('journal story (390px): sheets cover the tab bar and Back closes them', { s
     assert.ok(metrics.barCovered, 'the tab bar is under the sheet, not over it');
     assert.ok(metrics.dockHidden, 'the dock is away while a sheet is open');
     const labels = await sheet.innerText();
-    for (const label of ['Search journal', 'Souvenirs', 'Print', 'Export', 'Share', 'Trash', 'Refresh']) {
+    for (const label of ['Search journal', 'Print', 'Export', 'Share', 'Trash', 'Refresh']) {
       assert.match(labels, new RegExp(label), `options sheet offers ${label}`);
     }
     assert.match(labels, /Partner/, 'Partner lines toggle is offered when the journal has them');
@@ -282,6 +294,79 @@ test('journal story (390px): photo row, viewer and Photos view', { skip: !hasTra
     assert.equal(await overflowX(page), 0);
     await page.locator('[data-story-view="story"]').click();
     await page.locator('#mom_arch').waitFor();
+  } finally {
+    await context.close();
+  }
+});
+
+test('journal keepsakes (390px): kept in the story, on the board, and added from the phone', { skip: !hasTravelBuild }, async () => {
+  const { context, page, puts } = await openStory(browser, { width: 390, height: 844 });
+  try {
+    // In the story: after the 9:40 moment and before the 11:15 one, with its name in real text.
+    const order = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-journal-moment], .story-keep')].map((node) => node.id));
+    assert.deepEqual(order.slice(0, 3), ['mom_arch', 'keep_sv_spec_ticket', 'mom_two']);
+    assert.match(await page.locator('#keep_sv_spec_ticket .story-keep__text').innerText(), /Kept: Funicular ticket/);
+    assert.match(await page.locator('.story-cover__stats').innerText(), /1 keepsake/);
+    assert.equal(await overflowX(page), 0);
+
+    // Its sheet: flush to the bottom, over the tab bar, with Go to that day.
+    await page.locator('#keep_sv_spec_ticket .story-keep__object').click();
+    const sheet = page.locator('.story-sheet');
+    await sheet.waitFor();
+    await page.waitForTimeout(450);
+    const gap = await page.evaluate(() => window.innerHeight - document.querySelector('.story-sheet').getBoundingClientRect().bottom);
+    assert.ok(Math.abs(gap) <= 1, 'keepsake sheet sits flush with the bottom');
+    assert.match(await sheet.innerText(), /Go to that day/);
+    assert.equal(await overflowX(page), 0, 'the large keepsake does not widen the page');
+    await page.goBack();
+    await sheet.waitFor({ state: 'detached', timeout: 5000 });
+
+    // The board.
+    await page.locator('[data-story-view="keepsakes"]').click();
+    await page.locator('[data-keepsake-board]').waitFor();
+    assert.match(await page.locator('.keep-board__count').innerText(), /^1 kept$/);
+    assert.equal(await page.locator('.keep-board__stamp .keepsake--stamp').count(), 2, 'one arrival stamp per city');
+    assert.equal(await overflowX(page), 0);
+    const smallItems = await page.evaluate(() => [...document.querySelectorAll('.keep-board__item, .keep-board__add')]
+      .filter((node) => node.getBoundingClientRect().width < 43.5 || node.getBoundingClientRect().height < 43.5).length);
+    assert.equal(smallItems, 0, 'board items are at least 44px');
+
+    // Keep something: choose a kind, choose a photo, keep it.
+    await page.locator('.keep-board__add').click();
+    await sheet.waitFor();
+    const chooser = page.waitForEvent('filechooser');
+    await sheet.getByRole('button', { name: /Poster or flyer/ }).click();
+    const photos = fs.readdirSync(PHOTO_DIR).filter((name) => name.endsWith('.jpg')).sort();
+    await (await chooser).setFiles(path.join(PHOTO_DIR, photos[0]));
+    await sheet.locator('.keep-form .keepsake.is-poster img').waitFor();
+    await sheet.getByLabel('Name (optional)').fill('Gig flyer');
+    assert.equal(await overflowX(page), 0);
+    await sheet.getByRole('button', { name: 'Keep it' }).click();
+    await sheet.waitFor({ state: 'detached', timeout: 10000 });
+
+    // Saved with its kind and a new photo, and the view is still Keepsakes (V7).
+    assert.equal(puts.length, 1);
+    const saved = Object.values(puts[0].preferences.journal_souvenirs_v1).find((row) => row.title === 'Gig flyer');
+    assert.equal(saved.kind, 'poster');
+    assert.equal(saved.source, 'photo');
+    assert.ok(puts[0].media.some((m) => m.id === saved.media_id), 'the photo is a media row of the journal');
+    assert.ok(!puts[0].moments.some((m) => m.media_ids.includes(saved.media_id)), 'and belongs to no moment');
+    await page.locator('[data-keepsake-board]').waitFor();
+    assert.match(await page.locator('.keep-board__count').innerText(), /^2 kept$/);
+    assert.equal(await page.locator('.keep-board__item').count(), 2);
+
+    // Remove it, then bring it back from Trash.
+    await page.locator('.keep-board__item', { has: page.locator('.is-poster') }).click();
+    await sheet.waitFor();
+    await sheet.getByRole('button', { name: /^Remove/ }).click();
+    await page.waitForFunction(() => document.querySelector('.keep-board__count')?.textContent === '1 kept');
+    await page.evaluate(() => window.scrollTo(0, document.querySelector('.story-ribbon').getBoundingClientRect().top + window.scrollY));
+    await page.locator('.story-ribbon__more').click();
+    await sheet.getByRole('button', { name: /Trash/ }).click();
+    const card = page.locator('.journal-trash__card', { hasText: 'Gig flyer' });
+    await card.getByRole('button', { name: 'Restore' }).click();
+    await page.waitForFunction(() => document.querySelector('.keep-board__count')?.textContent === '2 kept');
   } finally {
     await context.close();
   }

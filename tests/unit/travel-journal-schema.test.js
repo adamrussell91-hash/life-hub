@@ -164,3 +164,47 @@ test('journal id helpers use required prefixes', () => {
   assert.match(makeTransitionId(), /^trn_[a-z2-7]{12}$/);
   assert.match(makeOperationId(), /^op_[a-z2-7]{12}$/);
 });
+
+test('keepsakes: a record from before keepsakes and a full new one both validate', () => {
+  const journal = emptyJournal('trp_test01');
+  journal.preferences = {
+    cover_media_id: 'med_cover001',
+    journal_souvenirs_v1: {
+      sv_old: { id: 'sv_old', title: 'Fridge magnet', lifecycle: 'live', created_at: '2027-03-03T10:00:00.000Z' },
+      sv_new: {
+        id: 'sv_new', title: 'Tram ticket', lifecycle: 'live', created_at: '2027-03-03T10:00:00.000Z',
+        kind: 'ticket', source: 'photo', media_id: 'med_ticket01', leg_id: 'leg_test01',
+        local_date: '2027-03-03', local_time: '11:20', coordinates: { lat: 38.71, lon: -9.14 }
+      },
+      sv_hide_itm_train01: {
+        id: 'sv_hide_itm_train01', title: 'Test Rail IC200', lifecycle: 'deleted', created_at: '2027-03-03T10:00:00.000Z',
+        kind: 'ticket', source: 'booking', item_id: 'itm_train01', deleted_at: '2027-03-04T10:00:00.000Z'
+      }
+    }
+  };
+  assert.doesNotThrow(() => validateJournal(journal));
+});
+
+test('keepsakes: an unknown kind, source, date or place is rejected', () => {
+  const base = { id: 'sv_a', title: 'Thing', lifecycle: 'live', created_at: '2027-03-03T10:00:00.000Z' };
+  const cases = [
+    [{ kind: 'sticker' }, 'kind'],
+    [{ source: 'gift' }, 'source'],
+    [{ local_date: '3 March' }, 'local_date'],
+    [{ local_time: '9am' }, 'local_time'],
+    [{ coordinates: { lat: 120, lon: 0 } }, 'coordinates'],
+    [{ item_id: 42 }, 'item_id']
+  ];
+  for (const [extra, key] of cases) {
+    const journal = emptyJournal('trp_test01');
+    journal.preferences = { journal_souvenirs_v1: { sv_a: { ...base, ...extra } } };
+    assert.throws(
+      () => validateJournal(journal),
+      (err) => err.code === 'validation_error' && String(err.path).endsWith(`sv_a.${key}`),
+      key
+    );
+  }
+  const journal = emptyJournal('trp_test01');
+  journal.preferences = { cover_media_id: 7 };
+  assert.throws(() => validateJournal(journal), (err) => err.path === 'preferences.cover_media_id');
+});

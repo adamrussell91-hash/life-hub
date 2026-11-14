@@ -18,9 +18,23 @@ import { getActiveJournalDayMap } from '@/journal/map-expanded';
 import { openTrashView } from '@/journal/trash-view';
 import { openJournalSearch } from '@/journal/search-sheet';
 import { openJournalShareSheet } from '@/journal/share-sheet';
-import { openSouvenirsCollection } from '@/journal/souvenirs-sheet';
 import { runMomentAction, type MomentActionContext } from '@/journal/moment-actions';
 import { transitionForFromLeg } from '@/journal/transitions';
+import { renderKeepsakeBoard } from '@/journal/keepsakes/board';
+import { drawKeepsake, ticketDate } from '@/journal/keepsakes/draw';
+import { openKeepSheet } from '@/journal/keepsakes/keep-sheet';
+import { openKeepsakeSheet } from '@/journal/keepsakes/keepsake-sheet';
+import {
+  countKept,
+  hideBookingKeepsake,
+  keepsakesForDay,
+  listKeepsakes,
+  removeKeepsake,
+  type BookingKeepsake,
+  type Keepsake,
+} from '@/journal/keepsakes/model';
+import { renderStoryKeep } from '@/journal/keepsakes/story-keep';
+import { showHubToast } from '../../design-kit/js/hub-feedback.js';
 import {
   filterMomentsForPerspectiveDisplay,
   journalHasPartnerMoments,
@@ -65,7 +79,7 @@ import { ICONS, button, el } from '@/journal/story/dom';
 
 const LAST_VIEW_KEY = (tripId: string) => `lifehub.travel.journal.lastView.${tripId}`;
 /** Views that are built. Keepsakes joins when it ships; nothing is offered before it works. */
-const STORY_VIEWS: StoryView[] = ['story', 'photos'];
+const STORY_VIEWS: StoryView[] = ['story', 'photos', 'keepsakes'];
 export const COVER_PREF_KEY = 'cover_media_id';
 
 export interface RenderJournalOptions {
@@ -206,6 +220,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
       anchor: root,
       trip: liveTrip,
       onJournalSaved,
+      onKeep: (moment) => openKeep(moment),
     };
   }
 
@@ -303,10 +318,14 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
   let visibleMomentIds = new Set<string>();
   let photos: TripPhoto[] = [];
   let photoIndex = new Map<string, number>();
+  let keepsakes: Keepsake[] = [];
+  let mediaById = new Map<string, JournalMedia>();
 
   function indexPhotos(): void {
     photos = tripPhotos(liveFixture, orderedMoments, (m) => dayNo(m.local_date));
     photoIndex = new Map(photos.map((p, i) => [`${p.moment.id}|${p.media.id}`, i]));
+    keepsakes = listKeepsakes(journalDoc(), liveTrip);
+    mediaById = new Map(liveFixture.media.map((m) => [m.id, m]));
   }
 
   function applyMomentWindow(focusMomentId?: string): void {
@@ -348,28 +367,6 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
       });
     }
     items.push(
-      {
-        label: 'Souvenirs',
-        paths: ICONS.keepsake,
-        onSelect: () =>
-          swap(
-            'souvenirs',
-            openSouvenirsCollection({
-              tripId: liveFixture.trip_id,
-              journal: journalDoc(),
-              version: liveVersion,
-              anchor: root,
-              onSaved: onJournalSaved,
-              onJumpToMoment: (id) => {
-                setView('story');
-                scrollToChapter(id, root, opts.onChapterJump);
-              },
-              onClose: () => {
-                overlays.souvenirs = null;
-              },
-            }),
-          ),
-      },
       {
         label: 'Print',
         paths: ICONS.print,
@@ -465,6 +462,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
         journaledDays ? plural(journaledDays, 'day') : '',
         legs.length ? plural(legs.length, 'city', 'cities') : '',
         photos.length ? plural(photos.length, 'photo') : '',
+        countKept(keepsakes) ? plural(countKept(keepsakes), 'keepsake') : '',
       ],
       photo: photo ? { tripId: liveFixture.trip_id, media: photo } : undefined,
       accent: legs[0] ? cityOf(legs[0])?.accent.color : undefined,
@@ -513,6 +511,119 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
       onOptions: openOptions,
     });
     ribbonHost.replaceChildren(ribbon.el);
+  }
+
+  // ---- Keepsakes -----------------------------------------------------------
+
+  const draw = (k: Keepsake): HTMLElement =>
+    drawKeepsake(k, {
+      tripId: liveFixture.trip_id,
+      mediaById,
+      stampInk: k.type === 'stamp' ? liveTrip?.cities.find((c) => c.id === legsById().get(k.legId)?.city_id)?.accent.color : undefined,
+    });
+
+  function openKeep(moment?: JournalMoment): void {
+    const ctx = moment ? { legId: moment.leg_id, localDate: moment.local_date } : resolveCaptureContext(liveFixture);
+    if (!ctx) return;
+    const firstPhotoId = moment?.media_ids.find((id) => {
+      const media = mediaById.get(id);
+      return media && media.lifecycle === 'live' && !isAudioMedia(media);
+    });
+    swap(
+      'keep',
+      openKeepSheet({
+        anchor: root,
+        tripId: liveFixture.trip_id,
+        journal: journalDoc(),
+        version: liveVersion,
+        legId: ctx.legId,
+        localDate: ctx.localDate,
+        timeZone: legsById().get(ctx.legId)?.timezone,
+        tripTitle: title(),
+        moment,
+        momentPhoto: firstPhotoId ? mediaById.get(firstPhotoId) : undefined,
+        onSaved: onJournalSaved,
+        onClose: () => {
+          overlays.keep = null;
+        },
+      }),
+    );
+  }
+
+  /** Where a keepsake lives in the story: its moment, its day, or its city. */
+  function keepsakeHome(k: Keepsake): string {
+    if (k.type === 'photo' && k.momentId) return k.momentId;
+    const date = k.type === 'photo' ? k.localDate : k.date;
+    const day = liveFixture.days.find((d) => d.lifecycle === 'live' && d.leg_id === k.legId && d.local_date === date);
+    return day?.id ?? k.legId;
+  }
+
+  function keepsakeMeta(k: Keepsake): string {
+    if (k.type === 'stamp') return k.date ? `Arrived ${ticketDate(k.date)}` : '';
+    if (k.type === 'booking') {
+      const n = dayNo(k.date);
+      return [n > 0 ? `Day ${n}` : '', longDate(k.date), clock12(k.departTime)].filter(Boolean).join(' · ');
+    }
+    const n = k.localDate ? dayNo(k.localDate) : 0;
+    return [n > 0 ? `Day ${n}` : '', k.localDate ? longDate(k.localDate) : '', clock12(k.localTime), k.placeName ?? '']
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  function removeKept(k: Keepsake): void {
+    if (k.type === 'stamp') return;
+    const next =
+      k.type === 'booking'
+        ? hideBookingKeepsake(journalDoc(), k.itemId, `${k.carrier} ${k.number}`)
+        : removeKeepsake(journalDoc(), k.id);
+    void persistJournalPatch(liveFixture.trip_id, liveVersion, next).then(
+      (saved) => {
+        onJournalSaved(saved);
+        showHubToast('Removed. It is in Trash if you want it back.');
+      },
+      () => showHubToast('Could not remove it. Try again.', { tone: 'danger' }),
+    );
+  }
+
+  function openKeepsake(k: Keepsake, _from: HTMLElement): void {
+    const home = keepsakeHome(k);
+    swap(
+      'keepsake',
+      openKeepsakeSheet({
+        anchor: root,
+        keepsake: k,
+        drawn: draw(k),
+        meta: keepsakeMeta(k),
+        onGoToDay: home
+          ? () => {
+              setView('story');
+              scrollToChapter(home, root, opts.onChapterJump);
+            }
+          : undefined,
+        onRemove: k.type === 'stamp' ? undefined : () => removeKept(k),
+        onClose: () => {
+          overlays.keepsake = null;
+        },
+      }),
+    );
+  }
+
+  let keepTilt = 0;
+  const KEEP_TILTS = [-3, 2.5, -2, 3.5];
+  function storyKeep(k: Keepsake): HTMLElement {
+    const meta =
+      k.type === 'booking'
+        ? 'Kept automatically from your booking'
+        : k.type === 'photo'
+          ? [clock12(k.localTime), k.placeName ?? ''].filter(Boolean).join(' · ')
+          : '';
+    return renderStoryKeep({
+      keepsake: k,
+      drawn: draw(k),
+      meta,
+      tilt: k.type === 'booking' ? undefined : KEEP_TILTS[keepTilt++ % KEEP_TILTS.length],
+      onOpen: openKeepsake,
+    });
   }
 
   // ---- Story ---------------------------------------------------------------
@@ -595,6 +706,8 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
       const days = legDays(leg);
       const legMoments = orderedMoments.filter((m) => m.leg_id === leg.id);
       const pattern = opts.patternOff ? null : getPattern(leg.pattern_id);
+      const legStamp = keepsakes.find((k) => k.type === 'stamp' && k.legId === leg.id);
+      const legBookings = keepsakes.filter((k): k is BookingKeepsake => k.type === 'booking' && k.legId === leg.id);
       const range = leg.start_date ? shortDateRange(leg.start_date, leg.end_date ?? leg.start_date) : '';
       legSection.append(
         renderChapterOpener({
@@ -604,13 +717,16 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
           counts: [
             days.length ? plural(days.length, 'day') : '',
             legMoments.length ? plural(legMoments.length, 'moment') : '',
+            countKept(keepsakes, leg.id) ? plural(countKept(keepsakes, leg.id), 'keepsake') : '',
           ]
             .filter(Boolean)
             .join(' · '),
           patternHref: pattern?.href ?? null,
           accentSoft: cityOf(leg)?.accent.soft,
+          stamp: legStamp ? draw(legStamp) : undefined,
         }),
       );
+      for (const ticket of legBookings.filter((k) => k.side === 'arrive')) legSection.append(storyKeep(ticket));
 
       const today = todayFor(leg);
       const city = cityOf(leg);
@@ -621,6 +737,10 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
         daySection.id = day.id;
 
         const moments = legMoments.filter((m) => m.local_date === day.local_date);
+        const dayKeeps = keepsakesForDay(keepsakes, leg.id, day.local_date);
+        // Keepsakes with no moment sit in time order; the rest follow their moment.
+        const loose = dayKeeps.filter((k) => !k.momentId);
+        const dayOnScreen = moments.length === 0 || moments.some((m) => visibleMomentIds.has(m.id));
         const sunset = city?.center
           ? sunsetLocal(city.center.lat, city.center.lon, day.local_date, leg.timezone || city.tz)
           : null;
@@ -629,7 +749,11 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
             number: dayNo(day.local_date),
             date: longDate(day.local_date),
             isToday: day.local_date === today,
-            facts: [moments.length ? plural(moments.length, 'moment') : '', sunset ? `sunset ${clock12(sunset)}` : ''],
+            facts: [
+              moments.length ? plural(moments.length, 'moment') : '',
+              dayKeeps.length ? plural(dayKeeps.length, 'keepsake') : '',
+              sunset ? `sunset ${clock12(sunset)}` : '',
+            ],
           }),
         );
 
@@ -648,7 +772,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
           );
         }
 
-        if (moments.length === 0) {
+        if (moments.length === 0 && dayKeeps.length === 0) {
           const empty = el('div', 'story-day-empty');
           empty.append(el('p', 'journal-day__empty', 'Nothing from this day yet.'));
           const add = button('btn btn--secondary journal-day__add', 'Add moment');
@@ -660,6 +784,10 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
         let previous: JournalMoment | undefined;
         for (const moment of moments) {
           if (!visibleMomentIds.has(moment.id)) continue;
+          while (loose.length && loose[0]!.localTime && moment.local_time && loose[0]!.localTime < moment.local_time) {
+            daySection.append(storyKeep(loose.shift()!));
+            previous = undefined;
+          }
           if (previous) {
             const label = stitchLabel(previous, moment);
             if (label) {
@@ -692,7 +820,11 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
             }),
           );
           previous = moment;
+          const linked = dayKeeps.filter((k) => k.momentId === moment.id);
+          for (const k of linked) daySection.append(storyKeep(k));
+          if (linked.length) previous = undefined;
         }
+        if (dayOnScreen) for (const k of loose) daySection.append(storyKeep(k));
 
         legSection.append(daySection);
       }
@@ -712,6 +844,12 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
             onJournalSaved,
           }),
         );
+      }
+      const departing = legBookings.filter((k) => k.side === 'depart');
+      if (departing.length) {
+        const wrap = el('div', 'story-keep-group');
+        for (const ticket of departing) wrap.append(storyKeep(ticket));
+        host.append(wrap);
       }
     });
 
@@ -747,6 +885,23 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
       );
       return;
     }
+    if (view === 'keepsakes') {
+      story.append(
+        renderKeepsakeBoard({
+          keepsakes,
+          cities: liveLegs().map((leg) => ({
+            id: leg.id,
+            name: leg.destination,
+            arrived: leg.start_date ? `Arrived ${ticketDate(leg.start_date)}` : '',
+          })),
+          draw,
+          onOpen: openKeepsake,
+          onKeep: () => openKeep(),
+        }),
+      );
+      return;
+    }
+    keepTilt = 0;
     paintStory(story);
     detachPrefetch?.();
     detachPrefetch = attachMomentPrefetchObserver(root, liveFixture.trip_id, liveFixture, orderedMoments);
@@ -832,7 +987,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
   buildRibbon();
   paintView();
 
-  const dock: DockHandle = mountDock({ onPhotos: () => openImport(), onMoment: () => openCapture() });
+  const dock: DockHandle = mountDock({ onPhotos: () => openImport(), onMoment: () => openCapture(), onKeepsake: () => openKeep() });
   root.append(coverHost, ribbonHost, timeline, dock.el);
   cleanups.push(() => dock.destroy());
   cleanups.push(mountJournalOfflineStatus(root));

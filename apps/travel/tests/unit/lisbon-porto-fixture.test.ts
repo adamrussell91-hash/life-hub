@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { LISBON_PORTO_PHOTOS, lisbonPortoJournal } from '@/journal/fixtures/lisbon-porto';
+import { LISBON_PORTO_KEEPSAKE_PHOTOS, LISBON_PORTO_PHOTOS, lisbonPortoJournal } from '@/journal/fixtures/lisbon-porto';
 import { isAudioMedia } from '@/journal/transcripts';
 import testTrip from '../../fixtures/test-trip.json';
 
@@ -9,7 +9,7 @@ const journal = lisbonPortoJournal(testTrip.id);
 
 describe('lisbonPortoJournal', () => {
   it('has a photo file on disk for every photo it names', () => {
-    for (const name of Object.keys(LISBON_PORTO_PHOTOS)) {
+    for (const name of [...Object.keys(LISBON_PORTO_PHOTOS), ...Object.keys(LISBON_PORTO_KEEPSAKE_PHOTOS)]) {
       const file = path.resolve(__dirname, '../../fixtures/journal-photos', `${name}.jpg`);
       expect(existsSync(file), `${name}.jpg`).toBe(true);
     }

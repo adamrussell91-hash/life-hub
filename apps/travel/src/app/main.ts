@@ -9,6 +9,7 @@ import '../../design-kit/mobile.css';
 import '../styles/travel.css';
 import '../styles/journal.css';
 import '../styles/journal-story.css';
+import '../styles/keepsakes.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';

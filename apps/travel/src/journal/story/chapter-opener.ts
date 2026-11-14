@@ -12,6 +12,8 @@ export interface ChapterOpenerOptions {
   patternHref?: string | null;
   /** The city's soft accent colour, used when there is no pattern. */
   accentSoft?: string;
+  /** The arrival stamp, drawn. */
+  stamp?: HTMLElement;
 }
 
 /** The start of a city: a band of its pattern or colour, then its name. */
@@ -31,5 +33,10 @@ export function renderChapterOpener(options: ChapterOpenerOptions): HTMLElement 
   const title = el('h2', 'story-chapter__title', options.name);
   opener.append(art, el('p', 'story-eyebrow story-chapter__eyebrow num', eyebrow), title);
   if (options.counts) opener.append(el('p', 'story-chapter__counts num', options.counts));
+  if (options.stamp) {
+    const stamp = el('span', 'story-chapter__stamp');
+    stamp.append(options.stamp);
+    opener.append(stamp);
+  }
   return opener;
 }
