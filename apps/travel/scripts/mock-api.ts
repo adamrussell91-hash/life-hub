@@ -374,6 +374,23 @@ export function createMockApi() {
     }
 
     // An invented earlier trip, a year before the test trip, so the noticing cards have a past to draw on.
+    // One invented wish, matched to the train on 5 March, so the card can be seen locally.
+    if (path === '/api/travel-noticing' && method === 'POST') {
+      const asked = body as { kind?: string; day?: string };
+      const cards =
+        asked?.kind === 'wishes' && asked.day === '2027-03-05'
+          ? [{
+              key: 'wish:tsk_mockriver:itm_testtrain01', kind: 'wish', source: 'wishes', sourceLabel: 'From your bucket list', day: asked.day,
+              headline: 'Take a train along a river', body: 'You have wanted this since 2024.',
+              evidence: { label: 'On your itinerary today', text: 'Lisbon to Porto (Lisbon)' },
+              basis: 'Added to your bucket list on 14 March 2024', wish: { taskId: 'tsk_mockriver', list: 'bucket_list' }, score: 100,
+            }]
+          : [];
+      return json(200, { ok: true, data: { cards } });
+    }
+    if (path === '/api/tasks' && method === 'PATCH') {
+      return json(200, { ok: true, data: { id: url.searchParams.get('id'), status: 'done' } });
+    }
     if (path === '/api/travel-noticing' && method === 'GET') {
       const day = (date: string, city: string, photos: number, ids: string[], lat: number) => ({
         trip_id: 'trp_testearlier1', date, city, country: 'Spain', photos, first_time: '08:40', last_time: '21:10',

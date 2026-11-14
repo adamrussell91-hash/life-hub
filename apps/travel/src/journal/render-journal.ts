@@ -18,7 +18,7 @@ import {
 import { mountImportStrip, STRIP_HIDE_AFTER_MS, type ImportStripHandle } from '@/journal/story/import-strip';
 import { openUndatedSheet, type UndatedDayChoice } from '@/journal/undated-sheet';
 import { applyPlaceNames, lookUpPlaces, momentsNeedingPlace, type PlaceLookup } from '@/journal/place-lookup';
-import { getNoticingHistory } from '@/api/travel';
+import { askNoticing, getNoticingHistory, tickOffTask } from '@/api/travel';
 import { openNoticeCards, type FillNoticePhoto } from '@/journal/noticing/cards';
 import { renderKeptBand } from '@/journal/noticing/kept-band';
 import {
@@ -28,7 +28,12 @@ import {
   keptForDay,
   markSeen,
   readNoticingState,
+  recordAsked,
+  recordTry,
+  shouldAsk,
   unkeepCard,
+  waitsForAnswer,
+  type AskKind,
   type NoticeCard,
 } from '@/journal/noticing/model';
 import { renderNoticePill } from '@/journal/noticing/pill';
@@ -128,6 +133,12 @@ export interface RenderJournalOptions {
   lookupPlace?: PlaceLookup;
   /** Other trips, for the noticing cards. Defaults to the server's on a saved journal; none in previews. */
   loadNoticingHistory?: () => Promise<NoticingHistory | null>;
+  /** Asks the server what one trip day fulfilled or showed. Defaults to the server on a saved journal. */
+  askNoticing?: (kind: AskKind, day: string) => Promise<NoticeCard[]>;
+  /** Marks a Someday item done in Tasks. Defaults to the Tasks API. */
+  tickWish?: (taskId: string) => Promise<unknown>;
+  /** The hour of the day in the trip's current city, for tests. */
+  localHour?: number;
 }
 
 function scrollBehaviorFor(root: ParentNode): ScrollBehavior {
@@ -503,15 +514,59 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     });
   };
 
+  /** The time zone the trip is in now: that of the latest moment the owner journaled. */
+  function noticingZone(): string {
+    const latest = orderedLiveMoments(liveFixture).filter((m) => m.author !== 'partner').at(-1);
+    return (latest && legsById().get(latest.leg_id)?.timezone) || liveTrip?.home_tz || 'UTC';
+  }
+  const noticingToday = (): string => opts.today ?? todayIn(noticingZone());
+
   /** Today's unseen cards, best first. Nothing before the trip, and nothing new once it is over. */
   function noticesToOffer(): NoticeCard[] {
     if (!liveTrip) return [];
-    const latest = orderedLiveMoments(liveFixture).filter((m) => m.author !== 'partner').at(-1);
-    const zone = (latest && legsById().get(latest.leg_id)?.timezone) || liveTrip.home_tz || 'UTC';
-    const day = noticingDay(journalDoc(), liveTrip, opts.today ?? todayIn(zone));
-    if (!day) return [];
+    const state = readNoticingState(journalDoc());
+    const day = noticingDay(journalDoc(), liveTrip, noticingToday());
+    // Cards the server already made wait until they are dealt with, even after the trip.
+    if (!day) return cardsToOffer([], state);
     const cards = countingCards({ journal: journalDoc(), trip: liveTrip, history: noticingHistory, day });
-    return cardsToOffer(cards, readNoticingState(journalDoc()));
+    return cardsToOffer(cards, state);
+  }
+
+  // Once a trip day, in the evening or the morning after, the server is asked what the day fulfilled.
+  const askServer: ((kind: AskKind, day: string) => Promise<NoticeCard[]>) | null =
+    opts.askNoticing ??
+    (liveTrip && !isFixtureVersion(liveVersion)
+      ? (kind, day) => askNoticing(liveFixture.trip_id, kind, day).then((r) => r.cards)
+      : null);
+  let asking = false;
+
+  function localHour(): number {
+    if (opts.localHour !== undefined) return opts.localHour;
+    try {
+      const hour = new Intl.DateTimeFormat('en-GB', { timeZone: noticingZone(), hour: '2-digit', hour12: false }).format(new Date());
+      return Number(hour) % 24;
+    } catch {
+      return new Date().getHours();
+    }
+  }
+
+  async function askAboutToday(kind: AskKind): Promise<void> {
+    if (!askServer || !liveTrip || asking) return;
+    const today = noticingToday();
+    const day = noticingDay(journalDoc(), liveTrip, today);
+    if (!day) return;
+    // Wait for the day to be mostly lived: from 5 pm, or once the next day has begun.
+    if (day === today && localHour() < 17) return;
+    if (!shouldAsk(readNoticingState(journalDoc()), kind, day)) return;
+    asking = true;
+    try {
+      const cards = await askServer(kind, day);
+      saveNoticing((j) => recordAsked(j, kind, day, cards), true);
+    } catch {
+      saveNoticing((j) => recordTry(j, kind, day), true);
+    } finally {
+      asking = false;
+    }
   }
 
   function paintNoticePill(): void {
@@ -519,8 +574,11 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     noticeHost.replaceChildren(...(pill ? [pill] : []));
   }
 
-  /** Save a change to what was seen, kept or marked not right, and repaint without moving the reader. */
-  function saveNoticing(change: (journal: JournalDocument) => JournalDocument): void {
+  /**
+   * Save a change to what was seen, kept or marked not right, and repaint without moving the reader.
+   * `quiet` is for the journal's own bookkeeping: a failure there is not the reader's problem.
+   */
+  function saveNoticing(change: (journal: JournalDocument) => JournalDocument, quiet = false): void {
     const next = change(journalDoc());
     if (next === journalDoc()) {
       paintNoticePill();
@@ -528,11 +586,19 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     }
     void persistJournalPatch(liveFixture.trip_id, liveVersion, next).then(
       (saved) => {
+        // While words are being typed or cards are open, take the copy and leave the page be.
+        if (editingWords || overlays.notices) {
+          liveFixture = saved.journal;
+          liveVersion = saved.version;
+          repaintOwed = true;
+          return;
+        }
         liveFixture = saved.journal;
         liveVersion = saved.version;
         repaintInPlace();
       },
       () =>
+        quiet ||
         strip.message({
           text: 'Could not save what you kept',
           notes: ['Check your connection'],
@@ -556,9 +622,17 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
         fillPhoto: fillNoticePhoto,
         onKeep: (card) => changes.push((j) => keepCard(j, card)),
         onNotRight: (card) => changes.push((j) => dismissCard(j, card.key)),
+        onTick: (card) => (opts.tickWish ?? tickOffTask)(card.wish!.taskId).then(() => undefined),
         onClose: (seenKeys) => {
           overlays.notices = null;
-          saveNoticing((j) => markSeen(changes.reduce((acc, change) => change(acc), j), seenKeys));
+          if (repaintOwed && !editingWords) {
+            repaintOwed = false;
+            repaintInPlace();
+          }
+          // A wish waits until it is ticked off or turned down: looking at it does not use it up.
+          const waiting = new Set(cards.filter(waitsForAnswer).map((c) => c.key));
+          const looked = seenKeys.filter((key) => !waiting.has(key));
+          saveNoticing((j) => markSeen(changes.reduce((acc, change) => change(acc), j), looked));
         },
       }),
     );
@@ -585,6 +659,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
       () => undefined,
     );
   }
+  void askAboutToday('wishes');
 
   // ---- Words edited in place ------------------------------------------------------
 

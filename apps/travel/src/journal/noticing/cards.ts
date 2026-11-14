@@ -1,4 +1,6 @@
 import { SOURCE_LINE, type NoticeCard, type NoticePhoto } from '@/journal/noticing/model';
+
+export const TICK_FAILED = 'Could not reach Tasks. It is not ticked off yet.';
 import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 import { button, el, icon, ICONS } from '@/journal/story/dom';
 
@@ -12,6 +14,8 @@ export interface NoticeCardsOptions {
   onKeep: (card: NoticeCard) => void;
   /** "Not right": remove it for good. */
   onNotRight: (card: NoticeCard) => void;
+  /** "Tick it off in Tasks", for a bucket-list or dreams-jar card. Rejects when Tasks could not be reached. */
+  onTick?: (card: NoticeCard) => Promise<void>;
   /** Told which cards were looked at, once, when the cards close. */
   onClose: (seenKeys: string[]) => void;
 }
@@ -19,7 +23,10 @@ export interface NoticeCardsOptions {
 /** The parts every card shows: where it is from, the one thing, the evidence, and what it rests on. */
 export function renderNoticeFace(card: NoticeCard, fillPhoto: FillNoticePhoto, headingTag: 'h2' | 'h3' = 'h2'): HTMLElement {
   const face = el('div', `notice-face notice-face--${card.source}`);
-  face.append(el('p', 'notice-face__source', SOURCE_LINE[card.source]), el(headingTag, 'notice-face__headline', card.headline));
+  face.append(
+    el('p', 'notice-face__source', card.sourceLabel ?? SOURCE_LINE[card.source]),
+    el(headingTag, 'notice-face__headline', card.headline),
+  );
   if (card.photos?.length) {
     const photos = el('div', `notice-face__photos notice-face__photos--${Math.min(card.photos.length, 3)}`);
     for (const photo of card.photos.slice(0, 3)) {
@@ -41,6 +48,12 @@ export function renderNoticeFace(card: NoticeCard, fillPhoto: FillNoticePhoto, h
     face.append(stats);
   }
   if (card.body) face.append(el('p', 'notice-face__body num', card.body));
+  if (card.evidence) {
+    const proof = el('div', 'notice-face__evidence');
+    proof.append(el('p', 'notice-face__evidence-label', card.evidence.label), el('p', 'notice-face__evidence-text', card.evidence.text));
+    face.append(proof);
+  }
+  if (card.ticked) face.append(el('p', 'notice-face__ticked', 'Ticked off in Tasks'));
   face.append(el('p', 'notice-face__basis num', card.basis));
   return face;
 }
@@ -82,8 +95,12 @@ export function openNoticeCards(options: NoticeCardsOptions): { destroy(): void 
   const keepBtn = button('notice__action notice__action--keep', 'Keep in the story');
   const wrongBtn = button('notice__action notice__action--wrong', 'Not right');
   actions.append(wrongBtn, keepBtn);
+  const status = el('p', 'notice__status');
+  status.setAttribute('role', 'alert');
+  status.hidden = true;
+  let ticking = false;
 
-  dialog.append(top, stage, prevZone, nextZone, actions);
+  dialog.append(top, stage, prevZone, nextZone, status, actions);
   back.append(dialog);
 
   function close(): void {
@@ -109,7 +126,15 @@ export function openNoticeCards(options: NoticeCardsOptions): { destroy(): void 
     count.textContent = `${index + 1} of ${deck.length}`;
     prevZone.disabled = index === 0;
     const isKept = kept.has(card.key);
-    keepBtn.textContent = isKept ? 'Kept in the story' : 'Keep in the story';
+    status.hidden = true;
+    if (card.wish && options.onTick) {
+      // A wish: the choice is to tick it off in Tasks, or to say it was not this.
+      keepBtn.textContent = isKept ? 'Ticked off in Tasks' : 'Tick it off in Tasks';
+      wrongBtn.textContent = 'Not this one';
+    } else {
+      keepBtn.textContent = isKept ? 'Kept in the story' : 'Keep in the story';
+      wrongBtn.textContent = 'Not right';
+    }
     keepBtn.disabled = isKept;
     wrongBtn.hidden = isKept;
   }
@@ -137,7 +162,34 @@ export function openNoticeCards(options: NoticeCardsOptions): { destroy(): void 
   prevZone.addEventListener('click', () => go(-1));
   keepBtn.addEventListener('click', () => {
     const card = deck[index];
-    if (!card || kept.has(card.key)) return;
+    if (!card || kept.has(card.key) || ticking) return;
+    if (card.wish && options.onTick) {
+      ticking = true;
+      keepBtn.disabled = true;
+      wrongBtn.disabled = true;
+      keepBtn.textContent = 'Ticking it off…';
+      status.hidden = true;
+      void options.onTick(card).then(
+        () => {
+          ticking = false;
+          wrongBtn.disabled = false;
+          const done = { ...card, ticked: true };
+          deck[deck.indexOf(card)] = done;
+          kept.add(card.key);
+          options.onKeep(done);
+          if (!closed) paint();
+        },
+        () => {
+          ticking = false;
+          wrongBtn.disabled = false;
+          keepBtn.disabled = false;
+          keepBtn.textContent = 'Try again';
+          status.hidden = false;
+          status.textContent = TICK_FAILED;
+        },
+      );
+      return;
+    }
     kept.add(card.key);
     options.onKeep(card);
     paint();

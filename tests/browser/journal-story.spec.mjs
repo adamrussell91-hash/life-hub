@@ -146,9 +146,19 @@ async function openStory(engine, viewport, contextOptions = {}, mutate, extras =
       ? route.fulfill(ok({ trip: extras.trip, version: 't1' }))
       : route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ ok: false, error: { code: 'not_found', message: 'none' } }) })
   );
-  await page.route('**/api/travel-noticing?*', (route) =>
-    route.fulfill(ok({ history: extras.history ?? { trips: [], days: [] } }))
-  );
+  const asks = [];
+  const ticks = [];
+  await page.route('**/api/travel-noticing?*', (route) => {
+    if (route.request().method() === 'POST') {
+      asks.push(route.request().postDataJSON());
+      return route.fulfill(ok({ cards: extras.wishCards ?? [] }));
+    }
+    return route.fulfill(ok({ history: extras.history ?? { trips: [], days: [] } }));
+  });
+  await page.route('**/api/tasks?*', (route) => {
+    ticks.push({ method: route.request().method(), url: route.request().url(), body: route.request().postDataJSON() });
+    return route.fulfill(ok({ id: 'tsk_spec', status: 'done' }));
+  });
   await page.route('**/api/travel-journal-media?*', (route) => {
     if (route.request().method() !== 'GET') return route.fulfill({ status: 503, body: '' });
     return route.fulfill({ status: 200, contentType: 'image/jpeg', body: fs.readFileSync(path.join(PHOTO_DIR, 'ribeira.jpg')) });
@@ -166,7 +176,7 @@ async function openStory(engine, viewport, contextOptions = {}, mutate, extras =
   await page.evaluate((hash) => { location.hash = hash; }, `#/trip/${TRIP}/journal`);
   await page.locator('.story-cover').waitFor({ timeout: 15000 });
   await page.locator('#mom_arch').waitFor({ timeout: 15000 });
-  return { context, page, errors, puts };
+  return { context, page, errors, puts, asks, ticks };
 }
 
 const overflowX = (page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -587,7 +597,7 @@ test('journal noticing (390px): the pill, the cards, keeping one, and nothing wh
       last_time: '20:00', north: null, south: null, photo_ids: ['med_past_a', 'med_past_b', 'med_past_c'] }]
   };
   const { context, page, puts, errors } = await openStory(browser, { width: 390, height: 844 }, {}, undefined,
-    { trip: storyTrip(), history, now: '2026-05-03T17:00:00Z' });
+    { trip: storyTrip(), history, now: '2026-05-03T10:00:00Z' });
   try {
     // Day 2 of 4: "a year ago today" from the past trip, and "halfway" from this one.
     const pill = page.locator('[data-notice-pill]');
@@ -653,6 +663,57 @@ test('journal noticing (390px): the pill, the cards, keeping one, and nothing wh
     assert.doesNotMatch(await quiet.page.locator('#app').innerText(), /noticed/i);
   } finally {
     await quiet.context.close();
+  }
+});
+
+test('journal noticing (390px): a bucket list wish is offered in the evening and ticked off only on the tap', { skip: !hasTravelBuild }, async () => {
+  const wishCards = [{
+    key: 'wish:tsk_spec:mom_two', kind: 'wish', source: 'wishes', sourceLabel: 'From your bucket list', day: '2026-05-03',
+    headline: 'Ride a tram to the top of a hill', body: 'You have wanted this since 2024.',
+    evidence: { label: 'In your journal today', text: 'Rua Inventada: Two frames of the same tram.' },
+    basis: 'Added to your bucket list on 14 March 2024', wish: { taskId: 'tsk_spec', list: 'bucket_list' }, momentId: 'mom_words', score: 100
+  }];
+  const { context, page, puts, asks, ticks, errors } = await openStory(browser, { width: 390, height: 844 }, {}, undefined,
+    { trip: storyTrip(), wishCards, now: '2026-05-03T19:00:00Z' });
+  try {
+    // Asked once for the day, in the evening. Nothing is ticked off by being offered.
+    const pill = page.locator('[data-notice-pill]');
+    await page.waitForFunction(() => document.querySelector('[data-notice-pill]')?.textContent === '2 things noticed today', null, { timeout: 15000 });
+    assert.deepEqual(asks, [{ kind: 'wishes', day: '2026-05-03' }]);
+    assert.equal(ticks.length, 0);
+
+    await pill.click();
+    const cards = page.locator('.notice');
+    await cards.waitFor();
+    assert.equal(await cards.locator('.notice-face__source').innerText(), 'FROM YOUR BUCKET LIST');
+    assert.equal(await cards.locator('.notice-face__headline').innerText(), 'Ride a tram to the top of a hill');
+    assert.equal(await cards.locator('.notice-face__body').innerText(), 'You have wanted this since 2024.');
+    assert.match(await cards.locator('.notice-face__evidence').innerText(), /Two frames of the same tram/);
+    assert.deepEqual(await cards.locator('.notice__action').allInnerTexts(), ['Not this one', 'Tick it off in Tasks']);
+    assert.doesNotMatch(await cards.innerText(), /you asked|finally|at last|said you wanted/i);
+    assert.equal(await overflowX(page), 0);
+    const small = await page.evaluate(() => [...document.querySelectorAll('.notice__action')].filter((b) => b.getBoundingClientRect().height < 43.5).length);
+    assert.equal(small, 0);
+
+    await cards.getByRole('button', { name: 'Tick it off in Tasks' }).click();
+    await cards.getByRole('button', { name: 'Ticked off in Tasks' }).waitFor({ timeout: 5000 });
+    assert.equal(ticks.length, 1);
+    assert.equal(ticks[0].method, 'PATCH');
+    assert.match(ticks[0].url, /\/api\/tasks\?id=tsk_spec$/);
+    assert.deepEqual(ticks[0].body, { status: 'done' });
+
+    await cards.getByRole('button', { name: 'Close' }).click();
+    await cards.waitFor({ state: 'detached', timeout: 5000 });
+    const band = page.locator('[data-noticed^="wish:"]');
+    await band.waitFor({ timeout: 10000 });
+    assert.match(await band.innerText(), /Ticked off in Tasks/);
+    const state = puts.at(-1).preferences.journal_noticing_v1;
+    assert.equal(state.kept['wish:tsk_spec:mom_two'].ticked, true);
+    assert.deepEqual(state.asked.wishes, ['2026-05-03']);
+    assert.equal(asks.length, 1, 'the day is not asked about twice');
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
   }
 });
 

@@ -90,6 +90,48 @@
   text-wrap: pretty;
 }
 
+/* The owner's own words that show it. */
+.notice-face__evidence {
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid currentColor;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.notice-face__evidence-label {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.notice-face__evidence-text {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+.notice-face__ticked {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+}
+
+.notice-face__ticked::before {
+  content: '✓ ';
+}
+
+.notice__status {
+  position: relative;
+  z-index: 2;
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
 .notice-face__basis {
   margin: 0;
   font-size: var(--text-sm);

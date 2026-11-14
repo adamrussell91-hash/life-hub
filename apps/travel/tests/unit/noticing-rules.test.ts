@@ -228,6 +228,6 @@ describe('seen, kept and not right', () => {
 
   it('ignores anything in storage that is not a card', () => {
     const odd = { ...journal(), preferences: { journal_noticing_v1: { seen: 'yes', kept: { a: { key: 1 } }, dismissed: [3, 'ok'] } } } as unknown as JournalDocument;
-    expect(readNoticingState(odd)).toEqual({ seen: [], dismissed: ['ok'], kept: {} });
+    expect(readNoticingState(odd)).toEqual({ seen: [], dismissed: ['ok'], kept: {}, made: {}, asked: { wishes: [], photos: [] }, tries: {} });
   });
 });
