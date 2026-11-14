@@ -33,6 +33,12 @@ export interface DayListOptions {
   onEditArrivalGuide?: () => void;
   /** Owner: open mark-safe / add-photo sheet for this stop. */
   onMarkSafe?: (item: Item, mode: 'mark' | 'photo') => void;
+  /** Owner: log what was eaten at a food stop, or reopen the logged meal. */
+  onLogMeal?: (item: Item, momentId?: string) => void;
+  /** Food stops with a logged meal → that journal moment's id. */
+  mealMomentByItem?: Map<string, string>;
+  /** Today in the city (YYYY-MM-DD); defaults to the city's clock. */
+  today?: string;
 }
 
 type PublicSafeFields = { safe_at?: string; safe_photo_id?: string };
@@ -49,6 +55,24 @@ function tagFor(item: Item): { cls: string; label: string } | null {
   if (item.kind === 'med') return { cls: 'med', label: 'Private' };
   if (item.kind === 'post') return { cls: 'post', label: 'Post home' };
   return null;
+}
+
+/** One quiet line under a food stop: "Log meal", then "Meal logged" once saved. */
+function appendMealLog(meta: HTMLElement, item: Item, options: DayListOptions): void {
+  if (item.kind !== 'food' || options.isPublic || !options.onLogMeal) return;
+  const momentId = options.mealMomentByItem?.get(item.id);
+  const today = options.today ?? dateInZone(new Date(), options.cityTz || 'UTC');
+  if (!momentId && item.date > today) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = momentId ? 'meal-log is-logged' : 'meal-log';
+  btn.innerHTML = momentId ? `${I.check}<span>Meal logged</span>` : `${I.food}<span>Log meal</span>`;
+  if (momentId) btn.setAttribute('aria-label', `Meal logged at ${item.title}. Edit meal`);
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    options.onLogMeal?.(item, momentId);
+  });
+  meta.append(btn);
 }
 
 function resolveSafe(
@@ -300,6 +324,7 @@ function renderCard(
     }
     // Mark safe belongs to arriving; a later night would echo night 1's check-in.
     if (!continuing) appendSafeMark(meta, item, options, byItem);
+    appendMealLog(meta, item, options);
   }
 
   if (!options.isPublic && options.onEdit) {

@@ -88,6 +88,7 @@ describe('safe photo sheet', () => {
   function pickFile(host: HTMLElement, file: File): void {
     const input = host.querySelector('input[type="file"]') as HTMLInputElement;
     Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    input.dispatchEvent(new Event('change'));
   }
 
   it('says it is uploading while the save runs, so it never looks frozen', async () => {
@@ -131,6 +132,26 @@ describe('safe photo sheet', () => {
     const alert = host.querySelector('[role="alert"]') as HTMLElement;
     expect(alert.hidden).toBe(false);
     expect(alert.textContent).toBe('Could not save. Try again.');
+  });
+
+  it('uses a proper Choose photo button, then shows the name with Remove', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    renderSafePhotoSheet(host, { item, onClose: () => {}, onConfirm: async () => {} });
+    const input = host.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(input.hidden).toBe(true);
+    const choose = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('Choose photo'));
+    expect(choose).toBeTruthy();
+    expect(host.textContent).not.toContain('Choose File');
+
+    pickFile(host, cameraPhoto(1000, 'harbour.jpg'));
+    expect(host.querySelector('.safe-photo-picked')?.textContent).toContain('harbour.jpg');
+    expect(choose!.hidden).toBe(true);
+    const remove = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Remove')!;
+    remove.click();
+    expect(host.querySelector('.safe-photo-picked')).toBeNull();
+    expect(choose!.hidden).toBe(false);
+    expect((host.querySelector('img.safe-photo-preview') as HTMLImageElement).hidden).toBe(true);
   });
 
   it("shows plain words when Safari says 'Load failed'", async () => {

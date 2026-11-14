@@ -2,6 +2,18 @@ import { getJournal, rememberJournalEnvelope, type JournalDocument } from '@/api
 import { deleteTravelMeal, getTravelMeal, putTravelMeal } from '@/api/travel-meal';
 import { persistJournalPatch } from '@/journal/journal-sheet-save';
 import {
+  applyAttachmentEdits,
+  mountMomentAttachments,
+  type MomentAttachmentsHandle,
+} from '@/journal/moment-attachments';
+import {
+  dropQueuedJournalMedia,
+  flushJournalOutbox,
+  queueJournalMedia,
+} from '@/journal/journal-outbox';
+import { rememberLocalJournalMedia } from '@/journal/media-loading';
+import { isAudioContentType } from '@/journal/media-upload';
+import {
   canBeMeal,
   MEAL_MESSAGES,
   mealPayload,
@@ -106,12 +118,12 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
   const scroll = document.createElement('div');
   scroll.className = 'addform__scroll';
 
-  const photosNote = document.createElement('p');
-  photosNote.className = 'journal-edit-moment__section-hint';
-  photosNote.textContent =
-    moment.media_ids.length > 0
-      ? `${moment.media_ids.length} photo${moment.media_ids.length === 1 ? '' : 's'} attached — reorder and crop in a later update.`
-      : 'Text-only moment — no photos attached.';
+  // Photos and sound: add, record or remove. Saved with the rest of the sheet.
+  const attachmentsHost = document.createElement('div');
+  attachmentsHost.className = 'journal-attachments';
+  let attachments: MomentAttachmentsHandle | null = null;
+  // A retry after a failed meal call must not add the same files twice.
+  let attachmentsSaved = false;
 
   const textArea = document.createElement('textarea');
   textArea.className = 'journal-edit-moment__text';
@@ -119,9 +131,6 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
   textArea.placeholder = 'Reflection';
   textArea.value = text;
 
-  const audioNote = document.createElement('p');
-  audioNote.className = 'journal-edit-moment__section-hint';
-  audioNote.textContent = 'Voice notes — editing attachments comes in a later update.';
 
   const dateInput = document.createElement('input');
   dateInput.type = 'date';
@@ -152,14 +161,6 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
   placeSummary.className = 'journal-edit-moment__place-summary';
   placeSummary.hidden = true;
 
-  const advanced = document.createElement('details');
-  advanced.className = 'journal-edit-moment__advanced';
-  const advancedSummary = document.createElement('summary');
-  advancedSummary.textContent = 'Crop and metadata';
-  const advancedBody = document.createElement('p');
-  advancedBody.className = 'journal-edit-moment__section-hint';
-  advancedBody.textContent = 'EXIF and crop controls stay in advanced editing — not shown here.';
-  advanced.append(advancedSummary, advancedBody);
 
   const status = document.createElement('p');
   status.className = 'journal-edit-moment__status';
@@ -192,9 +193,8 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
   }
 
   scroll.append(
-    photosNote,
+    section('Photos and sound', attachmentsHost),
     field('Writing', textArea),
-    audioNote,
     field('Date', dateInput),
     field('Time (optional)', timeInput),
     field('Leg and day', legDayReadonly),
@@ -203,7 +203,6 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
     placeActions,
     placeSummary,
     ...(mealHost ? [mealHost] : []),
-    advanced,
     status,
   );
 
@@ -268,6 +267,23 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
   function markDirty(): void {
     dirty = true;
   }
+
+  // A plain heading, not a <label>: the row holds several buttons.
+  function section(labelText: string, body: HTMLElement): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'journal-edit-moment__field';
+    const label = document.createElement('span');
+    label.textContent = labelText;
+    wrap.append(label, body);
+    return wrap;
+  }
+
+  attachments = mountMomentAttachments(attachmentsHost, {
+    tripId: options.tripId,
+    journal,
+    moment,
+    onChange: markDirty,
+  });
 
   refreshPlaceSummary();
 
@@ -356,6 +372,7 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
   function finishClose(): void {
     if (destroyed) return;
     destroyed = true;
+    attachments?.destroy();
     pinOverlay?.destroy();
     overlay?.release();
     options.onClose?.();
@@ -382,6 +399,11 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
   async function submit(): Promise<void> {
     saveBtn.disabled = true;
     status.hidden = true;
+    await attachments?.settle();
+    const added = attachmentsSaved ? [] : (attachments?.added() ?? []);
+    const removedIds = attachmentsSaved ? [] : (attachments?.removed() ?? []);
+    const attachmentsDirty = added.length > 0 || removedIds.length > 0;
+    const addedPhoto = added.some((a) => !isAudioContentType(a.row.content_type ?? ''));
 
     const place: JournalPlace | undefined = placeName.trim()
       ? { name: placeName.trim() }
@@ -399,8 +421,10 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
     };
 
     let nextJournal = patchMomentInJournal(journal, moment.id, patch);
+    if (attachmentsDirty) nextJournal = applyAttachmentEdits(nextJournal, moment.id, added, removedIds);
 
     if (isFixtureVersion(options.version)) {
+      for (const a of added) rememberLocalJournalMedia(a.mediaId, a.blob);
       options.onSaved?.({ journal: nextJournal, version: options.version });
       finishClose();
       return;
@@ -417,7 +441,7 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
     const mealOn = Boolean(
       mealNow?.available &&
         mealNow.enabled() &&
-        (mealNow.changed() || mealNow.photosPending.length > 0 || momentFedVisit),
+        (mealNow.changed() || mealNow.photosPending.length > 0 || momentFedVisit || addedPhoto),
     );
     const mealOff = Boolean(mealNow?.available && mealNow.wasLinked && !mealNow.enabled());
     const mealState = mealOn ? mealNow!.state() : null;
@@ -452,8 +476,32 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
     let step: 'moment' | 'meal' = 'moment';
     try {
       // The ordinary save never touches the meal; the meal call follows on its version.
-      if (!samePatch(savedPatch, patch) || maccasDirty) {
-        const envelope = await persistJournalPatch(options.tripId, version, nextJournal);
+      if (!samePatch(savedPatch, patch) || maccasDirty || attachmentsDirty) {
+        // New files wait in the device outbox first, so a dropped signal loses nothing.
+        try {
+          for (const a of added) {
+            await queueJournalMedia(
+              { tripId: options.tripId, mediaId: a.mediaId, blob: a.blob, contentType: a.row.content_type ?? 'image/jpeg' },
+              { flush: false },
+            );
+          }
+        } catch {
+          await dropQueuedJournalMedia(added.map((a) => a.mediaId));
+          fail('This phone is out of space for the new files. Your edits are still here.');
+          return;
+        }
+        let envelope;
+        try {
+          envelope = await persistJournalPatch(options.tripId, version, nextJournal);
+        } catch (err) {
+          await dropQueuedJournalMedia(added.map((a) => a.mediaId));
+          throw err;
+        }
+        if (attachmentsDirty) {
+          attachmentsSaved = true;
+          for (const a of added) rememberLocalJournalMedia(a.mediaId, a.blob);
+          if (added.length) void flushJournalOutbox();
+        }
         journal = envelope.journal;
         version = envelope.version;
         options.onSaved?.(envelope);
@@ -472,6 +520,13 @@ export function openEditMomentSheet(options: OpenEditMomentSheetOptions): { dest
         return;
       }
       step = 'meal';
+      if (addedPhoto) {
+        // Upload the new photos first so the Food Journal can copy them now.
+        await flushJournalOutbox();
+        const latest = await getJournal(options.tripId);
+        journal = latest.journal;
+        version = latest.version;
+      }
       const versions = { travel_version: version, food_version: mealNow!.foodVersion };
       const result = mealOn
         ? await putTravelMeal(options.tripId, moment.id, mealPayload(mealState!, versions))

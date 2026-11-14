@@ -92,6 +92,22 @@ function journalWithOneMoment() {
   return journal;
 }
 
+test('a moment may point at the itinerary stop it was logged from', () => {
+  const doc = journalWithOneMoment();
+  doc.moments[0].item_id = 'itm_lunchstop01';
+  assert.doesNotThrow(() => validateJournal(doc));
+  doc.moments[0].item_id = null;
+  assert.doesNotThrow(() => validateJournal(doc));
+  for (const bad of ['nope', 'itm_!', 42]) {
+    const copy = structuredClone(doc);
+    copy.moments[0].item_id = bad;
+    assert.throws(
+      () => validateJournal(copy),
+      (err) => err.code === 'validation_error' && String(err.path).endsWith('item_id')
+    );
+  }
+});
+
 test('a moment may carry a meal link with travel extras', () => {
   const doc = journalWithOneMoment();
   doc.moments[0].meal = {

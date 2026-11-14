@@ -21,6 +21,11 @@ import {
   loadCaptureDraft,
 } from '@/journal/drafts';
 import { bootstrapJournalForFirstMoment } from '@/journal/capture-context';
+import {
+  AmbientRecorderError,
+  startAmbientRecording,
+  type AmbientRecording,
+} from '@/journal/ambient-recorder';
 import { attachVisualViewportInset } from '../../design-kit/js/visual-viewport.js';
 import { presentJournalOverlay, type JournalOverlayHandle } from '@/journal/overlay-host';
 import {
@@ -63,12 +68,7 @@ export function isCaptureSaveEnabled(input: CaptureSaveInput): boolean {
   return false;
 }
 
-/** Ambient means the room as it is: no echo cancelling, noise gating or levelling. */
-export const AMBIENT_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
-  echoCancellation: false,
-  noiseSuppression: false,
-  autoGainControl: false,
-};
+export { AMBIENT_AUDIO_CONSTRAINTS } from '@/journal/ambient-recorder';
 
 /** How long Save waits for a first location fix before saving without one. */
 const LOCATION_WAIT_ON_SAVE_MS = 4000;
@@ -147,7 +147,7 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
   let soundBlob: Blob | null = null;
   let soundUrl: string | null = null;
   let soundSeconds = 0;
-  let recorder: MediaRecorder | null = null;
+  let recorder: AmbientRecording | null = null;
   let recordStartedAt = 0;
   let recordTicker: ReturnType<typeof setInterval> | null = null;
   let recordingDone: Promise<void> | null = null;
@@ -513,60 +513,42 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
   }
 
   async function startAmbient(): Promise<void> {
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      showNotice('Sound recording is not available in this browser.');
-      return;
-    }
     showNotice(null);
-    let stream: MediaStream;
+    let rec: AmbientRecording;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: AMBIENT_AUDIO_CONSTRAINTS });
-    } catch {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch {
-        showNotice('Microphone access was not allowed.');
-        return;
-      }
+      rec = await startAmbientRecording();
+    } catch (err) {
+      showNotice(err instanceof AmbientRecorderError ? err.message : 'Microphone access was not allowed.');
+      return;
     }
     if (destroyed) {
-      stream.getTracks().forEach((t) => t.stop());
+      void rec.stop();
       return;
     }
-    const chunks: BlobPart[] = [];
-    const rec = new MediaRecorder(stream);
     recorder = rec;
-    recordStartedAt = Date.now();
-    recordingDone = new Promise<void>((resolve) => {
-      rec.addEventListener('dataavailable', (ev) => {
-        if (ev.data.size) chunks.push(ev.data);
-      });
-      rec.addEventListener('stop', () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const seconds = (Date.now() - recordStartedAt) / 1000;
-        recorder = null;
-        if (chunks.length) {
-          clearSound();
-          soundBlob = new Blob(chunks, { type: rec.mimeType || 'audio/mp4' });
-          soundUrl = URL.createObjectURL(soundBlob);
-          soundSeconds = seconds;
-        }
-        setRecordingUi(false);
-        renderTray();
-        renderStamp();
-        markDirty();
-        resolve();
-      });
-    });
-    // Small timeslices so a killed tab still leaves most of the clip.
-    rec.start(1000);
+    recordStartedAt = rec.startedAt;
     setRecordingUi(true);
     renderStamp();
     refreshSave();
   }
 
   async function stopAmbient(): Promise<void> {
-    if (recorder && recorder.state !== 'inactive') recorder.stop();
+    const rec = recorder;
+    if (rec && !recordingDone) {
+      recordingDone = rec.stop().then((clip) => {
+        recorder = null;
+        if (clip) {
+          clearSound();
+          soundBlob = clip.blob;
+          soundUrl = URL.createObjectURL(clip.blob);
+          soundSeconds = clip.seconds;
+        }
+        setRecordingUi(false);
+        renderTray();
+        renderStamp();
+        markDirty();
+      });
+    }
     if (recordingDone) await recordingDone;
     recordingDone = null;
   }
@@ -643,7 +625,7 @@ export function openCaptureSheet(options: OpenCaptureSheetOptions): { destroy():
     destroyed = true;
     autosave.destroy();
     if (recordTicker) clearInterval(recordTicker);
-    if (recorder && recorder.state !== 'inactive') recorder.stop();
+    if (recorder) void recorder.stop();
     for (const p of photos) URL.revokeObjectURL(p.url);
     if (soundUrl) URL.revokeObjectURL(soundUrl);
     overlay?.release();

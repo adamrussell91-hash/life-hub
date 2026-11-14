@@ -22,6 +22,8 @@ import { renderDayLabelSheet } from '@/components/day-label-sheet';
 import { renderArrivalGuideSheet } from '@/components/arrival-guide-sheet';
 import { renderSafePhotoSheet } from '@/components/safe-photo-sheet';
 import { safeSaveErrorMessage, shrinkSafePhoto } from '@/lib/safe-photo';
+import { getJournal } from '@/api/journal';
+import { openQuickMealSheet } from '@/journal/quick-meal-sheet';
 import { renderTakeMeHome } from '@/components/take-me-home';
 import { renderShareSheet } from '@/components/share-sheet';
 import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
@@ -208,6 +210,50 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     }
   }
 
+  // Food stops with a logged meal, read from the journal after the page shows.
+  const mealMomentByItem = new Map<string, string>();
+  // Any live moment logged from a stop, meal saved or not, so a retry reuses it.
+  const momentByItem = new Map<string, string>();
+  let rerenderDay: (() => void) | null = null;
+
+  function rememberMealMoments(moments: { id: string; item_id?: string; lifecycle: string; meal?: unknown }[]): void {
+    mealMomentByItem.clear();
+    momentByItem.clear();
+    for (const m of moments) {
+      if (m.lifecycle !== 'live' || !m.item_id) continue;
+      momentByItem.set(m.item_id, m.id);
+      if (m.meal) mealMomentByItem.set(m.item_id, m.id);
+    }
+  }
+
+  function loadMealMoments(): void {
+    if (!trip.items.some((i) => i.kind === 'food')) return;
+    getJournal(tripId)
+      .then((env) => {
+        rememberMealMoments(env.journal.moments);
+        rerenderDay?.();
+      })
+      .catch(() => {
+        /* No journal yet, or offline: every food stop offers Log meal. */
+      });
+  }
+
+  function openLogMeal(item: Item, momentId?: string): void {
+    const city = trip.cities.find((c) => c.id === item.city_id);
+    openQuickMealSheet({
+      tripId,
+      item,
+      timeZone: city?.tz ?? trip.home_tz,
+      momentId: momentId ?? momentByItem.get(item.id),
+      tripTitle: trip.title,
+      onSaved: (savedMomentId) => {
+        momentByItem.set(item.id, savedMomentId);
+        mealMomentByItem.set(item.id, savedMomentId);
+        rerenderDay?.();
+      }
+    });
+  }
+
   function renderCityScene(): void {
     citySection.replaceChildren();
     citySection.style.setProperty('--city', '');
@@ -367,6 +413,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     day.append(listCol, mapCol);
     citySection.append(day);
 
+    rerenderDay = () => renderDay();
     function renderDay(): void {
       updateChips();
       renderDayBarState();
@@ -382,7 +429,9 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
         onAddAt: (cityId, date) => openForm(undefined, cityId, date),
         onTellPenelope: (prompt) => writePenelopeHandoff(trip, city.id, selectedDate, prompt),
         onEditArrivalGuide: () => openArrivalGuide(city),
-        onMarkSafe: (item, mode) => openSafeMark(item, mode)
+        onMarkSafe: (item, mode) => openSafeMark(item, mode),
+        onLogMeal: (item, momentId) => openLogMeal(item, momentId),
+        mealMomentByItem
       });
       dayMapHandle?.destroy();
       dayMapHandle = null;
@@ -573,6 +622,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
 
   updateChips();
   selectCity(selectedCityId);
+  loadMealMoments();
 }
 
 async function startWhereAmI(

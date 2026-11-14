@@ -1694,3 +1694,88 @@ html.vv-keyboard-open .journal-overlay .journal-chapter {
   min-height: 2.75rem;
   margin-top: var(--space-2);
 }
+
+/* Edit moment: photos and sound on a saved moment. Quiet by default: the
+   thumbnails reuse New moment's tray, sound is a small chip, and the two add
+   buttons sit on one line under them. */
+.journal-attachments {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.journal-attachments__sounds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.journal-attachments__sound {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper) 90%, var(--ink) 10%);
+}
+
+.journal-attachments__play,
+.journal-attachments__sound-remove {
+  min-height: 2.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.journal-attachments__play {
+  padding: 0 var(--space-2) 0 var(--space-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.journal-attachments__sound-remove {
+  min-width: 2.75rem;
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+.journal-attachments__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4, 16px);
+}
+
+.journal-attachments__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 2.75rem;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--wave);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.journal-attachments__add svg {
+  width: 16px;
+  height: 16px;
+}
+
+.journal-attachments__icon {
+  display: inline-flex;
+}
+
+.journal-attachments__add:focus-visible {
+  outline: 2px solid var(--wave);
+  border-radius: 6px;
+}
+
+.journal-attachments__add.is-recording {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
