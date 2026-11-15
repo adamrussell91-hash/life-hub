@@ -66,7 +66,8 @@ test('habits read boxes, redrafts and next steps without writing anything', asyn
   assert.deepEqual(out.organiser, {
     streak: 3,
     avg_box: 2,
-    weekly: [{ week_start: '2026-11-02', right: 1, seen: 2 }, { week_start: '2026-11-09', right: 3, seen: 4 }]
+    weekly: [{ week_start: '2026-11-02', right: 1, seen: 2 }, { week_start: '2026-11-09', right: 3, seen: 4 }],
+    days: ['2026-11-02', '2026-11-03', '2026-11-10', '2026-11-11', '2026-11-12']
   });
   assert.equal(out.redrafts, 2);
   assert.deepEqual(out.steps, { set: 3, acted: 2 });
@@ -85,7 +86,7 @@ test('a student with nothing gets null and zeros, not an error', async () => {
   assert.deepEqual(out, { organiser: null, redrafts: 0, steps: { set: 0, acted: 0 } });
   s.data.set(`organiser_practice/class1/${workOwner('class1', ben.id)}`, { boxes: {} });
   const empty = await teacherProfileAction(s, 'class1', { action: 'habits', student_id: ben.id }, NOW);
-  assert.deepEqual(empty.organiser, { streak: 0, avg_box: null, weekly: [] });
+  assert.deepEqual(empty.organiser, { streak: 0, avg_box: null, weekly: [], days: [] });
 });
 
 test('habits need a student on the roster', async () => {

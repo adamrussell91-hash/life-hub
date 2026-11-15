@@ -287,10 +287,14 @@ export async function organiserHabits(store, classId, studentId, { now = new Dat
       weeks.set(weekStart(d), w);
     }
   }
+  const today = sydneyDay(now);
+  const since = addDays(today, -27);
   return {
-    streak: streakOf(days, sydneyDay(now)),
+    streak: streakOf(days, today),
     avg_box: boxed ? Math.round((boxSum / boxed) * 10) / 10 : null,
-    weekly: [...weeks].sort(([a], [b]) => a.localeCompare(b)).map(([week_start, w]) => ({ week_start, ...w }))
+    weekly: [...weeks].sort(([a], [b]) => a.localeCompare(b)).map(([week_start, w]) => ({ week_start, ...w })),
+    // The last four weeks of practice days, for the Progress share grid.
+    days: [...days].filter((d) => d >= since && d <= today).sort()
   };
 }
 

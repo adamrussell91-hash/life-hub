@@ -29,6 +29,8 @@ export type RouteName =
   | 'student-profile'
   | 'student-feedback'
   | 'student-sheet'
+  | 'student-share'
+  | 'student-share-lesson'
   | 'sign-in'
   | 'not-found';
 
@@ -61,6 +63,8 @@ export type RouteParams = {
   'student-profile': { classId: string };
   'student-feedback': { token: string };
   'student-sheet': { token: string };
+  'student-share': { token: string };
+  'student-share-lesson': { token: string; lessonId: string };
   'sign-in': Record<string, never>;
   'not-found': Record<string, never>;
 };
@@ -160,6 +164,26 @@ export function match(pathname: string): RouteMatch | null {
     return {
       name: 'student-class-lesson',
       params: { classId: studentClassLesson[1], lessonId: studentClassLesson[2] },
+      requiresAuth: false,
+      path
+    };
+  }
+
+  const studentShareLesson = path.match(/^\/s\/share\/([A-Za-z0-9_-]{24})\/lessons\/([^/]+)$/);
+  if (studentShareLesson) {
+    return {
+      name: 'student-share-lesson',
+      params: { token: studentShareLesson[1], lessonId: studentShareLesson[2] },
+      requiresAuth: false,
+      path
+    };
+  }
+
+  const studentShare = path.match(/^\/s\/share\/([A-Za-z0-9_-]{24})$/);
+  if (studentShare) {
+    return {
+      name: 'student-share',
+      params: { token: studentShare[1] },
       requiresAuth: false,
       path
     };

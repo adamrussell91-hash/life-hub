@@ -1,0 +1,160 @@
+/* Explainer tour: spotlight, card, and the Help button it shrinks into. */
+.tour-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+.tour-spot {
+  position: fixed;
+  border-radius: 12px;
+  box-shadow: 0 0 0 200vmax color-mix(in srgb, var(--navy, #17375e) 55%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--paper, #fff) 80%, transparent);
+  transition: top 300ms ease-out, left 300ms ease-out, width 300ms ease-out, height 300ms ease-out, opacity 200ms ease-out;
+  pointer-events: none;
+}
+
+.tour-spot.is-off {
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  outline: none;
+}
+
+.tour-card {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: min(340px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--paper, #fff);
+  color: var(--ink, #17375e);
+  box-shadow: var(--elev-4, 0 12px 32px rgba(0, 0, 0, 0.25));
+  transition: top 300ms ease-out, left 300ms ease-out;
+}
+
+.tour-card.is-centred {
+  transform: translate(-50%, -50%);
+}
+
+.tour-card.is-docked {
+  top: auto;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  width: auto;
+  transform: none;
+}
+
+.tour-card__title {
+  font-size: 1.05rem;
+  margin: 0 0 6px;
+}
+
+.tour-card__body {
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+
+.tour-card__dots {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  color: var(--ink-muted, #555);
+}
+
+.tour-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.tour-card__skip {
+  margin-right: auto;
+}
+
+.tour-layer.is-leaving .tour-spot {
+  opacity: 0;
+  transition: opacity 300ms ease-out;
+}
+
+.tour-ghost {
+  position: fixed;
+  box-sizing: border-box;
+  padding: 16px;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 2px solid color-mix(in srgb, var(--wave, #3a7bd5) 70%, transparent);
+  background: color-mix(in srgb, var(--pastel-blue, #dbe8fb) 70%, var(--paper, #fff));
+  box-shadow: var(--elev-3, 0 8px 24px rgba(0, 0, 0, 0.2));
+  transform-origin: center;
+  pointer-events: none;
+}
+
+.tour-ghost > * {
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.tour-layer.is-fading .tour-ghost {
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
+
+.tour-help {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 900;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line, #ccc);
+  background: var(--paper, #fff);
+  color: var(--ink-muted, #555);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--elev-1, none);
+}
+
+.tour-help[hidden] {
+  display: none;
+}
+
+.tour-help:hover,
+.tour-help:focus-visible {
+  color: var(--ink, #17375e);
+}
+
+.tour-help.is-pulse {
+  animation: tour-pulse 600ms ease-out 1;
+}
+
+@keyframes tour-pulse {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--wave, #3a7bd5) 60%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 12px transparent;
+  }
+}
+
+@media (max-width: 599px) {
+  .tour-help {
+    top: 12px;
+    right: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-spot,
+  .tour-card {
+    transition: none;
+  }
+}
