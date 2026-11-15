@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadRoster } from '../../netlify/functions/_shared/class-claims.mjs';
+import { createPublishedProgressShareHandler } from '../../netlify/functions/published-progress-share.mjs';
+import { isPublicStudentApi } from '../../netlify/functions/_shared/public-student-routes.mjs';
 import { openShare, signIn, signOut, deviceIn, teacherShareAction, SHARE_TRIES_PER_DAY, SHARE_MAX_DEVICES } from '../../netlify/functions/_shared/progress-share.mjs';
 
 function storeFixture(entries = []) {
@@ -125,4 +127,28 @@ test('teacher add refuses bad initials and unknown students; another class canâ€
   await assert.rejects(teacherShareAction(store, 'class1', { action: 'add', student_id: 'st_nobody', initials: 'PT' }), { code: 'bad_request' });
   store.data.set('classes/class2', { id: 'class2', type: 'class', status: 'active', title: '10 English', students: [] });
   await assert.rejects(teacherShareAction(store, 'class2', { action: 'remove', token }), { code: 'not_found' });
+});
+
+test('the public route is open only for a 24-character token', () => {
+  assert.equal(isPublicStudentApi('POST', `/api/published/share/${'A'.repeat(24)}`), true);
+  assert.equal(isPublicStudentApi('POST', '/api/published/share/short'), false);
+  assert.equal(isPublicStudentApi('GET', `/api/published/share/${'A'.repeat(24)}`), false);
+});
+
+test('the public handler signs in and serves the page', async () => {
+  const { store, token, pin } = await setup();
+  const cls = store.data.get('classes/class1');
+  store.data.set('classes/class1', { ...cls, current_unit_id: 'unit1' });
+  store.data.set('units/unit1', { id: 'unit1', title: 'Poetry', lesson_ids: [] });
+  store.data.set('markbook/class1', { columns: [], marks: {}, hidden_quizzes: [], focus: {}, took: {}, groups: [], history: [] });
+  const origin = 'http://127.0.0.1:5190';
+  const handler = createPublishedProgressShareHandler({ getContentStore: async () => store, env: { SITE_ORIGIN: origin }, now: () => NOW });
+  const call = (body) => handler(new Request(`${origin}/api/published/share/${token}`, { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify(body) }));
+  const first = await (await call({ action: 'page', device_token: DEVICE })).json();
+  assert.equal(first.data.need, 'sign_in');
+  const signedIn = await call({ action: 'sign_in', device_token: DEVICE, initials: 'PT', pin });
+  assert.equal(signedIn.status, 200);
+  assert.equal((await signedIn.json()).data.viewer_initials, 'PT');
+  const wrong = await call({ action: 'sign_in', device_token: 'd'.repeat(48), initials: 'PT', pin });
+  assert.equal(wrong.status, 403);
 });
