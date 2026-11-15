@@ -22,7 +22,9 @@ const STUDENT_ROUTES = new Set([
   'student-class-lesson',
   'student-profile',
   'student-feedback',
-  'student-sheet'
+  'student-sheet',
+  'student-share',
+  'student-share-lesson'
 ]);
 
 export function isClassSiteHost(
