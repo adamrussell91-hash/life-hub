@@ -64,6 +64,8 @@ import {
 } from '@/student/feedback-view';
 import { mountStudentSheetView, type StudentSheetViewHandle } from '@/student/sheet-view';
 import { mountStudentProfileView, type StudentProfileViewHandle } from '@/student/profile-view';
+import { mountShareView } from '@/student/share-view';
+import { mountShareLesson } from '@/student/share-lesson';
 import {
   applyCreatedEntity,
   applyCreatedMedia,
@@ -125,6 +127,8 @@ let studentSheetViewHandle: StudentSheetViewHandle | null = null;
 
 // The student progress view mounted for the current public route, if any.
 let studentProfileViewHandle: StudentProfileViewHandle | null = null;
+// Progress share page or one of its locked lessons, if mounted.
+let shareViewHandle: { dispose(): void } | null = null;
 
 // Home dashboard handle (clock interval + create control), if mounted.
 let homeHandle: { dispose: () => void } | null = null;
@@ -200,6 +204,11 @@ function teardownStudentFeedbackView(): void {
   if (!studentFeedbackViewHandle) return;
   studentFeedbackViewHandle.dispose();
   studentFeedbackViewHandle = null;
+}
+
+function teardownShareView(): void {
+  shareViewHandle?.dispose();
+  shareViewHandle = null;
 }
 
 function teardownStudentProfileView(): void {
@@ -828,6 +837,16 @@ function renderStudentSheetRoute(sheetToken: string, token: number): void {
   });
 }
 
+function renderShareRoute(shareToken: string, token: number): void {
+  teardownShareView();
+  shareViewHandle = mountShareView({ root: appRoot, token: shareToken, isStale: () => token !== renderToken });
+}
+
+function renderShareLessonRoute(shareToken: string, lessonId: string, token: number): void {
+  teardownShareView();
+  shareViewHandle = mountShareLesson({ root: appRoot, token: shareToken, lessonId, isStale: () => token !== renderToken });
+}
+
 function renderStudentProfileRoute(classId: string, token: number): void {
   teardownStudentProfileView();
   studentProfileViewHandle = mountStudentProfileView({
@@ -1168,6 +1187,12 @@ function renderRoute(match: RouteMatch, token: number): void {
     case 'student-profile':
       renderStudentProfileRoute(match.params.classId, token);
       break;
+    case 'student-share':
+      renderShareRoute(match.params.token, token);
+      break;
+    case 'student-share-lesson':
+      renderShareLessonRoute(match.params.token, match.params.lessonId, token);
+      break;
     case 'not-found':
       renderNotFoundRoute(token);
       break;
@@ -1211,6 +1236,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   teardownStudentFeedbackView();
   teardownStudentSheetView();
   teardownStudentProfileView();
+  teardownShareView();
 
   if (isClassSiteHost() && !isClassSiteStudentRoute(match.name)) {
     renderClassSiteDeadEnd(appRoot);
