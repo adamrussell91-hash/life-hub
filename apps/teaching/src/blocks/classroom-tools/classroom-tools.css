@@ -1169,3 +1169,81 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-xs);
 }
+
+/* Progress share links under a student row. */
+.class-students__share-host:empty {
+  display: none;
+}
+
+.class-students__share-host {
+  flex-basis: 100%;
+}
+
+.share-panel {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) 0 var(--space-1);
+  font: var(--text-sm) / 1.4 var(--font-ui);
+}
+
+.share-panel__lead {
+  margin: 0;
+  color: var(--ink-muted);
+}
+
+.share-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.share-panel__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--paper);
+}
+
+.share-panel__row p,
+.share-panel__link {
+  margin: 0;
+  flex-basis: 100%;
+}
+
+.share-panel__link {
+  overflow-wrap: anywhere;
+  font-size: var(--text-xs);
+}
+
+.share-panel__pin.is-fresh {
+  font-weight: 600;
+}
+
+.share-panel__none {
+  color: var(--ink-muted);
+}
+
+.share-panel__add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.share-panel__initials {
+  font: inherit;
+  width: 9rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+.share-panel__say {
+  margin: 0;
+  min-height: 1.2em;
+}

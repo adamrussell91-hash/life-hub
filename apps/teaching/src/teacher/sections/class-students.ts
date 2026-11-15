@@ -17,6 +17,7 @@ import { MAX_CLASS_STUDENTS } from '@/schemas';
 import { parseStudentList } from '@/blocks/classroom-tools/logic';
 import { apiPost } from '@/api/client';
 import { assignInitials, initialsProblems, normaliseInitials } from '@/schemas/student-initials';
+import { mountProgressSharePanel } from '@/teacher/sections/progress-share-panel';
 import { patchClass } from '@/teacher/schedule-api';
 import { peekCurriculum, replaceCurriculum } from '@/app/curriculum-state';
 import { createClassFold } from '@/teacher/class-fold';
@@ -73,6 +74,8 @@ export function mountClassStudents(host: HTMLElement, cls: Class, options: Optio
   let claims: Record<string, string> | null = null;
   let codes: Record<string, string> = {};
   let pointerOff = new Set<string>();
+  // Students whose Progress share panel is open: it stays open when the list repaints.
+  const sharesOpen = new Set<string>();
   const take = (reply: ClaimsReply) => {
     claims = reply.claims;
     codes = reply.codes ?? codes;
@@ -234,6 +237,34 @@ export function mountClassStudents(host: HTMLElement, cls: Class, options: Optio
           });
           item.append(release);
         }
+        // Progress share: a view-only link for a pastoral teacher or parent. Its panel sits under the row.
+        let shareHost: HTMLElement | null = null;
+        if (student.id) {
+          const studentId = student.id;
+          const shareBtn = el('button', 'btn btn--ghost class-students__share', 'Progress share');
+          shareBtn.type = 'button';
+          shareBtn.setAttribute('aria-label', `Progress share links for ${student.name}`);
+          const host = (shareHost = el('div', 'class-students__share-host'));
+          let panel: { dispose(): void } | null = null;
+          const open = () => {
+            panel = mountProgressSharePanel(host, { classId: cls.id, studentId, studentName: student.name });
+            shareBtn.setAttribute('aria-expanded', 'true');
+          };
+          shareBtn.setAttribute('aria-expanded', 'false');
+          shareBtn.addEventListener('click', () => {
+            if (panel) {
+              panel.dispose();
+              panel = null;
+              sharesOpen.delete(studentId);
+              shareBtn.setAttribute('aria-expanded', 'false');
+              return;
+            }
+            sharesOpen.add(studentId);
+            open();
+          });
+          if (sharesOpen.has(studentId)) open();
+          item.append(shareBtn);
+        }
         // Only students who said "Don't show this again" to their progress page's pointer get this.
         if (student.id && pointerOff.has(student.id) && claimsApi.pointerOn) {
           const on = el('button', 'btn btn--ghost class-students__pointer', 'Pointer off · Turn on');
@@ -255,6 +286,7 @@ export function mountClassStudents(host: HTMLElement, cls: Class, options: Optio
           item.append(on);
         }
         item.append(label);
+        if (shareHost) item.append(shareHost);
         return item;
       })
     );
