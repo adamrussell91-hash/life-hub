@@ -53,6 +53,8 @@ import { getActiveJournalDayMap, resolveCssColor } from '@/journal/map-expanded'
 import { Map as MapLibreMap, Marker as MapLibreMarker } from '@/lib/maplibre';
 import { renderMapView, type MapViewHandle } from '@/journal/map/map-view';
 import { buildTripStops } from '@/journal/map/stops';
+import { openRelive } from '@/journal/map/relive';
+import { buildReliveScenes } from '@/journal/map/relive-scenes';
 import type { MapLibrary } from '@/journal/map/trip-map';
 import { openTrashView } from '@/journal/trash-view';
 import { openJournalSearch } from '@/journal/search-sheet';
@@ -100,6 +102,7 @@ import {
   dayNumber,
   longDate,
   shortDateRange,
+  tripLength,
   tripPhase,
 } from '@/journal/trip-days';
 import { sunsetLocal } from '@/lib/sun';
@@ -1397,6 +1400,53 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
   /** Where the slider is: 0 for the whole trip, then the stops. Kept when the view is left and returned to. */
   let mapPosition = 0;
 
+  const mapLibrary = (): MapLibrary => opts.mapLibrary ?? ({ Map: MapLibreMap, Marker: MapLibreMarker } as unknown as MapLibrary);
+  const mapColors = (): { line: string; plain: string } => ({
+    // MapLibre cannot read CSS variables: resolve the tokens first.
+    line: resolveCssColor(root, '--navy', '#17375e'),
+    plain: resolveCssColor(root, '--sand', '#f1e7d6'),
+  });
+
+  /** Relive: the trip played on the map. Only ever started by the reader's tap. */
+  /** The trip's length once it is over, for Relive's last card. */
+  function finishedTripDays(): number | null {
+    if (!liveTrip?.start_date || !liveTrip.end_date) return null;
+    const zone = liveFixture.legs[0]?.timezone || 'UTC';
+    const phase = tripPhase(liveTrip.start_date, liveTrip.end_date, opts.today ?? todayIn(zone));
+    return phase.kind === 'after' ? tripLength(liveTrip.start_date, liveTrip.end_date) : null;
+  }
+
+  function startRelive(): void {
+    const trip = buildTripStops(liveFixture, orderedMoments, dayNo);
+    const scenes = buildReliveScenes({ fixture: liveFixture, moments: orderedMoments, trip, keepsakes, dayNumberOf: dayNo, tripDays: finishedTripDays() });
+    if (!scenes.length) return;
+    const legs = legsById();
+    swap(
+      'relive',
+      openRelive({
+        anchor: root,
+        lib: mapLibrary(),
+        title: title(),
+        scenes,
+        trip,
+        colors: mapColors(),
+        reducedMotion: prefersReducedMotion(root),
+        fillPhoto: (img, mediaId) => {
+          const media = mediaById.get(mediaId);
+          if (media) configureJournalImage(img, { tripId: liveFixture.trip_id, media, layout: 'single', eager: true });
+        },
+        drawKeepsake: draw,
+        sunsetFor: (stopIndex) => {
+          const stop = trip.stops[stopIndex];
+          return stop ? sunsetLocal(stop.lat, stop.lon, stop.localDate, legs.get(stop.legId)?.timezone || 'UTC') : null;
+        },
+        onClose: () => {
+          overlays.relive = null;
+        },
+      }),
+    );
+  }
+
   function paintMapView(): void {
     const trip = buildTripStops(liveFixture, orderedMoments, dayNo);
     const signature = JSON.stringify([trip.unplaced, trip.stops.map((s) => [s.momentId, s.lat, s.lon, s.localTime, s.placeName, s.mediaId, s.text])]);
@@ -1406,12 +1456,11 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     mapPosition = Math.min(mapPosition, trip.stops.length);
     const legs = legsById();
     const view = renderMapView({
-      lib: opts.mapLibrary ?? ({ Map: MapLibreMap, Marker: MapLibreMarker } as unknown as MapLibrary),
+      lib: mapLibrary(),
       trip,
       cityCount: new Set(trip.stops.map((s) => s.legId)).size,
       position: mapPosition,
-      // MapLibre cannot read CSS variables: resolve the tokens first.
-      colors: { line: resolveCssColor(root, '--navy', '#17375e'), plain: resolveCssColor(root, '--sand', '#f1e7d6') },
+      colors: mapColors(),
       reducedMotion: prefersReducedMotion(root),
       fillPhoto: (img, mediaId) => {
         const media = mediaById.get(mediaId);
@@ -1426,6 +1475,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
       onPosition: (position) => {
         mapPosition = position;
       },
+      onRelive: () => startRelive(),
     });
     mapView = view;
     story.replaceChildren(view.el);

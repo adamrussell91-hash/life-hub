@@ -23,6 +23,8 @@ export interface MapViewOptions {
   onOpenMoment: (momentId: string) => void;
   /** Told whenever the slider moves, so the place is kept when the view is left and returned to. */
   onPosition: (position: number) => void;
+  /** Starts Relive. The button is only drawn when this is given. */
+  onRelive?: () => void;
 }
 
 export interface MapViewHandle {
@@ -81,6 +83,12 @@ export function renderMapView(options: MapViewOptions): MapViewHandle {
   const unplacedText = unplacedLine(unplaced);
   if (unplacedText) panel.append(el('p', 'trip-map__unplaced num', unplacedText));
   root.append(canvas, notice, panel);
+  if (options.onRelive) {
+    const relive = button('trip-map__relive');
+    relive.append(icon(ICONS.play), el('span', undefined, 'Relive'));
+    relive.addEventListener('click', () => options.onRelive?.());
+    root.append(relive);
+  }
 
   let position = Math.max(0, Math.min(options.position, stops.length));
   let map: TripMapHandle;
