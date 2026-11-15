@@ -272,6 +272,8 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
   const announce = el('p', 'mb-sr mb__announce');
   announce.setAttribute('aria-live', 'polite');
   const body = el('div', 'mb__body');
+  // The markbook can take a few seconds to arrive: say so rather than leave a blank space.
+  body.append(el('p', 'mb__status mb__loading', 'Loading the markbook…'));
   section.append(head, hiddenList, warning, status, announce, body);
   host.replaceChildren(section);
 
@@ -785,6 +787,8 @@ export function mountMarkbook(host: HTMLElement, cls: Class, options: Options = 
       // A server's own message says what went wrong; a dropped connection or garbled reply gets the plain one.
       const fromServer = error instanceof ApiClientError && error.code !== 'network_error' && error.code !== 'invalid_response';
       if (repaint) status.textContent = fromServer ? error.message : 'Couldn’t load the markbook.';
+      // Never loaded: the status line says why, so the loading line goes.
+      if (!view) body.replaceChildren();
       return false;
     }
   }

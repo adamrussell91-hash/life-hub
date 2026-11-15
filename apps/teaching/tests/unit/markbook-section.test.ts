@@ -265,6 +265,54 @@ describe('markbook section', () => {
     await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('Couldn’t load the markbook.'));
   });
 
+  it('says it is loading while the markbook is on its way, and drops that line if the load fails', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const api = fakeApi(view());
+    let fail!: (e: unknown) => void;
+    (api.load as Mock).mockReturnValueOnce(new Promise((_r, reject) => { fail = reject; }));
+    mountMarkbook(host, cls, { api, narrow: () => false, today: () => '2026-11-03', view: 'marks' });
+    expect(host.querySelector('.mb__body')?.textContent).toBe('Loading the markbook…');
+    fail(new ApiClientError({ code: 'network_error', message: 'Failed to fetch' }));
+    await vi.waitFor(() => expect(host.querySelector('.mb__status')?.textContent).toBe('Couldn’t load the markbook.'));
+    expect(host.querySelector('.mb__body')?.textContent).toBe('');
+    host.remove();
+  });
+
+  it('measures the Marks & progress box again when the page above it grows', async () => {
+    let fire: () => void = () => {};
+    const original = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      constructor(cb: () => void) { fire = cb; }
+      observe(): void {}
+      disconnect(): void {}
+      unobserve(): void {}
+    } as unknown as typeof ResizeObserver;
+    const page = document.createElement('div');
+    page.className = 'teacher-layout__canvas';
+    const host = document.createElement('div');
+    page.append(host);
+    document.body.append(page);
+    const rect = (bottom: number) => ({ bottom, top: 0, left: 0, right: 0, width: 0, height: bottom, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+    // The page is still short and stretched to the screen: lots of room "below" the table.
+    let pageBottom = 1500;
+    page.getBoundingClientRect = () => rect(pageBottom);
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => rect(900));
+    try {
+      mountMarkbook(host, cls, { api: fakeApi(view()), narrow: () => false, today: () => '2026-11-03', view: 'marks', progressLessons: [{ id: 'l1', title: 'One', role: 'core', assessment: false, date: '2026-11-01', unit: 'U' }] });
+      const box = () => host.querySelector<HTMLElement>('.mb-book__scroll');
+      await vi.waitFor(() => expect(box()?.style.getPropertyValue('--mb-below')).toBe('600px'));
+      // The calendar arrives; the table now sits at the foot of the page.
+      pageBottom = 940;
+      fire();
+      expect(box()?.style.getPropertyValue('--mb-below')).toBe('40px');
+    } finally {
+      spy.mockRestore();
+      page.remove();
+      globalThis.ResizeObserver = original;
+    }
+  });
+
   it('moves focus to the heading when the focused control goes away', async () => {
     const quiz = { kind: 'quiz' as const, id: 'quiz:l1', lesson_id: 'l1', title: 'Quiz 1', date: '2026-10-20', hidden: false, confidence: false, questions: [], scores: {} };
     const { host } = await mount(view({ quizzes: [quiz] }));
