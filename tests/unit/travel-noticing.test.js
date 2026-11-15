@@ -307,3 +307,97 @@ test('travel-noticing POST photos: looks only when the day has six photos, and n
   assert.deepEqual((await down.json()).data.cards, []);
   assert.equal(calls.length, before);
 });
+
+// ---- Food journal, diary and bookshelf ---------------------------------------
+
+const { diaryOnThisDay, diaryRecord, foodFacts, shelfMatches } = await import('../../netlify/functions/_shared/travel-noticing-extras.mjs');
+
+const extrasTrip = {
+  id: 'trp_now00001', start_date: '2027-03-03', end_date: '2027-03-07',
+  cities: [
+    { id: 'lis', name: 'Lisbon', country: 'Portugal', center: { lat: 38.72, lon: -9.14 } },
+    { id: 'opo', name: 'Porto', country: 'Portugal', center: { lat: 41.15, lon: -8.61 } }
+  ]
+};
+const foodJournal = {
+  visits: [
+    { id: 'visit_a', source_id: 'travel:trp_now00001:mom_dinner:1', date: '2027-03-05', venue: { name: 'Taberna Inventada' },
+      dishes: [{ title: 'Grilled sardines', rating: 4.5 }, { title: 'House wine' }, { title: '', rating: 5 }] },
+    { id: 'visit_b', source_id: 'travel:trp_other0001:mom_x', date: '2026-01-10', venue: { name: 'Elsewhere', lat: 38.73, lon: -9.15 },
+      dishes: [{ title: 'Custard tart', order_again: true, rating: 5 }, { title: 'Soup', order_again: false }] },
+    { id: 'visit_c', date: '2025-06-01', venue: { name: 'Far away', lat: 48.85, lon: 2.35 }, dishes: [{ title: 'Onion soup', order_again: true }] },
+    { id: 'visit_d', date: '2027-03-04', venue: { name: 'During the trip', lat: 38.72, lon: -9.14 }, dishes: [{ title: 'Bifana', order_again: true }] },
+    { id: 'visit_e', date: '2024-02-02', venue: { name: 'No pin' }, dishes: [{ title: 'Francesinha', order_again: true }] }
+  ]
+};
+
+test('food: rated dishes of this trip, and order-again dishes from earlier visits to its cities', () => {
+  assert.deepEqual(foodFacts({ foodJournal, trip: extrasTrip }), {
+    dishes: [{ date: '2027-03-05', title: 'Grilled sardines', venue: 'Taberna Inventada', rating: 4.5, moment_id: 'mom_dinner' }],
+    order_again: [{ city: 'Lisbon', title: 'Custard tart', venue: 'Elsewhere', date: '2026-01-10' }]
+  });
+  assert.deepEqual(foodFacts({ foodJournal: null, trip: extrasTrip }), { dishes: [], order_again: [] });
+});
+
+test('diary: this date in earlier years, with only the date, a mood word and one highlight line', () => {
+  const records = [
+    { type: 'diary', date: '2026-03-05', mood: 'content', highlights: '- Walked the long way home\n- Rang a friend', notes: 'PRIVATE BODY TEXT', challenges: 'PRIVATE CHALLENGE' },
+    { type: 'diary', date: '2025-03-05', moods: ['restless', 'tired'], highlights: [' ', 'Planted the lemon tree'] },
+    { type: 'diary', date: '2026-03-06', mood: 'fine', highlights: 'A different day' },
+    { type: 'mind_session', date: '2026-03-05', mood: 'x', highlights: 'Not a diary entry' },
+    { type: 'diary', date: '2024-03-05' }
+  ];
+  const out = diaryOnThisDay(records, '2027-03-05');
+  assert.deepEqual(out, [
+    { date: '2026-03-05', mood: 'content', line: 'Walked the long way home' },
+    { date: '2025-03-05', mood: 'restless', line: 'Planted the lemon tree' }
+  ]);
+  assert.ok(!JSON.stringify(out).includes('PRIVATE'));
+  const yaml = (text) => Object.fromEntries(text.split('\n').map((l) => l.split(': ')));
+  assert.deepEqual(diaryRecord('---\ntype: diary\ndate: 2026-03-05\n---\nBody', yaml), { type: 'diary', date: '2026-03-05' });
+  assert.equal(diaryRecord('no frontmatter here', yaml), null);
+  assert.equal(diaryRecord('---\nx\n---', () => { throw new Error('bad yaml'); }), null);
+});
+
+test('books: only a title that names one of the trip’s cities or countries, as a whole word', () => {
+  const books = [
+    { label: 'A Winter in Lisbon', author: 'Invented Author', completed_on: '2026-08-01' },
+    { label: 'The Portugal Papers', author: '' },
+    { label: 'Portolan charts', author: 'Someone' },
+    { label: 'Night Train', author: 'Someone Else' },
+    { label: '' }
+  ];
+  assert.deepEqual(shelfMatches({ books, trip: extrasTrip }), [
+    { title: 'A Winter in Lisbon', author: 'Invented Author', completed_on: '2026-08-01', place: 'Lisbon' },
+    { title: 'The Portugal Papers', author: '', completed_on: null, place: 'Portugal' }
+  ]);
+});
+
+test('travel-noticing GET: adds food, diary and books to the history, and survives any one of them failing', async () => {
+  const base = {
+    env, ...signedIn, github: {}, loadTrips: async () => [], loadJournals: async () => [],
+    createTravelRepository: () => ({ getTrip: async () => ({ trip: extrasTrip }) }),
+    loadFoodJournal: async () => foodJournal,
+    loadDiaryRecords: async (_ctx, day) => [{ type: 'diary', date: '2026-03-05', mood: 'content', highlights: 'Walked the long way home', asked: day }],
+    loadBooks: async () => [{ label: 'A Winter in Lisbon' }]
+  };
+  const get = async (deps, query = 'trip=trp_now00001&day=2027-03-05') =>
+    (await (await createTravelNoticingHandler(deps)(new Request(`https://life-hub.test/api/travel-noticing?${query}`))).json()).data.history;
+
+  const full = await get(base);
+  assert.equal(full.food.dishes.length, 1);
+  assert.deepEqual(full.diary, [{ date: '2026-03-05', mood: 'content', line: 'Walked the long way home' }]);
+  assert.equal(full.books[0].place, 'Lisbon');
+  assert.deepEqual(full.trips, []);
+
+  // No day given: the diary is not opened at all.
+  let opened = 0;
+  const noDay = await get({ ...base, loadDiaryRecords: async () => { opened += 1; return []; } }, 'trip=trp_now00001');
+  assert.equal(noDay.diary, undefined);
+  assert.equal(opened, 0);
+
+  // The shelf store is down: everything else still arrives.
+  const partial = await get({ ...base, loadBooks: async () => { throw new Error('store down'); } });
+  assert.equal(partial.books, undefined);
+  assert.equal(partial.food.dishes.length, 1);
+});

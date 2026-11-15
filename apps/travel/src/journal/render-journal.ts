@@ -655,7 +655,11 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
   const loadNoticingHistory =
     opts.loadNoticingHistory ??
     (liveTrip && !isFixtureVersion(liveVersion)
-      ? () => getNoticingHistory(liveFixture.trip_id).then((r) => r.history, () => null)
+      ? () =>
+          getNoticingHistory(liveFixture.trip_id, liveTrip ? noticingDay(journalDoc(), liveTrip, noticingToday()) : null).then(
+            (r) => r.history,
+            () => null,
+          )
       : null);
   if (loadNoticingHistory) {
     void loadNoticingHistory().then(

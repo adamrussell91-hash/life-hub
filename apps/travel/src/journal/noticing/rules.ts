@@ -37,6 +37,15 @@ export interface HistoryDay {
 export interface NoticingHistory {
   trips: HistoryTrip[];
   days: HistoryDay[];
+  /** From the food journal: rated dishes of this trip, and dishes marked "order again" in its cities before it. */
+  food?: {
+    dishes: { date: string; title: string; venue: string; rating: number; moment_id: string }[];
+    order_again: { city: string; title: string; venue: string; date: string }[];
+  };
+  /** From the diary, for one date: earlier years' entries, as a mood word and one highlight line. */
+  diary?: { date: string; mood: string; line: string }[];
+  /** From the bookshelf: books whose title names a city or country of this trip. */
+  books?: { title: string; author: string; completed_on: string | null; place: string }[];
 }
 
 export interface RuleInput {
@@ -347,7 +356,85 @@ const halfway: Rule = (ctx) => {
   };
 };
 
-const RULES: Rule[] = [onThisDay, backAgain, newCountry, longestTrip, furthestPoint, mostPhotographedCity, biggestDay, halfway, earlyOrLate];
+const longDay = (date: string): string => `${Number(date.slice(8))} ${monthYear(date)}`;
+const firstDayIn = (ctx: Ctx, match: (d: DayFacts) => boolean): boolean => match(ctx.today) && !ctx.before.some(match);
+
+/** The dish rated above every other on this trip, on the day it was eaten. */
+const bestDish: Rule = (ctx) => {
+  const dishes = ctx.history?.food?.dishes ?? [];
+  if (dishes.length < 3) return null;
+  const sorted = [...dishes].sort((a, b) => b.rating - a.rating);
+  const top = sorted[0]!;
+  if (top.rating <= sorted[1]!.rating || top.date !== ctx.day) return null;
+  return {
+    ...base(ctx, 'best-dish', `${ctx.trip.id}:${top.moment_id}:${top.title.toLowerCase()}`),
+    source: 'food',
+    headline: 'The best thing you have eaten this trip',
+    body: top.venue ? `${top.title}, at ${top.venue}.` : `${top.title}.`,
+    stats: [{ value: String(top.rating), label: 'out of 5, your rating' }],
+    basis: `Rated above the other ${dishes.length - 1} dishes you have rated on this trip`,
+    momentId: ctx.today.moments.some((m) => m.id === top.moment_id) ? top.moment_id : undefined,
+    score: 58,
+  };
+};
+
+/** First day in a city where an earlier visit left a dish marked "order again". */
+const orderAgain: Rule = (ctx) => {
+  const here = (ctx.history?.food?.order_again ?? []).filter((d) => same(d.city, ctx.today.city));
+  if (!here.length || !firstDayIn(ctx, (d) => same(d.city, ctx.today.city))) return null;
+  const first = here[0]!;
+  const more = here.length - 1;
+  return {
+    ...base(ctx, 'order-again', `${ctx.today.city.toLowerCase()}:${first.title.toLowerCase()}`),
+    source: 'food',
+    headline: `Worth ordering again in ${ctx.today.city}`,
+    body: `${first.title}, at ${first.venue}. You marked it to order again on ${longDay(first.date)}.`,
+    basis: more > 0 ? `From your food journal, with ${plural(more, 'more dish', 'more dishes')} marked the same way here` : 'From your food journal',
+    score: 62,
+  };
+};
+
+/** This date in the diary, a year or more ago: the mood word and one highlight line, as written. */
+const diaryYearsAgo: Rule = (ctx) => {
+  const entry = (ctx.history?.diary ?? [])
+    .filter((d) => d.date.slice(5) === ctx.day.slice(5) && d.date < ctx.day)
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+  if (!entry) return null;
+  const years = Number(ctx.day.slice(0, 4)) - Number(entry.date.slice(0, 4));
+  if (years < 1 || (!entry.line && !entry.mood)) return null;
+  return {
+    ...base(ctx, 'diary-on-this-day', `${ctx.day}:${entry.date}`),
+    source: 'diary',
+    headline: `${years === 1 ? 'A year' : `${years} years`} ago today, in your diary`,
+    body: entry.mood ? `The mood you wrote down that day: ${entry.mood}.` : undefined,
+    evidence: entry.line ? { label: 'One line from that day', text: entry.line } : undefined,
+    basis: `From your diary entry of ${longDay(entry.date)}`,
+    score: 68,
+  };
+};
+
+/** First day in a city or country that a book on the shelf names in its title. */
+const bookOnShelf: Rule = (ctx) => {
+  const book = (ctx.history?.books ?? []).find(
+    (b) =>
+      (same(b.place, ctx.today.city) && firstDayIn(ctx, (d) => same(d.city, ctx.today.city))) ||
+      (same(b.place, ctx.today.country) && firstDayIn(ctx, (d) => same(d.country, ctx.today.country))),
+  );
+  if (!book) return null;
+  return {
+    ...base(ctx, 'book-on-shelf', `${book.title.toLowerCase()}:${book.place.toLowerCase()}`),
+    source: 'books',
+    headline: `${book.title} is on your shelf`,
+    body: [book.author ? `By ${book.author}.` : '', book.completed_on ? `You finished it on ${longDay(book.completed_on)}.` : ''].filter(Boolean).join(' ') || undefined,
+    basis: `Matched by its title only, which names ${book.place}`,
+    score: 45,
+  };
+};
+
+const RULES: Rule[] = [
+  onThisDay, backAgain, newCountry, longestTrip, furthestPoint, diaryYearsAgo, mostPhotographedCity,
+  orderAgain, biggestDay, bestDish, halfway, bookOnShelf, earlyOrLate,
+];
 
 /** The trip day the cards are about: the latest day with the owner's moments, no later than today and inside the trip. */
 export function noticingDay(journal: JournalDocument, trip: Trip, today: string): string | null {
