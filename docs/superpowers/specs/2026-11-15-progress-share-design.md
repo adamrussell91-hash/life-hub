@@ -80,7 +80,8 @@ Mobile first, one column, top to bottom. The header names the student (first nam
    - the **time** it was done, e.g. "Tue 11 Nov, 9:42pm"
    - how: *Ticked*, *Quiz submitted* or *Marked by teacher*
    - when the class calendar has the lesson, its planned date, e.g. "planned Mon 3 Nov"
-   - **Burst flag**: when 3 or more ticks fall within 10 minutes of each other, the group gets one label: "5 ticked within 4 minutes". Quiz submissions and teacher marks are not counted in bursts.
+   - **Tick record**: when a lesson has been ticked more than once, or unticked and ticked again, the row says "Ticked 3 times" and opens to its full record, oldest first: "Ticked Tue 4 Nov, 10:02am · Unticked Mon 10 Nov, 9:40pm · Ticked Mon 10 Nov, 9:41pm". The row's main time is the first tick, so ticking again later never hides when it was first done.
+   - **Burst flag**: when 3 or more tick events on different lessons fall within 10 minutes of each other, the group gets one label: "5 ticked within 4 minutes". Every tick in the record counts, re-ticks included. Quiz submissions and teacher marks are not counted in bursts.
    - Shows the whole current unit, with a "Show earlier" button after the first 20 rows.
 5. **Practice**: current streak in days; a 4-week grid (Mon–Sun rows) with a filled square for each day the student practised; weekly accuracy as "18 of 24 right" per week for the last 4 weeks.
 6. **Today's organiser**: cards left today and cards answered today (`practiceToday`).
@@ -164,6 +165,21 @@ New and changed files in `netlify/functions/`:
 | `_shared/public-student-routes.mjs` | Allow the new public route |
 | `_shared/organiser.mjs` | `organiserHabits` also returns `days` (sorted practice days, last 28) for the grid |
 
+### Tick record
+
+Done records are create-only and an untick deletes them, so today a re-tick replaces the original time. A new append-only log keeps every event:
+
+```
+profile/{class}/{student}/ticks/{lesson}   { events: [{ at, kind: 'tick' | 'untick' | 'quiz' }] }
+```
+
+- `recordDone` appends `tick` (or `quiz`) and `undoTick` appends `untick`, in `_shared/profile-done.mjs`. The append uses the store's etag (`onlyIfMatch` / `onlyIfNew`) with up to 5 retries, like `writeTeacherMark`.
+- The log is written after the done record. If the append still fails, the tick itself stands and the failure is logged; a student's tick never fails because of the record.
+- A repeat `done` for a lesson that is already ticked writes no event (nothing changed).
+- At most 50 events per lesson; beyond that the oldest drop, keeping the first event.
+- Ticks made before this ships have no log. Their done record's `at` stands in as a single `tick` event, so the page reads the same either way.
+- Nothing else reads or shows the log. The student's own page and the teacher's views are unchanged, though the teacher's Over time view could use it later.
+
 `progress-share-page.mjs` calls `unitState`, `todoFor`, `organiserHabits`, `practiceToday`, `returnedRows` and `listDone`, then copies only these fields:
 
 ```
@@ -171,7 +187,8 @@ New and changed files in `netlify/functions/`:
   next: [{ title, lesson_id? }],
   unit: { title, core_done, core_total },
   countdowns: [{ title, due }],
-  ticks: [{ lesson_id, title, at, via, planned? }],
+  ticks: [{ lesson_id, title, at, via, planned?, record: [{ at, kind }] }],
+  bursts: [{ from, to, count }],
   practice: { streak, days: [date], weekly: [{ week_start, right, seen }], today: { left, answered } },
   feedback: { to_act: [{ title, lesson_id }], waiting: number } }
 ```
@@ -213,7 +230,9 @@ Unit (`tests/unit/progress-share.test.js`, in-memory store):
 Unit (`tests/unit/progress-share-page.test.js`):
 
 - payload keys exactly match the allowlist; no `feedback`, `rubric`, `score`, `code`, `text`, `name` (other than `first_name`) at any depth
-- burst detection: 5 ticks in 4 minutes → one burst label; 2 ticks → none; quiz and teacher marks excluded
+- burst detection: 5 ticks in 4 minutes → one burst label; 2 ticks → none; quiz and teacher marks excluded; re-ticks count
+- tick record: tick → untick → tick gives three events and the row keeps the first tick's time; a pre-existing done record with no log reads as one tick; a repeat `done` adds no event; a failed log write leaves the tick in place
+- the student's own `progress` payload is unchanged (snapshot of keys)
 - planned date appears when the calendar has the lesson
 
 Browser (`tests/browser/progress-share.spec.mjs`, desktop and 390px):
