@@ -87,6 +87,8 @@
 
 **V13 · Sheet appended beside its backdrop, not inside it.** **Seen:** Travel journal delete, share, trash and annotation sheets (17/10/26): `anchor.append(back, sheet)` made the sheet a sibling of `.sheet-back` (z-index 50) and the backdrop's click handler closed with no target check, so the first tap anywhere on the sheet closed it. **Rule:** The sheet goes inside its backdrop (`back.append(sheet)`), and the backdrop closes only when `event.target === back`. Journal overlays mount through `presentJournalOverlay` (`apps/travel/src/journal/overlay-host.ts`), which does both. **Check:** with the sheet open, clicking a control inside it leaves the sheet open; clicking the dim area closes it.
 
+**V14 · A placeholder that reads as a failed load.** **Seen:** Travel journal day map preview (15/11/26): by design it was a plain drawing (dots and lines on a beige box, no streets), so on a phone it read as a map that had not loaded and was reported as broken. **Rule:** A stand-in for media (map, photo, chart) either is the real thing in small form, a saved picture where a live one is too heavy, or is styled and labelled so nobody can take it for a failed load. Keep the plain drawing only as the fallback when the real thing cannot load. **Check:** in a browser at 390 with tiles reachable, the day preview has `.has-picture` and an `img` with `naturalWidth > 0`; with WebGL or tiles missing it keeps the drawing; `apps/travel/tests/unit/day-map-picture.test.ts` stays green.
+
 ## R: Responsive
 
 **R1 · Phone DOM at desktop, or desktop DOM at phone.** **Seen:** Goals runway (G-43). **Rule:** When JS renders different DOM per breakpoint, re-render via a `matchMedia` listener; CSS alone isn't enough. **Check:** resize 390 → 1440 → 390 without reloading.
