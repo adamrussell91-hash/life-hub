@@ -220,7 +220,7 @@ function warmSchedule(store) {
 }
 
 /** The student's own unit: their lessons, the map's rows, each lesson's published copy and the markbook load. */
-async function unitState(store, roster, student, t = untimed) {
+export async function unitState(store, roster, student, t = untimed) {
   const classId = roster.cls.id;
   // None of the three needs another, so they load side by side.
   const unit = await t.time('unit', () => classUnit(store, roster.cls));
