@@ -213,6 +213,8 @@ export function presentJournalOverlay(
         pendingPops.push(token);
         history.back();
         setTimeout(() => {
+          // The page may be gone by now (a test's window, or a closed tab): nothing left to settle.
+          if (typeof history === 'undefined') return;
           const idx = pendingPops.indexOf(token);
           if (idx < 0) return;
           pendingPops.splice(idx, 1);

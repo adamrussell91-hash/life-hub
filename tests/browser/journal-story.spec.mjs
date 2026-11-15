@@ -781,6 +781,98 @@ test('journal map (390px): the Map view walks the trip, and still works when the
   }
 });
 
+test('journal relive (390px): starts only on the tap, steps by tap and key, and Back closes it', { skip: !hasTravelBuild }, async () => {
+  // Two weeks after the invented trip ended.
+  const { context, page, errors } = await openStory(browser, { width: 390, height: 844 }, {}, undefined, { trip: storyTrip(), now: '2026-05-20T10:00:00Z' });
+  try {
+    await page.route('https://tiles.openfreemap.org/**', (route) => route.abort());
+    await page.locator('[data-story-view="map"]').click();
+    const start = page.locator('.trip-map__relive');
+    await start.waitFor();
+    // Nothing plays by itself.
+    await page.waitForTimeout(600);
+    assert.equal(await page.locator('.relive').count(), 0);
+    assert.ok((await box(page, '.trip-map__relive')).height >= 43.5, 'Relive is at least 44px');
+    const hashBefore = await page.evaluate(() => location.hash);
+
+    await start.click();
+    const relive = page.locator('.relive');
+    await relive.waitFor();
+    assert.equal(await relive.getAttribute('data-relive-scene'), 'arrive');
+    assert.match(await page.locator('.relive__eyebrow').innerText(), /arriving in/i);
+
+    // Pause, so the test moves it and nothing else does.
+    await page.getByRole('button', { name: 'Pause' }).click();
+    await page.getByRole('button', { name: 'Play' }).waitFor();
+    const small = await page.evaluate(() => [...document.querySelectorAll('.relive__btn')]
+      .filter((n) => !n.hidden && (n.getBoundingClientRect().height < 43.5 || n.getBoundingClientRect().width < 43.5)).length);
+    assert.equal(small, 0, 'Pause and Close are at least 44px');
+    assert.equal(await overflowX(page), 0);
+
+    // Tap the right of the screen for the next scene, the left for the one before.
+    await page.mouse.click(300, 300);
+    assert.equal(await relive.getAttribute('data-relive-scene'), 'moment');
+    assert.match(await page.locator('.relive__meta').innerText(), /^Day 1 · /);
+    await page.waitForFunction(() => ['plain', 'none', 'map'].includes(document.querySelector('.relive')?.getAttribute('data-map-state')), null, { timeout: 15000 });
+    const drawn = (await relive.getAttribute('data-map-state')) !== 'none';
+    await page.waitForTimeout(1300);
+    const card = await box(page, '.relive__card');
+    assert.ok(card.bottom <= 844 + 1 && card.top >= 0, 'the card is on the screen');
+    if (drawn) {
+      // The map has a real height (S7), and the pin this photo came from is above the card, not under it (W15).
+      assert.ok((await box(page, '.relive__map')).height >= 843, 'the map fills the screen');
+      const pin = await box(page, '.relive .trip-pin.is-on');
+      assert.ok(pin.bottom <= card.top, `the current pin (${pin.bottom}) is above the card (${card.top})`);
+    }
+    assert.equal(await overflowX(page), 0);
+    await page.mouse.click(40, 300);
+    assert.equal(await relive.getAttribute('data-relive-scene'), 'arrive');
+
+    // Arrow keys step too. Paused, it stays where it is put.
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await relive.getAttribute('data-relive-scene'), 'moment');
+    await page.waitForTimeout(3600);
+    assert.equal(await relive.getAttribute('data-relive-scene'), 'moment', 'paused: it does not move on');
+
+    // To the end: the counts, Play again, and no Pause left to press.
+    for (let i = 0; i < 40 && (await relive.getAttribute('data-relive-scene')) !== 'end'; i += 1) await page.keyboard.press('ArrowRight');
+    assert.equal(await relive.getAttribute('data-relive-scene'), 'end');
+    // The invented trip is over: its four days are counted, though only three have a moment.
+    assert.match(await page.locator('.relive__counts').innerText(), /^4 days · 2 cities · /);
+    assert.ok((await box(page, '.relive__again')).height >= 43.5, 'Play again is at least 44px');
+    if (drawn) {
+      // The whole trip is back in view above the card.
+      await page.waitForTimeout(1300);
+      const endCard = await box(page, '.relive__card');
+      const hidden = await page.evaluate((top) => [...document.querySelectorAll('.relive .trip-pin')].filter((p) => {
+        const r = p.getBoundingClientRect();
+        return r.top < 0 || r.left < 0 || r.right > innerWidth || r.bottom > top;
+      }).length, endCard.top);
+      assert.equal(hidden, 0, 'every pin is on screen above the last card');
+    }
+    assert.equal(await page.locator('.relive__btn:not([hidden])').count(), 1, 'only Close is left at the end');
+    assert.equal(await overflowX(page), 0);
+    await page.locator('.relive__again').click();
+    assert.equal(await relive.getAttribute('data-relive-scene'), 'arrive');
+
+    // Back closes it, on the Map view, with the hash as it was (R7).
+    await page.goBack();
+    await relive.waitFor({ state: 'detached' });
+    assert.equal(await page.evaluate(() => location.hash), hashBefore);
+    assert.equal(await page.locator('[data-trip-map]').count(), 1);
+
+    // Escape closes it too.
+    await page.locator('.trip-map__relive').click();
+    await relive.waitFor();
+    await page.keyboard.press('Escape');
+    await relive.waitFor({ state: 'detached' });
+    assert.equal(await page.evaluate(() => location.hash), hashBefore);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test('journal story (390px): a ribbon day jumps to that day', { skip: !hasTravelBuild }, async () => {
   const { context, page } = await openStory(browser, { width: 390, height: 844 });
   try {

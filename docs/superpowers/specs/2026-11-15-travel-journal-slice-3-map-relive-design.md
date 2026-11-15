@@ -55,7 +55,8 @@ It is the same map, full screen, playing the trip from the first stop to the las
 - **Moments with no place** still play, as a card over the map where it stands.
 - **Between cities.** The route runs to the next city along the dashed line, with the journey named ("Lisbon to Porto, by train"). A ticket kept from a booking is shown with it.
 - **Keepsakes** kept with a moment are shown with that moment.
-- **The end.** The map draws back to the whole trip, with the stamps and the counts: days, cities, photos, keepsakes.
+- **The end.** The map draws back to the whole trip, with the stamps and the counts: days, cities, photos, keepsakes. The days are the trip's full length once it is over. While it is under way they run from the first journaled day to the last, so a day spent travelling with nothing written still counts.
+- **The card and the map.** The card covers the lower part of the screen, so each stop is centred in the map that is left above it, never under the photo. The map's credit line moves to the top for the same reason.
 
 **Controls.**
 
@@ -94,6 +95,8 @@ MapLibre cannot run in the unit test environment, so `trip-map.ts` takes the lib
 | C12 | No colour handed to MapLibre is a CSS variable |
 | M1, M3 | Relive only moves when it is playing. With reduced motion nothing eases |
 | P4 | Relive is not drawn until it is built |
+| S7 | Relive's map has a real height in a browser. Its size rule outranks MapLibre's own |
+| W15 | With a card up, the current pin is above the card. The last scene shows every pin |
 
 ## Order of work
 

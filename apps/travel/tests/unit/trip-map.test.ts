@@ -22,6 +22,7 @@ function fakeLibrary(mode: 'ok' | 'throws' = 'ok') {
     filters = new Map<string, unknown>();
     eases: Array<Record<string, unknown>> = [];
     fits: unknown[] = [];
+    fitOptions: Array<Record<string, unknown>> = [];
     style: unknown;
     removed = false;
     resized = 0;
@@ -46,7 +47,7 @@ function fakeLibrary(mode: 'ok' | 'throws' = 'ok') {
     getSource(id: string) { return this.sources.has(id) ? { setData() {} } : undefined; }
     setFilter(layer: string, filter: unknown) { this.filters.set(layer, filter); }
     setStyle(style: unknown) { this.style = style; this.sources.clear(); this.layers = []; }
-    fitBounds(bounds: unknown) { this.fits.push(bounds); }
+    fitBounds(bounds: unknown, options: Record<string, unknown> = {}) { this.fits.push(bounds); this.fitOptions.push(options); }
     easeTo(options: Record<string, unknown>) { this.eases.push(options); }
     getZoom() { return 6; }
     getCanvasContainer() { return this.container; }
@@ -73,14 +74,16 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-function mount(mode: 'ok' | 'throws' = 'ok', reducedMotion = false) {
+function mount(mode: 'ok' | 'throws' = 'ok', reducedMotion = false, inset?: () => { top: number; bottom: number }) {
   const { lib, maps } = fakeLibrary(mode);
   const host = document.createElement('div');
+  // The test page lays nothing out, so the map is told its height.
+  Object.defineProperty(host, 'clientHeight', { value: 664 });
   document.body.append(host);
   const states: TripMapState[] = [];
   const picks: number[] = [];
   const handle = mountTripMap(host, {
-    lib, stops: tripStops.stops, segments: tripStops.segments, colors, reducedMotion,
+    lib, stops: tripStops.stops, segments: tripStops.segments, colors, reducedMotion, inset,
     onPick: (i) => picks.push(i), onState: (s) => states.push(s),
   });
   return { handle, map: maps[0]!, host, states, picks };
@@ -122,6 +125,33 @@ describe('mountTripMap', () => {
     handle.showAll();
     expect(pins.some((p) => p.classList.contains('is-on'))).toBe(false);
     expect(JSON.stringify(map.filters.get('trip-route-city'))).toContain(`"toIndex"],${tripStops.stops.length}]`);
+  });
+
+  it('centres a stop in the part of the map nothing covers, and fits the whole trip into it', () => {
+    const { handle, map } = mount('ok', false, () => ({ top: 64, bottom: 300 }));
+    map.fire('load');
+    handle.select(2);
+    // Shifted up by half the difference, and never as padding: that would stay on the map and count twice.
+    expect(map.eases.at(-1)).toMatchObject({ offset: [0, -118] });
+    expect(map.eases.at(-1)).not.toHaveProperty('padding');
+    handle.showAll();
+    expect(map.fitOptions.at(-1)).toMatchObject({ padding: { top: 120, bottom: 356, left: 44, right: 44 } });
+  });
+
+  it('never lets a cover leave no map to centre in', () => {
+    const { handle, map } = mount('ok', false, () => ({ top: 64, bottom: 2000 }));
+    map.fire('load');
+    handle.select(0);
+    // 664 high: at least 96 stays clear, so the bottom cover counts for 504 at most.
+    expect(map.eases.at(-1)).toMatchObject({ offset: [0, (64 - 504) / 2] });
+  });
+
+  it('leaves the stop in the middle when nothing covers the map', () => {
+    const { handle, map } = mount();
+    map.fire('load');
+    handle.select(2);
+    expect(map.eases.at(-1)).not.toHaveProperty('offset');
+    expect(map.fitOptions[0]).toMatchObject({ padding: { top: 56, bottom: 56 } });
   });
 
   it('does not ease with reduced motion', () => {
@@ -276,7 +306,6 @@ describe('the Map view in the journal', () => {
     renderJournal(root, { fixture: lisbonPortoJournal('trp_testlisbon01'), trip: testTrip as unknown as Trip, today: '2027-03-20', mapLibrary: lib });
     const views = [...root.querySelectorAll('[data-story-view]')].map((b) => b.getAttribute('data-story-view'));
     expect(views).toEqual(['story', 'photos', 'keepsakes', 'map']);
-    expect(root.textContent).not.toMatch(/Relive/); // not built yet, so not drawn
 
     (root.querySelector('[data-story-view="map"]') as HTMLButtonElement).click();
     expect(root.querySelector('[data-story-showing]')?.getAttribute('data-story-showing') ?? root.getAttribute('data-story-showing')).toBe('map');

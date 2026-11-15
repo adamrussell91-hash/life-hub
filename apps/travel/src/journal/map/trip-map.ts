@@ -56,6 +56,11 @@ export interface TripMapOptions {
   colors: { line: string; plain: string };
   reducedMotion: boolean;
   styleUrl?: string;
+  /**
+   * Space at the top and bottom that something else covers (Relive's card).
+   * A stop is centred in what is left, so its pin is never under the card.
+   */
+  inset?: () => { top: number; bottom: number };
   /** A pin was tapped. */
   onPick: (index: number) => void;
   onState: (state: TripMapState) => void;
@@ -160,14 +165,34 @@ export function mountTripMap(host: HTMLElement, options: TripMapOptions): TripMa
     live.setFilter(JOURNEY_LAYER, ['all', ['==', ['get', 'kind'], 'journey'], ['<=', ['get', 'toIndex'], upTo]]);
   }
 
+  /** The covered space, kept small enough that some map is always left to centre in. */
+  function covered(): { top: number; bottom: number } | null {
+    if (!options.inset) return null;
+    const { top, bottom } = options.inset();
+    const height = host.clientHeight || 0;
+    const most = Math.max(0, height - 96);
+    const safeTop = Math.max(0, Math.min(top, most));
+    return { top: safeTop, bottom: Math.max(0, Math.min(bottom, most - safeTop)) };
+  }
+
   function fitAll(animate: boolean): void {
     const bounds = stopsBounds(stops);
     if (!bounds) return;
+    const over = covered();
     if (stops.length === 1) {
-      live.easeTo({ center: [stops[0]!.lon, stops[0]!.lat], zoom: 13, duration: 0 });
+      live.easeTo({
+        center: [stops[0]!.lon, stops[0]!.lat],
+        zoom: 13,
+        duration: 0,
+        ...(over ? { offset: [0, (over.top - over.bottom) / 2] } : {}),
+      });
       return;
     }
-    live.fitBounds(bounds, { padding: { top: 56, bottom: 56, left: 44, right: 44 }, maxZoom: 14, duration: animate && !options.reducedMotion ? 900 : 0 });
+    live.fitBounds(bounds, {
+      padding: { top: 56 + (over?.top ?? 0), bottom: 56 + (over?.bottom ?? 0), left: 44, right: 44 },
+      maxZoom: 14,
+      duration: animate && !options.reducedMotion ? 900 : 0,
+    });
   }
 
   /** The route and pins, added once the map has a style to add them to. */
@@ -249,10 +274,13 @@ export function mountTripMap(host: HTMLElement, options: TripMapOptions): TripMa
     drawRouteUpTo(index);
     if (!routeReady) return;
     const stop = stops[index]!;
+    const over = covered();
     live.easeTo({
       center: [stop.lon, stop.lat],
       zoom: Math.max(live.getZoom(), 13.5),
       duration: animate && !options.reducedMotion ? 900 : 0,
+      // An offset, not padding: padding given to easeTo stays on the map and would then count twice in fitAll.
+      ...(over ? { offset: [0, (over.top - over.bottom) / 2] } : {}),
     });
   }
 

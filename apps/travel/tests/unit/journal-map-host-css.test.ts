@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const journalCss = readFileSync(resolve(__dirname, '../../src/styles/journal.css'), 'utf8');
+const journalMapCss = readFileSync(resolve(__dirname, '../../src/styles/journal-map.css'), 'utf8');
 
 /** Selectors of every rule that styles an element MapLibre turns into `.maplibregl-map`. */
 function mapHostRules(css: string): { selector: string; body: string }[] {
@@ -10,7 +11,7 @@ function mapHostRules(css: string): { selector: string; body: string }[] {
   const code = css.replace(/\/\*[\s\S]*?\*\//g, '');
   for (const match of code.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     const selector = match[1]!.trim();
-    if (/__map-host\b/.test(selector)) rules.push({ selector, body: match[2]! });
+    if (/__map-host\b|\.relive__map\b/.test(selector)) rules.push({ selector, body: match[2]! });
   }
   return rules;
 }
@@ -31,5 +32,13 @@ describe('journal map hosts keep their size once MapLibre styles them', () => {
         expect(classCount(part), part.trim()).toBeGreaterThanOrEqual(2);
       }
     }
+  });
+
+  // Relive's map fills the screen behind its cards. One class left it 0px high: cards over a blank screen.
+  it('sizes the Relive map with a selector that outranks .maplibregl-map', () => {
+    const rules = mapHostRules(journalMapCss).filter((r) => /position:\s*absolute/.test(r.body) && /\.relive__map\s*$/.test(r.selector));
+    expect(rules).toHaveLength(1);
+    expect(classCount(rules[0]!.selector)).toBeGreaterThanOrEqual(2);
+    expect(rules[0]!.body).toMatch(/height:\s*100%/);
   });
 });
