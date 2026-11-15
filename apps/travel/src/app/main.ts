@@ -11,6 +11,7 @@ import '../styles/journal.css';
 import '../styles/journal-story.css';
 import '../styles/keepsakes.css';
 import '../styles/noticing.css';
+import '../styles/journal-map.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';

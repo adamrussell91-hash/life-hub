@@ -49,7 +49,11 @@ import { closeAllJournalOverlays } from '@/journal/overlay-host';
 import { onJournalSynced } from '@/journal/journal-outbox';
 import { isFixtureVersion, persistJournalPatch } from '@/journal/journal-sheet-save';
 import { createDayMapPreview } from '@/journal/map-preview';
-import { getActiveJournalDayMap } from '@/journal/map-expanded';
+import { getActiveJournalDayMap, resolveCssColor } from '@/journal/map-expanded';
+import { Map as MapLibreMap, Marker as MapLibreMarker } from '@/lib/maplibre';
+import { renderMapView, type MapViewHandle } from '@/journal/map/map-view';
+import { buildTripStops } from '@/journal/map/stops';
+import type { MapLibrary } from '@/journal/map/trip-map';
 import { openTrashView } from '@/journal/trash-view';
 import { openJournalSearch } from '@/journal/search-sheet';
 import { openJournalShareSheet } from '@/journal/share-sheet';
@@ -115,7 +119,7 @@ import { ICONS, button, el } from '@/journal/story/dom';
 
 const LAST_VIEW_KEY = (tripId: string) => `lifehub.travel.journal.lastView.${tripId}`;
 /** Views that are built. Keepsakes joins when it ships; nothing is offered before it works. */
-const STORY_VIEWS: StoryView[] = ['story', 'photos', 'keepsakes'];
+const STORY_VIEWS: StoryView[] = ['story', 'photos', 'keepsakes', 'map'];
 export const COVER_PREF_KEY = 'cover_media_id';
 
 export interface RenderJournalOptions {
@@ -142,6 +146,8 @@ export interface RenderJournalOptions {
   tickWish?: (taskId: string) => Promise<unknown>;
   /** The hour of the day in the trip's current city, for tests. */
   localHour?: number;
+  /** The map library, replaced in tests (MapLibre needs a graphics context). */
+  mapLibrary?: MapLibrary;
 }
 
 function scrollBehaviorFor(root: ParentNode): ScrollBehavior {
@@ -1383,9 +1389,59 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     }
   }
 
+  // ---- The Map view ------------------------------------------------------------
+
+  let mapView: MapViewHandle | null = null;
+  /** What the map was built from, so a repaint that changes nothing on it leaves it alone. */
+  let mapSignature = '';
+  /** Where the slider is: 0 for the whole trip, then the stops. Kept when the view is left and returned to. */
+  let mapPosition = 0;
+
+  function paintMapView(): void {
+    const trip = buildTripStops(liveFixture, orderedMoments, dayNo);
+    const signature = JSON.stringify([trip.unplaced, trip.stops.map((s) => [s.momentId, s.lat, s.lon, s.localTime, s.placeName, s.mediaId, s.text])]);
+    if (mapView && signature === mapSignature && story.contains(mapView.el)) return;
+    mapView?.destroy();
+    mapSignature = signature;
+    mapPosition = Math.min(mapPosition, trip.stops.length);
+    const legs = legsById();
+    const view = renderMapView({
+      lib: opts.mapLibrary ?? ({ Map: MapLibreMap, Marker: MapLibreMarker } as unknown as MapLibrary),
+      trip,
+      cityCount: new Set(trip.stops.map((s) => s.legId)).size,
+      position: mapPosition,
+      // MapLibre cannot read CSS variables: resolve the tokens first.
+      colors: { line: resolveCssColor(root, '--navy', '#17375e'), plain: resolveCssColor(root, '--sand', '#f1e7d6') },
+      reducedMotion: prefersReducedMotion(root),
+      fillPhoto: (img, mediaId) => {
+        const media = mediaById.get(mediaId);
+        if (media) configureJournalImage(img, { tripId: liveFixture.trip_id, media, layout: 'pair', eager: true });
+      },
+      sunsetFor: (stop) => sunsetLocal(stop.lat, stop.lon, stop.localDate, legs.get(stop.legId)?.timezone || 'UTC'),
+      onOpenMoment: (momentId) => {
+        setView('story');
+        rebuild(true, momentId);
+        scrollToChapter(momentId, root, opts.onChapterJump);
+      },
+      onPosition: (position) => {
+        mapPosition = position;
+      },
+    });
+    mapView = view;
+    story.replaceChildren(view.el);
+    // The map measures itself when made; it is only in the page now.
+    requestAnimationFrame(() => view.resize());
+  }
+
   function paintView(): void {
-    story.replaceChildren();
     root.setAttribute('data-story-showing', view);
+    if (view === 'map') {
+      paintMapView();
+      return;
+    }
+    mapView?.destroy();
+    mapView = null;
+    story.replaceChildren();
     if (view === 'photos') {
       const legs = legsById();
       story.append(
@@ -1444,7 +1500,10 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     // Start the new view at its top, unless the cover is still on screen.
     const win = root.ownerDocument?.defaultView;
     const viewTop = coverHost.getBoundingClientRect().bottom + (win?.scrollY ?? 0);
-    if (win && win.scrollY > viewTop) win.scrollTo({ top: viewTop, behavior: 'auto' });
+    if (win && view === 'map') {
+      // The map fills the screen under the ribbon, so bring the ribbon to the top.
+      win.scrollTo({ top: ribbonHost.getBoundingClientRect().top + win.scrollY, behavior: 'auto' });
+    } else if (win && win.scrollY > viewTop) win.scrollTo({ top: viewTop, behavior: 'auto' });
     syncCurrentDay();
   }
 
@@ -1527,6 +1586,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
 
   cleanups.push(() => {
     getActiveJournalDayMap()?.destroy();
+    mapView?.destroy();
   });
 
   const storedId = (() => {

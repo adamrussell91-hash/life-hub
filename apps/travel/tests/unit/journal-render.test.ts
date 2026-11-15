@@ -116,7 +116,7 @@ describe('renderJournal', () => {
     const root = document.createElement('div');
     renderJournal(root, { fixture: klIstanbulFixture() });
     const views = [...root.querySelectorAll('[data-story-view]')].map((b) => b.getAttribute('data-story-view'));
-    expect(views).toEqual(['story', 'photos', 'keepsakes']);
+    expect(views).toEqual(['story', 'photos', 'keepsakes', 'map']);
     expect(root.textContent).not.toMatch(/Relive|noticed/i);
   });
 
