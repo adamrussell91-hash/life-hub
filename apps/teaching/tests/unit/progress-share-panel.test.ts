@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { mountProgressSharePanel, type ShareRow } from '@/teacher/sections/progress-share-panel';
 
+const askConfirmCard = vi.fn(() => Promise.resolve(true));
+vi.mock('@/teacher/confirm-dialog', () => ({ askConfirmCard: (...args: unknown[]) => askConfirmCard(...(args as [])) }));
+
 const row = (over: Partial<ShareRow> = {}): ShareRow => ({ token: 'Abc123_-Abc123_-Abc123_-', student_id: 'st_a', initials: 'PT', made_at: '2026-11-15T01:00:00Z', opened_at: null, pin: '123456', pin_used_at: null, devices: 0, ...over });
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
@@ -52,9 +55,9 @@ describe('progress share panel', () => {
     host.querySelector<HTMLButtonElement>('[aria-label="Make a new PIN for PT"]')!.click();
     await flush();
     expect(host.textContent).toContain('PIN 654321');
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     host.querySelector<HTMLButtonElement>('[aria-label="Remove PT’s link"]')!.click();
     await flush();
+    expect(askConfirmCard).toHaveBeenCalled();
     expect(api.remove).toHaveBeenCalledWith('class1', 'Abc123_-Abc123_-Abc123_-');
     expect(host.textContent).toContain('No links yet.');
   });

@@ -1,5 +1,6 @@
 import { apiPost } from '@/api/client';
 import { studentSiteOrigin } from '@/app/class-site';
+import { askConfirmCard } from '@/teacher/confirm-dialog';
 
 /**
  * Progress share links for one student, on the class student list: a private link plus a
@@ -84,9 +85,13 @@ export function mountProgressSharePanel(host: HTMLElement, options: ProgressShar
         const remove = el('button', 'btn btn--ghost', 'Remove');
         remove.type = 'button';
         remove.setAttribute('aria-label', `Remove ${s.initials}’s link`);
-        remove.addEventListener('click', () => {
-          if (!window.confirm(`Remove ${s.initials}’s link to ${studentName}’s progress? It stops working at once.`)) return;
-          void run(() => api.remove(classId, s.token), `${s.initials}’s link is removed.`);
+        remove.addEventListener('click', async () => {
+          const sure = await askConfirmCard({
+            title: `Remove ${s.initials}’s link?`,
+            supporting: `It stops working at once, on every browser. You can make a new link for ${studentName} later.`,
+            confirmLabel: 'Remove link'
+          });
+          if (sure) void run(() => api.remove(classId, s.token), `${s.initials}’s link is removed.`);
         });
         li.append(copy, fresh, remove);
         return li;

@@ -2,7 +2,7 @@
 
 Date: 15 November 2026
 Hub: Teaching
-Status: design approved in chat, awaiting spec review
+Status: built (see `docs/superpowers/plans/2026-11-15-progress-share.md`)
 
 ## Purpose
 
@@ -102,8 +102,8 @@ A guided tour of the progress page, shown once per new browser, then always avai
 ### How it looks
 
 - A dimmed backdrop with a spotlight cut out around the current section (rounded rectangle, 8px padding). The spotlight glides between sections (transform and size, 300ms ease-out); the page scrolls the section into view first (`scrollIntoView({ block: 'center', behavior: 'smooth' })`).
-- An explainer card beside the spotlight: a step title, one or two sentences, step dots ("3 of 10"), and **Back**, **Next** (**Done** on the last step) and **Skip tour**. Positioned with the design kit's vendored floating-ui (`packages/design-kit/js/vendor/floating-ui`), flipping to stay on screen.
-- At 390px the card docks to the bottom of the screen at full width, with the spotlight above it, so it never covers the section it describes.
+- An explainer card beside the spotlight: a step title, one or two sentences, step dots ("3 of 10"), and **Back**, **Next** (**Done** on the last step) and **Skip tour**. Positioned by the tour itself: below the section, else above it, clamped to the screen.
+- At 390px the card docks to the bottom of the screen at full width, with the spotlight above it, so it never covers the section it describes. While it is open the page gets bottom room so the last sections can scroll above the card, and every section has a `scroll-margin-top` that clears the class site's sticky header.
 - Keyboard: focus moves into the card; Right/Enter = Next, Left = Back, Esc = Skip. Focus is trapped in the card while it is open and returns to the Help button afterwards. The card is `role="dialog"` with `aria-modal="true"`, labelled by its title; step changes are announced via its live region.
 - The page underneath is `inert` while the tour runs.
 
@@ -136,20 +136,20 @@ With `prefers-reduced-motion: reduce`, the spotlight jumps instead of gliding an
 
 ### Code
 
-- `apps/teaching/src/toolkit/tour.ts` + `tour.css`: a generic `mountTour({ steps, helpButton, storageKey })` where each step is `{ target?: () => HTMLElement | null, title, body }`. It returns `{ start(), dispose() }`. Nothing in it knows about progress shares, so other pages can reuse it.
-- `share-view.ts` builds the steps and owns the Help button.
+- `apps/teaching/src/app/tour.ts` + `tour.css`: a generic `mountTour({ steps, helpButton, storageKey })` where each step is `{ target?: () => HTMLElement | null, title, body }`. It returns `{ start(), dispose() }`. Nothing in it knows about progress shares, so other pages can reuse it.
+- `share-view.ts` builds the steps (`mountShareTour`).
 
 ## Read-only lessons
 
 A lesson link from the share page opens `/teaching/s/share/<token>/lessons/<lessonId>`.
 
-- The server checks the lesson is in the student's current unit list (the same `lessonsForStudent` result the page uses). Other lesson ids get the 404 page.
+- The page payload carries `lesson_ids` (the student's own `lessonsForStudent` list). The lesson view opens only those, and otherwise says the lesson isn't on the student's list. Published lessons are already public at `/s/lessons/<id>`, so a separate server check would add no protection.
 - It shows the **published student content**: the same `renderPublishedLesson` output a student sees. Teacher notes, Teacher callouts and teacher-only blocks stay out, because the published copy already strips them. No answer keys are added.
 - It is locked:
   - the lesson content root gets the `inert` attribute, so nothing in it can be clicked, typed in or focused
-  - the view mounts in a `viewer` mode that skips anything that writes or claims: work sync, the lesson footer tick, the initials token, the organiser end card, class examples, live quiz joining, pulses
+  - the lesson renders through `renderLockedLesson` (`share-lesson.ts`), which passes no class id to the blocks and mounts none of the student page's extras (work sync, footer tick, initials token, organiser end card, class examples, live quiz, pulses), so nothing saves or claims
   - a banner across the top: "Viewing only. Nothing here can be changed." with a **Back to progress** link
-- Long lessons still scroll; collapsed sections render open in viewer mode so nothing is hidden behind a control the viewer can't press.
+- Long lessons still scroll; collapsed sections and every tab panel render open so nothing is hidden behind a control the viewer can't press.
 - Lecture and quiz-mode lessons render their content as a plain block list (no player).
 
 ## Server
@@ -183,17 +183,17 @@ profile/{class}/{student}/ticks/{lesson}   { events: [{ at, kind: 'tick' | 'unti
 `progress-share-page.mjs` calls `unitState`, `todoFor`, `organiserHabits`, `practiceToday`, `returnedRows` and `listDone`, then copies only these fields:
 
 ```
-{ student: { first_name }, class_title, viewer_initials,
+{ student: { first_name }, class_title, viewer_initials, lesson_ids,
   next: [{ title, lesson_id? }],
   unit: { title, core_done, core_total },
   countdowns: [{ title, due }],
   ticks: [{ lesson_id, title, at, via, planned?, record: [{ at, kind }] }],
   bursts: [{ from, to, count }],
   practice: { streak, days: [date], weekly: [{ week_start, right, seen }], today: { left, answered } },
-  feedback: { to_act: [{ title, lesson_id }], waiting: number } }
+  feedback: { to_act: [{ title, redraft }], waiting: number } }
 ```
 
-`unitState` and `progressPage` internals in `profile.mjs` are exported (or a narrow wrapper added) so the share page reuses them without copying.
+`unitState` in `profile.mjs` is exported so the share page reuses it without copying.
 
 Rate limit on the public route matches `published-profile.mjs`. Bodies over 4000 bytes are refused.
 
@@ -203,7 +203,8 @@ Rate limit on the public route matches `published-profile.mjs`. Bodies over 4000
 |---|---|
 | `apps/teaching/src/student/share-view.ts` + `share-view.css` | Sign-in form and the progress page |
 | `apps/teaching/src/student/share-lesson.ts` | Read-only lesson wrapper |
-| `apps/teaching/src/student/lesson-view.ts` | `viewer: true` option that skips the writing parts listed above |
+| `apps/teaching/src/student/share-format.ts`, `share-api.ts` | Sydney times, burst labels; the client calls |
+| `apps/teaching/src/app/tour.ts` + `tour.css` | The explainer tour |
 | `apps/teaching/src/app/router.ts`, `main.ts`, `class-site.ts` | Routes `share` and `share-lesson` under `/s/` |
 | `apps/teaching/src/teacher/sections/class-students.ts` | Progress share button and panel |
 
