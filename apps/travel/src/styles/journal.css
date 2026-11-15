@@ -159,6 +159,60 @@
   line-height: 1.3;
 }
 
+/* A saved picture of the day's streets, with the stops drawn on top at the same scale. */
+.journal-day__map-preview.has-picture {
+  position: relative;
+  overflow: hidden;
+}
+
+.journal-day__map-preview .journal-day__map-preview-picture,
+.journal-day__map-preview .journal-day__map-preview-route {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.journal-day__map-preview .journal-day__map-preview-picture {
+  display: block;
+  object-fit: cover;
+}
+
+.journal-day__map-preview .journal-day__map-preview-route {
+  color: var(--high-sea, #f68620);
+}
+
+.journal-day__map-preview .journal-day__map-preview-route path {
+  stroke-width: 3;
+  opacity: 0.9;
+}
+
+.journal-day__map-preview .journal-day__map-preview-route circle {
+  stroke-width: 2;
+}
+
+.journal-day__map-preview .journal-day__map-preview-credit {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-2);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-xs);
+  background: rgba(251, 248, 242, 0.8);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.journal-day__map-preview.has-picture .journal-day__map-preview-label {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: rgba(251, 248, 242, 0.88);
+}
+
 @media (min-width: 720px) {
   .journal-day__map-preview {
     min-height: 128px;

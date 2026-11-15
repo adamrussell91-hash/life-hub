@@ -6,6 +6,13 @@ import {
   type MapSegment,
 } from '@/journal/map-connections';
 import { openJournalDayMap, type JournalDayMapHandle } from '@/journal/map-expanded';
+import {
+  createDayMapPicturer,
+  idbDayMapPictureStore,
+  type DayMapPicture,
+  type DayMapPicturer,
+  type PictureMapLibrary,
+} from '@/journal/day-map-picture';
 
 const SCHEMATIC_W = 320;
 const SCHEMATIC_H = 72;
@@ -66,10 +73,17 @@ export function layoutPhotoStopSchematic(
   return { points, paths };
 }
 
-function schematicSvg(layout: SchematicLayout): SVGSVGElement {
+function schematicSvg(
+  layout: SchematicLayout,
+  view: { width: number; height: number; className: string } = {
+    width: SCHEMATIC_W,
+    height: SCHEMATIC_H,
+    className: 'journal-day__map-preview-schematic',
+  },
+): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('class', 'journal-day__map-preview-schematic');
-  svg.setAttribute('viewBox', `0 0 ${SCHEMATIC_W} ${SCHEMATIC_H}`);
+  svg.setAttribute('class', view.className);
+  svg.setAttribute('viewBox', `0 0 ${view.width} ${view.height}`);
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
 
@@ -99,6 +113,58 @@ function schematicSvg(layout: SchematicLayout): SVGSVGElement {
   return svg;
 }
 
+let sharedPicturer: DayMapPicturer | null = null;
+
+/** One hidden map for every day's picture, started only when a day first needs one. */
+function dayMapPicturer(): DayMapPicturer {
+  sharedPicturer ??= createDayMapPicturer({
+    loadLibrary: async () => (await import('@/lib/maplibre')) as unknown as PictureMapLibrary,
+    store: idbDayMapPictureStore(),
+  });
+  return sharedPicturer;
+}
+
+export function __setDayMapPicturerForTests(picturer: DayMapPicturer | null): void {
+  sharedPicturer = picturer;
+}
+
+/** Ask for the picture once the day is near the screen, not for every day on open. */
+function whenNearScreen(el: HTMLElement, run: () => void): void {
+  if (typeof IntersectionObserver === 'undefined') return;
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      observer.disconnect();
+      run();
+    },
+    { rootMargin: '400px 0px' },
+  );
+  observer.observe(el);
+}
+
+/** Streets under the stops: the picture, then the route and stops where the map put them. */
+function showPicture(btn: HTMLButtonElement, schematic: SVGSVGElement, picture: DayMapPicture): void {
+  const img = document.createElement('img');
+  img.className = 'journal-day__map-preview-picture';
+  img.alt = '';
+  img.decoding = 'async';
+  img.src = picture.url;
+  const route = schematicSvg(
+    { points: picture.points, paths: picture.paths },
+    { width: picture.width, height: picture.height, className: 'journal-day__map-preview-route' },
+  );
+  // Scales with the picture's own object-fit: cover, so the stops stay on their streets.
+  route.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+  for (const stop of route.querySelectorAll('circle')) stop.setAttribute('r', '5');
+  const credit = document.createElement('span');
+  credit.className = 'journal-day__map-preview-credit';
+  credit.setAttribute('aria-hidden', 'true');
+  credit.textContent = '© OpenMapTiles © OpenStreetMap';
+  schematic.replaceWith(img, route);
+  btn.append(credit);
+  btn.classList.add('has-picture');
+}
+
 export interface CreateDayMapPreviewOptions {
   moments: JournalMoment[];
   dayId: string;
@@ -108,7 +174,11 @@ export interface CreateDayMapPreviewOptions {
   onClose?: () => void;
 }
 
-/** One accessible preview control per day (static schematic, no WebGL). */
+/**
+ * One accessible preview control per day: a saved picture of the day's streets
+ * with its stops on top, or a plain drawing of the stops when there is none.
+ * No live map runs in the story.
+ */
 export function createDayMapPreview(options: CreateDayMapPreviewOptions): HTMLButtonElement {
   const stops = buildPhotoStops(options.moments);
   const segments = buildSegments(stops, { steps: 12, wrapLongitude: true });
@@ -124,7 +194,20 @@ export function createDayMapPreview(options: CreateDayMapPreviewOptions): HTMLBu
   label.className = 'journal-day__map-preview-label';
   label.textContent = 'Open photo stops for this day';
 
-  btn.append(schematicSvg(layout), label);
+  const schematic = schematicSvg(layout);
+  btn.append(schematic, label);
+
+  if (stops.length) {
+    whenNearScreen(btn, () => {
+      const request = { stops, segments, width: btn.clientWidth, height: btn.clientHeight };
+      void dayMapPicturer()
+        .picture(request)
+        .then((picture) => {
+          if (picture && btn.isConnected && schematic.isConnected) showPicture(btn, schematic, picture);
+        })
+        .catch(() => undefined);
+    });
+  }
 
   btn.addEventListener('click', () => {
     const handle = openJournalDayMap({
