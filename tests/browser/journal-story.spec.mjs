@@ -83,13 +83,13 @@ function storyJournal() {
     ],
     moments: [
       moment('mom_arch', 'leg_a', '2026-05-02', 1, '09:40', 'Into the light off the airport metro.',
-        { media_ids: ['med_arch'], place: { name: 'Praça do Exemplo', lat: 38.7075, lon: -9.1364 } }),
+        { media_ids: ['med_arch'], place: { name: 'Praça do Exemplo' }, coordinates: { lat: 38.7075, lon: -9.1364 } }),
       moment('mom_two', 'leg_a', '2026-05-02', 2, '11:15', 'Two frames of the same tram.',
-        { media_ids: ['med_tram', 'med_cafe'], place: { name: 'Rua Inventada', lat: 38.7139, lon: -9.1334 } }),
+        { media_ids: ['med_tram', 'med_cafe'], place: { name: 'Rua Inventada' }, coordinates: { lat: 38.7139, lon: -9.1334 } }),
       moment('mom_words', 'leg_a', '2026-05-03', 1, '21:30', 'Nobody spoke for an hour. Words only, no photo.'),
       moment('mom_partner', 'leg_a', '2026-05-03', 2, '22:10', 'Partner writes one line.', { author: 'partner' }),
       moment('mom_bridge', 'leg_b', '2026-05-04', 1, '17:20', 'Across the top deck at dusk.',
-        { media_ids: ['med_bridge'], place: { name: 'Ponte de Exemplo', lat: 41.1400, lon: -8.6094 } })
+        { media_ids: ['med_bridge'], place: { name: 'Ponte de Exemplo' }, coordinates: { lat: 41.1400, lon: -8.6094 } })
     ],
     media: [
       photo('med_arch', 'arch', 1200, 800),
@@ -711,6 +711,70 @@ test('journal noticing (390px): a bucket list wish is offered in the evening and
     assert.equal(state.kept['wish:tsk_spec:mom_two'].ticked, true);
     assert.deepEqual(state.asked.wishes, ['2026-05-03']);
     assert.equal(asks.length, 1, 'the day is not asked about twice');
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test('journal map (390px): the Map view walks the trip, and still works when the map cannot load', { skip: !hasTravelBuild }, async () => {
+  const { context, page, errors } = await openStory(browser, { width: 390, height: 844 });
+  try {
+    // The tile server cannot be reached, as on a weak signal abroad.
+    await page.route('https://tiles.openfreemap.org/**', (route) => route.abort());
+    await page.locator('[data-story-view="map"]').click();
+    const view = page.locator('[data-trip-map]');
+    await view.waitFor();
+    await page.waitForFunction(() => ['plain', 'none'].includes(document.querySelector('[data-trip-map]')?.getAttribute('data-map-state')), null, { timeout: 15000 });
+    const state = await view.getAttribute('data-map-state');
+    assert.match(await page.locator('.trip-map__notice-text').innerText(), state === 'plain' ? /could not load\. Your route is shown without it/ : /cannot draw the map/);
+    if (state === 'plain') assert.equal(await page.locator('.trip-pin').count(), 3, 'the pins are still drawn');
+
+    // Three of the five moments have a place. The other two are counted, not hidden.
+    assert.equal(await page.locator('.trip-map__unplaced').innerText(), '2 moments have no place and are not on the map');
+    const slider = page.locator('.trip-map__slider');
+    assert.equal(await slider.getAttribute('max'), '3');
+    assert.match(await slider.getAttribute('aria-valuetext'), /The whole trip, 3 stops/);
+
+    // The view fills the screen between the ribbon and the tab bar, and the dock is away.
+    const look = await page.evaluate(() => {
+      const r = (sel) => document.querySelector(sel).getBoundingClientRect();
+      const small = [...document.querySelectorAll('.trip-map__step, .trip-map__retry, .trip-map__slider')]
+        .filter((n) => n.offsetParent !== null && n.getBoundingClientRect().height < 43.5).length;
+      return {
+        viewTop: r('[data-trip-map]').top, viewBottom: r('[data-trip-map]').bottom, ribbonBottom: r('.story-ribbon').bottom,
+        barTop: r('.hub-mobile-nav').top, dock: getComputedStyle(document.querySelector('.story-dock')).display, small,
+      };
+    });
+    assert.ok(Math.abs(look.viewTop - look.ribbonBottom) <= 2, `the map starts under the ribbon (view ${look.viewTop}, ribbon ${look.ribbonBottom})`);
+    assert.ok(look.viewBottom <= look.barTop + 1, `the panel clears the tab bar (${look.viewBottom} vs ${look.barTop})`);
+    assert.equal(look.dock, 'none');
+    assert.equal(look.small, 0, 'map controls are at least 44px');
+    assert.equal(await overflowX(page), 0);
+
+    // Walk two stops. The card shows each one.
+    await page.getByRole('button', { name: 'Next stop' }).click();
+    assert.equal(await page.locator('.trip-map__card-place').innerText(), 'Praça do Exemplo');
+    assert.match(await page.locator('.trip-map__card-meta').innerText(), /Day 1 · 9:40 am/);
+    await page.getByRole('button', { name: 'Next stop' }).click();
+    assert.equal(await page.locator('.trip-map__card-place').innerText(), 'Rua Inventada');
+    assert.match(await slider.getAttribute('aria-valuetext'), /^Stop 2 of 3, Day 1, Rua Inventada$/);
+    await slider.focus();
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await page.locator('.trip-map__card-place').innerText(), 'Ponte de Exemplo');
+
+    // Leave and come back: the slider is where it was (V7).
+    await page.locator('[data-story-view="photos"]').click();
+    await page.locator('.story-grid__cell').first().waitFor();
+    await page.locator('[data-story-view="map"]').click();
+    await page.locator('[data-trip-map]').waitFor();
+    assert.equal(await page.locator('.trip-map__slider').inputValue(), '3');
+
+    // The card opens that moment in the story.
+    await page.locator('.trip-map__card').click();
+    await page.locator('#mom_bridge').waitFor();
+    assert.equal(await page.locator('[data-trip-map]').count(), 0);
+    assert.equal(await page.locator('[data-story-showing]').first().getAttribute('data-story-showing'), 'story');
     assert.deepEqual(errors, []);
   } finally {
     await context.close();

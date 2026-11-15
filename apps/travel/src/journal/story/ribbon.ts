@@ -1,6 +1,6 @@
 import { ICONS, button, el, icon } from '@/journal/story/dom';
 
-export type StoryView = 'story' | 'photos' | 'keepsakes';
+export type StoryView = 'story' | 'photos' | 'keepsakes' | 'map';
 
 export interface RibbonDay {
   /** Element id of the day section in the story. */
@@ -36,6 +36,7 @@ const VIEW_META: Record<StoryView, { label: string; paths: string | string[] }> 
   story: { label: 'Story', paths: ICONS.story },
   photos: { label: 'All photos', paths: ICONS.grid },
   keepsakes: { label: 'Keepsakes', paths: ICONS.keepsake },
+  map: { label: 'Map', paths: ICONS.map },
 };
 
 /** Sticky strip under the cover: one button per day, and the view switch. */
