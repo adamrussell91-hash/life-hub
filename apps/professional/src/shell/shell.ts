@@ -46,6 +46,9 @@ const REST: NavItem[] = [
 
 const NAV: NavItem[] = [...MAJOR_ITEMS, ...REST];
 
+/** Rail pages already on the phone bottom bar, so More skips them. */
+const ON_PHONE_BAR = new Set<RailViewId>(['home', 'people']);
+
 export function viewChrome(view: RailViewId): { eyebrow: string; title: string } {
   const item = NAV.find((entry) => entry.id === view);
   return { eyebrow: 'Professional Hub', title: item?.label ?? 'People' };
@@ -189,32 +192,13 @@ function syncMobileChrome(shellRoot: HTMLElement, active: RailViewId | null): vo
         current: active === 'people'
       }
     ],
-    more: [
-      {
-        id: 'organisations',
-        label: 'Organisations',
-        paths: RAIL_ICON_PATHS.organisations,
-        href: '#/organisations'
-      },
-      {
-        id: 'relationships',
-        label: 'Relationships',
-        paths: RAIL_ICON_PATHS.relationships,
-        href: '#/relationships'
-      },
-      {
-        id: 'calendar',
-        label: 'Calendar',
-        paths: RAIL_ICON_PATHS.calendar,
-        href: '#/calendar'
-      },
-      {
-        id: 'network-ecology',
-        label: 'Network Ecology',
-        paths: RAIL_ICON_PATHS['network-ecology'],
-        href: '#/network-ecology'
-      }
-    ]
+    // Built from the rail's own list so a new page shows on phones too.
+    more: NAV.filter((item) => !ON_PHONE_BAR.has(item.id)).map((item) => ({
+      id: item.id,
+      label: item.label,
+      paths: RAIL_ICON_PATHS[item.id] ?? [],
+      href: item.href
+    }))
   });
 }
 
