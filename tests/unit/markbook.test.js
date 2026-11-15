@@ -318,3 +318,41 @@ test('saved groups: rename, add and remove after saving, with the record kept', 
   assert.equal(markbook.groups[0].retired, null);
   assert.deepEqual(markbook.history.map((e) => e.kind), ['joined', 'joined', 'left', 'left', 'retired', 'joined']);
 });
+
+test('a load reads the lesson ticks while the lesson reads are still going, not after them', async () => {
+  const { store } = await setup();
+  // Hold every quiz read until the ticks have been asked for.
+  let ticksAsked;
+  const asked = new Promise((resolve) => { ticksAsked = resolve; });
+  const get = store.get.bind(store);
+  const list = store.list.bind(store);
+  store.list = async (opts) => {
+    if (opts.prefix.startsWith('profile/class1/')) ticksAsked();
+    return list(opts);
+  };
+  store.get = async (key) => {
+    if (key.startsWith('quiz/quiz1/')) await asked;
+    return get(key);
+  };
+  const loaded = await Promise.race([
+    markbookAction(store, 'class1', { action: 'load' }),
+    new Promise((_r, reject) => setTimeout(() => reject(new Error('ticks waited for the quiz reads')), 2000))
+  ]);
+  assert.equal(loaded.quizzes.length, 0);
+  assert.ok(loaded.done);
+});
+
+test('a load for an unknown class is still a plain not-found, with nothing left unhandled', async () => {
+  const { store } = await setup();
+  const stray = [];
+  const onStray = (e) => stray.push(e);
+  process.on('unhandledRejection', onStray);
+  store.getWithMetadata = async () => { throw new Error('store down'); };
+  try {
+    await assert.rejects(markbookAction(store, 'gone', { action: 'load' }), /Class not found/);
+    await new Promise((r) => setTimeout(r, 20));
+    assert.deepEqual(stray, []);
+  } finally {
+    process.off('unhandledRejection', onStray);
+  }
+});
