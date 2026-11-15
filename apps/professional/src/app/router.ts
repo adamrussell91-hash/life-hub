@@ -42,6 +42,7 @@ export type Route =
   | { name: 'organisation'; id: string }
   | { name: 'relationships' }
   | { name: 'mentoring' }
+  | { name: 'mentoring-person'; id: string }
   | { name: 'communications' }
   | { name: 'meetings' }
   | { name: 'events' }
@@ -106,6 +107,11 @@ export function parseRoute(hash: string = location.hash): Route {
   }
   if (segments.length === 1 && segments[0] === 'relationships') return { name: 'relationships' };
   if (segments.length === 1 && segments[0] === 'mentoring') return { name: 'mentoring' };
+  if (segments.length === 2 && segments[0] === 'mentoring') {
+    const id = safeDecode(segments[1]!);
+    if (id && isValidPersonId(id)) return { name: 'mentoring-person', id };
+    return { name: 'not-found', path };
+  }
   if (segments.length === 1 && segments[0] === 'communications') return { name: 'communications' };
   if (segments.length === 1 && segments[0] === 'meetings') return { name: 'meetings' };
   if (segments.length === 1 && segments[0] === 'events') return { name: 'events' };
@@ -255,7 +261,7 @@ export function railHighlightFor(route: Route): RailViewId | null {
   if (route.name === 'people' || route.name === 'people-ties' || route.name === 'person' || route.name === 'person-brief') return 'people';
   if (route.name === 'organisations' || route.name === 'organisation') return 'organisations';
   if (route.name === 'relationships') return 'relationships';
-  if (route.name === 'mentoring') return 'mentoring';
+  if (route.name === 'mentoring' || route.name === 'mentoring-person') return 'mentoring';
   if (
     route.name === 'applications' ||
     route.name === 'application' ||
@@ -276,6 +282,11 @@ export function railHighlightFor(route: Route): RailViewId | null {
 /** Canonical People page with optional selected person (`#/people` or `#/people/<id>`). */
 export function personRoute(id: string): string {
   return `#/people/${encodeURIComponent(id)}`;
+}
+
+/** One person's mentoring page (`#/mentoring/<person id>`). */
+export function mentoringPersonRoute(id: string): string {
+  return `#/mentoring/${encodeURIComponent(id)}`;
 }
 
 /** @deprecated Brief is the profile pane — redirects to `#/people/<id>`. */

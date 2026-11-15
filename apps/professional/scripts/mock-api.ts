@@ -14,7 +14,7 @@ import { isDeletedRecord, withoutDeleted } from '../../../netlify/functions/_sha
  * When a sibling life-hub-data checkout is present, Notion communications.json
  * is merged into Comms/Meetings lists the same way production Functions do.
  */
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -486,6 +486,136 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
     };
   }
 
+  // ---- Mentoring (invented people): mentees, a mentor, links to meetings, ledger, tasks, mentorships ----
+  const mentoringRoles = new Map<string, Array<{ role: string; label: string; current: boolean }>>();
+  const tasks = new Map<string, Record<string, unknown>>();
+  const mentorships = new Map<string, Record<string, unknown>>();
+  const mentorshipSheetShares = new Map<string, { token: string; created_at: string; updated_at: string }>();
+  const mentorshipSheets = new Map<string, Record<string, unknown>>();
+  {
+    const stamp = '2026-01-01T00:00:00.000Z';
+    const dayMs = 86_400_000;
+    const at = (days: number, hour = 1) => {
+      const date = new Date(Date.now() + days * dayMs);
+      date.setUTCHours(hour, 0, 0, 0);
+      return date.toISOString();
+    };
+    const school = 'organisation_00000000-0000-4000-8000-0000000000d1';
+    organisations.set(school, {
+      schema_version: 1, id: school, kind: 'organisation', display_name: 'Harbourview High School', legal_name: null,
+      aliases: [], logo_key: null, lifecycle_status: 'active', retention_reason: null, retention_review_at: null,
+      created_at: stamp, updated_at: stamp
+    } as OrganisationRecord);
+    const cast = [
+      { n: 'f1', name: 'Priya Anand', role: 'mentee', label: 'Accreditation', current: true },
+      { n: 'f2', name: 'Tomas Wirth', role: 'mentee', label: 'Highly Accomplished', current: true },
+      { n: 'f3', name: 'Marguerite Osei', role: 'mentee', label: 'Lead', current: true },
+      { n: 'f4', name: 'Daniel Okafor', role: 'mentor', label: 'Mentor', current: true },
+      { n: 'f5', name: 'Rowan Fitzgerald', role: 'mentee', label: 'Accreditation', current: false }
+    ];
+    const personId = (n: string) => `person_00000000-0000-4000-8000-0000000000${n}`;
+    for (const c of cast) {
+      const id = personId(c.n);
+      people.set(id, {
+        schema_version: 1, id, kind: 'person', display_name: c.name, sort_name: null, aliases: [],
+        lifecycle_status: 'active', is_self: false, retention_reason: null, retention_review_at: null,
+        created_at: stamp, updated_at: stamp
+      });
+      mentoringRoles.set(id, [{ role: c.role, label: c.label, current: c.current }]);
+      relationships.push({
+        id: `link_mentoring_org_${c.n}`, source_ref: `shared:person:${id}`, target_ref: `shared:organisation:${school}`,
+        relationship_type: 'employee_at', inverse_label: 'employs', context_key: null, status: 'current',
+        temporal_mode: 'period', valid_from: '2024-02-01', valid_to: null, occurred_at: null, role: 'Teacher'
+      });
+    }
+    // Meetings: [person suffix, days from now, title]. Negative days are past.
+    const sessions: Array<[string, number, string]> = [
+      ['f1', -34, 'Priya: first observation debrief'], ['f1', -21, 'Priya: evidence folder check'],
+      ['f1', -9, 'Priya: standard 3 planning'], ['f1', 6, 'Priya: mock accreditation interview'],
+      ['f2', -48, 'Tomas: portfolio scoping'], ['f2', -17, 'Tomas: lesson study follow-up'],
+      ['f2', 12, 'Tomas: portfolio review'],
+      ['f3', -75, 'Marguerite: leading a faculty review'], ['f3', -58, 'Marguerite: project plan'],
+      ['f4', -26, 'Daniel: mentor check-in'], ['f4', 20, 'Daniel: term planning'],
+      ['f5', -230, 'Rowan: pre-assessment run-through'], ['f5', -190, 'Rowan: final evidence check']
+    ];
+    sessions.forEach(([n, days, title], index) => {
+      const id = `meeting_00000000-0000-4000-8000-0000000001${String(index + 10).padStart(2, '0')}`;
+      const start = at(days);
+      const end = new Date(Date.parse(start) + 3_600_000).toISOString();
+      meetings.set(id, {
+        schema_version: 1, id, title, scheduled_start: start, scheduled_end: end, time_zone: 'Australia/Sydney',
+        location_text: null, agenda: null, notes: null, state: days < 0 ? 'completed' : 'scheduled',
+        occurrence_history: [], created_at: stamp, updated_at: stamp
+      });
+      relationships.push({
+        id: `link_mentoring_meeting_${index}`, source_ref: `professional:meeting:${id}`, target_ref: `shared:person:${personId(n)}`,
+        relationship_type: 'attendee', inverse_label: 'attends', context_key: null, status: 'current',
+        temporal_mode: 'point', valid_from: null, valid_to: null, occurred_at: start, role: null
+      });
+    });
+    // Ledger: one thing you owe and one thing they owe the first mentee.
+    const firstRef = `shared:person:${personId('f1')}`;
+    for (const [direction, text, due] of [
+      ['you_owe', 'Send the evidence checklist for standards 3 and 6', at(5).slice(0, 10)],
+      ['they_owe', 'Draft the reflection on the observed lesson', at(3).slice(0, 10)]
+    ] as const) {
+      const item = {
+        id: `ledger_${randomUUID()}`, person_ref: firstRef, direction, text, task_ref: null, comm_ref: null, due,
+        checked_in_ref: null, status: 'open', author: 'adam', source_key: `mentoring-seed::${direction}`,
+        created_at: stamp, updated_at: stamp
+      };
+      ledgerItems.set(item.id, item);
+    }
+    // Tasks linked to people (task is the link source; relationship `collaborator`).
+    const seedTasks: Array<[string, string, string, string | null, string]> = [
+      ['f1', 'Book a classroom for the observation', 'open', at(4).slice(0, 10), 'task_mentoring_01'],
+      ['f1', 'Read standard 3 exemplars together', 'open', null, 'task_mentoring_02'],
+      ['f1', 'Share the unit outline', 'done', at(-12).slice(0, 10), 'task_mentoring_03'],
+      ['f2', 'Collect two student work samples', 'open', at(10).slice(0, 10), 'task_mentoring_04']
+    ];
+    for (const [n, title, status, due, id] of seedTasks) {
+      tasks.set(id, {
+        schema_version: 1, id, title, description: '', kind: 'task', bucket: 'active', domain: 'teaching', status,
+        priority: 'medium', ...(due ? { due_date: due } : {}), created_at: stamp, updated_at: stamp,
+        completed_at: status === 'done' ? at(-12) : null, tags: []
+      });
+      relationships.push({
+        id: `link_mentoring_${id}`, source_ref: `tasks:task:${id}`, target_ref: `shared:person:${personId(n)}`,
+        relationship_type: 'collaborator', inverse_label: 'collaborates_on', context_key: null, status: 'current',
+        temporal_mode: 'timeless', valid_from: null, valid_to: null, occurred_at: null, role: null
+      });
+    }
+    // Mentorships. Blocks copy the shape of a meeting's rich_text block.
+    const note = (id: string, html: string) => ({ id, block_type: 'rich_text', variant: 'medium', content: { html } });
+    const seedMentorships: Array<Record<string, unknown>> = [
+      {
+        n: 'f1', kind: 'accreditation', organisation_ref: `shared:organisation:${school}`,
+        focus: 'Evidence for standards 3 and 6 before the mock interview', started_on: '2026-08-04',
+        blocks: [note('mb_private_f1', '<p>Private: nervous about the interview; rehearse the opening answer.</p>')],
+        shared_blocks: [note('mb_shared_f1', '<p>Goal for this term: two annotated lesson samples for standard 3.</p>')]
+      },
+      { n: 'f2', kind: 'halt_highly_accomplished', focus: 'Portfolio scoping for a Highly Accomplished submission', started_on: '2026-05-12' },
+      { n: 'f3', kind: 'halt_lead', focus: 'A faculty-wide review as the leading evidence', started_on: '2026-02-20' },
+      {
+        n: 'f5', kind: 'accreditation', status: 'completed', started_on: '2025-03-10', completed_on: '2026-02-28',
+        outcome: 'Proficient achieved', organisation_ref: `shared:organisation:${school}`
+      }
+    ];
+    for (const row of seedMentorships) {
+      const { n, ...fields } = row;
+      const id = `mentorship_${randomUUID()}`;
+      mentorships.set(id, {
+        schema_version: 1, id, person_ref: `shared:person:${personId(String(n))}`, label: null, organisation_ref: null,
+        focus: null, status: 'active', started_on: null, completed_on: null, outcome: null, blocks: [], shared_blocks: [],
+        ...fields, created_at: stamp, updated_at: at(-Math.floor(Math.random() * 20) - 1)
+      });
+    }
+  }
+  const mentorshipSummary = (record: Record<string, unknown>) => {
+    const { blocks: _blocks, shared_blocks: _shared, ...summary } = record;
+    return summary;
+  };
+
   let authenticated = false;
   const meetingSheetShares = new Map<string, { token: string; created_at: string; updated_at: string; picks: unknown; sheet: unknown }>();
 
@@ -826,7 +956,7 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
             display_name: displayName,
             initials,
             role_line: titled ? `${titled.role} · ${titled.display_name}${more}` : primary ? `${primary.current ? 'At' : 'Formerly'} ${primary.display_name}${primary.current ? more : ''}` : 'No relationship on record',
-            relationship_roles: [],
+            relationship_roles: mentoringRoles.get(p.id) ?? [],
             organisation: primary ? { ref: primary.ref, display_name: primary.display_name, monogram: primary.monogram, logo_key: null, current: primary.current } : null,
             organisations: orgLinks.map(({ role: _role, ...o }) => o),
             lifecycle_status: p.lifecycle_status,
@@ -835,8 +965,8 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
             relationship_state: 'active',
             relationship_reasons: [],
             open_item_count: 0,
-            you_owe_count: 0,
-            they_owe_count: 0,
+            you_owe_count: [...ledgerItems.values()].filter((i) => i.person_ref === ref && i.status === 'open' && i.direction === 'you_owe').length,
+            they_owe_count: [...ledgerItems.values()].filter((i) => i.person_ref === ref && i.status === 'open' && i.direction === 'they_owe').length,
             pending_proposal_count: 0,
             next_label: null,
             created_at: String(p.created_at ?? '2020-01-01T00:00:00.000Z'),
@@ -2628,6 +2758,111 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
       return json(200, { ok: true, data: { thread } });
     }
 
+    if (path === '/api/mentorships') {
+      const KINDS = ['accreditation', 'halt_highly_accomplished', 'halt_lead', 'coaching', 'other'];
+      const fail = (status: number, code: string, message: string) => json(status, { ok: false, error: { code, message } });
+      const clean = (value: unknown, max: number) => (typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : null);
+      const readFields = (input: Record<string, unknown>, out: Record<string, unknown>) => {
+        if (input.label !== undefined) out.label = clean(input.label, 60);
+        if (input.organisation_ref !== undefined) out.organisation_ref = clean(input.organisation_ref, 200);
+        if (input.focus !== undefined) out.focus = clean(input.focus, 300);
+        if (input.started_on !== undefined) out.started_on = clean(input.started_on, 10);
+        if (input.completed_on !== undefined) out.completed_on = clean(input.completed_on, 10);
+        if (input.outcome !== undefined) out.outcome = clean(input.outcome, 300);
+        if (Array.isArray(input.blocks)) out.blocks = input.blocks;
+        if (Array.isArray(input.shared_blocks)) out.shared_blocks = input.shared_blocks;
+        if (input.status === 'active' || input.status === 'completed') out.status = input.status;
+        if (typeof input.kind === 'string' && KINDS.includes(input.kind)) out.kind = input.kind;
+      };
+      if (method === 'GET') {
+        const id = url.searchParams.get('id');
+        if (id) {
+          const found = mentorships.get(id);
+          return found ? json(200, { ok: true, data: { mentorship: found } }) : fail(404, 'mentorship_not_found', 'Mentorship not found.');
+        }
+        const personRef = url.searchParams.get('person_ref');
+        if (personRef) {
+          const mine = [...mentorships.values()]
+            .filter((m) => m.person_ref === personRef)
+            .sort((a, b) => Date.parse(String(b.updated_at)) - Date.parse(String(a.updated_at)));
+          const pick = mine.find((m) => m.status === 'active') ?? mine[0] ?? null;
+          return json(200, { ok: true, data: { mentorship: pick } });
+        }
+        const list = [...mentorships.values()]
+          .sort((a, b) => Date.parse(String(b.updated_at)) - Date.parse(String(a.updated_at)))
+          .map(mentorshipSummary);
+        return json(200, { ok: true, data: { mentorships: list } });
+      }
+      if (method === 'POST') {
+        const input = (body ?? {}) as Record<string, unknown>;
+        const personRef = typeof input.person_ref === 'string' ? input.person_ref : '';
+        if (!personRef.startsWith('shared:person:')) return fail(400, 'invalid_person_ref', 'person_ref must be a shared:person reference.');
+        if (typeof input.kind !== 'string' || !KINDS.includes(input.kind)) return fail(400, 'invalid_kind', 'kind is not one of the mentorship kinds.');
+        const status = input.status === 'completed' ? 'completed' : 'active';
+        if (status === 'active' && [...mentorships.values()].some((m) => m.person_ref === personRef && m.status === 'active')) {
+          return fail(409, 'mentorship_exists', 'This person already has an active mentorship.');
+        }
+        const now = new Date().toISOString();
+        const record: Record<string, unknown> = {
+          schema_version: 1, id: `mentorship_${randomUUID()}`, person_ref: personRef, kind: input.kind, label: null,
+          organisation_ref: null, focus: null, status, started_on: null, completed_on: null, outcome: null,
+          blocks: [], shared_blocks: [], created_at: now, updated_at: now
+        };
+        readFields(input, record);
+        mentorships.set(String(record.id), record);
+        return json(201, { ok: true, data: { mentorship: record } });
+      }
+      if (method === 'PATCH') {
+        const id = url.searchParams.get('id');
+        const record = id ? mentorships.get(id) : null;
+        if (!record) return fail(404, 'mentorship_not_found', 'Mentorship not found.');
+        const patch: Record<string, unknown> = {};
+        readFields((body ?? {}) as Record<string, unknown>, patch);
+        if (!Object.keys(patch).length) return fail(400, 'empty_update', 'Update has no fields.');
+        Object.assign(record, patch, { updated_at: new Date().toISOString() });
+        return json(200, { ok: true, data: { mentorship: record } });
+      }
+      return json(405, { ok: false, error: { code: 'method_not_allowed', message: 'Method not allowed.' } });
+    }
+
+    if (path.startsWith('/api/published/sheets/') && method === 'GET') {
+      const sheet = mentorshipSheets.get(path.split('/').pop() ?? '');
+      return sheet
+        ? json(200, { ok: true, data: sheet })
+        : json(404, { ok: false, error: { code: 'not_found', message: 'This sheet is no longer shared.' } });
+    }
+
+    if (path === '/api/mentorship-sheets') {
+      const id = url.searchParams.get('mentorship_id') ?? '';
+      const record = mentorships.get(id);
+      if (!/^mentorship_[0-9a-f-]{36}$/.test(id)) {
+        return json(400, { ok: false, error: { code: 'invalid_mentorship_id', message: 'A valid mentorship_id is required.' } });
+      }
+      if (!record) return json(404, { ok: false, error: { code: 'mentorship_not_found', message: 'Mentorship not found.' } });
+      const share = mentorshipSheetShares.get(id) ?? null;
+      if (method === 'GET') return json(200, { ok: true, data: { share } });
+      const action = url.searchParams.get('action');
+      if (action === 'stop') {
+        if (share) mentorshipSheets.delete(share.token);
+        mentorshipSheetShares.delete(id);
+        return json(200, { ok: true, data: { share: null } });
+      }
+      if (action !== 'publish') {
+        return json(400, { ok: false, error: { code: 'invalid_action', message: 'Unsupported action.' } });
+      }
+      const input = (body ?? {}) as { title?: string; message?: string; from?: string };
+      const title = typeof input.title === 'string' && input.title.trim() ? input.title.trim() : 'Shared with you';
+      const at = new Date().toISOString();
+      const token = share?.token ?? randomBytes(24).toString('hex');
+      mentorshipSheets.set(token, { title, message: input.message ?? '', from: input.from ?? '', blocks: record.shared_blocks });
+      const next = { token, created_at: share?.created_at ?? at, updated_at: at };
+      mentorshipSheetShares.set(id, next);
+      return json(200, {
+        ok: true,
+        data: { share: next, left_off: { blocks: 0, promise_lines: 0, minutes_sections: 0, voice_unpublished: 0 } }
+      });
+    }
+
     if (path === '/api/events' && method === 'GET') {
       const id = url.searchParams.get('id');
       if (id) {
@@ -2880,6 +3115,31 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
 
     if (path === '/api/repo/files' && method === 'POST') {
       return json(200, { ok: true, data: { commitSha: 'a'.repeat(40), files: [] } });
+    }
+
+    if (path === '/api/tasks' && method === 'GET') {
+      const taskId = url.searchParams.get('id');
+      if (taskId) {
+        const task = tasks.get(taskId);
+        if (!task) return json(404, { ok: false, error: { code: 'not_found', message: 'Task not found' } });
+        return json(200, { ok: true, data: task });
+      }
+      return json(200, { ok: true, data: { tasks: [...tasks.values()] } });
+    }
+
+    if (path === '/api/tasks' && method === 'PATCH') {
+      const taskId = url.searchParams.get('id') ?? '';
+      const task = tasks.get(taskId);
+      if (!task) return json(404, { ok: false, error: { code: 'not_found', message: 'Task not found' } });
+      const patch = (body ?? {}) as Record<string, unknown>;
+      const now = new Date().toISOString();
+      for (const [key, value] of Object.entries(patch)) {
+        if (key !== 'id' && key !== 'schema_version' && key !== 'created_at') task[key] = value;
+      }
+      task.updated_at = now;
+      if (patch.status === 'done' && !task.completed_at) task.completed_at = now;
+      else if (patch.status && patch.status !== 'done') task.completed_at = null;
+      return json(200, { ok: true, data: task });
     }
 
     if (
@@ -3533,16 +3793,26 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
     }
 
     if (path === '/api/tasks' && method === 'POST') {
-      const input = body as { title?: string };
+      const input = (body ?? {}) as { title?: string; domain?: string; priority?: string; status?: string; due_date?: string };
       const id = `task_${randomUUID().slice(0, 8)}`;
+      const now = new Date().toISOString();
       const task = {
+        schema_version: 1,
         id,
         title: typeof input.title === 'string' ? input.title : 'Untitled',
-        status: 'open',
-        domain: 'work',
-        priority: 'normal',
-        kind: 'task'
+        description: '',
+        kind: 'task',
+        bucket: 'active',
+        status: typeof input.status === 'string' && input.status ? input.status : 'open',
+        domain: typeof input.domain === 'string' ? input.domain : 'teaching',
+        priority: typeof input.priority === 'string' ? input.priority : 'medium',
+        ...(typeof input.due_date === 'string' && input.due_date ? { due_date: input.due_date } : {}),
+        created_at: now,
+        updated_at: now,
+        completed_at: null,
+        tags: []
       };
+      tasks.set(id, task);
       // Task JSON never stores Communication or Person IDs.
       return json(201, { ok: true, data: task });
     }
@@ -3687,42 +3957,54 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
 
     if (path === '/api/universal-links' && method === 'GET') {
       const entityRef = url.searchParams.get('entity_ref');
-      if (!entityRef) {
+      const entityRefs = url.searchParams.get('entity_refs');
+      if (!entityRef && !entityRefs) {
         return json(400, { ok: false, error: { code: 'missing_selector', message: 'selector required' } });
       }
-      const outgoing = relationships
-        .filter((link) => link.source_ref === entityRef && link.status === 'current')
-        .map((link) => ({
-          link,
-          endpoint: findByRef(link.target_ref)
-            ? endpointFor(findByRef(link.target_ref) as PersonRecord | OrganisationRecord | CommunicationRecord)
-            : {
-                ref: link.target_ref,
-                kind: 'unknown',
-                display_label: link.target_ref,
-                supporting_label: null,
-                href: null,
-                lifecycle_status: null,
-                visibility: 'operator'
-              }
-        }));
-      const incoming = relationships
-        .filter((link) => link.target_ref === entityRef && link.status === 'current')
-        .map((link) => ({
-          link,
-          endpoint: findByRef(link.source_ref)
-            ? endpointFor(findByRef(link.source_ref) as PersonRecord | OrganisationRecord | CommunicationRecord)
-            : {
-                ref: link.source_ref,
-                kind: 'unknown',
-                display_label: link.source_ref,
-                supporting_label: null,
-                href: null,
-                lifecycle_status: null,
-                visibility: 'operator'
-              }
-        }));
-      return json(200, { ok: true, data: { outgoing, incoming } });
+      const endpointForRef = (ref: string) => {
+        const found = findByRef(ref);
+        if (found) return endpointFor(found as PersonRecord | OrganisationRecord | CommunicationRecord);
+        const taskMatch = /^tasks:task:(.+)$/.exec(ref);
+        const task = taskMatch ? tasks.get(taskMatch[1]!) : null;
+        if (task) {
+          return {
+            ref,
+            kind: 'task',
+            display_label: String(task.title),
+            supporting_label: String(task.status),
+            href: null,
+            lifecycle_status: String(task.status),
+            visibility: 'operator'
+          };
+        }
+        const meetingMatch = /^professional:meeting:(.+)$/.exec(ref);
+        const meeting = meetingMatch ? meetings.get(meetingMatch[1]!) : null;
+        if (meeting) {
+          return {
+            ref,
+            kind: 'meeting',
+            display_label: String(meeting.title),
+            supporting_label: null,
+            href: null,
+            lifecycle_status: String(meeting.state ?? 'scheduled'),
+            visibility: 'operator'
+          };
+        }
+        return { ref, kind: 'unknown', display_label: ref, supporting_label: null, href: null, lifecycle_status: null, visibility: 'operator' };
+      };
+      const linksFor = (ref: string) => ({
+        outgoing: relationships
+          .filter((link) => link.source_ref === ref && link.status === 'current')
+          .map((link) => ({ link, endpoint: endpointForRef(link.target_ref) })),
+        incoming: relationships
+          .filter((link) => link.target_ref === ref && link.status === 'current')
+          .map((link) => ({ link, endpoint: endpointForRef(link.source_ref) }))
+      });
+      if (entityRefs) {
+        const refs = [...new Set(entityRefs.split(',').map((ref) => ref.trim()).filter(Boolean))].slice(0, 50);
+        return json(200, { ok: true, data: { results: Object.fromEntries(refs.map((ref) => [ref, linksFor(ref)])) } });
+      }
+      return json(200, { ok: true, data: linksFor(entityRef!) });
     }
 
     if (path === '/api/universal-links' && method === 'PATCH') {
