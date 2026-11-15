@@ -243,16 +243,32 @@ export function renderBook(o: BookOptions): HTMLElement {
 
 /**
  * The box is as tall as the screen less whatever sits below it on the page, so scrolled to
- * the end the whole box, header included, is in view with nothing wasted under it.
+ * the end the whole box, header included, is in view with nothing wasted under it. It measures
+ * again whenever the page changes height (the calendar and lessons above often arrive after the
+ * table), not once; the CSS keeps a floor, so a measurement taken at a bad moment can't shrink
+ * the box to a sliver.
  */
 function fitToScreen(wrap: HTMLElement): void {
-  const measure = (): void => {
-    if (!wrap.isConnected) return window.removeEventListener('resize', measure);
-    const page = wrap.closest('.teacher-layout__canvas') ?? document.body;
+  let page: Element = document.body;
+  let watch: ResizeObserver | null = null;
+  const stop = (): void => {
+    window.removeEventListener('resize', measure);
+    watch?.disconnect();
+  };
+  function measure(): void {
+    if (!wrap.isConnected) return stop();
     const below = Math.max(0, page.getBoundingClientRect().bottom - wrap.getBoundingClientRect().bottom);
     wrap.style.setProperty('--mb-below', `${Math.round(below)}px`);
-  };
-  requestAnimationFrame(measure);
+  }
+  requestAnimationFrame(() => {
+    if (!wrap.isConnected) return stop();
+    page = wrap.closest('.teacher-layout__canvas') ?? document.body;
+    measure();
+    if (typeof ResizeObserver === 'function') {
+      watch = new ResizeObserver(() => measure());
+      watch.observe(page);
+    }
+  });
   window.addEventListener('resize', measure);
 }
 
