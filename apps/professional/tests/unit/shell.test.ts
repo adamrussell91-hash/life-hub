@@ -29,6 +29,30 @@ describe('professional rail hub switcher', () => {
   });
 });
 
+describe('professional phone chrome', () => {
+  it('reaches every rail page from the bottom bar or the More sheet', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const refs = renderHubShell(host);
+    renderPrimaryNav(refs.railNav, 'home');
+
+    const railHrefs = [...refs.railNav.querySelectorAll<HTMLAnchorElement>('a.hub-rail__link')].map((a) =>
+      a.getAttribute('href')
+    );
+    const bar = [...document.querySelectorAll<HTMLAnchorElement>('.hub-mobile-nav a')].map((a) => a.getAttribute('href'));
+    const more = [...document.querySelectorAll<HTMLAnchorElement>('.hub-more-sheet__nav a[href^="#/"]')].map((a) =>
+      a.getAttribute('href')
+    );
+
+    expect(railHrefs.length).toBeGreaterThan(4);
+    for (const href of railHrefs) expect([...bar, ...more]).toContain(href);
+    expect(more).toContain('#/meetings');
+    expect(more).not.toContain('#/home');
+    expect(more).not.toContain('#/people');
+    host.remove();
+  });
+});
+
 describe('browser tab name', () => {
   it('names the tab after the page heading', () => {
     const refs = renderHubShell(document.createElement('div'));
