@@ -86,10 +86,13 @@ export async function addColumnWithMarks(store, classId, column, marks) {
   return Object.keys(kept).length;
 }
 
+/** How many lessons (or calendar rows) the markbook load reads at once; the student progress page uses the same. */
+const LOAD_READS = 16;
+
 /** This class's live calendar rows. */
 async function scheduledRows(store, classId) {
   const rowKeys = (await listBlobKeys(store, SCHEDULED_LESSON_PREFIX)).filter((key) => !key.endsWith('/_index'));
-  const rows = await mapBounded(rowKeys, 8, (key) => read(store, key));
+  const rows = await mapBounded(rowKeys, LOAD_READS, (key) => read(store, key));
   return rows.filter((row) => row && !isDeletedRecord(row) && row.class_id === classId);
 }
 
@@ -97,10 +100,11 @@ async function scheduledRows(store, classId) {
  * Every lesson a student can answer for this class (see classesForLesson):
  * the active units, the current unit, and lessons on the class calendar from any unit.
  */
-export async function classLessonIds(store, roster) {
+export async function classLessonIds(store, roster, rowsAhead = null) {
   const cls = roster.cls;
   const unitIds = [...new Set([...(cls.active_unit_ids ?? []), ...(cls.current_unit_id ? [cls.current_unit_id] : [])])].filter(isSafeId);
-  const [units, rows] = await Promise.all([mapBounded(unitIds, 4, (unitId) => read(store, unitKey(unitId))), scheduledRows(store, cls.id)]);
+  // The load starts reading the calendar before the roster is in; anyone else reads it here.
+  const [units, rows] = await Promise.all([mapBounded(unitIds, 4, (unitId) => read(store, unitKey(unitId))), rowsAhead ?? scheduledRows(store, cls.id)]);
   // Lessons keep the order of the class's units; calendar-only lessons follow.
   const lessonIds = new Set();
   for (const unit of units) {
@@ -130,18 +134,18 @@ export async function workColumns(store, roster, lessonIds, { size = 8 } = {}) {
  * Game lessons' evidence, per game a student on the list has finished. Games never write marks;
  * this is evidence only, and readers count it as "right once" at most (games/core/events.ts).
  */
-export async function gameColumns(store, roster, lessonIds) {
+export async function gameColumns(store, roster, lessonIds, { size = 8 } = {}) {
   const ids = roster.students.map((s) => s.id);
-  const found = await mapBounded(lessonIds, 8, (lessonId) => classGameEvidence(store, lessonId, roster.cls.id, ids));
+  const found = await mapBounded(lessonIds, size, (lessonId) => classGameEvidence(store, lessonId, roster.cls.id, ids));
   return found.flat();
 }
 
 /** Quiz lessons that someone on the list has handed in, or saved answers on. */
-export async function quizColumns(store, roster, book, lessonIds) {
+export async function quizColumns(store, roster, book, lessonIds, { size = 8 } = {}) {
   // Quiz cells only cover students on the list. A removed student's attempts
   // stay visible in that quiz's Results, not here.
   const ids = roster.students.map((s) => s.id);
-  const found = await mapBounded(lessonIds, 8, (lessonId) => classQuizScores(store, lessonId, roster.cls.id, ids));
+  const found = await mapBounded(lessonIds, size, (lessonId) => classQuizScores(store, lessonId, roster.cls.id, ids));
   return found
     // A quiz shows once someone handed in, or has answers saved on a go they haven't handed in.
     .filter((q) => q && (Object.keys(q.scores).length || q.saved))
@@ -222,16 +226,41 @@ export async function markbookAction(store, classId, body) {
   return result;
 }
 
+/** A markbook load's reads that need only the class id. Failures surface when awaited; until then they are held, not thrown. */
+function startLoadReads(store, classId) {
+  const hold = (promise) => {
+    promise.catch(() => {});
+    return promise;
+  };
+  return {
+    book: hold(readBook(store, classId).then((r) => r.book)),
+    ledger: hold(readRubricLedger(store, classId)),
+    rows: hold(scheduledRows(store, classId))
+  };
+}
+
 async function markbookActionInner(store, classId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
+  const action = body.action ?? 'load';
+  // The load's reads that need only the class id start alongside the roster, not after it.
+  const ahead = action === 'load' && isSafeId(classId) ? startLoadReads(store, classId) : null;
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');
-  const action = body.action ?? 'load';
 
   if (action === 'load') {
-    const [{ book }, lessonIds] = await Promise.all([readBook(store, classId), classLessonIds(store, roster)]);
-    const [quizzes, work, ledger, games] = await Promise.all([quizColumns(store, roster, book, lessonIds), workColumns(store, roster, lessonIds), readRubricLedger(store, classId), gameColumns(store, roster, lessonIds)]);
-    const rubrics = ledgerRows(ledger, roster.students.map((s) => s.id));
+    const reads = ahead ?? startLoadReads(store, classId);
+    const studentIds = roster.students.map((s) => s.id);
+    // Lesson ticks don't depend on the lessons, so they come in alongside them.
+    const done = body.skip_done ? null : listClassDone(store, classId, studentIds);
+    const [book, lessonIds] = await Promise.all([reads.book, classLessonIds(store, roster, reads.rows)]);
+    const [quizzes, work, ledger, games, doneByStudent] = await Promise.all([
+      quizColumns(store, roster, book, lessonIds, { size: LOAD_READS }),
+      workColumns(store, roster, lessonIds, { size: LOAD_READS }),
+      reads.ledger,
+      gameColumns(store, roster, lessonIds, { size: LOAD_READS }),
+      done
+    ]);
+    const rubrics = ledgerRows(ledger, studentIds);
     return {
       markbook: book,
       students: roster.students.map(({ id, name, initials }) => ({ id, name, initials })),
@@ -240,7 +269,7 @@ async function markbookActionInner(store, classId, body) {
       ...(rubrics.length ? { rubrics } : {}),
       ...(games.length ? { games } : {}),
       // Which lessons each student has marked done, for the gradebook. The student profile skips it.
-      ...(body.skip_done ? {} : { done: await listClassDone(store, classId, roster.students.map((s) => s.id)) })
+      ...(body.skip_done ? {} : { done: doneByStudent })
     };
   }
 
