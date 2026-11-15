@@ -18,6 +18,48 @@ import { deleteKey } from './teaching-blobs.mjs';
 const doneKey = (classId, studentId, lessonId) => `profile/${classId}/${studentId}/done/${lessonId}`;
 const donePrefix = (classId, studentId) => `profile/${classId}/${studentId}/done/`;
 const marksKey = (classId) => `profile/${classId}/teacher-marks`;
+const ticksKey = (classId, studentId, lessonId) => `profile/${classId}/${studentId}/ticks/${lessonId}`;
+const ticksPrefix = (classId, studentId) => `profile/${classId}/${studentId}/ticks/`;
+
+/** Events kept per lesson. Past this the oldest go, except the very first. */
+export const TICK_RECORD_MAX = 50;
+
+/**
+ * Adds one event to a lesson's tick record (`tick`, `untick` or `quiz`):
+ *
+ *   profile/{class}/{student}/ticks/{lesson}   { events: [{ at, kind }] }   append-only
+ *
+ * Only a Progress share page reads it. It never throws: the tick itself must stand even if this fails.
+ */
+export async function appendTickEvent(store, classId, studentId, lessonId, kind, at = new Date().toISOString()) {
+  const key = ticksKey(classId, studentId, lessonId);
+  try {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const row = store.getWithMetadata ? await store.getWithMetadata(key, { type: 'json', consistency: 'strong' }) : null;
+      const held = row ? row.data : store.getWithMetadata ? null : await read(store, key);
+      const events = Array.isArray(held?.events) ? held.events : [];
+      const next = [...events, { at, kind }];
+      const kept = next.length > TICK_RECORD_MAX ? [next[0], ...next.slice(-(TICK_RECORD_MAX - 1))] : next;
+      const options = row ? { onlyIfMatch: row.etag } : store.getWithMetadata ? { onlyIfNew: true } : undefined;
+      const written = await store.setJSON(key, { events: kept }, options);
+      if (written?.modified !== false) return true;
+    }
+  } catch (e) {
+    console.warn('tick record not written', e?.message ?? e);
+  }
+  return false;
+}
+
+/** Every lesson's tick record for one student: { [lessonId]: [{ at, kind }] }. */
+export async function listTickRecords(store, classId, studentId) {
+  const prefix = ticksPrefix(classId, studentId);
+  const out = {};
+  await mapBounded(await listBlobKeys(store, prefix), 8, async (key) => {
+    const held = await read(store, key);
+    if (Array.isArray(held?.events)) out[key.slice(prefix.length)] = held.events.filter((e) => e && typeof e.at === 'string' && typeof e.kind === 'string');
+  });
+  return out;
+}
 
 /** Every teacher mark in the class, by student then lesson. */
 export async function readTeacherMarks(store, classId) {
@@ -45,13 +87,23 @@ export async function recordDone(store, classId, studentId, lessonId, via) {
   if (!isSafeId(lessonId)) reject(400, 'bad_request', 'Unknown lesson.');
   const key = doneKey(classId, studentId, lessonId);
   const record = { at: new Date().toISOString(), via };
+  const note = () => appendTickEvent(store, classId, studentId, lessonId, via, record.at);
   const written = await store.setJSON(key, record, { onlyIfNew: true });
-  if (written?.modified !== false) return;
+  if (written?.modified !== false) {
+    await note();
+    return;
+  }
   const held = await read(store, key);
   // A teacher's "partial" mark yields to the student's own tick.
-  if (held?.partial) await store.setJSON(key, record);
+  if (held?.partial) {
+    await store.setJSON(key, record);
+    await note();
+  }
   // Under a teacher's "complete" override, keep the tick so clearing the override brings it back.
-  else if (held?.via === 'teacher' && !held.was) await store.setJSON(key, { ...held, was: record });
+  else if (held?.via === 'teacher' && !held.was) {
+    await store.setJSON(key, { ...held, was: record });
+    await note();
+  }
 }
 
 /**
@@ -62,10 +114,13 @@ export async function undoTick(store, classId, studentId, lessonId) {
   if (!isSafeId(lessonId)) reject(400, 'bad_request', 'Unknown lesson.');
   const key = doneKey(classId, studentId, lessonId);
   const held = await read(store, key);
-  if (held?.via === 'tick') await deleteKey(store, key);
-  else if (held?.via === 'teacher' && held.was) {
+  if (held?.via === 'tick') {
+    await deleteKey(store, key);
+    await appendTickEvent(store, classId, studentId, lessonId, 'untick');
+  } else if (held?.via === 'teacher' && held.was) {
     const { was: _was, ...rest } = held;
     await store.setJSON(key, rest);
+    await appendTickEvent(store, classId, studentId, lessonId, 'untick');
   }
 }
 
