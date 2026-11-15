@@ -15,6 +15,7 @@ import {
   isFixtureMediaUrl,
   journalAudioSrc,
   journalMediaDerivativeUrl,
+  setJournalMediaSrc,
   localJournalMediaUrl,
 } from '@/journal/media-loading';
 import {
@@ -182,7 +183,8 @@ export function mountMomentAttachments(
       return;
     }
     player?.pause();
-    player = new Audio(item.src);
+    player = new Audio();
+    setJournalMediaSrc(player, item.src);
     playingId = item.id;
     player.addEventListener('ended', () => {
       playingId = null;
@@ -204,7 +206,7 @@ export function mountMomentAttachments(
         const cell = document.createElement('div');
         cell.className = 'journal-capture__thumb';
         const img = document.createElement('img');
-        img.src = p.src;
+        setJournalMediaSrc(img, p.src);
         img.alt = `Photo ${index + 1}`;
         img.decoding = 'async';
         const x = document.createElement('button');

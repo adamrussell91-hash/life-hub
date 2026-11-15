@@ -9,9 +9,14 @@ import {
   isJournalMediaKey,
   journalMediaDerivativeKey,
   journalMediaOriginalKey,
+  parseJournalByteRange,
+  travelJournalGetObject,
   travelJournalPresignGet,
   travelJournalR2Unbound
 } from './_shared/travel-journal-r2.mjs';
+
+/** A photo copy or voice note never changes under its key, so the phone may keep it a day. */
+const MEDIA_BYTES_CACHE = 'private, max-age=86400';
 
 export const config = { path: '/api/travel-journal-media' };
 
@@ -76,25 +81,49 @@ export function createTravelJournalMediaHandler(deps = {}) {
       );
     }
     const key = resolved.key;
+    const redirectToStorage = async () =>
+      new Response(null, {
+        status: 302,
+        headers: {
+          Location: await travelJournalPresignGet(ctx.env, { key, signGet: deps.signGet }),
+          'cache-control': 'private, no-store'
+        }
+      });
 
     try {
-      const signedUrl = await travelJournalPresignGet(ctx.env, {
-        key,
-        signGet: deps.signGet
-      });
       const wantsJson =
         url.searchParams.get('format') === 'json' ||
         (request.headers.get('accept') ?? '').includes('application/json');
       if (wantsJson) {
+        const signedUrl = await travelJournalPresignGet(ctx.env, { key, signGet: deps.signGet });
         return okResponse(200, { url: signedUrl, key }, PRIVATE_CACHE);
       }
-      return new Response(null, {
-        status: 302,
-        headers: {
-          Location: signedUrl,
-          'cache-control': 'private, no-store'
-        }
-      });
+
+      // The page asks for photos and voice notes as credentialed CORS requests
+      // to this API. Following a redirect to the bucket would depend on the
+      // bucket's own CORS rules, so the bytes are sent from here.
+      const range = parseJournalByteRange(request.headers.get('range')) ?? undefined;
+      const object = await travelJournalGetObject(ctx.env, { key, range, getObject: deps.getObject });
+      if (!object) {
+        return errorResponse(404, 'not_found', 'Media object not available.', false, PRIVATE_CACHE);
+      }
+      if (object.invalidRange) {
+        return new Response(null, { status: 416, headers: PRIVATE_CACHE });
+      }
+      if (object.tooLarge) return redirectToStorage();
+
+      const headers = {
+        'content-type':
+          object.contentType ||
+          (variant === 'derivative' ? 'image/jpeg' : media.content_type) ||
+          'application/octet-stream',
+        'content-length': String(object.bytes.byteLength),
+        'accept-ranges': 'bytes',
+        'cache-control': MEDIA_BYTES_CACHE,
+        'access-control-expose-headers': 'content-length, content-range, accept-ranges'
+      };
+      if (object.contentRange) headers['content-range'] = object.contentRange;
+      return new Response(object.bytes, { status: object.contentRange ? 206 : 200, headers });
     } catch (error) {
       if (error?.code === travelJournalR2Unbound().code || error?.status === 503) {
         return errorResponse(

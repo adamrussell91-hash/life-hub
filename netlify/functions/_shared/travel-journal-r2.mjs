@@ -1,4 +1,4 @@
-import { knowledgeR2Config } from './knowledge-r2.mjs';
+import { knowledgeR2ClientOptions, knowledgeR2Config } from './knowledge-r2.mjs';
 
 export const MAX_JOURNAL_MEDIA_BYTES = 50 * 1024 * 1024;
 export const JOURNAL_MEDIA_SIGN_EXPIRES_IN = 300;
@@ -267,16 +267,12 @@ export function verifyHeadObject(head, expected) {
   return { ok: false, message: 'Stored checksum does not match' };
 }
 
+// The same options as Knowledge and the Food Journal: R2 answers the SDK's
+// default checksum mode with 501, so signed PUTs failed and signed GETs
+// returned XML instead of the photo or the voice note.
 function s3Client(config) {
-  return import('@aws-sdk/client-s3').then(({ S3Client }) =>
-    new S3Client({
-      region: 'auto',
-      endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
-      credentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey
-      }
-    })
+  return import('@aws-sdk/client-s3').then(
+    ({ S3Client }) => new S3Client(knowledgeR2ClientOptions(config))
   );
 }
 
@@ -339,4 +335,77 @@ export async function travelJournalHeadObject(env, { key, headObject } = {}) {
     if (error?.name === 'NotFound' || error?.$metadata?.httpStatusCode === 404) return null;
     throw error;
   }
+}
+
+/**
+ * The most the API sends or receives itself for one journal object. Netlify
+ * caps a function's request and reply at 6 MB with base64 included, so 4 MB
+ * of bytes fits, as it does for the Food Journal's photos.
+ */
+export const JOURNAL_RELAY_MAX_BYTES = 4 * 1024 * 1024;
+
+const SINGLE_BYTE_RANGE_RE = /^bytes=(\d*)-(\d*)$/;
+
+/** One byte range ("bytes=0-1", "bytes=100-", "bytes=-500"), or null for none or anything else. */
+export function parseJournalByteRange(header) {
+  const value = typeof header === 'string' ? header.trim() : '';
+  const match = SINGLE_BYTE_RANGE_RE.exec(value);
+  if (!match || (match[1] === '' && match[2] === '')) return null;
+  return value;
+}
+
+/**
+ * Read one journal object for the API to send on: `{ bytes, contentType,
+ * contentRange }`, `null` when it is not in storage, `{ tooLarge: true }`
+ * when it is too big to relay, `{ invalidRange: true }` for a range past its end.
+ */
+export async function travelJournalGetObject(
+  env,
+  { key, range, getObject, maxBytes = JOURNAL_RELAY_MAX_BYTES } = {}
+) {
+  const config = travelJournalR2Config(env);
+  if (!config) throw travelJournalR2Unbound();
+  if (typeof getObject === 'function') return getObject({ ...config, key, range, maxBytes });
+  const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+  const client = await s3Client(config);
+  let out;
+  try {
+    out = await client.send(
+      new GetObjectCommand({ Bucket: config.bucket, Key: key, ...(range ? { Range: range } : {}) })
+    );
+  } catch (error) {
+    const status = error?.$metadata?.httpStatusCode;
+    if (error?.name === 'NoSuchKey' || error?.name === 'NotFound' || status === 404) return null;
+    if (error?.name === 'InvalidRange' || status === 416) return { invalidRange: true };
+    throw error;
+  }
+  if (Number(out.ContentLength) > maxBytes) {
+    out.Body?.destroy?.();
+    return { tooLarge: true };
+  }
+  return {
+    bytes: await out.Body.transformToByteArray(),
+    contentType: out.ContentType,
+    contentRange: out.ContentRange
+  };
+}
+
+/** Store one journal object from the API, so the browser never needs the bucket's CORS rules. */
+export async function travelJournalPutObject(env, { key, body, contentType, checksum, putObject } = {}) {
+  const config = travelJournalR2Config(env);
+  if (!config) throw travelJournalR2Unbound();
+  if (typeof putObject === 'function') {
+    return putObject({ ...config, key, body, contentType, checksum });
+  }
+  const { PutObjectCommand } = await import('@aws-sdk/client-s3');
+  const client = await s3Client(config);
+  await client.send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      Metadata: checksum ? { checksum: String(checksum).toLowerCase() } : undefined
+    })
+  );
 }
