@@ -46,6 +46,8 @@ export function mountTour(options: TourOptions): TourHandle {
   let spot: HTMLElement | null = null;
   let card: HTMLElement | null = null;
   let disposed = false;
+  /** The body's own bottom padding, put back when the tour closes. */
+  let padWas: string | null = null;
 
   const help = document.createElement('button');
   help.type = 'button';
@@ -132,6 +134,12 @@ export function mountTour(options: TourOptions): TourHandle {
     }
     card.classList.remove('is-centred');
     spot.classList.remove('is-off');
+    // On a phone the card docks over the bottom of the screen; room below the page lets the last
+    // sections scroll up above it.
+    if (phone && padWas === null) {
+      padWas = document.body.style.paddingBottom;
+      document.body.style.paddingBottom = '75vh';
+    }
     if (scroll) target.scrollIntoView?.({ block: phone ? 'start' : 'center', behavior: 'auto' });
     const r = target.getBoundingClientRect();
     // On a phone the docked card covers the bottom of the screen: keep the spotlight above it.
@@ -199,6 +207,10 @@ export function mountTour(options: TourOptions): TourHandle {
     document.removeEventListener('keydown', onKey);
     window.removeEventListener('resize', onResize);
     host.removeAttribute('inert');
+    if (padWas !== null) {
+      document.body.style.paddingBottom = padWas;
+      padWas = null;
+    }
     const leaving = layer;
     const ghost = card;
     const from = card?.getBoundingClientRect();
@@ -215,7 +227,10 @@ export function mountTour(options: TourOptions): TourHandle {
     ghost.className = 'tour-ghost';
     ghost.removeAttribute('role');
     ghost.removeAttribute('aria-modal');
-    ghost.replaceChildren();
+    ghost.removeAttribute('aria-live');
+    ghost.setAttribute('aria-hidden', 'true');
+    // Its words fade in the first moment (CSS); only the card's shape travels.
+    ghost.querySelectorAll('button').forEach((b) => (b.tabIndex = -1));
     Object.assign(ghost.style, { top: `${from.top}px`, left: `${from.left}px`, width: `${from.width}px`, height: `${from.height}px` });
     leaving.classList.add('is-leaving');
     help.focus();
@@ -231,9 +246,9 @@ export function mountTour(options: TourOptions): TourHandle {
     const fly = ghost.animate(
       [
         { transform: 'translate(0, 0) scale(1, 1)', borderRadius: '12px', opacity: 1 },
-        { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`, borderRadius: '50%', opacity: 0.9 }
+        { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`, borderRadius: '50%', opacity: 0.85 }
       ],
-      { duration: 450, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', fill: 'forwards' }
+      { duration: 550, easing: 'cubic-bezier(0.45, 0, 0.2, 1)', fill: 'forwards' }
     );
     const done = () => {
       leaving.remove();

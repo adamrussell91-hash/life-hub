@@ -51,6 +51,11 @@
   margin-left: auto;
 }
 
+/* The class-site header is sticky: a section scrolled to the top (by the tour) clears it. */
+.share-page [data-tour] {
+  scroll-margin-top: 80px;
+}
+
 .share-card {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg, 12px);
