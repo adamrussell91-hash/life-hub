@@ -14,6 +14,7 @@ import { isValidLinkProposalId } from './link-proposal-schema.mjs';
 import { isValidLedgerItemId } from './ledger-schema.mjs';
 import { isValidRememberFactId } from './remember-schema.mjs';
 import { isValidThreadId } from './thread-schema.mjs';
+import { isValidMentorshipId } from './mentorship-schema.mjs';
 import { isValidPdGroupId } from './pd-group-schema.mjs';
 import {
   isValidAchievementId,
@@ -58,6 +59,7 @@ export const LEDGER_ITEM_BY_PERSON_PREFIX = 'ledger-items/by-person/';
 export const LEDGER_ITEM_BY_SOURCE_PREFIX = 'ledger-items/by-source/';
 
 export const THREAD_PREFIX = 'threads/records/';
+export const MENTORSHIP_PREFIX = 'mentorships/records/';
 
 export const PD_GROUP_PREFIX = 'pd-groups/records/';
 
@@ -353,6 +355,17 @@ export function threadKey(id) {
 
 export async function listThreadKeys(store) {
   return (await listBlobKeys(store, THREAD_PREFIX)).filter((key) => !isIndexKey(key));
+}
+
+export function mentorshipKey(id) {
+  if (!isValidMentorshipId(id)) {
+    throw Object.assign(new Error(`Invalid mentorship id: ${JSON.stringify(id)}`), { status: 400, code: 'invalid_mentorship_id' });
+  }
+  return `${MENTORSHIP_PREFIX}${id}`;
+}
+
+export async function listMentorshipKeys(store) {
+  return (await listBlobKeys(store, MENTORSHIP_PREFIX)).filter((key) => !isIndexKey(key));
 }
 
 export function pdGroupKey(id) {

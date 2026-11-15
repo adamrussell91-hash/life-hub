@@ -29,6 +29,7 @@ import '../styles/block-page.css';
 import '../styles/comm-page.css';
 import '../styles/thread-page.css';
 import '../styles/meeting-page.css';
+import '../styles/mentoring.css';
 import '../styles/guides.css';
 import '../styles/share-sheet.css';
 import '../styles/check-in.css';
@@ -50,6 +51,7 @@ import { renderHomeView } from '@/views/home';
 import { renderOrganisationsView } from '@/views/organisations';
 import { renderRelationshipsView } from '@/views/relationships';
 import { renderMentoringView } from '@/views/mentoring';
+import { renderMentoringPersonView } from '@/views/mentoring-person';
 import { renderCommunicationsView } from '@/views/communications';
 import { renderCommLog } from '@/views/comm-log';
 import { renderCommPage } from '@/views/comm-page';
@@ -213,6 +215,17 @@ async function bootApp(root: HTMLElement): Promise<void> {
     if (route.name === 'mentoring') {
       renderPageHeader(shell, viewChrome('mentoring'));
       await renderMentoringView(shell.canvas, {
+        isCurrent: () => generation === routeGeneration
+      });
+      return;
+    }
+    if (route.name === 'mentoring-person') {
+      renderPageHeader(shell, { eyebrow: 'Mentoring', title: 'Loading…' });
+      await renderMentoringPersonView(shell.canvas, route.id, {
+        onTitleReady: (title) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, { eyebrow: 'Mentoring', title });
+        },
         isCurrent: () => generation === routeGeneration
       });
       return;
