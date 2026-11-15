@@ -13,36 +13,9 @@ import {
   travelJournalR2Unbound,
   verifyHeadObject
 } from './_shared/travel-journal-r2.mjs';
+import { stampStoredJournalMedia } from './_shared/travel-journal-media-stamp.mjs';
 
 export const config = { path: '/api/travel-journal-media-sign' };
-
-function applyVerifiedMedia(journal, parsed) {
-  const idx = journal.media.findIndex((item) => item.id === parsed.media_id);
-  if (idx < 0) {
-    const err = new Error('Media not found in journal.');
-    err.code = 'not_found';
-    err.status = 404;
-    throw err;
-  }
-  const media = { ...journal.media[idx] };
-  media.upload_state = 'backed_up';
-  if (parsed.purpose === 'original') {
-    media.original_key = parsed.key;
-    media.byte_size = parsed.byte_size;
-    media.checksum = parsed.checksum;
-    if (parsed.content_type) media.content_type = parsed.content_type;
-  } else {
-    const derivative_keys = { ...(media.derivative_keys ?? {}) };
-    derivative_keys[String(parsed.derivative_width)] = parsed.key;
-    media.derivative_keys = derivative_keys;
-  }
-  const next = {
-    ...journal,
-    revision: journal.revision + 1,
-    media: journal.media.map((item, i) => (i === idx ? media : item))
-  };
-  return next;
-}
 
 export function createTravelJournalMediaSignHandler(deps = {}) {
   return createTravelOperatorHandler(async (request, ctx) => {
@@ -66,28 +39,12 @@ export function createTravelJournalMediaSignHandler(deps = {}) {
         return errorResponse(400, 'verify_failed', check.message, false, PRIVATE_CACHE);
       }
 
-      // Verify only stamps one media row, so apply it to the latest journal
-      // rather than the client's version: uploads finish in any order, and
-      // a version moved on by another save must not fail the backup.
-      let saved;
-      for (let attempt = 0; ; attempt += 1) {
-        const { journal, version } = await ctx.repo.getJournal(parsed.value.trip_id);
-        const nextJournal = applyVerifiedMedia(journal, parsed.value);
-        try {
-          saved = await ctx.repo.saveJournal(
-            nextJournal,
-            version,
-            `travel-journal: verify media ${parsed.value.media_id}`
-          );
-          break;
-        } catch (error) {
-          if (error?.code !== 'conflict' || attempt >= 3) throw error;
-        }
-      }
+      const saved = await stampStoredJournalMedia(ctx.repo, parsed.value);
+      const row = saved.journal.media.find((item) => item.id === parsed.value.media_id);
       return okResponse(
         200,
         {
-          upload_state: 'backed_up',
+          upload_state: row?.upload_state ?? 'pending',
           journal: saved.journal,
           version: saved.version,
           key: parsed.value.key

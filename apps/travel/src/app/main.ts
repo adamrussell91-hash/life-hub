@@ -37,7 +37,7 @@ import { renderAtlas } from '@/views/atlas';
 import { getTrip, listTrips } from '@/api/travel';
 import { pickPrimaryTrip } from '@/lib/pick-trip';
 import { registerServiceWorker, mountOfflineBanner } from '@/lib/offline';
-import { bindJournalOutbox } from '@/journal/journal-outbox';
+import { bindJournalOutbox, restoreQueuedMediaPreviews } from '@/journal/journal-outbox';
 
 function journalUseFixture(): boolean {
   return new URLSearchParams(location.search).get('fixture') === '1';
@@ -187,6 +187,8 @@ async function bootApp(root: HTMLElement): Promise<void> {
             /* title stays blank until trip load works */
           }
         }
+        // Photos still waiting to upload show from this phone, after a reload too.
+        await restoreQueuedMediaPreviews();
         journalHandle = renderJournal(shell.canvas, {
           fixture,
           journalVersion,

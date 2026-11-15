@@ -7,6 +7,7 @@ import {
   journalMediaDerivativeKey,
   journalMediaOriginalKey,
   parseJournalMediaSignRequest,
+  travelJournalPresignGet,
   travelJournalPresignPut,
   travelJournalR2Unbound,
   verifyHeadObject
@@ -89,4 +90,29 @@ test('parseJournalMediaSignRequest mints derivative sign payload', () => {
   });
   assert.ok(parsed.value);
   assert.equal(parsed.value.key, `travel/journal/${TRIP}/${MEDIA}/der/1600.jpg`);
+});
+
+// R2 answers 501 NotImplemented to the SDK's default checksum mode: a signed
+// PUT that names a CRC32 (of an empty body) fails, and a signed GET with
+// x-amz-checksum-mode returns XML instead of the photo or the voice note.
+test('signed journal URLs carry no SDK checksum parameters R2 rejects', async () => {
+  const env = {
+    R2_ACCOUNT_ID: 'acct',
+    R2_BUCKET: 'bucket',
+    R2_ACCESS_KEY_ID: 'key',
+    R2_SECRET_ACCESS_KEY: 'secret'
+  };
+  const key = journalMediaDerivativeKey(TRIP, MEDIA, 960);
+  const put = new URL(
+    await travelJournalPresignPut(env, { key, contentType: 'image/jpeg', checksum: CHECKSUM })
+  );
+  const get = new URL(await travelJournalPresignGet(env, { key }));
+  for (const url of [put, get]) {
+    const names = [...url.searchParams.keys()].map((name) => name.toLowerCase());
+    assert.deepEqual(
+      names.filter((name) => name.startsWith('x-amz-checksum') || name === 'x-amz-sdk-checksum-algorithm'),
+      [],
+      url.toString()
+    );
+  }
 });

@@ -25,12 +25,14 @@ import {
   flushJournalOps,
   listJournalOps,
   removeJournalOp,
+  updateJournalOpPayload,
   isJournalOpPending,
   type JournalOpAck,
   type JournalQueuedOp,
 } from '@/journal/offline-queue';
-import { backUpJournalMedia, type JournalMediaUploadJob } from '@/journal/media-upload';
+import { backUpJournalMedia, type JournalMediaPart, type JournalMediaUploadJob } from '@/journal/media-upload';
 import { isJournalSaveConflict, recoverJournalSaveConflict } from '@/journal/conflict-resolve';
+import { rememberLocalJournalMedia } from '@/journal/media-loading';
 
 /** Saves sort (and so flush) before media: verify needs the media row on the server. */
 const SAVE_PREFIX = 'a-save:';
@@ -155,6 +157,25 @@ export async function queueJournalMedia(
   if (options.flush !== false) scheduleFlush();
 }
 
+/**
+ * Photos and voice notes not yet backed up show from this device. Their bytes
+ * wait here, but the preview URLs live in memory and a reload loses them, so
+ * hand them back before the journal paints.
+ */
+export async function restoreQueuedMediaPreviews(): Promise<void> {
+  let ops: JournalQueuedOp[];
+  try {
+    ops = await listJournalOps();
+  } catch {
+    return;
+  }
+  for (const op of ops) {
+    const payload = op.payload as MediaPayload | undefined;
+    if (!op.id.startsWith(MEDIA_PREFIX) || payload?.kind !== 'media') continue;
+    if (payload.blob instanceof Blob) rememberLocalJournalMedia(payload.mediaId, payload.blob);
+  }
+}
+
 export async function dropQueuedJournalMedia(mediaIds: string[]): Promise<void> {
   for (const id of mediaIds) await removeJournalOp(MEDIA_PREFIX + id).catch(() => undefined);
 }
@@ -176,16 +197,23 @@ async function sendSave(payload: SavePayload): Promise<JournalOpAck> {
   return { state: 'acked', server_version: envelope.version };
 }
 
-async function sendMedia(payload: MediaPayload): Promise<JournalOpAck> {
+async function sendMedia(op: JournalQueuedOp, payload: MediaPayload): Promise<JournalOpAck> {
   // The moment that references these bytes has not reached the server yet:
   // uploading now would only fail verify. Keep them and try after the save.
   if (await hasPendingSave(payload.tripId)) {
     return { state: 'failed', error: 'Waiting for the journal save' };
   }
+  const stored = new Set<JournalMediaPart>(payload.stored ?? []);
   try {
-    const envelope = await backUpJournalMedia(payload);
-    void emitSynced(payload.tripId, envelope);
-    return { state: 'acked', server_version: envelope.version };
+    const envelope = await backUpJournalMedia(payload, {
+      // Remembered on the device, so a retry after a dropped connection sends only what is left.
+      onStored: async (part) => {
+        stored.add(part);
+        await updateJournalOpPayload(op.id, op.stamp, { ...payload, stored: [...stored] });
+      },
+    });
+    if (envelope) void emitSynced(payload.tripId, envelope);
+    return { state: 'acked', server_version: envelope?.version };
   } catch (err) {
     if (err instanceof ApiClientError && err.code === 'not_found') {
       const { journal } = await getJournal(payload.tripId);
@@ -202,7 +230,7 @@ async function sendMedia(payload: MediaPayload): Promise<JournalOpAck> {
 async function send(op: JournalQueuedOp): Promise<JournalOpAck> {
   const payload = op.payload as SavePayload | MediaPayload;
   if (payload?.kind === 'save') return sendSave(payload);
-  if (payload?.kind === 'media') return sendMedia(payload);
+  if (payload?.kind === 'media') return sendMedia(op, payload);
   return { state: 'acked' };
 }
 

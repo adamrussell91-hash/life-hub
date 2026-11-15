@@ -5,7 +5,7 @@ import {
   resolveMomentAuthor,
 } from '@/journal/partner-perspective';
 import { formatMediaAnnotationsPlainText, getMediaPhotoAnnotations } from '@/journal/annotations';
-import { isFixtureMediaUrl, journalMediaDerivativeUrl } from '@/journal/media-loading';
+import { isFixtureMediaUrl, isJournalApiMediaUrl, journalMediaDerivativeUrl } from '@/journal/media-loading';
 import { transitionForFromLeg } from '@/journal/transitions';
 import { resolveMediaTranscriptText } from '@/journal/transcripts';
 import type { JournalFixture, JournalMedia, JournalMoment } from '@/journal/types';
@@ -155,8 +155,10 @@ function renderMomentBlock(
       `<div class="journal-print-moment__photos${pair ? ' journal-print-moment__photos--pair' : ''}">`,
     );
     for (const item of liveMedia) {
-      const src = escapeHtml(journalPrintImageSrc(tripId, item));
-      parts.push(`<img src="${src}" alt="" width="${escapeHtml(String(item.width))}" height="${escapeHtml(String(item.height))}" />`);
+      const url = journalPrintImageSrc(tripId, item);
+      // The API answers only requests that name their origin; see setJournalMediaSrc.
+      const cors = isJournalApiMediaUrl(url) ? 'crossorigin="use-credentials" ' : '';
+      parts.push(`<img ${cors}src="${escapeHtml(url)}" alt="" width="${escapeHtml(String(item.width))}" height="${escapeHtml(String(item.height))}" />`);
     }
     parts.push('</div>');
   }

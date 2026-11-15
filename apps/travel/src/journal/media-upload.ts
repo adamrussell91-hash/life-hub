@@ -3,23 +3,37 @@
  *
  * Photos: the 320 / 960 / 1600px JPEG copies the journal displays go up
  * first, then the original. The server marks the media `backed_up` only
- * when the original is verified, so `backed_up` means everything is there.
+ * when the original is stored, so `backed_up` means everything is there.
  * Voice notes: the original only.
  *
- * Every PUT is re-signed per attempt (signed URLs expire after 5 minutes)
- * and retried with backoff; the caller keeps the bytes on the device until
- * this resolves.
+ * A file up to JOURNAL_RELAY_MAX_BYTES goes to the API, which stores it, so
+ * nothing depends on the bucket accepting a PUT from the browser. A bigger
+ * original goes up on a signed URL, re-signed per attempt (they expire after
+ * 5 minutes). Everything retries with backoff; the caller keeps the bytes on
+ * the device until this resolves.
  */
+import { ApiClientError } from '@/api/client';
 import {
   signJournalMedia,
+  uploadJournalMediaThroughApi,
   uploadJournalMediaToSignedUrl,
   verifyJournalMedia,
   type JournalMediaSignInput,
+  type JournalMediaVerifyResult,
 } from '@/api/journal-media';
 import type { JournalEnvelope } from '@/api/journal';
 import { rememberJournalEnvelope } from '@/api/journal';
-import { JOURNAL_DERIVATIVE_WIDTHS } from '@/journal/media-loading';
+import { JOURNAL_DERIVATIVE_WIDTHS, type JournalDerivativeWidth } from '@/journal/media-loading';
 import type { JournalMedia } from '@/journal/types';
+
+/**
+ * The most the API carries for one file (netlify `JOURNAL_RELAY_MAX_BYTES`):
+ * a function's body is capped at 6 MB with base64 included.
+ */
+export const JOURNAL_RELAY_MAX_BYTES = 4 * 1024 * 1024;
+
+/** One stored piece of a photo or voice note: a copy at one width, or the original. */
+export type JournalMediaPart = 'original' | `w${JournalDerivativeWidth}`;
 
 export interface JournalMediaUploadJob {
   tripId: string;
@@ -28,6 +42,13 @@ export interface JournalMediaUploadJob {
   contentType: string;
   /** SHA-256 of the original, when it was already worked out (photo import). */
   checksum?: string;
+  /** Parts an earlier attempt stored, so a retry does not send them again. */
+  stored?: JournalMediaPart[];
+}
+
+export interface JournalMediaUploadHooks {
+  /** Called as each part is stored, so the caller can remember it across attempts. */
+  onStored?: (part: JournalMediaPart) => void | Promise<void>;
 }
 
 const RETRY_DELAYS_MS = [1000, 4000, 12000];
@@ -55,6 +76,12 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** A refusal the API will repeat (a bad request, a missing row, too big): retrying cannot help. */
+function isFinalRefusal(err: unknown): boolean {
+  const status = err instanceof ApiClientError ? (err.status ?? 0) : 0;
+  return status >= 400 && status < 500 && status !== 408 && status !== 429;
+}
+
 async function withRetry<T>(run: () => Promise<T>): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
@@ -62,6 +89,7 @@ async function withRetry<T>(run: () => Promise<T>): Promise<T> {
       return await run();
     } catch (err) {
       lastError = err;
+      if (isFinalRefusal(err)) break;
       if (typeof navigator !== 'undefined' && navigator.onLine === false) break;
       const delay = RETRY_DELAYS_MS[attempt];
       if (delay === undefined) break;
@@ -103,7 +131,15 @@ export async function jpegDerivative(image: DecodedImage, width: number): Promis
   return blob;
 }
 
-async function putAndVerify(
+async function putSignedAndVerify(signInput: JournalMediaSignInput, blob: Blob): Promise<JournalMediaVerifyResult> {
+  await withRetry(async () => {
+    const sign = await signJournalMedia(signInput);
+    await uploadJournalMediaToSignedUrl(sign.upload_url, blob, sign.headers);
+  });
+  return withRetry(() => verifyJournalMedia({ ...signInput, if_version: 'latest', action: 'verify' }));
+}
+
+async function storePart(
   base: Omit<JournalMediaSignInput, 'checksum' | 'byte_size' | 'content_type'>,
   blob: Blob,
   contentType: string,
@@ -115,38 +151,53 @@ async function putAndVerify(
     byte_size: blob.size,
     checksum: knownChecksum ?? (await sha256Hex(blob)),
   };
-  await withRetry(async () => {
-    const sign = await signJournalMedia(signInput);
-    await uploadJournalMediaToSignedUrl(sign.upload_url, blob, sign.headers);
-  });
-  const verified = await withRetry(() =>
-    verifyJournalMedia({ ...signInput, if_version: 'latest', action: 'verify' }),
-  );
+  let stored: JournalMediaVerifyResult | undefined;
+  if (blob.size <= JOURNAL_RELAY_MAX_BYTES) {
+    try {
+      stored = await withRetry(() => uploadJournalMediaThroughApi(signInput, blob));
+    } catch (err) {
+      // The API's host refused the body as too big: a signed upload can still carry it.
+      if (!(err instanceof ApiClientError && err.status === 413)) throw err;
+    }
+  }
+  stored ??= await putSignedAndVerify(signInput, blob);
   return rememberJournalEnvelope({
-    journal: verified.journal as JournalEnvelope['journal'],
-    version: verified.version,
+    journal: stored.journal as JournalEnvelope['journal'],
+    version: stored.version,
   });
 }
 
-/** Upload derivatives (photos) and the original; resolves with the server's latest journal. */
-export async function backUpJournalMedia(job: JournalMediaUploadJob): Promise<JournalEnvelope> {
+/**
+ * Upload the copies (photos) and the original, skipping parts already stored.
+ * Resolves with the server's latest journal, or null when nothing was left to send.
+ */
+export async function backUpJournalMedia(
+  job: JournalMediaUploadJob,
+  hooks: JournalMediaUploadHooks = {},
+): Promise<JournalEnvelope | null> {
   const base = { trip_id: job.tripId, media_id: job.mediaId };
+  const done = new Set<JournalMediaPart>(job.stored ?? []);
+  let envelope: JournalEnvelope | null = null;
   if (!isAudioContentType(job.contentType)) {
-    const image = await decodeImage(job.blob);
-    try {
-      for (const width of JOURNAL_DERIVATIVE_WIDTHS) {
-        const copy = await jpegDerivative(image, width);
-        await putAndVerify(
-          { ...base, purpose: 'derivative', derivative_width: width },
-          copy,
-          'image/jpeg',
-        );
+    const widths = JOURNAL_DERIVATIVE_WIDTHS.filter((width) => !done.has(`w${width}`));
+    if (widths.length) {
+      const image = await decodeImage(job.blob);
+      try {
+        for (const width of widths) {
+          const copy = await jpegDerivative(image, width);
+          envelope = await storePart({ ...base, purpose: 'derivative', derivative_width: width }, copy, 'image/jpeg');
+          await hooks.onStored?.(`w${width}`);
+        }
+      } finally {
+        image.source.close();
       }
-    } finally {
-      image.source.close();
     }
   }
-  return putAndVerify({ ...base, purpose: 'original' }, job.blob, job.contentType, job.checksum);
+  if (!done.has('original')) {
+    envelope = await storePart({ ...base, purpose: 'original' }, job.blob, job.contentType, job.checksum);
+    await hooks.onStored?.('original');
+  }
+  return envelope;
 }
 
 export function makeMediaId(): string {

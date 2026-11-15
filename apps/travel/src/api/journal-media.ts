@@ -1,4 +1,5 @@
-import { apiPost } from '@/api/client';
+import { ApiClientError, apiPost, parseApiResponse } from '@/api/client';
+import { getApiBaseUrl } from '@/api/config';
 
 export interface JournalMediaSignInput {
   trip_id: string;
@@ -23,7 +24,8 @@ export interface JournalMediaVerifyInput extends JournalMediaSignInput {
 }
 
 export interface JournalMediaVerifyResult {
-  upload_state: 'backed_up';
+  /** `backed_up` once the original is stored; a copy alone leaves the row pending. */
+  upload_state: 'backed_up' | 'pending';
   journal: unknown;
   version: string;
   key: string;
@@ -75,4 +77,43 @@ export async function uploadJournalMediaWithProgress(
   const sign = await signJournalMedia(signInput);
   await uploadJournalMediaToSignedUrl(sign.upload_url, file, sign.headers, onProgress);
   return { key: sign.key, sign };
+}
+
+/**
+ * Send the bytes to the API, which stores them and records them on the journal
+ * in one step. Nothing here depends on the bucket accepting a browser PUT. The
+ * API refuses anything over its size limit with 413 (`too_large`).
+ */
+export async function uploadJournalMediaThroughApi(
+  input: JournalMediaSignInput,
+  file: Blob
+): Promise<JournalMediaVerifyResult> {
+  const params = new URLSearchParams({
+    trip: input.trip_id,
+    id: input.media_id,
+    purpose: input.purpose,
+    ...(input.derivative_width ? { width: String(input.derivative_width) } : {}),
+    checksum: input.checksum
+  });
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}/api/travel-journal-media-upload?${params}`, {
+      method: 'POST',
+      headers: { 'content-type': input.content_type },
+      body: file,
+      credentials: 'include',
+      signal:
+        typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(60_000) : undefined
+    });
+  } catch (cause) {
+    // Safari rejects with a bare TypeError ("Load failed") when the connection drops.
+    const timedOut = cause instanceof DOMException && cause.name === 'TimeoutError';
+    throw new ApiClientError({
+      code: timedOut ? 'timeout' : 'network_error',
+      message: cause instanceof Error ? cause.message : 'Network request failed'
+    });
+  }
+  const result = await parseApiResponse<JournalMediaVerifyResult>(response);
+  if (!result.ok) throw new ApiClientError(result.error, response.status, result.data);
+  return result.data;
 }

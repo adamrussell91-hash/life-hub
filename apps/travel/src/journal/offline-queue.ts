@@ -271,6 +271,16 @@ export async function ackJournalOp(id: string, ack: JournalOpAck): Promise<Journ
   return next;
 }
 
+/**
+ * Replace an op's payload without making it a new edit (the stamp stays), so
+ * the flush sending it still acks it. Nothing happens if a newer edit replaced it.
+ */
+export async function updateJournalOpPayload(id: string, stamp: string | undefined, payload: unknown): Promise<void> {
+  const current = await store().get(id);
+  if (!current || current.stamp !== stamp) return;
+  await store().put({ ...current, payload });
+}
+
 export interface FlushJournalOpsResult {
   sent: string[];
   skipped: string[];

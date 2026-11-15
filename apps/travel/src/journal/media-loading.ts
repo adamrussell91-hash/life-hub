@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from '@/api/config';
 import type { JournalFixture, JournalMedia, JournalMoment } from '@/journal/types';
 export type JournalPhotoLayout = 'single' | 'pair' | 'lead-pair' | 'lead-pair-more';
 
@@ -15,6 +16,16 @@ export function isFixtureMediaUrl(url: string | undefined): url is string {
   );
 }
 
+/** The API is another origin on the live site (Pages vs Functions), so its address goes first. */
+function journalMediaApiUrl(params: URLSearchParams): string {
+  return `${getApiBaseUrl()}/api/travel-journal-media?${params}`;
+}
+
+/** Served by the API, as opposed to bytes on this device or a fixture's own file. */
+export function isJournalApiMediaUrl(url: string): boolean {
+  return url.includes('/api/travel-journal-media');
+}
+
 export function journalMediaDerivativeUrl(
   tripId: string,
   mediaId: string,
@@ -26,7 +37,7 @@ export function journalMediaDerivativeUrl(
     variant: 'derivative',
     width: String(width),
   });
-  return `/api/travel-journal-media?${params}`;
+  return journalMediaApiUrl(params);
 }
 
 /** Voice notes play from the original (fixtures keep their own URL). */
@@ -35,7 +46,23 @@ export function journalAudioSrc(tripId: string, media: JournalMedia): string {
   if (local) return local;
   if (isFixtureMediaUrl(media.url)) return media.url;
   const params = new URLSearchParams({ trip: tripId, id: media.id, variant: 'original' });
-  return `/api/travel-journal-media?${params}`;
+  return journalMediaApiUrl(params);
+}
+
+/**
+ * The API answers only requests that name an allowed Origin, and a plain <img>
+ * or <audio> names none, so its media loads as a credentialed CORS request.
+ * Set before src (or srcset), or the plain request has already started.
+ */
+function corsModeFor(el: HTMLImageElement | HTMLAudioElement, url: string): void {
+  if (isJournalApiMediaUrl(url)) el.crossOrigin = 'use-credentials';
+  else el.removeAttribute('crossorigin');
+}
+
+/** Point an <img> or <audio> at journal media, from the API or from this device. */
+export function setJournalMediaSrc(el: HTMLImageElement | HTMLAudioElement, url: string): void {
+  corsModeFor(el, url);
+  el.src = url;
 }
 
 /**
@@ -106,22 +133,24 @@ export function configureJournalImage(img: HTMLImageElement, opts: ConfigureJour
   if (local && opts.media.upload_state !== 'backed_up') {
     img.removeAttribute('srcset');
     img.removeAttribute('sizes');
-    img.src = local;
+    setJournalMediaSrc(img, local);
     return;
   }
   const srcset = buildJournalImageSrcset(opts.tripId, opts.media);
   if (srcset) {
-    img.srcset = srcset;
-    img.sizes = sizesForPhotoLayout(opts.layout);
     const width = pickDerivativeWidth(
       opts.layout === 'pair' ? 360 : 720,
       img.ownerDocument?.defaultView?.devicePixelRatio ?? 1,
     );
-    img.src = journalMediaDerivativeUrl(opts.tripId, opts.media.id, width);
+    const src = journalMediaDerivativeUrl(opts.tripId, opts.media.id, width);
+    corsModeFor(img, src);
+    img.srcset = srcset;
+    img.sizes = sizesForPhotoLayout(opts.layout);
+    img.src = src;
   } else {
     img.removeAttribute('srcset');
     img.removeAttribute('sizes');
-    img.src = opts.media.url ?? '';
+    setJournalMediaSrc(img, opts.media.url ?? '');
   }
 }
 
@@ -217,6 +246,8 @@ export function prefetchMomentLeadImage(
       );
   const img = new Image();
   img.decoding = 'async';
+  // Same CORS mode as the page's own <img>, or the browser cannot reuse the copy.
+  if (isJournalApiMediaUrl(url)) img.crossOrigin = 'use-credentials';
   img.src = url;
 }
 

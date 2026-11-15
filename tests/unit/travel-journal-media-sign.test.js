@@ -111,3 +111,33 @@ test('stripDeletedFromJournal drops deleted rows even when the whole journal is 
     [MEDIA]
   );
 });
+
+test('verifying a photo copy records it but the row waits for the original to be backed up', async () => {
+  const repo = movingRepo();
+  const handler = createTravelJournalMediaSignHandler({
+    env,
+    verifySessionToken: () => ({ valid: true }),
+    createTravelRepository: () => repo,
+    headObject: async () => ({ contentLength: 1000, metadata: { checksum: CHECKSUM } })
+  });
+  const res = await handler(
+    new Request('https://example.test/api/travel-journal-media-sign', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        action: 'verify',
+        trip_id: TRIP,
+        media_id: MEDIA,
+        content_type: 'image/jpeg',
+        byte_size: 1000,
+        checksum: CHECKSUM,
+        purpose: 'derivative',
+        derivative_width: 320,
+        if_version: 'v2'
+      })
+    })
+  );
+  assert.equal(res.status, 200);
+  assert.equal(repo.stored.media[0].upload_state, 'pending');
+  assert.equal(repo.stored.media[0].derivative_keys['320'], `travel/journal/${TRIP}/${MEDIA}/der/320.jpg`);
+});

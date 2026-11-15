@@ -1,3 +1,4 @@
+import { setJournalMediaSrc } from '@/journal/media-loading';
 import { ICONS, button, el, icon } from '@/journal/story/dom';
 
 export interface SoundPlayerOptions {
@@ -23,7 +24,7 @@ export function renderSoundPlayer(options: SoundPlayerOptions): HTMLElement {
   const wrap = el('div', 'story-sound');
   const audio = el('audio');
   audio.preload = 'none';
-  audio.src = options.src;
+  setJournalMediaSrc(audio, options.src);
 
   const toggle = button('story-sound__toggle');
   toggle.setAttribute('aria-label', 'Play sound');

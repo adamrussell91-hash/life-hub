@@ -510,7 +510,47 @@ export function createMockApi() {
       });
     }
 
-    // Journal media: sign hands back a local upload URL; verify marks the row backed up.
+    // Journal media: the API stores small files itself; sign hands back a local
+    // upload URL for bigger ones; verify records the row (backed up once the original is in).
+    const mediaKey = (tripId: string, mediaId: string, purpose: string, width?: number | string | null) =>
+      `travel/journal/${tripId}/${mediaId}/${purpose === 'derivative' ? `w${width}` : 'original'}`;
+    const recordMedia = (tripId: string, mediaId: string, purpose: string, width: number | string | null | undefined) => {
+      const key = mediaKey(tripId, mediaId, purpose, width);
+      const entry = journals.get(tripId);
+      if (!entry) return json(404, { ok: false, error: { code: 'not_found', message: 'Journal not found.' } });
+      const media = (entry.journal.media as Record<string, unknown>[]) ?? [];
+      if (!media.some((m) => m.id === mediaId)) {
+        return json(404, { ok: false, error: { code: 'not_found', message: 'Media not found in journal.' } });
+      }
+      let state = 'pending';
+      entry.journal = {
+        ...entry.journal,
+        media: media.map((m) => {
+          if (m.id !== mediaId) return m;
+          if (purpose === 'derivative') {
+            state = String(m.upload_state ?? 'pending');
+            return { ...m, derivative_keys: { ...((m.derivative_keys as object) ?? {}), [`w${width}`]: key } };
+          }
+          state = 'backed_up';
+          return { ...m, original_key: key, upload_state: 'backed_up' };
+        })
+      };
+      entry.version += 1;
+      return json(200, {
+        ok: true,
+        data: { upload_state: state, journal: entry.journal, version: `v${entry.version}`, key }
+      });
+    };
+    if (path === '/api/travel-journal-media-upload' && method === 'POST') {
+      const tripId = url.searchParams.get('trip') ?? '';
+      const mediaId = url.searchParams.get('id') ?? '';
+      const purpose = url.searchParams.get('purpose') === 'derivative' ? 'derivative' : 'original';
+      const width = url.searchParams.get('width');
+      const raw = (body as { raw?: Buffer } | undefined)?.raw;
+      const result = recordMedia(tripId, mediaId, purpose, width);
+      if (raw && result.status === 200) uploads.set(mediaKey(tripId, mediaId, purpose, width), raw);
+      return result;
+    }
     if (path === '/api/travel-journal-media-sign' && method === 'POST') {
       const input = body as {
         trip_id: string;
@@ -519,31 +559,14 @@ export function createMockApi() {
         derivative_width?: number;
         action?: string;
       };
-      const key = `travel/journal/${input.trip_id}/${input.media_id}/${input.purpose === 'derivative' ? `w${input.derivative_width}` : 'original'}`;
+      const key = mediaKey(input.trip_id, input.media_id, input.purpose, input.derivative_width);
       if (input.action !== 'verify') {
         return json(200, {
           ok: true,
           data: { upload_url: `/api/mock-upload?key=${encodeURIComponent(key)}`, headers: {}, key, expires_in: 300 }
         });
       }
-      const entry = journals.get(input.trip_id);
-      if (!entry) return json(404, { ok: false, error: { code: 'not_found', message: 'Journal not found.' } });
-      const media = (entry.journal.media as Record<string, unknown>[]) ?? [];
-      entry.journal = {
-        ...entry.journal,
-        media: media.map((m) => {
-          if (m.id !== input.media_id) return m;
-          if (input.purpose === 'derivative') {
-            return { ...m, derivative_keys: { ...((m.derivative_keys as object) ?? {}), [`w${input.derivative_width}`]: key } };
-          }
-          return { ...m, original_key: key, upload_state: 'backed_up' };
-        })
-      };
-      entry.version += 1;
-      return json(200, {
-        ok: true,
-        data: { upload_state: 'backed_up', journal: entry.journal, version: `v${entry.version}`, key }
-      });
+      return recordMedia(input.trip_id, input.media_id, input.purpose, input.derivative_width);
     }
     if (path === '/api/mock-upload' && method === 'PUT') {
       return json(200, { ok: true, data: { stored: true } });
@@ -645,7 +668,9 @@ export function createMockApi() {
         const key = new URL(req.url ?? '/', 'http://local').searchParams.get('key');
         if (key) uploads.set(key, rawBuf);
       }
-      if (contentType.includes('multipart/form-data')) {
+      if (req.method === 'POST' && (req.url ?? '').startsWith('/api/travel-journal-media-upload')) {
+        requestBody = { raw: rawBuf };
+      } else if (contentType.includes('multipart/form-data')) {
         requestBody = { multipart: true, bytes: rawBuf.length };
       } else if (rawBuf.length) {
         try {
