@@ -88,6 +88,56 @@ Mobile first, one column, top to bottom. The header names the student (first nam
 
 Empty states use plain sentences: "Nothing ticked off in this unit yet." "No practice in the last 4 weeks."
 
+## Explainer tour
+
+A guided tour of the progress page, shown once per new browser, then always available from a small Help button.
+
+### When it runs
+
+- On the first load of the progress page in a browser, after the page has rendered (not over the sign-in form).
+- "Seen" is a `localStorage` flag, `progress-share-tour:v1`, set when the tour finishes or is skipped. It is per browser, not per share: a parent who has two children's links sees it once. Reads and writes are wrapped in try/catch; if storage throws, the tour does not auto-run (better to miss it than repeat it every visit) and the Help button still works.
+- Bumping the key to `v2` re-shows it after a meaningful change to the page.
+
+### How it looks
+
+- A dimmed backdrop with a spotlight cut out around the current section (rounded rectangle, 8px padding). The spotlight glides between sections (transform and size, 300ms ease-out); the page scrolls the section into view first (`scrollIntoView({ block: 'center', behavior: 'smooth' })`).
+- An explainer card beside the spotlight: a step title, one or two sentences, step dots ("3 of 10"), and **Back**, **Next** (**Done** on the last step) and **Skip tour**. Positioned with the design kit's vendored floating-ui (`packages/design-kit/js/vendor/floating-ui`), flipping to stay on screen.
+- At 390px the card docks to the bottom of the screen at full width, with the spotlight above it, so it never covers the section it describes.
+- Keyboard: focus moves into the card; Right/Enter = Next, Left = Back, Esc = Skip. Focus is trapped in the card while it is open and returns to the Help button afterwards. The card is `role="dialog"` with `aria-modal="true"`, labelled by its title; step changes are announced via its live region.
+- The page underneath is `inert` while the tour runs.
+
+### Steps
+
+Steps whose section is not on the page (for example no assessments coming up) are left out, and the dots count only the steps shown. The student's first name fills `{name}`.
+
+1. **Welcome** (centred, no spotlight): "This page shows how {name} is getting on in English. You can look at anything, but nothing here can be changed."
+2. **Up next**: "What {name} should work on now and next."
+3. **Unit progress**: "How far through the current unit {name} is, counting the core lessons."
+4. **Coming up**: "Assessments on the way, soonest first."
+5. **Ticked off**: "Everything {name} has finished, with the time it was done. When lots are ticked within a few minutes, you'll see a label saying so."
+6. **Practice**: "Each square is a day {name} practised with their organiser. The weeks show how many cards they got right."
+7. **Today's organiser**: "Cards left to practise today, and how many are done."
+8. **Feedback to act on**: "Work handed back that {name} still needs to read or redraft, and work waiting to be marked."
+9. **Lessons** (spotlights the first lesson link on the page): "Tap any lesson to read it as {name} sees it. It opens locked, so you can help without changing anything."
+10. **Help**: no separate step. Finishing or skipping triggers the shrink.
+
+### The shrink
+
+When the tour ends (Done, Skip tour or Esc):
+
+1. The spotlight and backdrop fade out (200ms).
+2. The explainer card animates into the Help button: a FLIP transition from the card's rect to the button's rect (scale, translate, border-radius to a circle), 450ms `cubic-bezier(0.2, 0.8, 0.2, 1)`. Its text fades out in the first 120ms so only the shape travels.
+3. The Help button then appears in its place with a single soft pulse (one ring, 600ms), and stays.
+
+The **Help button** sits fixed at top right (16px inset, below the share header on mobile): a 32px circle with a "?" glyph, muted colour, `aria-label="Show the tour again"`. Clicking it replays the tour from step 1. Replays end with the same shrink.
+
+With `prefers-reduced-motion: reduce`, the spotlight jumps instead of gliding and the card cross-fades into the button instead of flying.
+
+### Code
+
+- `apps/teaching/src/toolkit/tour.ts` + `tour.css`: a generic `mountTour({ steps, helpButton, storageKey })` where each step is `{ target?: () => HTMLElement | null, title, body }`. It returns `{ start(), dispose() }`. Nothing in it knows about progress shares, so other pages can reuse it.
+- `share-view.ts` builds the steps and owns the Help button.
+
 ## Read-only lessons
 
 A lesson link from the share page opens `/teaching/s/share/<token>/lessons/<lessonId>`.
@@ -171,6 +221,9 @@ Browser (`tests/browser/progress-share.spec.mjs`, desktop and 390px):
 - sign-in form → page renders every section with fixture data
 - clicking a lesson opens the locked view; typing in a writing box does nothing; the banner shows; Back returns
 - no horizontal scroll at 390px
+- tour: first load shows step 1; Next walks every present step; Skip ends it and the Help button is visible top right; reload does not show the tour again; Help replays it; Esc ends it; at 390px the card docks at the bottom and doesn't cover the spotlit section
+
+Unit (`tests/unit/tour.test.js`, jsdom): steps with a missing target are dropped; the seen flag is written on finish and skip; a throwing `localStorage` neither auto-runs the tour nor breaks Help; focus returns to the Help button.
 
 ## Failure modes to check (UI register)
 
