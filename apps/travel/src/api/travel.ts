@@ -135,8 +135,14 @@ export function searchPlaces(q: string, lat?: number, lon?: number): Promise<{ p
 }
 
 /** What the noticing cards need from outside the trip in hand: a compact history of every other trip. */
-export function getNoticingHistory(tripId: string): Promise<{ history: import('@/journal/noticing/rules').NoticingHistory }> {
-  return apiGet(`/api/travel-noticing?trip=${encodeURIComponent(tripId)}`);
+export function getNoticingHistory(
+  tripId: string,
+  day?: string | null,
+): Promise<{ history: import('@/journal/noticing/rules').NoticingHistory }> {
+  const params = new URLSearchParams({ trip: tripId });
+  // The day lets the server open the diary for that one date in earlier years.
+  if (day) params.set('day', day);
+  return apiGet(`/api/travel-noticing?${params.toString()}`);
 }
 
 /** Ask the server which bucket-list and dreams-jar items one day of the trip fulfilled. */

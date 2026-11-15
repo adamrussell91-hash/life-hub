@@ -413,6 +413,13 @@ export function createMockApi() {
               { ...day('2026-03-05', 'Porto', 11, ['med_lpribeira', 'med_lpsunset', 'med_lpnight'], 41.14), country: 'Portugal' },
               { ...day('2026-03-06', 'Porto', 6, ['med_lpbeach', 'med_lpcoffee2', 'med_lpribeira'], 41.15), country: 'Portugal' },
             ],
+            // Invented food journal, diary and bookshelf facts, in the shape the server returns.
+            food: {
+              dishes: [],
+              order_again: [{ city: 'Porto', title: 'Francesinha', venue: 'Café Inventado', date: '2026-03-05' }],
+            },
+            diary: [{ date: '2026-03-05', mood: 'content', line: 'Walked the long way home along the river.' }],
+            books: [{ title: 'A Winter in Porto', author: 'Invented Author', completed_on: '2026-08-01', place: 'Porto' }],
           },
         },
       });

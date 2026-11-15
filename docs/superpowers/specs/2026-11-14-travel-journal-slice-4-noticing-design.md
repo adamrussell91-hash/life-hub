@@ -56,14 +56,14 @@ From the food journal:
 | Card | Rule | Evidence |
 | --- | --- | --- |
 | Best thing so far | A dish rated higher than every other dish on this trip (needs three rated dishes) | The dish, the place, the rating |
-| Order again | A dish marked "order again" on an earlier visit to this city | The dish, the place, the date |
+| Order again | First day in a city where a dish was marked "order again" before the trip, at a place within 25 km of the city's centre (the food journal records no city, only a pin) | The dish, the place, the date |
 
 From the diary. Confirmed 14/11/26: exact words only.
 
 | Card | Rule | Evidence |
 | --- | --- | --- |
-| You wrote about this | The first diary entry before the trip that names this city or country in its highlights | The date and that one highlight line |
-| A year ago in your diary | A diary entry on this date a year or more ago | The date, the mood word and one highlight line |
+| You wrote about this | Not built. Finding the first entry that names a city means opening every diary file on each request, hundreds of reads. It needs an index of the diary first, which is separate work | |
+| A year ago in your diary | A diary entry on this date one to three years ago. The server opens only those files | The date, the mood word and one highlight line, exactly as written |
 
 ### Matched with a model's help
 

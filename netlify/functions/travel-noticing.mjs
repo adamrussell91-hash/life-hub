@@ -22,6 +22,12 @@ import {
   samplePhotos
 } from './_shared/travel-noticing-photos.mjs';
 import { travelJournalPresignGet } from './_shared/travel-journal-r2.mjs';
+import { createFoodJournalRepository } from './_shared/food-journal-repository.mjs';
+import { createGitHubClient } from './_shared/github-client.mjs';
+import { decodeBlob } from './_shared/decode-blob.mjs';
+import { selectOnThisDayEntries } from './_shared/mind-digest.mjs';
+import { defaultGetShelfStore, readShelf } from './_shared/knowledge-shelf.mjs';
+import { diaryOnThisDay, diaryRecord, foodFacts, shelfMatches } from './_shared/travel-noticing-extras.mjs';
 
 /** A 320px copy is tens of kilobytes. Anything much larger is not what was asked for. */
 const MAX_SMALL_COPY_BYTES = 400_000;
@@ -32,7 +38,9 @@ export const config = { path: '/api/travel-noticing' };
 
 /**
  * GET `?trip=`: what the journal's noticing cards need from outside the trip
- * in hand: a compact history of every other trip.
+ * in hand: a compact history of every other trip, and, matched by exact
+ * rules only, a few facts from the food journal, the diary (for `&day=`)
+ * and the bookshelf. Each of those is left out if it cannot be read.
  * POST `?trip=` with `{ kind: 'wishes', day }`: which open bucket-list and
  * dreams-jar items that day of the trip fulfilled. With `kind: 'photos'`:
  * what runs across that day's photos. Nothing is stored and nothing in Tasks
@@ -84,6 +92,38 @@ export function createTravelNoticingHandler(deps = {}) {
       signal: AbortSignal.timeout(25000)
     });
     return wishCards(parseWishMatches(raw, wishes, evidence), day);
+  }
+
+  const loadFoodJournal =
+    deps.loadFoodJournal ??
+    (async (ctx) =>
+      (await createFoodJournalRepository({ env: ctx.env, fetchImpl: deps.fetchImpl ?? fetch, github: deps.github }).getJournal()).journal);
+  const loadBooks = deps.loadBooks ?? (async () => (await readShelf(await defaultGetShelfStore())).books);
+  // The diary is read for one date only: this day in up to three earlier years. It is never sent to a model.
+  const loadDiaryRecords =
+    deps.loadDiaryRecords ??
+    (async (ctx, day) => {
+      const client = deps.github ?? createGitHubClient({ env: ctx.env, fetchImpl: deps.fetchImpl ?? fetch });
+      const { tree } = await client.resolveTree();
+      const { load } = await import('js-yaml');
+      const records = [];
+      for (const entry of selectOnThisDayEntries(tree, day)) {
+        const record = diaryRecord(decodeBlob(await client.readBlob(entry.sha)), load);
+        if (record) records.push(record);
+      }
+      return records;
+    });
+  const quietly = (work) => Promise.resolve().then(work).catch(() => null);
+
+  async function extrasFor(ctx, tripId, day) {
+    const trip = await quietly(async () => (await ctx.repo.getTrip(tripId)).trip);
+    if (!trip) return {};
+    const [food, diary, books] = await Promise.all([
+      quietly(async () => foodFacts({ foodJournal: await loadFoodJournal(ctx), trip })),
+      day ? quietly(async () => diaryOnThisDay(await loadDiaryRecords(ctx, day), day)) : null,
+      quietly(async () => shelfMatches({ books: await loadBooks(ctx), trip }))
+    ]);
+    return { ...(food ? { food } : {}), ...(diary ? { diary } : {}), ...(books ? { books } : {}) };
   }
 
   const loadPhotoBytes =
@@ -149,8 +189,14 @@ export function createTravelNoticingHandler(deps = {}) {
         return errorResponse(503, 'upstream_unavailable', 'Could not look at today just now.', true, PRIVATE_CACHE);
       }
     }
-    const [trips, journals] = await Promise.all([loadTrips(ctx), loadJournals(ctx)]);
-    return okResponse(200, { history: buildNoticingHistory({ trips, journals, exceptTripId: tripId }) }, PRIVATE_CACHE);
+    const dayParam = new URL(request.url).searchParams.get('day') || '';
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : '';
+    const [trips, journals, extras] = await Promise.all([loadTrips(ctx), loadJournals(ctx), extrasFor(ctx, tripId, day)]);
+    return okResponse(
+      200,
+      { history: { ...buildNoticingHistory({ trips, journals, exceptTripId: tripId }), ...extras } },
+      PRIVATE_CACHE
+    );
   }, deps);
 }
 
