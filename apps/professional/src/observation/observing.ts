@@ -7,7 +7,7 @@
  * box and Enter there logs.
  */
 import {
-  clockLabel, clockMs, deleteLogEntry, editLogEntry, endClock, gatherWriteUp, logEntry, pauseClock, resumeClock, setLessonStart, startClock, tally
+  addLogLineAt, clockLabel, clockMs, deleteLogEntry, editLogEntry, endClock, gatherWriteUp, logEntry, pauseClock, resumeClock, setLessonStart, startClock, tally
 } from './model';
 import type { Decision, LogEntry, LogKind, Observation, WriteUpRow } from './types';
 import { DECISIONS, focusOf, h, KIND_KEYS, kindMeta, KINDS, NESA, slotClass, slotOf, syncValue, type ObsCtx, type ObsView } from './ui';
@@ -224,7 +224,93 @@ export function mountObserving(ctx: ObsCtx): ObsView {
   // ---------------------------------------------------------------- log
   const logCount = h(doc, 'span', { class: 'obs-count' });
   const logList = h(doc, 'ol', { class: 'obs-log', 'data-part': 'obs-log', reversed: true });
-  const logCard = h(doc, 'div', { class: 'obs-card obs-logcard' }, h(doc, 'h3', {}, 'Log', logCount), logList);
+  const addMissed = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--xs', 'data-part': 'obs-log-add' }, '+ Add a missed line');
+  const addHost = h(doc, 'div', { class: 'obs-log__addhost' });
+  const logCard = h(doc, 'div', { class: 'obs-card obs-logcard' },
+    h(doc, 'div', { class: 'obs-row obs-log__head' }, h(doc, 'h3', {}, 'Log', logCount), h(doc, 'span', { class: 'obs-spacer' }), addMissed),
+    addHost, logList);
+
+  type LineDraft = { clock: string; descriptor: string | null; look_for: string | null; kind: LogKind; text: string };
+
+  /** One form for fixing a line or adding a missed one: time, descriptor, look-for, kind and words. */
+  function lineForm(start: LineDraft, saveLabel: string, onSave: (d: LineDraft) => boolean, onCancel: () => void): HTMLElement {
+    const obs = ctx.obs();
+    const d: LineDraft = { ...start };
+    const time = h(doc, 'input', { type: 'text', class: 'obs-input obs-lineform__time', 'data-field': 'clock', 'aria-label': 'Time in the lesson (mm:ss)', placeholder: 'mm:ss', inputmode: 'numeric', maxlength: 7 });
+    time.value = d.clock;
+    const desc = h(doc, 'select', { class: 'obs-input', 'data-field': 'descriptor', 'aria-label': 'Descriptor' },
+      h(doc, 'option', { value: '' }, 'No descriptor'),
+      ...obs.descriptors.map((x) => h(doc, 'option', { value: x.code }, `${x.code} ${focusOf(x.code)}`)));
+    desc.value = d.descriptor ?? '';
+    const look = h(doc, 'select', { class: 'obs-input', 'data-field': 'look_for', 'aria-label': 'Look-for' });
+    const kind = h(doc, 'select', { class: 'obs-input', 'data-field': 'kind', 'aria-label': 'Kind' },
+      ...KINDS.map((k) => h(doc, 'option', { value: k.kind }, k.label)),
+      h(doc, 'option', { value: 'transition' }, '⏱ Transition'));
+    kind.value = d.kind;
+    const text = h(doc, 'input', { type: 'text', class: 'obs-input obs-lineform__text', 'data-field': 'text', 'aria-label': 'What happened', placeholder: 'What happened', maxlength: 2000 });
+    text.value = d.text;
+    const msg = h(doc, 'span', { class: 'obs-small obs-lineform__msg', 'aria-live': 'polite' });
+    const save = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--primary obs-btn--xs', 'data-part': 'obs-line-save' }, saveLabel);
+    const cancel = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--xs obs-btn--quiet', 'data-part': 'obs-line-cancel' }, 'Cancel');
+
+    function paintLooks(): void {
+      const dd = obs.descriptors.find((x) => x.code === desc.value);
+      look.replaceChildren(h(doc, 'option', { value: '' }, dd ? 'No look-for' : '—'), ...(dd?.look_fors ?? []).map((l) => h(doc, 'option', { value: l.id }, l.label)));
+      look.value = dd?.look_fors.some((l) => l.id === d.look_for) ? d.look_for! : '';
+      const isT = kind.value === 'transition';
+      desc.disabled = isT;
+      look.disabled = isT || !dd;
+    }
+    desc.addEventListener('change', () => { d.look_for = null; paintLooks(); });
+    kind.addEventListener('change', paintLooks);
+    paintLooks();
+
+    const submit = () => {
+      const out: LineDraft = {
+        clock: time.value, kind: kind.value as LogKind, text: text.value,
+        descriptor: kind.value === 'transition' ? null : desc.value || null,
+        look_for: kind.value === 'transition' ? null : look.value || null
+      };
+      if (!/^\d{1,3}(:[0-5]\d)?$/.test(out.clock.trim())) { msg.textContent = 'Time as mm:ss, e.g. 12:30.'; time.focus(); return; }
+      if (onSave(out)) return;
+      msg.textContent = 'Couldn’t save that line.';
+    };
+    save.addEventListener('click', submit);
+    cancel.addEventListener('click', onCancel);
+    const form = h(doc, 'div', { class: 'obs-lineform', 'data-part': 'obs-lineform', role: 'group', 'aria-label': saveLabel },
+      h(doc, 'div', { class: 'obs-lineform__row' }, time, kind, desc, look),
+      h(doc, 'div', { class: 'obs-lineform__row' }, text, save, cancel),
+      msg);
+    form.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') { e.preventDefault(); submit(); }
+      if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+    });
+    return form;
+  }
+
+  function afterLogChange(): void {
+    renderLog();
+    renderTally();
+    syncWriteUp();
+  }
+
+  addMissed.addEventListener('click', () => {
+    if (addHost.firstChild) { addHost.replaceChildren(); return; }
+    const obs = ctx.obs();
+    const form = lineForm({ clock: clockLabel(clockMs(obs, ctx.now())), descriptor: sel.code, look_for: null, kind: sel.kind, text: '' }, 'Add line', (dft) => {
+      const before = new Set(ctx.obs().log.map((l) => l.id));
+      const next = addLogLineAt(ctx.obs(), dft, ctx.now());
+      if (next === ctx.obs()) return false;
+      ctx.change(() => withGather(next), 'now');
+      freshId = next.log.find((l) => !before.has(l.id))?.id ?? null;
+      addHost.replaceChildren();
+      const keep = freshId;
+      renderTally(); syncWriteUp(); renderLog(); freshId = keep;
+      return true;
+    }, () => addHost.replaceChildren());
+    addHost.replaceChildren(form);
+    (form.querySelector('[data-field="text"]') as HTMLInputElement).focus();
+  });
 
   function tags(obs: Observation, line: LogEntry): HTMLElement {
     const slot = slotOf(obs, line.descriptor);
@@ -246,32 +332,20 @@ export function mountObserving(ctx: ObsCtx): ObsView {
       h(doc, 'div', { class: 'obs-entry__body' }, tags(obs, line), text),
       h(doc, 'div', { class: 'obs-entry__tools' }, edit, del));
     edit.addEventListener('click', () => {
-      const input = h(doc, 'input', { type: 'text', class: 'obs-input', 'aria-label': `Edit line at ${line.clock}`, maxlength: 2000 });
-      input.value = line.text;
-      let done = false;
-      const finish = (save: boolean) => {
-        if (done) return;
-        done = true;
-        if (save && input.value.trim() !== line.text) {
-          ctx.change((o) => withGather(editLogEntry(o, line.id, { text: input.value.trim() })), 'now');
-          renderTally();
-          syncWriteUp();
-        }
-        renderLog();
-      };
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); finish(true); }
-        if (e.key === 'Escape') { e.preventDefault(); finish(false); }
-      });
-      input.addEventListener('blur', () => finish(true));
-      text.replaceWith(input);
-      input.focus();
+      const form = lineForm({ clock: line.clock, descriptor: line.descriptor, look_for: line.look_for, kind: line.kind, text: line.text }, 'Save', (dft) => {
+        const next = editLogEntry(ctx.obs(), line.id, dft);
+        if (next === ctx.obs()) return false;
+        ctx.change(() => withGather(next), 'now');
+        afterLogChange();
+        return true;
+      }, () => renderLog());
+      li.replaceChildren(form);
+      li.classList.add('is-editing');
+      (form.querySelector('[data-field="text"]') as HTMLInputElement).focus();
     });
     del.addEventListener('click', () => {
       ctx.change((o) => withGather(deleteLogEntry(o, line.id)), 'now');
-      renderLog();
-      renderTally();
-      syncWriteUp();
+      afterLogChange();
     });
     return li;
   }

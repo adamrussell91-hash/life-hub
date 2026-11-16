@@ -203,12 +203,68 @@ export function logEntry(
   return { ...obs, log: [...obs.log, line] };
 }
 
+/** Parse a typed lesson-clock time: 'mm:ss', 'm:ss' or plain minutes ('12'). Null when it isn't one. */
+export function parseClock(input: string): string | null {
+  const t = input.trim();
+  const mins = /^(\d{1,3})$/.exec(t);
+  if (mins) return clockLabel(Number(mins[1]) * 60_000);
+  const m = /^(\d{1,3}):([0-5]\d)$/.exec(t);
+  return m ? clockLabel((Number(m[1]) * 60 + Number(m[2])) * 1000) : null;
+}
+
+/** Keep the log in lesson-clock order (stable, so equal times keep their order). */
+const byClock = (log: LogEntry[]): LogEntry[] =>
+  log.map((l, i) => ({ l, i })).sort((a, b) => clockToMs(a.l.clock) - clockToMs(b.l.clock) || a.i - b.i).map((x) => x.l);
+
+/** The moment a lesson-clock time stands for, so a later start change shifts it too. */
+const atForClock = (obs: Observation, clock: string, fallback: Instant): string =>
+  obs.clock.started_at ? iso(ms(obs.clock.started_at) + clockToMs(clock)) : iso(fallback);
+
+/** Look-for only survives if it belongs to the line's descriptor. */
+function keepLook(obs: Observation, descriptor: string | null, lookFor: string | null): string | null {
+  if (!descriptor || !lookFor) return null;
+  return obs.descriptors.find((d) => d.code === descriptor)?.look_fors.some((l) => l.id === lookFor) ? lookFor : null;
+}
+
 export function editLogEntry(
   obs: Observation,
   id: string,
-  patch: Partial<Pick<LogEntry, 'text' | 'kind' | 'descriptor' | 'look_for'>>
+  patch: Partial<Pick<LogEntry, 'text' | 'kind' | 'descriptor' | 'look_for' | 'clock'>>
 ): Observation {
-  return { ...obs, log: obs.log.map((l) => (l.id === id ? { ...l, ...patch } : l)) };
+  const clock = patch.clock !== undefined ? parseClock(patch.clock) : null;
+  if (patch.clock !== undefined && !clock) return obs;
+  const log = obs.log.map((l) => {
+    if (l.id !== id) return l;
+    const next: LogEntry = { ...l, ...patch, text: (patch.text ?? l.text).trim() };
+    if (clock && clock !== l.clock) { next.clock = clock; next.at = atForClock(obs, clock, l.at); }
+    else next.clock = l.clock;
+    if (next.kind === 'transition') { next.descriptor = null; next.look_for = null; }
+    next.look_for = keepLook(obs, next.descriptor, next.look_for);
+    return next;
+  });
+  return { ...obs, log: clock ? byClock(log) : log };
+}
+
+/** Add a line after the fact at a typed lesson-clock time, slotted into clock order. */
+export function addLogLineAt(
+  obs: Observation,
+  entry: { descriptor?: string | null; look_for?: string | null; kind: LogKind; text: string; clock: string },
+  now: Instant
+): Observation {
+  const clock = parseClock(entry.clock);
+  if (!clock) return obs;
+  const transition = entry.kind === 'transition';
+  const descriptor = transition ? null : entry.descriptor ?? null;
+  const line: LogEntry = {
+    id: newId('log'),
+    at: atForClock(obs, clock, now),
+    clock,
+    descriptor,
+    look_for: keepLook(obs, descriptor, entry.look_for ?? null),
+    kind: entry.kind,
+    text: entry.text.trim() || (transition ? 'Transition' : '')
+  };
+  return { ...obs, log: byClock([...obs.log, line]) };
 }
 
 export function deleteLogEntry(obs: Observation, id: string): Observation {

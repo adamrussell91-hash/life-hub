@@ -164,6 +164,17 @@ button.obs-series__step:hover { background: var(--obs-paper); }
 .obs-entry__tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 3px; }
 .obs-entry__text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .obs-entry__tools { display: flex; gap: 2px; align-items: flex-start; }
+.obs-entry.is-editing { display: block; }
+.obs-log__head { align-items: center; margin-bottom: 8px; }
+.obs-log__head h3 { margin: 0; }
+.obs-lineform { display: flex; flex-direction: column; gap: 6px; border: 1px dashed var(--obs-line); border-radius: 12px; padding: 8px; background: var(--obs-card); }
+.obs-log__addhost .obs-lineform { margin-bottom: 8px; }
+.obs-lineform__row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.obs-lineform__row select, .obs-lineform__row input { width: auto; min-width: 0; font-size: 13px; padding: 4px 8px; }
+.obs-lineform__time { width: 5.5em !important; font-family: var(--obs-mono); }
+.obs-lineform__text { flex: 1 1 12em; }
+.obs-lineform__msg { color: var(--obs-rose-ink); }
+.obs-lineform__msg:empty { display: none; }
 .obs-entry.is-new { animation: obs-flash 1s ease; }
 @keyframes obs-flash { from { background: #fff7d6; } to { background: #fff; } }
 .obs-tally { display: flex; flex-direction: column; gap: 10px; }

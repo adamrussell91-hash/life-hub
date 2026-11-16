@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { PROFICIENT_DESCRIPTORS, descriptorByCode } from '@/observation/descriptors';
 import {
-  addDescriptor, addLookFor, assignLookForKeys, clockLabel, clockMs, deleteLogEntry, draftFeedback, editLogEntry,
+  addDescriptor, addLogLineAt, addLookFor, assignLookForKeys, clockLabel, clockMs, deleteLogEntry, draftFeedback, editLogEntry,
   endClock, gatherWriteUp, logEntry, newObservation, pauseClock, removeDescriptor, removeLookFor, renameLookFor,
-  resumeClock, setLessonStart, startClock, tally, windowDay, windowTone
+  parseClock, resumeClock, setLessonStart, startClock, tally, windowDay, windowTone
 } from '@/observation/model';
 import type { Observation } from '@/observation/types';
 
@@ -172,6 +172,49 @@ describe('setting the start by hand', () => {
   it('refuses a start in the future', () => {
     const o = planned();
     expect(setLessonStart(o, at(500), at(100))).toBe(o);
+  });
+});
+
+describe('fixing the log after the fact', () => {
+  function logged(): Observation {
+    let o = addLookFor(planned(), '3.5.2', 'Short instructions');
+    o = startClock(o, at(0));
+    o = logEntry(o, { descriptor: '3.5.2', look_for: o.descriptors[0].look_fors[0].id, kind: 'strength', text: 'Chunked' }, at(60));
+    o = logEntry(o, { kind: 'transition', text: 'Into groups' }, at(300));
+    return o;
+  }
+
+  it('reads typed times', () => {
+    expect(parseClock('12:30')).toBe('12:30');
+    expect(parseClock('7')).toBe('07:00');
+    expect(parseClock('3:5')).toBeNull();
+    expect(parseClock('soon')).toBeNull();
+  });
+
+  it('changes a line’s time, descriptor, kind and words, and keeps clock order', () => {
+    const o = logged();
+    const id = o.log[0].id;
+    const e = editLogEntry(o, id, { clock: '9:00', descriptor: '5.2.2', kind: 'next', text: ' Repeat the cue ' });
+    expect(e.log.map((l) => l.clock)).toEqual(['05:00', '09:00']);
+    const line = e.log.find((l) => l.id === id)!;
+    expect(line).toMatchObject({ descriptor: '5.2.2', look_for: null, kind: 'next', text: 'Repeat the cue', at: at(540).toISOString() });
+    // A later start change still shifts the edited line.
+    expect(setLessonStart(e, at(-60), at(900)).log.find((l) => l.id === id)!.clock).toBe('10:00');
+    // A bad time changes nothing.
+    expect(editLogEntry(o, id, { clock: 'later' })).toBe(o);
+  });
+
+  it('turning a line into a transition drops its descriptor', () => {
+    const o = logged();
+    const e = editLogEntry(o, o.log[0].id, { kind: 'transition' });
+    expect(e.log[0]).toMatchObject({ kind: 'transition', descriptor: null, look_for: null });
+  });
+
+  it('adds a missed line in clock order', () => {
+    const o = addLogLineAt(logged(), { descriptor: '3.5.2', kind: 'strength', text: 'Checked for understanding', clock: '02:30' }, at(900));
+    expect(o.log.map((l) => l.clock)).toEqual(['01:00', '02:30', '05:00']);
+    expect(o.log[1]).toMatchObject({ text: 'Checked for understanding', at: at(150).toISOString() });
+    expect(addLogLineAt(logged(), { kind: 'strength', text: 'x', clock: 'nope' }, at(900)).log).toHaveLength(2);
   });
 });
 
