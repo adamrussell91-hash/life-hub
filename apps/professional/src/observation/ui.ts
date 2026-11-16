@@ -4,6 +4,7 @@
  * same text. Template: NESA Observation Report (June 2026).
  */
 import { descriptorByCode } from './descriptors';
+import type { GatherNotes } from './model';
 import type { Decision, LogKind, Observation } from './types';
 
 type Child = Node | string | null | undefined | false;
@@ -35,6 +36,10 @@ export interface ObsCtx {
   /** Apply a change. 'later' waits ~600ms before saving (typing); 'now' saves at once. */
   change(fn: (o: Observation) => Observation, when: 'later' | 'now'): void;
   now(): Date;
+  /** The linked meetings' Notes as last read, for Gather. */
+  notes?(): GatherNotes;
+  /** Read the Notes again (fresh), then return them. */
+  refreshNotes?(): Promise<GatherNotes>;
 }
 
 export interface ObsView {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PROFICIENT_DESCRIPTORS, descriptorByCode } from '@/observation/descriptors';
 import {
   addDescriptor, addLogLineAt, addLookFor, assignLookForKeys, clockLabel, clockMs, deleteLogEntry, draftFeedback, editLogEntry,
-  endClock, gatherWriteUp, logEntry, newObservation, pauseClock, removeDescriptor, removeLookFor, renameLookFor,
+  endClock, gatherWriteUp, notesFor, logEntry, newObservation, pauseClock, removeDescriptor, removeLookFor, renameLookFor,
   parseClock, resumeClock, setLessonStart, startClock, tally, windowDay, windowTone
 } from '@/observation/model';
 import type { Observation } from '@/observation/types';
@@ -293,6 +293,14 @@ describe('gather and feedback', () => {
 
     // No decision yet: nothing is drafted.
     expect(draftFeedback({ ...o, write_up: gatherWriteUp(o), reflection: {} })['3.5.2'].feedback).toBe('');
+  });
+});
+
+describe('notes', () => {
+  it('picks paragraphs that name the exact code', () => {
+    const text = '4.5.2 - ethical ICT\n14.5.2 not this\n4.5.21 nor this\nCredited sources (4.5.2, 7.1.2)\nNo code';
+    expect(notesFor('4.5.2', text)).toEqual(['4.5.2 - ethical ICT', 'Credited sources (4.5.2, 7.1.2)']);
+    expect(notesFor('4.5.2', undefined)).toEqual([]);
   });
 });
 

@@ -277,13 +277,36 @@ describe('observing', () => {
     const gather = root.querySelector('[data-part="obs-gather"]') as HTMLButtonElement;
     const msg = () => root.querySelector('[data-part="obs-gather-msg"]')!.textContent;
     gather.click();
+    await flush();
     expect(msg()).toMatch(/^Nothing to gather yet/);
     const obs = logEntry(planned(), { descriptor: '3.5.2', kind: 'strength', text: 'Chunked' }, T0);
     ws?.destroy();
     host.replaceChildren();
     const r2 = await mount({ ...obs, write_up: {} }, 'observing', MEETING_OBS);
     (r2.querySelector('[data-part="obs-gather"]') as HTMLButtonElement).click();
+    await flush();
     expect(r2.querySelector('[data-part="obs-gather-msg"]')!.textContent).toBe('Already up to date.');
+  });
+
+  it('gathers paragraphs from both meetings’ Notes that name a descriptor, reading them fresh', async () => {
+    const obs = planned();
+    const notesOf: Record<string, unknown[]> = {
+      [MEETING_PLAN]: [{ block_type: 'rich_text', content: { html: '<p>3.5.2 - short steps on the board</p><p>General chat</p>' } }],
+      [MEETING_OBS]: [{ block_type: 'rich_text', content: { html: '<p>Clear routine at the door.</p><p>3.5.2 and 5.2.2: checked each pair understood.</p>' } }]
+    };
+    meetings.getMeeting.mockImplementation(async (id: string) => ({ meeting: { scheduled_start: '2026-11-18T23:00:00.000Z', time_zone: 'Australia/Sydney', blocks: notesOf[id] ?? [] } }));
+    const root = await mount(obs, 'observing', MEETING_OBS);
+    const cell = (code: string) => (root.querySelector(`tr[data-code="${code}"] textarea[data-cell="practice"]`) as HTMLTextAreaElement).value;
+    expect(cell('3.5.2')).toContain('From Planning notes: 3.5.2 - short steps on the board');
+    expect(cell('3.5.2')).toContain('3.5.2 and 5.2.2: checked each pair understood.');
+    expect(cell('5.2.2')).toContain('3.5.2 and 5.2.2: checked each pair understood.');
+    expect(cell('3.5.2')).not.toContain('Clear routine');
+    // Notes typed since the page opened come in when Gather is pressed.
+    notesOf[MEETING_OBS] = [{ block_type: 'rich_text', content: { html: '<p>5.2.2 named the criterion out loud</p>' } }];
+    (root.querySelector('[data-part="obs-gather"]') as HTMLButtonElement).click();
+    await flush();
+    expect(cell('5.2.2')).toContain('5.2.2 named the criterion out loud');
+    expect(meetings.getMeeting).toHaveBeenCalledWith(MEETING_OBS, { fresh: true });
   });
 
   it('gathers from the log into cells Adam has not edited', async () => {

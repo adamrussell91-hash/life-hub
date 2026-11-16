@@ -38,9 +38,10 @@ export function listMeetings(options: { signal?: AbortSignal } = {}): Promise<{ 
 
 export function getMeeting(
   id: string,
-  options: { signal?: AbortSignal } = {}
+  options: { signal?: AbortSignal; fresh?: boolean } = {}
 ): Promise<{ meeting: MeetingRecord }> {
   const params = new URLSearchParams({ id });
+  if (options.fresh) params.set('fresh', '1');
   return apiGet(`/api/meetings?${params.toString()}`, { signal: options.signal });
 }
 
