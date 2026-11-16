@@ -238,3 +238,20 @@ test('code trend compares the newest 3 pieces with the 3 before', async () => {
   assert.equal(codeTrend([0, 1]), 'steady', 'nothing earlier to compare with');
   assert.equal(codeTrend([null, null, null, 0, 1, 0]), 'steady');
 });
+
+test('each returned piece says how it went against the last one of its kind, with no mark', async () => {
+  const { store } = await setup();
+  const list = await profileAction(store, 'class1', { action: 'returned', ...device });
+  assert.deepEqual(list.items.map((i) => [i.title, i.verdict, i.day, i.work, i.good]), [
+    ['Paragraph 2', { kind: 'same' }, '2026-10-12', ['ts'], []],
+    ['Paragraph 1', { kind: 'first' }, '2026-10-11', ['ts'], []]
+  ]);
+  const piece = await profileAction(store, 'class1', { action: 'piece', item: list.items[0].id, ...device });
+  assert.deepEqual(piece.verdict, { kind: 'same', up: [], same: ['Analysis'], down: [] });
+});
+
+test('progress carries the one step the writing boxes show', async () => {
+  const { store } = await setup();
+  const out = await profileAction(store, 'class1', { action: 'progress', ...device });
+  assert.deepEqual(out.focus, { kind: 'do', line: 'Open each paragraph with your argument.' });
+});

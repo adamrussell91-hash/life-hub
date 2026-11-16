@@ -8,33 +8,63 @@ import { audioUrl } from '@/blocks/voice-client';
 import { paper, type Mark } from '@/blocks/peer-annotate';
 import { placeName, STEP_ORDER, RUNG_ORDER } from '@/progress/story-text';
 import { codeChip } from '@/progress/code-grid';
-import { focusBox, renderVoiceFeedback } from '@/blocks/voice-feedback-view';
+import { renderVoiceFeedback } from '@/blocks/voice-feedback-view';
+import { focusStep } from '@/blocks/feedback-codes';
 import '@/blocks/voice.css';
 import type { FeedbackCode } from '@/blocks/feedback-codes';
 import type { MineState } from '@/blocks/voice-client';
-import type { Place, ReturnedItem } from '@/progress/types';
+import type { FeedbackRow, Place, ReturnedItem, Verdict } from '@/progress/types';
+import { GROUP_WORD, kindGroup, verdictLine } from '@/progress/verdict';
+import { threeLines, type Practise } from '@/student/feedback-card';
+import { feedbackTimeline } from '@/student/feedback-timeline';
+import './feedback-home.css';
 import { returnedRubric, type ReturnedRubric } from './returned-rubric';
 import { redraftEditor, type RedraftApi, type RedraftScope } from '@/student/redraft-editor';
 
-const TAG: Record<ReturnedItem['kind'], string> = { written: 'Writing', viva: 'Viva', quiz: 'Quiz', answer: 'Answer', note: 'Note' };
+const askWords = (item: ReturnedItem): string => (item.redraft === 'asked' ? (item.kind === 'answer' ? 'Have another go' : 'Redraft asked') : '');
 
-export function returnedList(items: ReturnedItem[], onOpen: (id: string, wasNew: boolean) => void): HTMLElement {
+/** One card per piece still to open, or with a redraft asked for: its kind, how it went, and Open. */
+function toOpenCards(items: ReturnedItem[], onOpen: (id: string, wasNew: boolean) => void): HTMLElement {
+  const row = el('div', 'ru');
+  row.dataset.tour = 'unread';
+  for (const item of items) {
+    const card = el('button', 'ru__card');
+    card.type = 'button';
+    card.dataset.piece = item.id;
+    const group = kindGroup(item.kind);
+    const title = el('span', 'ru__title', item.title);
+    if (item.new) title.append(el('span', 'ru__new', 'New'));
+    card.append(el('span', `fb-kind fb-kind--${group}`, GROUP_WORD[group]), title, el('span', 'ru__meta', `Returned ${item.date}`));
+    const went = verdictLine(item.verdict, item.kind);
+    if (went) card.append(el('span', 'ru__verdict', went));
+    const ask = askWords(item);
+    if (ask) card.append(el('span', 'pg-returned__ask', ask));
+    card.append(el('span', 'ru__go', 'Open ›'));
+    card.addEventListener('click', () => onOpen(item.id, Boolean(item.new)));
+    row.append(card);
+  }
+  return row;
+}
+
+/**
+ * The Returned work tab in time order: what is still to open, then every piece along one line.
+ * `items` newest first, as the server sends them. `patterns`: what the feedback keeps saying.
+ */
+export function returnedHome(items: ReturnedItem[], onOpen: (id: string, wasNew: boolean) => void, patterns: readonly FeedbackRow[] = []): HTMLElement {
   const box = el('section', 'pg-returned');
   if (!items.length) {
     box.append(el('p', 'pm-empty', 'Feedback from your teacher appears here once it is returned.'));
     return box;
   }
-  for (const item of items) {
-    const card = el('button', `pg-returned__card${item.new ? ' is-new' : ''}`);
-    card.type = 'button';
-    card.append(el('span', `pg-returned__tag is-${item.kind}`, TAG[item.kind]));
-    const t = el('span', 'pg-returned__title', item.title);
-    if (item.new) t.append(el('span', 'pg-returned__new', 'New'));
-    if (item.redraft) t.append(el('span', 'pg-returned__ask', item.redraft === 'asked' ? (item.kind === 'answer' ? 'Have another go' : 'Redraft asked') : 'Sent to your teacher'));
-    card.append(t, el('span', 'pg-returned__meta', `Returned ${item.date}`), el('span', 'pg-returned__chev', '›'));
-    card.addEventListener('click', () => onOpen(item.id, Boolean(item.new)));
-    box.append(card);
+  const waiting = items.filter((i) => i.new || i.redraft === 'asked');
+  if (waiting.length) {
+    const sec = el('div', 'fh-sec');
+    sec.append(el('h2', 'pg-group', 'New for you'), toOpenCards(waiting, onOpen));
+    box.append(sec);
   }
+  const all = el('div', 'fh-sec');
+  all.append(el('h2', 'pg-group', 'All your feedback, oldest to newest'), feedbackTimeline(items, patterns, onOpen));
+  box.append(all);
   return box;
 }
 
@@ -59,6 +89,8 @@ export type PiecePayload = {
   rungs?: Record<string, string | null>;
   /** Their skill rungs, the pieces they used and their next step, if the teacher marked with a rubric. */
   rubric?: ReturnedRubric;
+  /** How it went against their last piece of this kind, with the names of what moved. */
+  verdict?: Verdict | null;
 };
 /** A note the teacher wrote and returned: its own document, with no tags or criteria. */
 export type NotePayload = { id: string; kind: 'note'; title: string; date: string; body_html: string; audio_url?: string | null; audio_deleted?: boolean };
@@ -94,15 +126,19 @@ function explain(tag: PieceTag): HTMLElement[] {
   return out;
 }
 
+/** The teacher's comment, then everything else folded behind More detail. The card above carries the next step. */
 function sideBoxes(p: PiecePayload, comment = p.comment): HTMLElement {
   const side = el('div', 'pg-piece__side');
-  const rubric = returnedRubric(p.rubric);
-  if (rubric) side.append(rubric);
   if (comment) {
     const c = el('div', 'pg-box');
     c.append(el('h3', 'pg-box__title', 'Your teacher’s comment'), el('p', 'pg-box__comment', comment));
     side.append(c);
   }
+  const more = el('details', 'pg-more');
+  more.append(el('summary', 'pg-more__sum', 'More detail'));
+  const inner = el('div', 'pg-more__in');
+  const rubric = returnedRubric(p.rubric ? { ...p.rubric, next_step: null } : p.rubric);
+  if (rubric) inner.append(rubric);
   if (p.criteria.length) {
     const c = el('div', 'pg-box');
     c.append(el('h3', 'pg-box__title', 'Where this piece sits'));
@@ -114,7 +150,11 @@ function sideBoxes(p: PiecePayload, comment = p.comment): HTMLElement {
       head.append(el('b', undefined, cr.label), el('span', 'pg-box__delta', delta));
       c.append(head, ladder(cr.step, cr.was));
     }
-    side.append(c);
+    inner.append(c);
+  }
+  if (inner.childElementCount) {
+    more.append(inner);
+    side.append(more);
   }
   return side;
 }
@@ -124,6 +164,8 @@ export type PieceViewOptions = {
   redraft?: RedraftApi; onSent?: () => void;
   /** Inside the lesson block it came from: no way back, and the block already names it. */
   inline?: boolean;
+  /** The lesson where the next step is practised next; only on the newest piece. */
+  practise?: Practise | null;
 };
 
 export function pieceView(p: PiecePayload | NotePayload, onBack: () => void, o: PieceViewOptions = {}): HTMLElement {
@@ -148,12 +190,14 @@ export function pieceView(p: PiecePayload | NotePayload, onBack: () => void, o: 
     return root;
   }
   const takes = p.takes ?? [];
-  // A next step the teacher chose stands alone, with no second one worked out from the codes.
-  const chosen = p.rubric?.next_step || takes.some((t) => t.rubric?.next_step);
-  const focus = chosen ? null : focusBox(takes.length ? takes.flatMap((t) => t.tags ?? []) : p.tags, p.codes ?? [], p.rungs);
-  if (focus) root.append(focus);
+  // One next step: the one the teacher chose, else the one worked out from the codes.
+  const chosen = p.rubric?.next_step?.trim() || [...takes].reverse().map((t) => t.rubric?.next_step?.trim()).find(Boolean);
+  const next = chosen || focusStep(takes.length ? takes.flatMap((t) => t.tags ?? []) : p.tags, p.codes ?? [], p.rungs)?.line || null;
+  const card = threeLines({ verdict: p.verdict, kind: p.kind, next, practise: o.practise });
+  if (card) root.append(card);
   if (takes.length) {
-    takes.forEach((take, i) => root.append(renderVoiceFeedback(take, { focus: false, title: take.prompt?.trim() || `Take ${i + 1}` })));
+    // The card above carries the next step, so each take's rubric leaves its own out.
+    takes.forEach((take, i) => root.append(renderVoiceFeedback(take.rubric ? { ...take, rubric: { ...take.rubric, next_step: null } } : take, { focus: false, title: take.prompt?.trim() || `Take ${i + 1}` })));
     root.append(sideBoxes(p));
     return root;
   }
@@ -199,7 +243,7 @@ export function pieceView(p: PiecePayload | NotePayload, onBack: () => void, o: 
   return root;
 }
 
-/** A draft's words with its highlights; tapping one explains it. A note has no typed text, so each tag is its own line. */
+/** A draft's words with its highlights, in two colours only (done well, to work on); tapping one explains it. A note has no typed text, so each tag is its own line. */
 function writingInto(left: HTMLElement, text: PiecePayload['text'], tagged: PieceTag[], comment: string): void {
   const pop = el('div', 'pg-pop');
   pop.hidden = true;
@@ -207,7 +251,7 @@ function writingInto(left: HTMLElement, text: PiecePayload['text'], tagged: Piec
     for (const [part, fields] of Object.entries(text)) {
       for (const [field, words] of Object.entries(fields)) {
         const tags = tagged.filter((t) => t.part === part && t.field === field);
-        const marks: Mark[] = tags.map((t, i) => ({ start: t.start, end: t.end, layer: i, colour: `var(--pastel-${t.positive ? 'sage' : t.colour}-ink)` }));
+        const marks: Mark[] = tags.map((t, i) => ({ start: t.start, end: t.end, layer: i, colour: `var(--pastel-${t.positive ? 'sage' : 'gold'}-ink)` }));
         const sheet = paper(words, marks, null);
         sheet.addEventListener('click', (e) => {
           const run = (e.target as HTMLElement).closest<HTMLElement>('.pa-run--mark');
@@ -221,7 +265,7 @@ function writingInto(left: HTMLElement, text: PiecePayload['text'], tagged: Piec
         left.append(sheet);
       }
     }
-    left.append(pop, el('p', 'pg-hint', tagged.some((t) => t.positive) ? 'Tap a highlight to see what it means. Green marks a strength.' : 'Tap a highlight to see what it means.'));
+    left.append(pop, el('p', 'pg-hint', tagged.some((t) => t.positive) ? 'Tap a highlight to see what it means. Green is done well. Gold is something to work on.' : 'Tap a highlight to see what it means.'));
     return;
   }
   const list = el('ul', 'pg-viva');

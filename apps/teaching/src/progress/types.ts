@@ -9,7 +9,7 @@ export type Story =
 export type PieceCol = { id: string; label: string; date: string; kind: 'written' | 'viva' | 'assessment' | 'quiz' };
 export type TargetRow = { key: string; name: string; sub: string; cells: (Place | null)[]; now: Place | null; story: Story; looks: string | null };
 export type SkillRow = {
-  key: string; name: string; counts: Record<Rung, number>; now: Rung; story: Story; i_can: string | null; next_move: string | null; next_rung: Rung | null;
+  key: string; name: string; counts: Record<Rung, number>; now: Rung; /** The first rung their work was placed on. */ first?: Rung | null; story: Story; i_can: string | null; next_move: string | null; next_rung: Rung | null;
   /** Each rung's "I can" line, for looking along the ladder. */
   rungs?: Record<Exclude<Rung, 'below'>, string | null>;
   /** At the top rung only: how to keep sharpening. */
@@ -26,6 +26,16 @@ export type Resource = { kind: 'link' | 'video'; url: string; title?: string; st
 export type NextStep = { code_id: string; code: string; colour: string; positive: boolean; hit: number; of: number; action: string; resource?: Resource };
 export type ProgressPayload = {
   need: null; initials: string; pieces: PieceCol[]; outcomes: TargetRow[]; concepts: TargetRow[];
-  skills: { strand: string; rows: SkillRow[] }[]; codes: CodeRow[]; feedback?: FeedbackPayload; next: NextStep[]; unseen: number; has_returned?: boolean; map: unknown;
+  skills: { strand: string; rows: SkillRow[] }[]; codes: CodeRow[]; feedback?: FeedbackPayload; /** The one step the writing boxes show. */ focus?: { kind: 'do' | 'keep'; line: string } | null; next: NextStep[]; unseen: number; has_returned?: boolean; map: unknown;
 };
-export type ReturnedItem = { id: string; kind: 'written' | 'viva' | 'quiz' | 'answer' | 'note'; title: string; date: string; new: boolean; codes: string[]; redraft?: 'asked' | 'sent' };
+/** How a piece went against the student's own last piece of its kind. `counts` when there was no place to compare. */
+export type VerdictKind = 'first' | 'better' | 'same' | 'mixed' | 'lower' | 'counts';
+export type Verdict = { kind: VerdictKind; up?: string[]; same?: string[]; down?: string[]; good?: number; work?: number };
+export type ReturnedItem = {
+  id: string; kind: 'written' | 'viva' | 'quiz' | 'answer' | 'note'; title: string; date: string; new: boolean; codes: string[]; redraft?: 'asked' | 'sent';
+  /** YYYY-MM-DD in Sydney: pieces returned on one day stack on the timeline. */
+  day?: string;
+  /** Code ids marked as strengths, and as things to work on. */
+  good?: string[]; work?: string[];
+  verdict?: Verdict | null;
+};

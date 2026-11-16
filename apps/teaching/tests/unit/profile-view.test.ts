@@ -4,7 +4,7 @@ vi.mock('@/organiser/print', () => ({ printOrganiser: vi.fn() }));
 import { renderProfile, withPracticeFrom } from '@/student/profile-view';
 import { PRACTISED_EVENT } from '@/organiser/practice';
 import { renderTodoPanel, type TodoPayload } from '@/student/todo-panel';
-import { pieceView, returnedList } from '@/student/returned-view';
+import { pieceView, returnedHome } from '@/student/returned-view';
 
 const unit = {
   content: { version: 2, rail_stops: [], gates: [], nudges: {}, terminus: { label: 'Assessment task' } },
@@ -105,19 +105,23 @@ describe('progress page', () => {
     expect(host.querySelector('.pg-next__do')!.textContent).toContain('Open each paragraph with your argument.');
     expect(host.querySelector('.pg-next .pg-seehow')!.textContent).toBe('See how →');
   });
-  it('shows learning rows, a skills path and the code grid with counts', () => {
+  it('shows learning rows, a skills path, and before, now and next in place of the code grid', () => {
     expect(host.textContent).toContain('Where your learning is');
     expect(host.querySelectorAll('.pg-learning .pg-chart').length).toBe(1);
     expect(host.querySelectorAll('.pg-skills .pg-sk__dot').length).toBe(4);
-    expect(host.querySelector('.pg-fb .pg-fb__count')!.textContent).toBe('2 of last 2 · steady');
+    expect(host.querySelector('.pg-fb')).toBeNull();
+    expect([...host.querySelectorAll('.ftr__say')].map((n) => n.textContent)).toEqual(['Analysis. You started here: Starting.', 'Analysis. You are here now: Building.']);
+    expect(host.querySelector('.ftr .fb-chip--work')!.textContent).toBe('Topic sentence: on 2 of your last 2');
+    expect(host.querySelector('.ftr .fb3__do')!.textContent).toBe('Open each paragraph with your argument.');
   });
-  it('keeps skills and the feedback codes on Returned work and feedback, under the list', () => {
+  it('keeps how you are going on Returned work and feedback, with skills behind More detail', () => {
     const h = renderProfile(rich as never, { classId: 'class1', loadReturned: async () => [] });
     const returnedPanel = h.querySelector('[data-tab="returned"]')!.getAttribute('aria-selected') === 'true' ? h.querySelectorAll('.pg-panel')[1]! : null;
     expect(returnedPanel).toBeTruthy();
     const extras = returnedPanel!.querySelector('.pg-returned__extras')!;
-    expect(extras.querySelector('.pg-skills')).toBeTruthy();
-    expect(extras.querySelector('.pg-fb')).toBeTruthy();
+    expect(extras.querySelector('details.pg-more .pg-skills')).toBeTruthy();
+    expect(extras.querySelector('.ftr')).toBeTruthy();
+    expect(extras.querySelector('.pg-fb')).toBeNull();
     expect(h.querySelectorAll('.pg-panel')[0]!.querySelector('.pg-skills, .pg-fb')).toBeNull();
     expect(h.querySelector('[data-tab="returned"]')!.textContent).toContain('Returned work and feedback');
   });
@@ -150,18 +154,19 @@ describe('progress page', () => {
     expect(gone.querySelector('audio')).toBeNull();
     expect(gone.textContent).toContain('kept for 28 days');
   });
-  it('opens a piece from a feedback row on the Returned work tab, for the teacher too', async () => {
+  it('opens a piece from its dot on the timeline, for the teacher too', async () => {
     for (const teacher of [undefined, { name: 'Sam Teacher' }]) {
       const asked: string[] = [];
-      const lists: number[] = [];
-      const h = renderProfile({ ...rich, unseen: 0 } as never, { classId: 'class1', teacher, loadReturned: async () => (lists.push(1), []), loadPiece: async (id) => (asked.push(id), { id, kind: 'written', title: 'Tension', date: '13 Oct', comment: '', text: null, tags: [], codes: [], criteria: [] } as never) });
-      (h.querySelector('.pg-fb__head') as HTMLElement).click();
-      (h.querySelector('.pg-fb__open') as HTMLElement).click();
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(h.querySelector('[data-tab="returned"]')!.getAttribute('aria-selected')).toBe('true');
-      expect(asked).toEqual(['w:l4:b']);
-      expect(lists).toEqual([], 'the list does not load over the piece');
+      const items = [{ id: 'w:l4:b', kind: 'written', title: 'Tension', date: '13 Oct', new: false, codes: [] }, { id: 'w:l1:b', kind: 'written', title: 'Road imagery', date: '6 Oct', new: false, codes: [] }];
+      const h = renderProfile({ ...rich, unseen: 0 } as never, { classId: 'class1', teacher, loadReturned: async () => items as never, loadPiece: async (id) => (asked.push(id), { id, kind: 'written', title: 'Tension', date: '13 Oct', comment: '', text: null, tags: [], codes: [], criteria: [] } as never) });
+      (h.querySelector('[data-tab="returned"]') as HTMLElement).click();
+      await new Promise((r) => setTimeout(r, 0));
+      (h.querySelector('.ft-dot[data-piece="w:l1:b"]') as HTMLElement).click();
+      expect(h.querySelector('.ft-peek__title')!.textContent).toBe('Road imagery');
+      (h.querySelector('.ft-peek__open') as HTMLElement).click();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(asked).toEqual(['w:l1:b']);
+      expect(h.querySelector('.pg-piece__title')!.textContent).toBe('Tension');
     }
   });
   it('puts the soonest assessment countdown at the top, and says when its page is still closed', () => {
@@ -189,7 +194,7 @@ describe('progress page', () => {
     (h.querySelector('[data-tab="returned"]') as HTMLElement).click();
     await Promise.resolve();
     await Promise.resolve();
-    expect(h.querySelector('.pg-returned__card')!.textContent).toContain('Paragraph 1');
+    expect(h.querySelector('.ru__card')!.textContent).toContain('Paragraph 1');
   });
 });
 
@@ -199,7 +204,7 @@ describe('returned work', () => {
     const h = renderProfile(rich as never, { classId: 'class1', loadReturned: async () => [{ id: 'w:l1:b', kind: 'written', title: 'Paragraph 1', date: '6 Oct', new: false, codes: [], redraft: 'asked' }], loadPiece: async () => asked, ...options });
     (h.querySelector('[data-tab="returned"]') as HTMLElement).click();
     await new Promise((r) => setTimeout(r, 0));
-    (h.querySelector('.pg-returned__card') as HTMLElement).click();
+    (h.querySelector('.ru__card') as HTMLElement).click();
     await new Promise((r) => setTimeout(r, 0));
     return h;
   };
@@ -221,7 +226,7 @@ describe('returned work', () => {
   });
   it('opens an item on click', () => {
     const opened: string[] = [];
-    const list = returnedList([{ id: 'w:l1:b', kind: 'written', title: 'Paragraph 1', date: '6 Oct', new: true, codes: [] }], (id) => opened.push(id));
+    const list = returnedHome([{ id: 'w:l1:b', kind: 'written', title: 'Paragraph 1', date: '6 Oct', new: true, codes: [] }], (id) => opened.push(id));
     (list.querySelector('button') as HTMLButtonElement).click();
     expect(opened).toEqual(['w:l1:b']);
   });
