@@ -908,7 +908,7 @@ describe('renderEventNewView', () => {
     presenterInput.dispatchEvent(new Event('input', { bubbles: true }));
     let addBtn: HTMLButtonElement | undefined;
     await vi.waitFor(() => {
-      addBtn = [...canvas.querySelectorAll('button')].find((b) => b.textContent === 'Add “Rowan Vale” to People');
+      addBtn = [...canvas.querySelectorAll('button')].find((b) => b.textContent === 'Create person “Rowan Vale”');
       expect(addBtn).toBeTruthy();
     });
     addBtn!.click();

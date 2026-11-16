@@ -357,7 +357,7 @@ export async function renderEventNewView(
     });
   }
 
-  // Nobody found: "Add … to People" opens a small card to fill in a few
+  // Nobody found: "Create person …" opens a small card to fill in a few
   // details; the new person then joins this event like a picked one.
   function addNewPerson(name: string, input: HTMLInputElement, note: string, add: typeof addPresenter): void {
     openQuickPersonCard({
@@ -370,7 +370,6 @@ export async function renderEventNewView(
       }
     });
   }
-  const addToPeopleLabel = (query: string) => `Add “${query}” to People`;
 
   const presenterPicker = createEntityPicker({
     mode: 'field',
@@ -382,7 +381,6 @@ export async function renderEventNewView(
       return { groups: { person: result.groups.person } };
     },
     onSelect: addPresenter,
-    createLabel: addToPeopleLabel,
     onCreate: (query) => addNewPerson(query, presenterInput, 'They’ll be added to this event as a presenter.', addPresenter)
   });
 
@@ -448,7 +446,6 @@ export async function renderEventNewView(
       };
     },
     onSelect: addAttendee,
-    createLabel: addToPeopleLabel,
     onCreate: (query) => addNewPerson(query, attendeeInput, 'They’ll be added to this event’s people.', addAttendee)
   });
 
