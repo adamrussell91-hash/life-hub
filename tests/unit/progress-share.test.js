@@ -152,3 +152,33 @@ test('the public handler signs in and serves the page', async () => {
   const wrong = await call({ action: 'sign_in', device_token: 'd'.repeat(48), initials: 'PT', pin });
   assert.equal(wrong.status, 403);
 });
+
+test('a new link shows at once even when the blob listing lags', async () => {
+  const store = storeFixture([['classes/class1', { id: 'class1', type: 'class', status: 'active', title: '9 English', students: [{ name: 'Ana Ames' }] }]]);
+  store.list = async () => ({ blobs: [] }); // listing hasn't caught up
+  const [ana] = (await loadRoster(store, 'class1')).students;
+  const reply = await teacherShareAction(store, 'class1', { action: 'add', student_id: ana.id, initials: 'PT' }, { now: NOW });
+  assert.equal(reply.shares.length, 1);
+  assert.equal(reply.shares[0].token, reply.made);
+  assert.match(reply.shares[0].pin, /^\d{6}$/);
+});
+
+test('the link log keeps made and removed times after the link is gone', async () => {
+  const { store, token } = await setup();
+  const later = new Date('2026-11-16T03:30:00Z');
+  const reply = await teacherShareAction(store, 'class1', { action: 'remove', token }, { now: later });
+  assert.equal(reply.shares.length, 0);
+  assert.equal(store.data.get(`progress_share/${token}`), undefined);
+  assert.deepEqual(reply.log.map((l) => [l.initials, l.made_at, l.removed_at]), [['PT', NOW.toISOString(), later.toISOString()]]);
+  await assert.rejects(openShare(store, token), { code: 'not_found' });
+});
+
+test('links made before the log existed still list, and are logged when removed', async () => {
+  const { store, token } = await setup();
+  store.data.delete('progress_share_log/class1');
+  const listed = await teacherShareAction(store, 'class1', { action: 'list' }, { now: NOW });
+  assert.equal(listed.shares.length, 1);
+  assert.equal(listed.log[0].removed_at, null);
+  const reply = await teacherShareAction(store, 'class1', { action: 'remove', token }, { now: NOW });
+  assert.equal(reply.log[0].removed_at, NOW.toISOString());
+});

@@ -9,7 +9,8 @@ import { askConfirmCard } from '@/teacher/confirm-dialog';
  */
 
 export type ShareRow = { token: string; student_id: string; initials: string; made_at: string; opened_at: string | null; pin: string | null; pin_used_at: string | null; devices: number };
-type Reply = { shares: ShareRow[]; made?: string };
+export type ShareLogRow = { token: string; student_id: string; initials: string; made_at: string; removed_at: string | null };
+type Reply = { shares: ShareRow[]; log?: ShareLogRow[]; made?: string };
 export type ShareApi = {
   list: (classId: string) => Promise<Reply>;
   add: (classId: string, studentId: string, initials: string) => Promise<Reply>;
@@ -27,6 +28,8 @@ export const defaultShareApi: ShareApi = {
 
 const day = new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'short', timeZone: 'Australia/Sydney' });
 const when = (iso: string | null) => (iso ? day.format(new Date(iso)) : '');
+const stamp = new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Australia/Sydney' });
+const at = (iso: string | null) => (iso ? stamp.format(new Date(iso)) : '');
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -43,7 +46,7 @@ export function mountProgressSharePanel(host: HTMLElement, options: ProgressShar
   const origin = options.origin ?? studentSiteOrigin();
   let disposed = false;
   const box = el('div', 'share-panel');
-  box.append(el('p', 'share-panel__lead', `A view-only link to ${studentName}’s progress for a pastoral teacher or parent. They type their initials and the PIN once per browser.`));
+  box.append(el('p', 'share-panel__lead', `A view-only link to ${studentName}’s progress for a pastoral teacher or parent. They type their own initials and the 6-digit PIN shown here once per browser. The PIN is not ${studentName}’s sign-in code.`));
   const list = el('ul', 'share-panel__list');
   const say = el('p', 'share-panel__say');
   say.setAttribute('role', 'status');
@@ -57,17 +60,37 @@ export function mountProgressSharePanel(host: HTMLElement, options: ProgressShar
   const add = el('button', 'btn btn--secondary', 'Make a link');
   add.type = 'submit';
   form.append(input, add);
-  box.append(list, form, say);
+  const logBox = el('details', 'share-panel__log');
+  const logSummary = el('summary', 'share-panel__log-title', 'Link log');
+  const logList = el('ul', 'share-panel__log-list');
+  logBox.append(logSummary, logList);
+  box.append(list, form, say, logBox);
   host.append(box);
 
-  const paint = (shares: ShareRow[]) => {
+  const paintLog = (log: ShareLogRow[] | undefined) => {
+    const mine = (log ?? []).filter((l) => l.student_id === studentId);
+    logBox.hidden = !mine.length;
+    logSummary.textContent = `Link log (${mine.length})`;
+    logList.replaceChildren(
+      ...mine.map((l) => {
+        const li = el('li', `share-panel__log-row${l.removed_at ? ' is-removed' : ''}`);
+        li.append(el('span', 'share-panel__log-who', l.initials));
+        li.append(el('span', 'share-panel__log-when', `Made ${at(l.made_at)}`));
+        li.append(el('span', 'share-panel__log-state', l.removed_at ? `Removed ${at(l.removed_at)}` : 'Active'));
+        return li;
+      })
+    );
+  };
+
+  const paint = (shares: ShareRow[], log?: ShareLogRow[]) => {
     if (disposed) return;
+    paintLog(log);
     const mine = shares.filter((s) => s.student_id === studentId);
     list.replaceChildren(
       ...mine.map((s) => {
         const li = el('li', 'share-panel__row');
         const link = `${origin}/s/share/${s.token}`;
-        li.append(el('p', 'share-panel__who', `${s.initials} · made ${when(s.made_at)}${s.opened_at ? ` · last opened ${when(s.opened_at)}` : ''}`));
+        li.append(el('p', 'share-panel__who', `${s.initials} · made ${at(s.made_at)}${s.opened_at ? ` · last opened ${when(s.opened_at)}` : ''}`));
         li.append(el('code', 'share-panel__link', link));
         li.append(el('p', `share-panel__pin${s.pin ? ' is-fresh' : ''}`, s.pin ? `PIN ${s.pin} (works once)` : `PIN used ${when(s.pin_used_at)} · ${s.devices} ${s.devices === 1 ? 'browser' : 'browsers'} in`));
         const copy = el('button', 'btn btn--ghost', 'Copy link');
@@ -82,16 +105,16 @@ export function mountProgressSharePanel(host: HTMLElement, options: ProgressShar
         fresh.type = 'button';
         fresh.setAttribute('aria-label', `Make a new PIN for ${s.initials}`);
         fresh.addEventListener('click', () => void run(() => api.newPin(classId, s.token), `New PIN made for ${s.initials}. The old one stops working; browsers already in stay in.`));
-        const remove = el('button', 'btn btn--ghost', 'Remove');
+        const remove = el('button', 'btn btn--ghost', 'Remove link');
         remove.type = 'button';
         remove.setAttribute('aria-label', `Remove ${s.initials}’s link`);
         remove.addEventListener('click', async () => {
           const sure = await askConfirmCard({
             title: `Remove ${s.initials}’s link?`,
-            supporting: `It stops working at once, on every browser. You can make a new link for ${studentName} later.`,
+            supporting: `It stops working at once, on every browser. The link log keeps when it was made and removed.`,
             confirmLabel: 'Remove link'
           });
-          if (sure) void run(() => api.remove(classId, s.token), `${s.initials}’s link is removed.`);
+          if (sure) void run(() => api.remove(classId, s.token), `${s.initials}’s link is removed. It stays in the link log.`);
         });
         li.append(copy, fresh, remove);
         return li;
@@ -103,7 +126,7 @@ export function mountProgressSharePanel(host: HTMLElement, options: ProgressShar
   const run = async (fn: () => Promise<Reply>, done: string) => {
     try {
       const reply = await fn();
-      paint(reply.shares);
+      paint(reply.shares, reply.log);
       say.textContent = done;
       return true;
     } catch (e) {
@@ -127,7 +150,7 @@ export function mountProgressSharePanel(host: HTMLElement, options: ProgressShar
   });
 
   void api.list(classId).then(
-    (r) => paint(r.shares),
+    (r) => paint(r.shares, r.log),
     () => (say.textContent = 'Links didn’t load. Check your connection.')
   );
   return {

@@ -6,6 +6,11 @@
  *   progress_share/{token}                   { class_id, student_id, initials, pin_hash?, pin_plain?, pin_made_at, pin_used_at?, devices, made_at, opened_at? }
  *   progress_share_by_class/{class}/{token}  { student_id, initials, made_at }
  *   progress_share_tries/{day}/{token}       { count }
+ *   progress_share_log/{class}               { links: [{ token, student_id, initials, made_at, removed_at? }] }
+ *
+ * The log is one record per class, read strongly. It is how the teacher's list finds a link
+ * the moment it is made (a blob listing can lag), and it keeps every link with when it was
+ * made and when it was removed, after the link itself is gone.
  *
  * `pin_plain` lets the teacher's panel show an unused PIN again; it goes the moment the PIN is
  * used or replaced. Devices are hashes of a browser token (deviceHash), never the token. No
@@ -28,6 +33,7 @@ const shareKey = (token) => `progress_share/${token}`;
 const indexKey = (classId, token) => `progress_share_by_class/${classId}/${token}`;
 const indexPrefix = (classId) => `progress_share_by_class/${classId}/`;
 const triesKey = (day, token) => `progress_share_tries/${day}/${token}`;
+const logKey = (classId) => `progress_share_log/${classId}`;
 const STRONG = { type: 'json', consistency: 'strong' };
 
 /** 18 random bytes: 24 URL-safe characters. */
@@ -97,12 +103,30 @@ export async function noteOpened(store, token, share, now = new Date()) {
   await store.setJSON(shareKey(token), { ...share, opened_at: now.toISOString() });
 }
 
-/** Teacher: every share in the class, oldest first, with any unused PIN. */
+async function readLog(store, classId) {
+  const row = store.getWithMetadata ? await store.getWithMetadata(logKey(classId), STRONG) : null;
+  const data = row ? row.data : await read(store, logKey(classId));
+  return { links: Array.isArray(data?.links) ? data.links : [], etag: row?.etag };
+}
+
+/** Changes the class log, retrying if another write got there first. */
+async function updateLog(store, classId, change) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const { links, etag } = await readLog(store, classId);
+    const next = change(links.map((l) => ({ ...l })));
+    const written = await store.setJSON(logKey(classId), { links: next }, etag ? { onlyIfMatch: etag } : { onlyIfNew: true });
+    if (written?.modified !== false) return next;
+  }
+  reject(409, 'busy', 'Someone else changed the links. Try again.');
+}
+
+/** Teacher: every live share in the class, oldest first, with any unused PIN; and the log of every link. */
 export async function listShares(store, classId) {
   const prefix = indexPrefix(classId);
-  const keys = await listBlobKeys(store, prefix);
-  const rows = await mapBounded(keys, 8, async (key) => {
-    const token = key.slice(prefix.length);
+  const [keys, log] = await Promise.all([listBlobKeys(store, prefix), readLog(store, classId)]);
+  const tokens = new Set(keys.map((key) => key.slice(prefix.length)));
+  for (const l of log.links) if (!l.removed_at) tokens.add(l.token);
+  const rows = await mapBounded([...tokens], 8, async (token) => {
     const share = await read(store, shareKey(token));
     if (!share || share.class_id !== classId) return null;
     return {
@@ -116,7 +140,14 @@ export async function listShares(store, classId) {
       devices: Array.isArray(share.devices) ? share.devices.length : 0
     };
   });
-  return rows.filter(Boolean).sort((a, b) => String(a.made_at).localeCompare(String(b.made_at)));
+  const shares = rows.filter(Boolean).sort((a, b) => String(a.made_at).localeCompare(String(b.made_at)));
+  // Links made before the log existed join it as they are listed.
+  const logged = new Set(log.links.map((l) => l.token));
+  const history = [
+    ...log.links.map((l) => ({ token: l.token, student_id: l.student_id, initials: l.initials, made_at: l.made_at, removed_at: l.removed_at ?? null })),
+    ...shares.filter((s) => !logged.has(s.token)).map((s) => ({ token: s.token, student_id: s.student_id, initials: s.initials, made_at: s.made_at, removed_at: null }))
+  ].sort((a, b) => String(b.made_at).localeCompare(String(a.made_at)));
+  return { shares, log: history };
 }
 
 async function ownShare(store, classId, token) {
@@ -140,12 +171,13 @@ export async function teacherShareAction(store, classId, body, { now = new Date(
     if (typeof studentId !== 'string' || !STUDENT_ID_PATTERN.test(studentId) || !roster.students.some((s) => s.id === studentId)) reject(400, 'bad_request', 'Unknown student.');
     const initials = normaliseInitials(body.initials);
     if (!INITIALS_PATTERN.test(initials)) reject(400, 'bad_request', 'Type the viewer’s initials, like JS.');
-    const theirs = (await listShares(store, classId)).filter((s) => s.student_id === studentId);
+    const theirs = (await listShares(store, classId)).shares.filter((s) => s.student_id === studentId);
     if (theirs.length >= SHARES_PER_STUDENT) reject(409, 'too_many', 'This student already has 10 links. Remove one first.');
     const token = makeShareToken();
     const pin = makePin();
     await store.setJSON(shareKey(token), { class_id: classId, student_id: studentId, initials, pin_hash: pinHash(token, pin), pin_plain: pin, pin_made_at: at, devices: [], made_at: at }, { onlyIfNew: true });
     await store.setJSON(indexKey(classId, token), { student_id: studentId, initials, made_at: at });
+    await updateLog(store, classId, (links) => [...links, { token, student_id: studentId, initials, made_at: at }]);
     made = token;
   }
   if (action === 'new_pin') {
@@ -155,9 +187,15 @@ export async function teacherShareAction(store, classId, body, { now = new Date(
     await store.setJSON(shareKey(body.token), { ...rest, pin_hash: pinHash(body.token, pin), pin_plain: pin, pin_made_at: at });
   }
   if (action === 'remove') {
-    await ownShare(store, classId, body.token);
+    const share = await ownShare(store, classId, body.token);
+    await updateLog(store, classId, (links) => {
+      const hit = links.find((l) => l.token === body.token);
+      if (hit) hit.removed_at = at;
+      else links.push({ token: body.token, student_id: share.student_id, initials: share.initials, made_at: share.made_at, removed_at: at });
+      return links;
+    });
     await deleteKey(store, shareKey(body.token));
     await deleteKey(store, indexKey(classId, body.token));
   }
-  return { shares: await listShares(store, classId), ...(made ? { made } : {}) };
+  return { ...(await listShares(store, classId)), ...(made ? { made } : {}) };
 }
