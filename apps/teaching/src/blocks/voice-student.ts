@@ -156,7 +156,7 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string, classId?:
         const item = el('li', 'voice-plan__point');
         const input = el('input', 'pa-input');
         input.type = 'text';
-        input.maxLength = 120;
+        input.maxLength = 240;
         input.value = text;
         input.placeholder = scaffold[i]?.label || `Point ${i + 1}`;
         input.setAttribute('aria-label', scaffold[i]?.label || `Point ${i + 1}`);
@@ -718,7 +718,7 @@ export function mountVoiceStudent(block: VoiceBlock, lessonId: string, classId?:
         const live = livePoint(slots, t, manual);
         while (current < live) {
           current += 1;
-          stamps.push({ label: labels[current]!.slice(0, 120), t: current === 0 ? 0 : Math.round(t * 10) / 10 });
+          stamps.push({ label: labels[current]!.slice(0, 240), t: current === 0 ? 0 : Math.round(t * 10) / 10 });
         }
       }
       view.paint(t, current);
