@@ -11,6 +11,9 @@ import {
   listVoiceSubmissions,
   maxSecondsFor,
   processVoiceTranscriptions,
+  requeueTranscription,
+  transcriptStuck,
+  TRANSCRIBE_STUCK_MS,
   readMine,
   returnVoiceSubmission,
   saveVoiceMarking,
@@ -183,6 +186,31 @@ test('a failing transcription retries, then gives up with an error the inbox can
   const [row] = await listVoiceSubmissions(store, 'lesson1', 'viva1');
   assert.equal(row.transcript_status, 'error');
   assert.equal((await processVoiceTranscriptions({ store, env, knowledgeFetch })).results.length, 0);
+});
+
+test('a take still pending after a failed try or 10 minutes is stuck, and a retry clears it', async () => {
+  const store = memoryStore(lessonSeed());
+  await submit(store);
+  const key = voiceKeys.submission('lesson1', 'viva1', (await listVoiceSubmissions(store, 'lesson1', 'viva1'))[0].id);
+  const fresh = await store.get(key, { type: 'json' });
+  const submitted = Date.parse(fresh.submitted_at);
+  assert.equal(transcriptStuck(fresh, submitted + 60_000), false);
+  assert.equal(transcriptStuck(fresh, submitted + TRANSCRIBE_STUCK_MS + 1), true);
+  assert.equal(transcriptStuck({ ...fresh, audio_key: null }, submitted + TRANSCRIBE_STUCK_MS + 1), false);
+
+  const env = { RESEARCH_KERNEL_SHARED_SECRET: 'x' };
+  await processVoiceTranscriptions({ store, env, knowledgeFetch: async () => new Response(JSON.stringify({ error: 'busy' }), { status: 502 }) });
+  const [row] = await listVoiceSubmissions(store, 'lesson1', 'viva1');
+  assert.equal(row.transcript_status, 'pending');
+  assert.equal(row.transcript_stuck, true);
+  const one = await getVoiceSubmission(store, 'lesson1', 'viva1', row.id);
+  assert.equal(one.transcript_stuck, true);
+  assert.equal(one.transcript_error, 'busy');
+
+  const again = await requeueTranscription(store, 'lesson1', 'viva1', row.id);
+  assert.equal(again.transcript_stuck, false);
+  assert.equal(again.transcribe_attempts, 0);
+  assert.ok(await store.get(voiceKeys.queue('lesson1', 'viva1', row.id), { type: 'json' }));
 });
 
 test('audio is deleted after 28 days; transcript and tags stay; the sweep is idempotent', async () => {

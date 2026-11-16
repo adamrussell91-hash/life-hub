@@ -55,6 +55,8 @@ type Row = {
   duration_s: number;
   status: Status;
   transcript_status: 'pending' | 'done' | 'error';
+  /** Still pending after a failed try or 10 minutes in the queue: the teacher can retry. */
+  transcript_stuck?: boolean;
   audio_deleted: boolean;
   audio_delete_after: string;
   tag_count: number;
@@ -213,7 +215,8 @@ export function mountVoiceTeacher(
       const meta = el('span', 'voice-inbox__meta block-secondary', `${clock(r.duration_s)} · ${shortWhen(r.submitted_at)} · #${r.device_hash}`);
       const status = el('span', `voice-pill voice-pill--${r.status}`, STATUS_LABEL[r.status]);
       const extra = el('span', 'voice-inbox__extra block-secondary');
-      if (r.transcript_status === 'pending') extra.textContent = 'Transcribing…';
+      if (r.transcript_stuck) extra.textContent = 'Transcript stuck';
+      else if (r.transcript_status === 'pending') extra.textContent = 'Transcribing…';
       else if (r.transcript_status === 'error') extra.textContent = 'Transcript failed';
       else if (r.tag_count) extra.textContent = `${r.tag_count} tag${r.tag_count === 1 ? '' : 's'}`;
       const audio = el('span', 'voice-pill voice-pill--quiet', r.audio_deleted ? 'Audio removed' : `Audio deletes in ${daysLeft(r.audio_delete_after)} d`);
@@ -476,17 +479,23 @@ export function mountVoiceTeacher(
     if (deepPanel) screen.append(deepPanel.el);
 
     if (!words.length) {
-      const why =
-        record.transcript_status === 'pending'
+      const stuck = record.transcript_status === 'pending' && record.transcript_stuck;
+      const why = stuck
+        ? `The transcript hasn’t come through.${record.transcript_error ? ` Last try: ${record.transcript_error}` : ''} You can listen now, or try again.`
+        : record.transcript_status === 'pending'
           ? 'The transcript is on its way. You can listen now; tagging opens when it arrives.'
           : record.transcript_error || 'There is no transcript for this recording.';
       left.replaceChildren(el('p', 'block-secondary', why));
       if (take && record.transcript_status === 'pending') waitForTranscript();
-      if (record.transcript_status === 'error' && record.audio_url) {
+      if ((stuck || record.transcript_status === 'error') && record.audio_url) {
         left.append(
           button('Try transcription again', 'secondary', async () => {
             await apiPost(`${base(lessonId, block.id)}/${encodeURIComponent(record.id)}/retranscribe`, {});
-            backToInbox();
+            if (!take) return backToInbox();
+            // To mark: reopen the take; it starts the run and waits for the transcript.
+            closeMarking?.();
+            closeMarking = null;
+            void openMarking(record.id);
           })
         );
       }
