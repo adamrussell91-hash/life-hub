@@ -158,6 +158,32 @@ export function endClock(obs: Observation, now: Instant): Observation {
   return { ...obs, clock: { ...c, ended_at: c.paused_at ?? iso(now), paused_at: null } };
 }
 
+/** 'mm:ss' (minutes may exceed 59) back to ms. */
+function clockToMs(label: string): number {
+  const m = /^(\d+):(\d{2})$/.exec(label);
+  return m ? (Number(m[1]) * 60 + Number(m[2])) * 1000 : 0;
+}
+
+/**
+ * Set when the lesson started, after the fact (e.g. Start lesson was never pressed). A clock that hadn't
+ * started starts running from `start`. Every log line's clock is redone: lines already timed shift by the
+ * change (so earlier pauses still count); lines logged before the old start, or with no start, are timed
+ * from `start`. Lines logged before `start` read 00:00. A start in the future is refused.
+ */
+export function setLessonStart(obs: Observation, start: Instant, now: Instant): Observation {
+  const startMs = ms(start);
+  if (!Number.isFinite(startMs) || startMs > ms(now)) return obs;
+  const c = obs.clock;
+  const oldStart = c.started_at ? ms(c.started_at) : null;
+  const log = obs.log.map((l) => {
+    const atMs = ms(l.at);
+    const t = oldStart !== null && atMs >= oldStart ? clockToMs(l.clock) + (oldStart - startMs) : atMs - startMs;
+    return { ...l, clock: clockLabel(t) };
+  });
+  const clock = c.started_at ? { ...c, started_at: iso(start) } : { started_at: iso(start), paused_ms: 0, paused_at: null, ended_at: null };
+  return { ...obs, clock, log };
+}
+
 // ---------------------------------------------------------------- log
 
 export function logEntry(
@@ -230,28 +256,43 @@ const sentence = (t: string): string => {
 
 const emptyRow = (): WriteUpRow => ({ practice: '', strengths: '', decision: null, comments: '', edited: [] });
 
-/** Fill each row's Teaching practice and Strengths from the log; cells Adam edited are left alone. */
+/** Lines in a Strengths cell that came from Planning, not the lesson; feedback drafting skips them. */
+export const PLANNED_PREFIXES = ['Planned impact:', 'How we will know:'] as const;
+const isPlannedLine = (l: string): boolean => PLANNED_PREFIXES.some((p) => l.startsWith(p));
+
+/**
+ * Fill each row's Teaching practice and Strengths from the Planning meeting, then the log; cells Adam
+ * edited are left alone (a cell cleared back to empty fills again). Teaching practice opens with what was planned to demonstrate the descriptor and
+ * its look-fors; Strengths opens with the planned impact and how it will be known.
+ */
 export function gatherWriteUp(obs: Observation): Observation['write_up'] {
   const out: Observation['write_up'] = {};
   for (const d of obs.descriptors) {
     const row = obs.write_up[d.code] ?? emptyRow();
     const lines = obs.log.filter((l) => l.descriptor === d.code);
     const labelOf = (id: string | null) => d.look_fors.find((l) => l.id === id)?.label ?? '';
-    const practice = lines
-      .filter((l) => l.kind !== 'next')
-      .map((l) => {
-        const label = labelOf(l.look_for);
-        return `${l.clock} ${label ? `${label}: ` : ''}${l.text}`.trim();
-      })
-      .join('\n');
+    const planned = (d.demonstrate.trim() || d.practice.trim());
+    const looks = d.look_fors.map((l) => l.label.trim()).filter(Boolean);
+    const practice = [
+      planned ? `Planned: ${sentence(planned)}` : '',
+      looks.length ? `Look-fors: ${looks.join('; ')}.` : '',
+      ...lines
+        .filter((l) => l.kind !== 'next')
+        .map((l) => {
+          const label = labelOf(l.look_for);
+          return `${l.clock} ${label ? `${label}: ` : ''}${l.text}`.trim();
+        })
+    ].filter(Boolean).join('\n');
     const strengths = [
+      d.planned_impact.trim() ? `${PLANNED_PREFIXES[0]} ${sentence(d.planned_impact)}` : '',
+      d.how_know.trim() ? `${PLANNED_PREFIXES[1]} ${sentence(d.how_know)}` : '',
       lines.filter((l) => l.kind === 'strength').map((l) => sentence(l.text)).filter(Boolean).join(' '),
       ...lines.filter((l) => l.kind === 'next').map((l) => `Next step: ${sentence(l.text)}`)
     ].filter(Boolean).join('\n');
     out[d.code] = {
       ...row,
-      practice: row.edited.includes('practice') ? row.practice : practice,
-      strengths: row.edited.includes('strengths') ? row.strengths : strengths
+      practice: row.edited.includes('practice') && row.practice.trim() ? row.practice : practice,
+      strengths: row.edited.includes('strengths') && row.strengths.trim() ? row.strengths : strengths
     };
   }
   return out;
@@ -270,7 +311,7 @@ export function draftFeedback(obs: Observation): Observation['reflection'] {
     const lines = obs.log.filter((l) => l.descriptor === d.code);
     const strengths = row.strengths
       .split('\n')
-      .filter((l) => l.trim() && !l.startsWith('Next step:'))
+      .filter((l) => l.trim() && !l.startsWith('Next step:') && !isPlannedLine(l))
       .join(' ')
       .trim();
     const nexts = lines.filter((l) => l.kind === 'next').map((l) => sentence(l.text)).filter(Boolean);

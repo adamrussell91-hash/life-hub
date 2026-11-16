@@ -3,7 +3,7 @@ import { PROFICIENT_DESCRIPTORS, descriptorByCode } from '@/observation/descript
 import {
   addDescriptor, addLookFor, assignLookForKeys, clockLabel, clockMs, deleteLogEntry, draftFeedback, editLogEntry,
   endClock, gatherWriteUp, logEntry, newObservation, pauseClock, removeDescriptor, removeLookFor, renameLookFor,
-  resumeClock, startClock, tally, windowDay, windowTone
+  resumeClock, setLessonStart, startClock, tally, windowDay, windowTone
 } from '@/observation/model';
 import type { Observation } from '@/observation/types';
 
@@ -147,6 +147,34 @@ describe('tally', () => {
   });
 });
 
+describe('setting the start by hand', () => {
+  it('starts a clock that was never started and times the log from it', () => {
+    let o = logEntry(planned(), { kind: 'transition', text: 'Into groups' }, at(600));
+    expect(o.log[0].clock).toBe('00:00');
+    o = setLessonStart(o, at(0), at(900));
+    expect(o.clock.started_at).toBe(at(0).toISOString());
+    expect(o.clock.ended_at).toBeNull();
+    expect(o.log[0].clock).toBe('10:00');
+    expect(clockMs(o, at(900))).toBe(900_000);
+  });
+
+  it('moves an existing start and shifts timed lines, keeping pauses', () => {
+    let o = startClock(planned(), at(120));
+    o = pauseClock(o, at(180));
+    o = resumeClock(o, at(240));
+    o = logEntry(o, { kind: 'transition', text: 'Pack up' }, at(300)); // 02:00 running time
+    expect(o.log[0].clock).toBe('02:00');
+    o = setLessonStart(o, at(0), at(400));
+    expect(o.log[0].clock).toBe('04:00');
+    expect(o.clock.paused_ms).toBe(60_000);
+  });
+
+  it('refuses a start in the future', () => {
+    const o = planned();
+    expect(setLessonStart(o, at(500), at(100))).toBe(o);
+  });
+});
+
 describe('gather and feedback', () => {
   function observed(): Observation {
     let o = addLookFor(planned(), '3.5.2', 'Short instructions');
@@ -160,7 +188,7 @@ describe('gather and feedback', () => {
 
   it('gathers practice and strengths, oldest first', () => {
     const w = gatherWriteUp(observed());
-    expect(w['3.5.2'].practice).toBe('01:15 Short instructions: Chunked the task');
+    expect(w['3.5.2'].practice).toBe('Look-fors: Short instructions.\n01:15 Short instructions: Chunked the task');
     expect(w['3.5.2'].strengths).toBe('Chunked the task.\nNext step: Repeat the transition cue.');
     expect(w['5.2.2'].strengths).toBe('Named a criterion.');
   });
@@ -176,6 +204,30 @@ describe('gather and feedback', () => {
     expect(w['3.5.2'].strengths).toContain('Chunked the task.');
     expect(w['3.5.2'].decision).toBe('partial');
     expect(w['3.5.2'].comments).toBe('keep me');
+  });
+
+  it('starts each row from Planning, before anything is logged, and feedback skips the planned lines', () => {
+    let o = addLookFor(planned(), '3.5.2', 'Short instructions');
+    o = { ...o, descriptors: o.descriptors.map((d) => d.code === '3.5.2'
+      ? { ...d, demonstrate: 'Model the task, then release in chunks', planned_impact: 'Students start within a minute', how_know: 'Exit ticket' }
+      : d) };
+    const w = gatherWriteUp(o);
+    expect(w['3.5.2'].practice).toBe('Planned: Model the task, then release in chunks.\nLook-fors: Short instructions.');
+    expect(w['3.5.2'].strengths).toBe('Planned impact: Students start within a minute.\nHow we will know: Exit ticket.');
+    expect(w['5.2.2'].practice).toBe('');
+
+    o = startClock(o, at(0));
+    o = logEntry(o, { descriptor: '3.5.2', kind: 'strength', text: 'Chunked the task' }, at(75));
+    const g = gatherWriteUp(o);
+    expect(g['3.5.2'].practice.split('\n')).toEqual(['Planned: Model the task, then release in chunks.', 'Look-fors: Short instructions.', '01:15 Chunked the task']);
+    g['3.5.2'] = { ...g['3.5.2'], decision: 'observed' };
+    expect(draftFeedback({ ...o, write_up: g })['3.5.2'].feedback).toBe('Chunked the task.');
+  });
+
+  it('refills a cell that was edited and then cleared', () => {
+    const o = observed();
+    const w = gatherWriteUp({ ...o, write_up: { '3.5.2': { practice: '', strengths: '', decision: null, comments: '', edited: ['practice', 'strengths'] } } });
+    expect(w['3.5.2'].practice).toBe('Look-fors: Short instructions.\n01:15 Short instructions: Chunked the task');
   });
 
   it('drafts feedback by decision and leaves edited feedback and teacher text', () => {

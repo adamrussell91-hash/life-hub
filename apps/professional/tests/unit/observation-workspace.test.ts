@@ -215,6 +215,34 @@ describe('observing', () => {
     expect(tableBtn.getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('fills the write-up from Planning before anything is logged', async () => {
+    let obs = planned();
+    obs = { ...obs, descriptors: obs.descriptors.map((d) => d.code === '3.5.2' ? { ...d, demonstrate: 'Chunk the instructions', planned_impact: 'Everyone starts quickly' } : d) };
+    const root = await mount(obs, 'observing', MEETING_OBS);
+    const cell = (code: string, k: string) => (root.querySelector(`tr[data-code="${code}"] textarea[data-cell="${k}"]`) as HTMLTextAreaElement).value;
+    expect(cell('3.5.2', 'practice')).toBe('Planned: Chunk the instructions.\nLook-fors: Instructions chunked; Checks before release.');
+    expect(cell('3.5.2', 'strengths')).toBe('Planned impact: Everyone starts quickly.');
+    expect(cell('5.2.2', 'practice')).toBe('Look-fors: Specific to criteria; Student acts on it.');
+  });
+
+  it('sets the lesson start by hand and retimes the log', async () => {
+    const now = Date.now();
+    const start = new Date(now - 30 * 60_000);
+    start.setSeconds(0, 0);
+    const lineAt = start.getTime() + 12 * 60_000 + 30_000;
+    const obs = logEntry(planned(), { descriptor: '3.5.2', kind: 'strength', text: 'Chunked instructions' }, lineAt);
+    const root = await mount(obs, 'observing', MEETING_OBS);
+    const input = root.querySelector('[data-part="obs-start-time"]') as HTMLInputElement;
+    input.value = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+    (root.querySelector('[data-part="obs-start-set"]') as HTMLButtonElement).click();
+    const saved = await lastSaved();
+    expect(saved.clock.started_at).toBe(start.toISOString());
+    expect(saved.log[0].clock).toBe('12:30');
+    expect(root.querySelector('[data-part="obs-clock"]')!.textContent).toContain('Lesson running');
+    expect(root.textContent).toContain('12:30');
+    expect((root.querySelector('tr[data-code="3.5.2"] textarea[data-cell="practice"]') as HTMLTextAreaElement).value).toContain('12:30 Chunked instructions');
+  });
+
   it('gathers from the log into cells Adam has not edited', async () => {
     let obs = planned();
     obs = logEntry(obs, { descriptor: '3.5.2', kind: 'strength', text: 'Chunked instructions' }, T0);

@@ -123,7 +123,10 @@ button.obs-series__step:hover { background: var(--obs-paper); }
 .obs-look__add { width: 14em; border-style: dashed; border-radius: 999px; padding: 4px 10px; font-size: 13px; background: transparent; }
 
 /* Observing */
-.obs-clockrow { gap: 10px; }
+.obs-clockrow { gap: 10px; flex-wrap: wrap; }
+.obs-starttime { gap: 6px; align-items: center; flex-wrap: nowrap; }
+.obs-starttime label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.obs-input--time { width: auto; min-width: 7.5em; padding: 4px 8px; }
 .obs-clock { font-family: var(--obs-mono); font-size: 22px; font-weight: 700; }
 .obs-rec { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--obs-rose-ink); }
 .obs-rec i { width: 9px; height: 9px; border-radius: 50%; background: #d23b3b; animation: obs-pulse 1.4s infinite; }

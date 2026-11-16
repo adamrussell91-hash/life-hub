@@ -48,7 +48,7 @@ export interface WriteUpRow {
   strengths: string;
   decision: Decision | null;
   comments: string;
-  /** Cells Adam has edited by hand; "Gather from log again" leaves these alone. */
+  /** Cells Adam has edited by hand; "Gather from Planning and log" leaves these alone unless emptied. */
   edited: Array<'practice' | 'strengths'>;
 }
 
