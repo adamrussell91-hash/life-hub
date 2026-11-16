@@ -206,6 +206,35 @@ export function validateObservationLink(value) {
   return link;
 }
 
+const FOLLOW_UP_ID_RE = /^[A-Za-z0-9_:.-]{1,200}$/;
+const isTimestamp = (value) => typeof value === 'string' && Number.isFinite(Date.parse(value));
+
+/** Whether Adam wants to send this meeting's notes: no, or yes with the reminder task and promises it made. */
+export function normalizeNotesFollowUp(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  if (!isTimestamp(value.answered_at)) return null;
+  if (value.answer === 'no') return { answer: 'no', answered_at: value.answered_at };
+  if (value.answer !== 'yes') return null;
+  const taskId = typeof value.task_id === 'string' && FOLLOW_UP_ID_RE.test(value.task_id) ? value.task_id : null;
+  const ledgerIds = Array.isArray(value.ledger_ids)
+    ? value.ledger_ids.filter((id) => typeof id === 'string' && FOLLOW_UP_ID_RE.test(id)).slice(0, 50)
+    : [];
+  return {
+    answer: 'yes',
+    answered_at: value.answered_at,
+    task_id: taskId,
+    ledger_ids: ledgerIds,
+    sent_at: isTimestamp(value.sent_at) ? value.sent_at : null
+  };
+}
+
+export function validateNotesFollowUp(value) {
+  if (value === null) return null;
+  const out = normalizeNotesFollowUp(value);
+  if (!out) throw validationError('invalid_notes_follow_up', 'notes_follow_up: needs answer yes or no and an answered_at timestamp, or null.');
+  return out;
+}
+
 /** Adam's own notes under each minutes item. Kept apart from the minutes, so replacing them leaves these alone. */
 export function validateMinutesNotes(value) {
   const fail = (why) => validationError('invalid_minutes_notes', `minutes_notes: ${why}`);
@@ -293,7 +322,8 @@ const STORED_KEYS = new Set([
   'minutes',
   'minutes_pending',
   'minutes_draft',
-  'minutes_notes'
+  'minutes_notes',
+  'notes_follow_up'
 ]);
 
 const HISTORY_KEYS = new Set([
@@ -367,7 +397,8 @@ export function parseMeetingRecord(raw) {
     minutes: raw.minutes && typeof raw.minutes === 'object' ? raw.minutes : null,
     minutes_pending: raw.minutes_pending && typeof raw.minutes_pending === 'object' && !Array.isArray(raw.minutes_pending) ? raw.minutes_pending : null,
     minutes_draft: typeof raw.minutes_draft === 'string' ? raw.minutes_draft : null,
-    minutes_notes: Array.isArray(raw.minutes_notes) ? raw.minutes_notes : []
+    minutes_notes: Array.isArray(raw.minutes_notes) ? raw.minutes_notes : [],
+    notes_follow_up: normalizeNotesFollowUp(raw.notes_follow_up)
   };
 }
 
@@ -418,7 +449,7 @@ export function validateMeetingCreateInput(input) {
   };
 }
 
-const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'observation', 'minutes', 'minutes_pending', 'minutes_draft', 'minutes_notes']);
+const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'observation', 'minutes', 'minutes_pending', 'minutes_draft', 'minutes_notes', 'notes_follow_up']);
 
 export function validateMeetingFieldUpdate(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -452,6 +483,7 @@ export function validateMeetingFieldUpdate(input) {
   if (input.minutes_pending !== undefined) patch.minutes_pending = validateMinutesPending(input.minutes_pending);
   if (input.minutes_draft !== undefined) patch.minutes_draft = trimBounded(input.minutes_draft, 'minutes_draft', MINUTES_DRAFT_MAX_LENGTH);
   if (input.minutes_notes !== undefined) patch.minutes_notes = validateMinutesNotes(input.minutes_notes);
+  if (input.notes_follow_up !== undefined) patch.notes_follow_up = validateNotesFollowUp(input.notes_follow_up);
   if (!Object.keys(patch).length) {
     throw validationError('empty_update', 'Update requires at least one field.');
   }
@@ -528,7 +560,8 @@ export function projectMeeting(record, incompleteLinks = null) {
     minutes: record.minutes ?? null,
     minutes_pending: record.minutes_pending ?? null,
     minutes_draft: record.minutes_draft ?? null,
-    minutes_notes: record.minutes_notes ?? []
+    minutes_notes: record.minutes_notes ?? [],
+    notes_follow_up: record.notes_follow_up ?? null
   };
   if (incompleteLinks) {
     projection.incomplete_links = incompleteLinks;

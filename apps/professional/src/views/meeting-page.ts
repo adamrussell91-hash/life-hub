@@ -46,6 +46,7 @@ import { openGuidePanel } from '@/guides/guide-panel';
 import { renderGuideCard } from '@/guides/guide-card';
 import { openCoachingPanel, renderCoachingCard, type CoachingSheet } from '@/guides/coaching-sheet';
 import { openShareSheet } from '@/guides/share-sheet';
+import { mountNotesFollowUp } from '@/views/notes-follow-up';
 import { saveSheet } from '../../../../packages/walkthrus/coaching.mjs';
 import { guideDigest, historyFor, noteLine, placeRuns, type PlacedRun } from '@/guides/runs';
 import type { GuideRun } from '@/guides/types';
@@ -288,10 +289,14 @@ export async function renderMeetingPage(
   const shareBtn = el('button', 'btn btn--secondary', 'Share sheet') as HTMLButtonElement;
   shareBtn.type = 'button';
   shareBtn.dataset.part = 'share-sheet';
-  shareBtn.addEventListener('click', async () => {
+  async function openShare(returnFocus: HTMLElement): Promise<void> {
     await blockPage?.flush();
-    openShareSheet(id, () => shareBtn.focus());
-  });
+    openShareSheet(id, () => {
+      if (returnFocus.isConnected) returnFocus.focus();
+      void followUpBar.refresh();
+    });
+  }
+  shareBtn.addEventListener('click', () => void openShare(shareBtn));
   headActions.append(shareBtn, editBtn);
   const actionStatus = el('p', 'meeting-form__status');
   actionStatus.hidden = true;
@@ -317,6 +322,7 @@ export async function renderMeetingPage(
         manual = false;
         setPhase('after');
       }
+      void followUpBar.refresh(record);
     } catch (err) {
       if (!options.isCurrent() || !root.isConnected) return;
       actionStatus.hidden = false;
@@ -356,6 +362,11 @@ export async function renderMeetingPage(
   }
   const phaseNote = el('p', 'comm-page__phase-note');
   head.append(chips, facts, switcher, headActions, phaseNote, actionStatus);
+  const followUpBar = mountNotesFollowUp({
+    record,
+    people: () => attendees.map((attendee) => ({ ref: attendee.ref, name: attendee.name })),
+    openShare: () => void openShare(shareBtn)
+  });
 
   const editor = buildDetailsEditor();
   editor.hidden = true;
@@ -392,7 +403,7 @@ export async function renderMeetingPage(
   grid.append(main, side);
   // Notes and the guides under them run the full width, below both columns (and last on a phone).
   const full = el('div', 'meeting-page__full');
-  root.append(head, editor, purpose, grid, full);
+  root.append(head, followUpBar.el, editor, purpose, grid, full);
   canvas.replaceChildren(root);
   paintRoom();
 

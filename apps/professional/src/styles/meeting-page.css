@@ -585,3 +585,41 @@
 .meeting-minutes__pending { display: grid; gap: var(--space-2); padding: var(--space-3); border-left: 3px solid var(--pastel-lilac-ink); background: var(--pastel-lilac); border-radius: var(--radius-sm); }
 .meeting-minutes__pending p { margin: 0; }
 .meeting-minutes__pending-title { font-weight: var(--weight-semibold); }
+
+/* ── Notes follow-up: asked once a meeting is completed ── */
+.notes-follow-up {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--pastel-lilac-ink);
+  border-radius: var(--radius-md);
+  background: var(--pastel-lilac);
+}
+
+.notes-follow-up[hidden] {
+  display: none;
+}
+
+.notes-follow-up__text {
+  flex: 1 1 16rem;
+  margin: 0;
+  font-weight: var(--weight-semibold);
+  color: var(--pastel-lilac-ink);
+}
+
+.notes-follow-up__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.notes-follow-up__error {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--high-sea-ink);
+}

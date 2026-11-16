@@ -71,3 +71,30 @@ test('minutes_notes saves per item, reads back, and rejects bad shapes', () => {
   reject([{ key: 'k', heading: null, text: 'x'.repeat(8001) }]);
   reject(Array.from({ length: 61 }, (_, i) => ({ key: `k${i}`, heading: null, text: 'x' })));
 });
+
+test('notes_follow_up keeps a yes or no answer and rejects junk', async () => {
+  const { validateNotesFollowUp } = await import('../../netlify/functions/_shared/meeting-schema.mjs');
+  const at = '2026-11-16T04:00:00.000Z';
+  assert.deepEqual(validateMeetingFieldUpdate({ notes_follow_up: { answer: 'no', answered_at: at, task_id: 'x' } }), {
+    notes_follow_up: { answer: 'no', answered_at: at }
+  });
+  assert.deepEqual(validateNotesFollowUp({ answer: 'yes', answered_at: at, task_id: 'task_1', ledger_ids: ['ledger_1', 7, '../x'] }), {
+    answer: 'yes', answered_at: at, task_id: 'task_1', ledger_ids: ['ledger_1'], sent_at: null
+  });
+  assert.equal(validateNotesFollowUp(null), null);
+  assert.throws(() => validateNotesFollowUp({ answer: 'maybe', answered_at: at }), { code: 'invalid_notes_follow_up' });
+  assert.throws(() => validateNotesFollowUp({ answer: 'yes' }), { code: 'invalid_notes_follow_up' });
+});
+
+test('a stored notes_follow_up survives a read and reaches the page', () => {
+  const at = '2026-11-16T04:00:00.000Z';
+  const raw = {
+    schema_version: 1, id: MEETING, title: 'T', scheduled_start: at, scheduled_end: '2026-11-16T05:00:00.000Z', time_zone: 'Australia/Sydney',
+    state: 'completed', occurrence_history: [], created_at: at, updated_at: at,
+    notes_follow_up: { answer: 'yes', answered_at: at, task_id: 'task_1', ledger_ids: [], sent_at: null }
+  };
+  const parsed = parseMeetingRecord(raw);
+  assert.ok(parsed, 'record parses');
+  assert.deepEqual(projectMeeting(parsed).notes_follow_up, raw.notes_follow_up);
+  assert.equal(projectMeeting(parseMeetingRecord({ ...raw, notes_follow_up: undefined })).notes_follow_up, null);
+});

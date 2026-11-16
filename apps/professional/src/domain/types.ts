@@ -380,7 +380,13 @@ export interface MeetingRecord {
   minutes_draft?: string | null;
   /** Adam's notes under each minutes item, matched by heading. Replacing the minutes leaves them alone. */
   minutes_notes?: MinutesItemNote[];
+  /** Whether Adam wants to send this meeting's notes; asked once the meeting is completed. */
+  notes_follow_up?: NotesFollowUp | null;
 }
+
+export type NotesFollowUp =
+  | { answer: 'no'; answered_at: string }
+  | { answer: 'yes'; answered_at: string; task_id: string | null; ledger_ids: string[]; sent_at: string | null };
 
 export interface MinutesItemNote {
   key: string;
