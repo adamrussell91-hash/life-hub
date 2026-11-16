@@ -7,7 +7,7 @@
  * box and Enter there logs.
  */
 import {
-  clockLabel, clockMs, deleteLogEntry, editLogEntry, endClock, gatherWriteUp, logEntry, pauseClock, resumeClock, startClock, tally
+  clockLabel, clockMs, deleteLogEntry, editLogEntry, endClock, gatherWriteUp, logEntry, pauseClock, resumeClock, setLessonStart, startClock, tally
 } from './model';
 import type { Decision, LogEntry, LogKind, Observation, WriteUpRow } from './types';
 import { DECISIONS, focusOf, h, KIND_KEYS, kindMeta, KINDS, NESA, slotClass, slotOf, syncValue, type ObsCtx, type ObsView } from './ui';
@@ -47,6 +47,33 @@ export function mountObserving(ctx: ObsCtx): ObsView {
     return b;
   }
 
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  /** Set when the lesson began by hand, e.g. when Start lesson was missed. Log times are redone to match. */
+  function startTimeControl(): HTMLElement {
+    const obs = ctx.obs();
+    const started = obs.clock.started_at ? new Date(obs.clock.started_at) : null;
+    const input = h(doc, 'input', { type: 'time', class: 'obs-input obs-input--time', 'data-part': 'obs-start-time', 'aria-label': 'Lesson started at' });
+    input.value = started ? hhmm(started) : '';
+    const set = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--sm', 'data-part': 'obs-start-set' }, started ? 'Change start' : 'Set start');
+    const msg = h(doc, 'span', { class: 'obs-muted obs-small', 'aria-live': 'polite' });
+    set.addEventListener('click', () => {
+      const m = /^(\d{2}):(\d{2})$/.exec(input.value);
+      if (!m) { msg.textContent = 'Pick a time first.'; return; }
+      // The lesson's day: when it started, else its first log line, else today.
+      const o = ctx.obs();
+      const day = started ?? (o.log[0] ? new Date(o.log[0].at) : ctx.now());
+      const when = new Date(day.getFullYear(), day.getMonth(), day.getDate(), Number(m[1]), Number(m[2]), 0, 0);
+      if (when.getTime() > ctx.now().getTime()) { msg.textContent = 'That time hasn’t happened yet.'; return; }
+      ctx.change((x) => withGather(setLessonStart(x, when, ctx.now())), 'now');
+      renderClock();
+      renderLog();
+      syncWriteUp();
+    });
+    return h(doc, 'span', { class: 'obs-row obs-starttime' }, h(doc, 'label', { class: 'obs-small' }, 'Started at ', input), set, msg);
+  }
+
   function renderClock(): void {
     const obs = ctx.obs();
     const c = obs.clock;
@@ -63,7 +90,7 @@ export function mountObserving(ctx: ObsCtx): ObsView {
         : [c.paused_at ? clockButton('Resume', 'obs-clock-resume', resumeClock) : clockButton('Pause', 'obs-clock-pause', pauseClock),
           clockButton('End lesson', 'obs-clock-end', endClock)];
     paintClock();
-    clockRow.replaceChildren(state ?? '', clockText, about ? h(doc, 'span', { class: 'obs-muted obs-small' }, `· ${about}`) : '', h(doc, 'span', { class: 'obs-spacer' }), ...buttons);
+    clockRow.replaceChildren(state ?? '', clockText, about ? h(doc, 'span', { class: 'obs-muted obs-small' }, `· ${about}`) : '', h(doc, 'span', { class: 'obs-spacer' }), startTimeControl(), ...buttons);
     if (running && !tick) tick = setInterval(paintClock, 1000);
     if (!running && tick) { clearInterval(tick); tick = null; }
   }
@@ -398,17 +425,17 @@ export function mountObserving(ctx: ObsCtx): ObsView {
     }
   }
 
-  const gather = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--sm', 'data-part': 'obs-gather' }, '↻ Gather from log again');
+  const gather = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--sm', 'data-part': 'obs-gather' }, '↻ Gather from Planning and log');
   gather.addEventListener('click', () => {
     ctx.change(withGather, 'now');
     syncWriteUp();
   });
 
   // ---------------------------------------------------------------- mount
-  // Rows with nothing in them start from the log.
+  // Rows Adam hasn't edited start from Planning and the log.
   const before = JSON.stringify(ctx.obs().write_up);
   const gathered = withGather(ctx.obs());
-  if (ctx.obs().log.length && JSON.stringify(gathered.write_up) !== before) ctx.change(() => gathered, 'later');
+  if (JSON.stringify(gathered.write_up) !== before) ctx.change(() => gathered, 'later');
 
   renderClock();
   paintDock();
@@ -428,7 +455,7 @@ export function mountObserving(ctx: ObsCtx): ObsView {
         planningFold())),
     h(doc, 'div', { class: 'obs-divider' }, 'Write-up · Phase 2 of the report'),
     h(doc, 'div', { class: 'obs-row' },
-      h(doc, 'span', { class: 'obs-muted obs-small' }, 'Each cell starts from the log lines tagged with that descriptor. Edit freely; gathering again leaves edited cells alone.'),
+      h(doc, 'span', { class: 'obs-muted obs-small' }, 'Each cell starts from what you planned for that descriptor, then the log lines tagged with it. Edit freely; gathering again leaves edited cells alone.'),
       h(doc, 'span', { class: 'obs-spacer' }), gather),
     table);
 
