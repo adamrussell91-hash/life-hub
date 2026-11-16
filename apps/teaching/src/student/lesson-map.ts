@@ -1,4 +1,5 @@
 import type { Block } from '@/schemas/block';
+import { GATE_CHANGE, isGatedAway } from '@/blocks/hinge-question/gate';
 import { el, uid } from '@/quiz/dom';
 import { lessonQuiz, LESSON_QUIZ_CHANGE, type LessonQuizHandle } from '@/quiz/student-quiz';
 import { savedWorkByBlock } from '@/student/work-sync';
@@ -288,10 +289,14 @@ export function mountLessonMap(options: LessonMapOptions): LessonMapHandle {
     for (const s of sections) {
       const isDone = done.get(s.id) === true;
       const row = checkRows.get(s.id)!;
+      // A part a hinge gate still holds back stays off the map until it opens.
+      const gated = isGatedAway(sectionEl(s.id));
+      row.li.hidden = gated;
+      railRows.get(s.id)!.li.hidden = gated;
       row.li.classList.toggle('is-done', isDone);
       row.tick.setAttribute('aria-pressed', String(isDone));
       row.status.textContent = isDone ? 'Done' : s.minutes ? `${s.minutes} min` : '';
-      const isNext = !isDone && !nextMarked;
+      const isNext = !isDone && !gated && !nextMarked;
       row.li.classList.toggle('is-next', isNext);
       if (isNext) nextMarked = true;
       const r = railRows.get(s.id)!;
@@ -313,6 +318,7 @@ export function mountLessonMap(options: LessonMapOptions): LessonMapHandle {
   listen(content, 'change', schedule);
   listen(content, 'click', schedule);
   listen(content, LESSON_QUIZ_CHANGE, schedule);
+  listen(content, GATE_CHANGE, () => paint());
   listen(window, 'storage', schedule);
 
   /* ── Where the student is ── */

@@ -2,6 +2,7 @@ import { revealBlockFromHash } from '@/app/block-hash';
 import { FAILURE } from '@/app/failure';
 import { apiGet, ApiClientError } from '@/api/client';
 import { renderBlock } from '@/blocks/render';
+import { applyHingeGates } from '@/blocks/hinge-question/gate';
 import type { Block } from '@/schemas/block';
 import { studentUnitAnthology } from '@/blocks/anthology-load';
 import { mountStudentBlockPulse } from '@/student/block-pulse';
@@ -279,6 +280,8 @@ function renderPublishedLesson(
     feedbackOff: lesson.feedback_off === true
   });
   if (inlineQuiz && !quizPlaced) blocks.append(mountStudentQuiz(lesson, { classId: quizClassId, stepFor, ...(quizSlots ? { slots: quizSlots } : {}) }));
+  // A gated hinge holds back the rest of the page until this student finishes it.
+  applyHingeGates(blocks, lesson.blocks);
   content.append(blocks);
   if (isQuiz) content.append(mountStudentQuiz(lesson, { classId: quizClassId, stepFor }));
   revealBlockFromHash(content);

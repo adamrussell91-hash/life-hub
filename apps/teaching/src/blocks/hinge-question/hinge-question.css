@@ -657,3 +657,40 @@
 .hq-ind-teacher__reason {
   overflow-wrap: anywhere;
 }
+
+/* ── Gate: the rest of a plain lesson waits for this student's answer ── */
+[data-gated-by] {
+  display: none !important;
+}
+
+.hq-gate-note {
+  margin: var(--space-4, 1rem) 0;
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md, 10px);
+  text-align: center;
+}
+
+.hq-gate-flag {
+  margin: 0 0 var(--space-2, 0.5rem);
+}
+
+.hq-editor__gate {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.6rem;
+  align-items: start;
+  margin: var(--space-3, 0.75rem) 0;
+}
+
+.hq-editor__gate[hidden] {
+  display: none;
+}
+
+.hq-editor__gate > .pf-field__hint {
+  grid-column: 2;
+}
+
+.hq-ind__carry {
+  margin-top: var(--space-2, 0.5rem);
+}

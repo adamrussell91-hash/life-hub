@@ -6,6 +6,7 @@ import { mountSolo } from './solo';
 import { mountIndependent } from './independent';
 import { mountIndependentTeacher } from './teacher-independent';
 import { LETTERS, paceOf, type HingeBlock } from './shared';
+import { gatesRest } from './gate';
 import '@/blocks/peer-feedback.css';
 import './hinge-question.css';
 
@@ -47,6 +48,9 @@ export function renderHingeQuestion(block: HingeBlock, mode: RenderMode, ctx: Re
   // Independent pace (outside a lecture): each student answers alone with a reason; no round to run.
   if (paceOf(block.content) === 'independent') {
     root.classList.add('is-independent');
+    if (mode === 'teacher' && !ctx.display && gatesRest(block.content)) {
+      root.append(el('p', 'hq-gate-flag block-secondary', 'Gate on: students see the rest of the lesson once they finish this.'));
+    }
     root.append(mode === 'teacher' ? mountIndependentTeacher(block, ctx.lessonId, ctx.display === true) : mountIndependent(block, ctx.lessonId));
     return root;
   }
