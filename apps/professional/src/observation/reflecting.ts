@@ -34,9 +34,28 @@ export function mountReflecting(ctx: ObsCtx): ObsView {
     const obs = ctx.obs();
     const r = obs.reflection[code];
     const decision = obs.write_up[code]?.decision ?? null;
-    if (!decision) return 'Set a decision in Observing to draft this.';
+    if (!decision) return 'Pick a decision to draft this.';
     if (r?.feedback_edited) return 'Edited by you';
     return decision === 'observed' ? '↳ drafted from strengths' : '↳ drafted from strengths and next steps';
+  }
+
+  // No decision was made while observing: make it here, then draft the feedback from it.
+  function decideHere(code: string, index: number): HTMLElement {
+    const host = h(doc, 'div', { class: 'obs-decide', role: 'group', 'aria-label': `Decision for ${code}`, 'data-part': 'obs-decide-here' });
+    for (const d of DECISIONS) {
+      const b = h(doc, 'button', { type: 'button', class: d.cls }, d.label);
+      b.addEventListener('click', () => {
+        ctx.change((o) => {
+          const prev = o.write_up[code] ?? { practice: '', strengths: '', decision: null, comments: '', edited: [] };
+          const next: Observation = { ...o, write_up: { ...o.write_up, [code]: { ...prev, decision: d.value } } };
+          return { ...next, reflection: draftFeedback(next) };
+        }, 'now');
+        const old = el.querySelector(`.obs-refl[data-code="${code}"]`);
+        old?.replaceWith(row(code, index));
+      });
+      host.append(b);
+    }
+    return host;
   }
 
   function row(code: string, index: number): HTMLElement {
@@ -50,8 +69,10 @@ export function mountReflecting(ctx: ObsCtx): ObsView {
     const evid = h(doc, 'div', { class: 'obs-evid' },
       h(doc, 'div', { class: 'obs-row' },
         h(doc, 'span', { class: 'obs-code' }, code),
-        h(doc, 'span', { class: `obs-pill ${pillClass(decision)}`, 'data-part': 'obs-decision-pill' },
-          DECISIONS.find((d) => d.value === decision)?.full ?? 'No decision yet')),
+        decision
+          ? h(doc, 'span', { class: `obs-pill ${pillClass(decision)}`, 'data-part': 'obs-decision-pill' },
+            DECISIONS.find((d) => d.value === decision)?.full ?? '')
+          : decideHere(code, index)),
       strengths.length || nexts.length
         ? h(doc, 'ul', {},
           ...strengths.map((l) => h(doc, 'li', {}, l.text)),
@@ -137,8 +158,8 @@ export function mountReflecting(ctx: ObsCtx): ObsView {
   const obs = ctx.obs();
   const heads = h(doc, 'div', { class: 'obs-col3h obs-col3h--refl' },
     h(doc, 'div', { class: 'obs-colh' }, 'From the observation'),
-    h(doc, 'div', { class: 'obs-colh' }, NESA.p3.teacherHead, h(doc, 'small', {}, NESA.p3.teacherQs.join(' '))),
-    h(doc, 'div', { class: 'obs-colh' }, NESA.p3.feedbackHead, h(doc, 'small', {}, `${NESA.p3.feedbackShown} ${NESA.p3.feedbackAdvice}`)));
+    h(doc, 'div', { class: 'obs-colh' }, NESA.p3.teacherHead),
+    h(doc, 'div', { class: 'obs-colh' }, NESA.p3.feedbackHead));
   renderActions();
   el.append(
     heads,

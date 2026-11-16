@@ -138,8 +138,9 @@ export function mountPlanning(ctx: ObsCtx): ObsView {
     colHead(NESA.p1.impact.head, [NESA.p1.impact.planned, NESA.p1.impact.howKnow]));
   const cards = h(doc, 'div', { class: 'obs-stack', 'data-part': 'obs-dcards' });
 
-  function colHead(title: string, questions: string[]): HTMLElement {
-    return h(doc, 'div', { class: 'obs-colh' }, title, h(doc, 'small', {}, questions.join(' ')));
+  // The template's questions already label each field, so the column head is the title alone.
+  function colHead(title: string, _questions: string[]): HTMLElement {
+    return h(doc, 'div', { class: 'obs-colh' }, title);
   }
 
   function textFor(code: string, key: DescriptorText, label: string): HTMLElement {
