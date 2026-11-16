@@ -316,12 +316,26 @@ const emptyRow = (): WriteUpRow => ({ practice: '', strengths: '', decision: nul
 export const PLANNED_PREFIXES = ['Planned impact:', 'How we will know:'] as const;
 const isPlannedLine = (l: string): boolean => PLANNED_PREFIXES.some((p) => l.startsWith(p));
 
+/** Plain text of the Planning and Observing meetings' Notes, one paragraph per line. */
+export interface GatherNotes {
+  planning?: string;
+  observing?: string;
+}
+
+/** Paragraphs that name this descriptor code ('4.5.2', not '14.5.2' or '4.5.21'). */
+export function notesFor(code: string, text: string | undefined): string[] {
+  if (!text) return [];
+  const re = new RegExp(`(?<![\\d.])${code.replace(/\./g, '\\.')}(?![\\d]|\\.\\d)`);
+  return text.split('\n').map((l) => l.trim()).filter((l) => l && re.test(l));
+}
+
 /**
  * Fill each row's Teaching practice and Strengths from the Planning meeting, then the log; cells Adam
  * edited are left alone (a cell cleared back to empty fills again). Teaching practice opens with what was planned to demonstrate the descriptor and
- * its look-fors; Strengths opens with the planned impact and how it will be known.
+ * its look-fors; Strengths opens with the planned impact and how it will be known. Paragraphs in either
+ * meeting's Notes that name the descriptor join Teaching practice: Planning's marked, Observing's as written.
  */
-export function gatherWriteUp(obs: Observation): Observation['write_up'] {
+export function gatherWriteUp(obs: Observation, notes: GatherNotes = {}): Observation['write_up'] {
   const out: Observation['write_up'] = {};
   for (const d of obs.descriptors) {
     const row = obs.write_up[d.code] ?? emptyRow();
@@ -332,13 +346,15 @@ export function gatherWriteUp(obs: Observation): Observation['write_up'] {
     const practice = [
       planned ? `Planned: ${sentence(planned)}` : '',
       looks.length ? `Look-fors: ${looks.join('; ')}.` : '',
+      ...notesFor(d.code, notes.planning).map((l) => `From Planning notes: ${l}`),
       ...lines
         .filter((l) => l.kind !== 'next')
         .map((l) => {
           const label = labelOf(l.look_for);
           return `${l.clock} ${label ? `${label}: ` : ''}${l.text}`.trim();
-        })
-    ].filter(Boolean).join('\n');
+        }),
+      ...notesFor(d.code, notes.observing)
+    ].filter((l, i, all) => l && all.indexOf(l) === i).join('\n');
     const strengths = [
       d.planned_impact.trim() ? `${PLANNED_PREFIXES[0]} ${sentence(d.planned_impact)}` : '',
       d.how_know.trim() ? `${PLANNED_PREFIXES[1]} ${sentence(d.how_know)}` : '',

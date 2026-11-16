@@ -4,7 +4,10 @@
  * Observing or Reflecting). One record, saved whole: typing waits ~600ms, everything else saves at once.
  * Spec: docs/superpowers/specs/2026-11-16-classroom-observation-design.md
  */
+import { getMeeting } from '@/api/meetings';
+import { blockPlainText } from '@/lib/inline-promises';
 import { getObservation, saveObservation } from './api';
+import type { GatherNotes } from './model';
 import { mountObserving } from './observing';
 import { mountPlanning } from './planning';
 import { mountReflecting } from './reflecting';
@@ -40,6 +43,25 @@ export function mountObservationWorkspace(host: HTMLElement, opts: ObservationWo
   let inFlight = false;
   let queued = false;
   const views: ObsView[] = [];
+  let notes: GatherNotes = {};
+
+  /** Plain text of the Planning and Observing meetings' Notes. A meeting that won't load just adds nothing. */
+  async function readNotes(fresh: boolean): Promise<GatherNotes> {
+    const ids = obs?.meetings ?? {};
+    const read = async (id: string | undefined): Promise<string | undefined> => {
+      if (!id) return undefined;
+      try {
+        const { meeting } = await getMeeting(id, { fresh });
+        const fromBlocks = meeting.blocks?.length ? blockPlainText(meeting.blocks) : '';
+        return fromBlocks || meeting.notes || undefined;
+      } catch {
+        return undefined;
+      }
+    };
+    const [planning, observing] = await Promise.all([read(ids.planning), read(ids.observing)]);
+    notes = { planning, observing };
+    return notes;
+  }
 
   const status = h(doc, 'span', { class: 'obs-save', 'data-part': 'obs-save', role: 'status', 'aria-live': 'polite' });
 
@@ -85,7 +107,9 @@ export function mountObservationWorkspace(host: HTMLElement, opts: ObservationWo
       setStatus('pending');
       timer = setTimeout(() => void saveNow(), SAVE_DELAY_MS);
     },
-    now: () => new Date()
+    now: () => new Date(),
+    notes: () => notes,
+    refreshNotes: () => readNotes(true)
   };
 
   function clearViews(): void {
@@ -127,6 +151,8 @@ export function mountObservationWorkspace(host: HTMLElement, opts: ObservationWo
       if (destroyed) return;
       obs = loaded;
       server = loaded;
+      if (opts.phase === 'observing') await readNotes(false);
+      if (destroyed) return;
       render();
     } catch {
       if (!destroyed) showError();

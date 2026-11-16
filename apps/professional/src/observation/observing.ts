@@ -7,7 +7,7 @@
  * box and Enter there logs.
  */
 import {
-  addLogLineAt, clockLabel, clockMs, deleteLogEntry, editLogEntry, endClock, gatherWriteUp, logEntry, pauseClock, resumeClock, setLessonStart, startClock, tally
+  addLogLineAt, clockLabel, clockMs, deleteLogEntry, editLogEntry, endClock, gatherWriteUp, logEntry, notesFor, pauseClock, resumeClock, setLessonStart, startClock, tally
 } from './model';
 import type { Decision, LogEntry, LogKind, Observation, WriteUpRow } from './types';
 import { DECISIONS, focusOf, h, KIND_KEYS, kindMeta, KINDS, NESA, slotClass, slotOf, syncValue, type ObsCtx, type ObsView } from './ui';
@@ -20,11 +20,10 @@ function isTyping(target: EventTarget | null): boolean {
   return t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable;
 }
 
-/** Apply a log change, then refill write-up cells Adam hasn't edited. */
-const withGather = (o: Observation): Observation => ({ ...o, write_up: gatherWriteUp(o) });
-
 export function mountObserving(ctx: ObsCtx): ObsView {
   const { doc } = ctx;
+  /** Apply a log change, then refill write-up cells Adam hasn't edited (from Planning, the log and Notes). */
+  const withGather = (o: Observation): Observation => ({ ...o, write_up: gatherWriteUp(o, ctx.notes?.() ?? {}) });
   const el = h(doc, 'div', { class: 'obs-view obs-observing', 'data-part': 'obs-observing' });
   const sel: { code: string | null; look: string | null; kind: LogKind } = { code: null, look: null, kind: 'strength' };
   let tick: ReturnType<typeof setInterval> | null = null;
@@ -501,7 +500,12 @@ export function mountObserving(ctx: ObsCtx): ObsView {
 
   const gather = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--sm', 'data-part': 'obs-gather' }, '↻ Gather from Planning and log');
   const gatherMsg = h(doc, 'span', { class: 'obs-small obs-gather__msg', 'data-part': 'obs-gather-msg', role: 'status', 'aria-live': 'polite' });
-  gather.addEventListener('click', () => {
+  gather.addEventListener('click', async () => {
+    if (ctx.refreshNotes) {
+      gather.disabled = true;
+      gatherMsg.textContent = 'Reading the meeting notes…';
+      try { await ctx.refreshNotes(); } finally { gather.disabled = false; }
+    }
     const before = ctx.obs();
     const after = withGather(before);
     let changed = 0;
@@ -515,14 +519,16 @@ export function mountObserving(ctx: ObsCtx): ObsView {
     }
     ctx.change(() => after, 'now');
     syncWriteUp();
-    const hasSource = before.descriptors.some((d) => [d.demonstrate, d.practice, d.planned_impact, d.how_know].some((t) => t.trim()))
+    const n = ctx.notes?.() ?? {};
+    const hasSource = before.descriptors.some((d) => [d.demonstrate, d.practice, d.planned_impact, d.how_know].some((t) => t.trim())
+      || notesFor(d.code, n.planning).length || notesFor(d.code, n.observing).length)
       || before.log.some((l) => l.descriptor);
     const keptNote = kept ? ` ${kept} edited ${kept === 1 ? 'cell' : 'cells'} left as you wrote ${kept === 1 ? 'it' : 'them'}.` : '';
     gatherMsg.textContent = changed
       ? `Filled ${changed} ${changed === 1 ? 'cell' : 'cells'}.${keptNote}`
       : hasSource
         ? `Already up to date.${keptNote}`
-        : 'Nothing to gather yet. Cells fill from the Planning form (what you’ll demonstrate, planned impact) and from log lines tagged with a descriptor.';
+        : 'Nothing to gather yet. Cells fill from the Planning form, log lines tagged with a descriptor, and paragraphs in either meeting’s Notes that name one (e.g. “4.5.2 – …”).';
     gatherMsg.classList.remove('is-flash');
     void gatherMsg.offsetWidth;
     gatherMsg.classList.add('is-flash');
@@ -552,7 +558,7 @@ export function mountObserving(ctx: ObsCtx): ObsView {
         planningFold())),
     h(doc, 'div', { class: 'obs-divider' }, 'Write-up · Phase 2 of the report'),
     h(doc, 'div', { class: 'obs-row' },
-      h(doc, 'span', { class: 'obs-muted obs-small' }, 'Each cell starts from what you planned for that descriptor, then the log lines tagged with it. Edit freely; gathering again leaves edited cells alone.'),
+      h(doc, 'span', { class: 'obs-muted obs-small' }, 'Each cell starts from what you planned for that descriptor, then the log lines tagged with it, then paragraphs in the meetings’ Notes that name it. Edit freely; gathering again leaves edited cells alone.'),
       h(doc, 'span', { class: 'obs-spacer' }), gatherMsg, gather),
     table);
 
