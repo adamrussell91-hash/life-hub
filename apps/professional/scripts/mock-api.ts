@@ -2794,7 +2794,7 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
         return json(404, { ok: false, error: { code: 'meeting_not_found', message: 'Meeting not found.' } });
       }
       const patch = body as Record<string, unknown>;
-      for (const key of ['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'observation', 'minutes', 'minutes_pending', 'minutes_draft', 'minutes_notes']) {
+      for (const key of ['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'observation', 'minutes', 'minutes_pending', 'minutes_draft', 'minutes_notes', 'notes_follow_up']) {
         if (patch[key] !== undefined) meeting[key] = patch[key];
       }
       meeting.updated_at = new Date().toISOString();

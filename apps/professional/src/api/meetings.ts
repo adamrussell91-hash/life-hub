@@ -2,7 +2,7 @@ import { apiGet, apiPatch, apiPost, ApiClientError } from './client';
 import type { GuideRun } from '@/guides/types';
 import type { CoachingSheet } from '@/guides/coaching-sheet';
 import type { MeetingObservationLink } from '@/observation/types';
-import type { MeetingDecision, MeetingMinutes, MeetingMinutesPending, MeetingRecord, MinutesItemNote } from '@/domain/types';
+import type { MeetingDecision, MeetingMinutes, MeetingMinutesPending, MeetingRecord, MinutesItemNote, NotesFollowUp } from '@/domain/types';
 
 export interface MeetingLinkInput {
   source_ref?: string;
@@ -68,6 +68,7 @@ export function updateMeeting(
     minutes_pending?: MeetingMinutesPending | null;
     minutes_draft?: string | null;
     minutes_notes?: MinutesItemNote[];
+    notes_follow_up?: NotesFollowUp | null;
   },
   options: { signal?: AbortSignal } = {}
 ): Promise<{ meeting: MeetingRecord }> {

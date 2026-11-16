@@ -11,6 +11,7 @@ import {
   type SheetShare
 } from '@/api/meeting-sheets';
 import { fetchSelfPerson } from '@/api/network-ecology';
+import { markNotesSent } from '@/views/notes-follow-up';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -210,6 +211,7 @@ export function openShareSheet(meetingId: string, onClose: () => void = () => {}
       make.addEventListener('click', () => void run(make, async () => {
         const result = await publishSheet(meetingId, current);
         share = result.share;
+        await markNotesSent(meetingId).catch(() => null);
       }));
       shareBox.append(make, el('p', 'share-sheet__hint', 'Anyone with the link can read the sheet, with no sign-in. They can open notes and play voice, and that is all.'));
       return;
@@ -242,6 +244,7 @@ export function openShareSheet(meetingId: string, onClose: () => void = () => {}
     update.addEventListener('click', () => void run(update, async () => {
       const result = await publishSheet(meetingId, current);
       share = result.share;
+      await markNotesSent(meetingId).catch(() => null);
     }));
     const open = el('a', 'btn btn--secondary', 'See their view');
     open.href = url;
