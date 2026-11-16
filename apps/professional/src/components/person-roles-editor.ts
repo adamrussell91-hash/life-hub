@@ -2,6 +2,8 @@
  * Roles and education on a person's profile. Each row is a link to an
  * Organisation with a role (or qualification) and a date range, and has
  * Edit, End and Remove. "Add role" and "Add education" open an inline row.
+ * With two or more current roles, a star picks the main one: it leads the
+ * profile header and the People row.
  */
 
 import { addPersonRole, editPersonRole, endPersonRole, removePersonRole } from '@/api/people-roles';
@@ -24,6 +26,10 @@ function button(text: string, className = 'btn btn--ghost'): HTMLButtonElement {
 export interface RolesEditorOptions {
   personRef: string;
   roles: PersonRole[];
+  /** The organisation of the chosen main role, if any. */
+  mainOrgRef?: string | null;
+  /** Save a new main role's organisation. */
+  setMain?: (orgRef: string) => Promise<unknown>;
   crest: (orgRef: string, orgName: string) => HTMLElement;
   /** A write landed; reload the person. */
   onChanged: () => void;
@@ -45,6 +51,33 @@ export function renderRolesEditor(host: HTMLElement, options: RolesEditorOptions
 
   const roles = options.roles.filter((r) => r.kind === 'role');
   const education = options.roles.filter((r) => r.kind === 'education');
+  const current = roles.filter((r) => r.current);
+  // Without a chosen (still current) main role, the newest current one leads.
+  const mainOrgRef = current.some((r) => r.orgRef === options.mainOrgRef)
+    ? options.mainOrgRef!
+    : current[0]?.orgRef ?? null;
+  const canPickMain = Boolean(options.setMain) && current.length > 1;
+
+  function mainControl(role: PersonRole): HTMLElement | null {
+    if (!canPickMain || role.kind !== 'role' || !role.current) return null;
+    if (role.orgRef === mainOrgRef) {
+      const tag = el('span', 'roles-editor__main-tag', '★ Main');
+      tag.title = 'Shown first on their profile and in People';
+      return tag;
+    }
+    const star = button('☆ Make main', 'roles-editor__act roles-editor__act--star');
+    star.title = 'Show this role first on their profile and in People';
+    star.addEventListener('click', () => {
+      star.disabled = true;
+      void options.setMain!(role.orgRef)
+        .then(() => options.onChanged())
+        .catch((err) => {
+          star.disabled = false;
+          showError(errorText(err));
+        });
+    });
+    return star;
+  }
 
   function rowFor(role: PersonRole): HTMLElement {
     const row = el('div', `roles-editor__row${role.current ? '' : ' is-past'}`);
@@ -57,6 +90,8 @@ export function renderRolesEditor(host: HTMLElement, options: RolesEditorOptions
     text.append(el('span', 'roles-editor__sub', [role.orgName, range].filter(Boolean).join(' · ')));
     main.append(text);
     const acts = el('div', 'roles-editor__acts');
+    const mainBit = mainControl(role);
+    if (mainBit) acts.append(mainBit);
     const edit = button('Edit', 'roles-editor__act');
     edit.addEventListener('click', () => openEdit(row, role));
     acts.append(edit);
@@ -168,7 +203,11 @@ export function renderRolesEditor(host: HTMLElement, options: RolesEditorOptions
   }
 
   const roleList = el('div', 'roles-editor__list');
-  for (const role of roles) roleList.append(rowFor(role));
+  // The main role sits at the top of the list too.
+  const ordered = mainOrgRef
+    ? [...roles.filter((r) => r.current && r.orgRef === mainOrgRef), ...roles.filter((r) => !(r.current && r.orgRef === mainOrgRef))]
+    : roles;
+  for (const role of ordered) roleList.append(rowFor(role));
   if (!roles.length) roleList.append(el('p', 'people-pane__empty', 'No roles yet.'));
   const addRole = button('+ Add role', 'roles-editor__add');
   addRole.addEventListener('click', () => openAdd('role', addRole));

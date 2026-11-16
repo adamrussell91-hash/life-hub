@@ -2095,6 +2095,7 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
         display_name?: unknown;
         sort_name?: unknown;
         aliases?: unknown;
+        main_organisation_ref?: unknown;
         professional_profile?: {
           summary?: unknown;
           linkedin_url?: unknown;
@@ -2116,6 +2117,10 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
       }
       if (Array.isArray(input.aliases)) {
         record.aliases = input.aliases.filter((value): value is string => typeof value === 'string' && value.trim() !== '');
+      }
+      if (record.kind === 'person' && input.main_organisation_ref !== undefined) {
+        (record as PersonRecord).main_organisation_ref =
+          typeof input.main_organisation_ref === 'string' ? input.main_organisation_ref : null;
       }
       if (record.kind === 'person' && input.professional_profile && typeof input.professional_profile === 'object') {
         const pp = input.professional_profile;

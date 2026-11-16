@@ -167,6 +167,15 @@ export function validatePersonFieldUpdate(input) {
     if (!isStringArray(input.aliases)) throw validationError('invalid_aliases', 'aliases must be an array of strings.');
     patch.aliases = [...input.aliases];
   }
+  // The organisation whose role leads this person's header and People row
+  // when they hold several current roles. Null clears it (newest wins).
+  if (input.main_organisation_ref !== undefined) {
+    const ref = input.main_organisation_ref;
+    if (ref !== null && (typeof ref !== 'string' || !/^shared:organisation:[A-Za-z0-9_-]+$/.test(ref))) {
+      throw validationError('invalid_main_organisation_ref', 'main_organisation_ref must be an organisation ref or null.');
+    }
+    patch.main_organisation_ref = ref;
+  }
   if (input.professional_profile !== undefined) {
     const profile = input.professional_profile;
     if (!profile || typeof profile !== 'object' || Array.isArray(profile)) {

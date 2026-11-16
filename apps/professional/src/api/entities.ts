@@ -24,6 +24,7 @@ export interface UpdatePersonInput {
   display_name?: string;
   sort_name?: string | null;
   aliases?: string[];
+  main_organisation_ref?: string | null;
   professional_profile?: {
     summary?: string | null;
     linkedin_url?: string | null;

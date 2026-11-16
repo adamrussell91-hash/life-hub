@@ -78,5 +78,10 @@ describe('rolesFromOverview', () => {
     expect(roles.find((r) => r.linkId === 'b')?.imported).toBe(true);
     expect(roles.find((r) => r.linkId === 'd')?.kind).toBe('education');
     expect(currentRoles(roles).map((r) => r.title)).toEqual(['Chair', 'Head of English']);
+    const mainRef = roles.find((r) => r.linkId === 'a')!.orgRef;
+    expect(currentRoles(roles, mainRef).map((r) => r.title)).toEqual(['Head of English', 'Chair']);
+    // A main role that has ended no longer leads.
+    const endedRef = roles.find((r) => r.linkId === 'c')!.orgRef;
+    expect(currentRoles(roles, endedRef).map((r) => r.title)).toEqual(['Chair', 'Head of English']);
   });
 });

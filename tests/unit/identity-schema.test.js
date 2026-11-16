@@ -245,3 +245,11 @@ test('identity responses never expose internal edit baselines, including after d
   assert.equal(redactIdentityRecord(record).professional_edits,undefined);
   assert.equal(redactIdentityRecord({...record,lifecycle_status:'deleted'}).professional_edits,undefined);
 });
+
+test('validatePersonFieldUpdate takes a main organisation ref or null, nothing else', () => {
+  const ref = 'shared:organisation:organisation_00000000-0000-4000-8000-000000000002';
+  assert.deepEqual(validatePersonFieldUpdate({ main_organisation_ref: ref }), { main_organisation_ref: ref });
+  assert.deepEqual(validatePersonFieldUpdate({ main_organisation_ref: null }), { main_organisation_ref: null });
+  assert.throws(() => validatePersonFieldUpdate({ main_organisation_ref: 'shared:person:x' }), { code: 'invalid_main_organisation_ref' });
+  assert.throws(() => validatePersonFieldUpdate({ main_organisation_ref: 7 }), { code: 'invalid_main_organisation_ref' });
+});

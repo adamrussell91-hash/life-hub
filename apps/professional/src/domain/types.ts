@@ -71,6 +71,8 @@ export interface PersonRecord {
   retention_review_at: string | null;
   created_at: string;
   updated_at: string;
+  /** The organisation whose role leads when they hold several current roles. */
+  main_organisation_ref?: string | null;
   /** Lossless source material from the private Professional People import.
    * It is returned only by a selected person's entity-overview response. */
   professional_profile?: ProfessionalProfile;

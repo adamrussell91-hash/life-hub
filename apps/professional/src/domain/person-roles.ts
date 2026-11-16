@@ -72,8 +72,11 @@ export function rolesFromOverview(overview: EntityOverview): PersonRole[] {
   );
 }
 
-export function currentRoles(roles: PersonRole[]): PersonRole[] {
-  return roles.filter((r) => r.kind === 'role' && r.current);
+/** Current roles, the main one (if chosen and still current) first. */
+export function currentRoles(roles: PersonRole[], mainOrgRef: string | null = null): PersonRole[] {
+  const current = roles.filter((r) => r.kind === 'role' && r.current);
+  if (!mainOrgRef) return current;
+  return [...current.filter((r) => r.orgRef === mainOrgRef), ...current.filter((r) => r.orgRef !== mainOrgRef)];
 }
 
 /** A student's current school: their newest current education row. */

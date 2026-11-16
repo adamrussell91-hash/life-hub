@@ -147,6 +147,10 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
       now: nowIso
     });
 
+    // A chosen main role leads; otherwise the first current one does.
+    const mainRef = typeof person.main_organisation_ref === 'string' ? person.main_organisation_ref : null;
+    const mainAt = mainRef ? currentOrgLinks.findIndex((o) => o.ref === mainRef) : -1;
+    if (mainAt > 0) currentOrgLinks.unshift(...currentOrgLinks.splice(mainAt, 1));
     const primaryOrg = currentOrgLinks[0] ?? formerOrgLinks[0] ?? null;
     // Job title at their current workplace says the most; then how you know
     // them; then just where they are.

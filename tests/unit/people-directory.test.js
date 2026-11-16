@@ -320,3 +320,28 @@ test('assemblePeopleDirectory: a student reads as year and school, never a job',
   assert.equal(row.organisation.ref, schoolRef);
   assert.equal(row.job_title, null);
 });
+
+test('assemblePeopleDirectory leads with the chosen main role', () => {
+  const ORG_B = 'organisation_00000000-0000-4000-8000-000000000003';
+  const link = (id, orgId, label, role) => ({
+    link: { id, relationship_type: 'employee_at', status: 'current', role, valid_to: null, occurred_at: null, valid_from: '2024-01-01', created_at: '2024-01-01T00:00:00.000Z' },
+    endpoint: { ref: `shared:organisation:${orgId}`, kind: 'organisation', display_label: label },
+    direction: 'outgoing'
+  });
+  const row = (main) => assemblePeopleDirectory(
+    [{
+      person: {
+        id: PERSON_ID, display_name: 'Isla Emberly', is_self: false, lifecycle_status: 'active',
+        created_at: '2026-09-01T00:00:00.000Z', updated_at: '2026-09-20T00:00:00.000Z',
+        ref: `shared:person:${PERSON_ID}`, main_organisation_ref: main
+      },
+      relationships: [link('l1', ORG_ID, 'Riverbend Rowing Club', 'Coach'), link('l2', ORG_B, 'Tallowwood College', 'Drama Teacher')]
+    }],
+    { now: '2026-09-26T00:00:00.000Z' }
+  ).people[0];
+  assert.equal(row(null).organisation.display_name, 'Riverbend Rowing Club');
+  const chosen = row(`shared:organisation:${ORG_B}`);
+  assert.equal(chosen.organisation.display_name, 'Tallowwood College');
+  assert.equal(chosen.job_title, 'Drama Teacher');
+  assert.equal(chosen.role_line, 'Drama Teacher · Tallowwood College +1');
+});

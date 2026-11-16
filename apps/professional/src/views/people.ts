@@ -11,6 +11,7 @@ import {
   fetchEntityOverview,
   fetchPeopleDedupePlan,
   transitionPerson,
+  updatePerson,
   type DedupeAction
 } from '@/api/entities';
 import { fetchPersonBrief } from '@/api/people-brief';
@@ -921,7 +922,9 @@ export async function renderPeoplePage(
             );
           // A student's header line is their year and school, not a job.
           const currentSchool = isStudent ? currentSchoolOf(roles) : null;
-          const headerRoles = currentSchool ? [currentSchool, ...currentRoles(roles)] : currentRoles(roles);
+          const mainOrgRef = personEntity.kind === 'person' ? personEntity.main_organisation_ref ?? null : null;
+          const ownRoles = currentRoles(roles, mainOrgRef);
+          const headerRoles = currentSchool ? [currentSchool, ...ownRoles] : ownRoles;
           const mainOrg = headerRoles[0] ?? null;
           const badgeRef = mainOrg?.orgRef ?? model.organisation?.ref ?? null;
           const badgeName = mainOrg?.orgName ?? model.organisation?.displayName ?? '';
@@ -1140,6 +1143,8 @@ export async function renderPeoplePage(
           renderRolesEditor(rolesHost, {
             personRef: ref,
             roles: rolesFromOverview(overview),
+            mainOrgRef: overview.entity.kind === 'person' ? overview.entity.main_organisation_ref ?? null : null,
+            setMain: (orgRef) => updatePerson(ref, { main_organisation_ref: orgRef }),
             crest: (orgRef, orgName) => crestFor(orgRef, orgName),
             onChanged: () => {
               void loadPersonSections(id);
