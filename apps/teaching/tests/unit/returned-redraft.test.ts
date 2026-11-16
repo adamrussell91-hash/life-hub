@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { pieceView, returnedList, type PiecePayload } from '@/student/returned-view';
+import { pieceView, returnedHome, type PiecePayload } from '@/student/returned-view';
 
 const piece = (over: Partial<PiecePayload> = {}): PiecePayload => ({
   id: 'w:l1:b1', kind: 'written', title: 'Harbour', date: '3 Nov', comment: 'Well found.',
@@ -37,7 +37,7 @@ describe('returned piece with drafts', () => {
 
 describe('returned list', () => {
   it('flags an ask until it is sent', () => {
-    const box = returnedList([{ id: 'w:l:b', kind: 'written', title: 'Harbour', date: '3 Nov', new: false, redraft: 'asked' }] as never, () => undefined);
+    const box = returnedHome([{ id: 'w:l:b', kind: 'written', title: 'Harbour', date: '3 Nov', new: false, redraft: 'asked' }] as never, () => undefined);
     expect(box.querySelector('.pg-returned__ask')!.textContent).toBe('Redraft asked');
   });
 });

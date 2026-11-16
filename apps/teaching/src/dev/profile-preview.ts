@@ -1,5 +1,7 @@
 import { renderProfile, type ProfilePayload } from '@/student/profile-view';
 import type { NetworkLine } from '@/schemas/block';
+import type { ReturnedItem } from '@/progress/types';
+import type { PiecePayload } from '@/student/returned-view';
 import '../styles/app.css';
 
 /**
@@ -49,13 +51,14 @@ const payload: ProfilePayload = {
   skills: [
     { strand: 'Reading', rows: [
       { key: 'skill:reading.tech', name: 'Technique and effect', counts: { below: 0, capable: 0, skilled: 0, accomplished: 0, excellent: 1 }, now: 'excellent', story: { kind: 'now', step: 'excellent' }, i_can: null, next_move: null, next_rung: null, rungs: rungs('Name a technique and say what it shows.', 'Quote a short phrase, name its technique and explain its effect.', 'Link a technique’s effect to the key idea in the question.', 'Show how two techniques work together and what the reader feels as a result.'), refine: 'Rewrite your answer in fewer words.' },
-      { key: 'skill:reading.infer', name: 'Inferring the implied', counts: { below: 0, capable: 0, skilled: 1, accomplished: 0, excellent: 0 }, now: 'skilled', story: { kind: 'now', step: 'skilled' }, i_can: 'Infer a feeling or attitude from a detail in the text.', next_move: 'Name the value behind that attitude, and say who holds power in the moment.', next_rung: 'accomplished', rungs: rungs('Say what literally happens in a passage.', 'Infer a feeling or attitude from a detail in the text.', 'Infer the values in a text and link them to who holds power.', 'Explain what a text leaves unsaid and why.') }
+      { key: 'skill:reading.infer', name: 'Inferring the implied', counts: { below: 0, capable: 1, skilled: 1, accomplished: 0, excellent: 0 }, now: 'skilled', first: 'capable', story: { kind: 'now', step: 'skilled' }, i_can: 'Infer a feeling or attitude from a detail in the text.', next_move: 'Name the value behind that attitude, and say who holds power in the moment.', next_rung: 'accomplished', rungs: rungs('Say what literally happens in a passage.', 'Infer a feeling or attitude from a detail in the text.', 'Infer the values in a text and link them to who holds power.', 'Explain what a text leaves unsaid and why.') }
     ] },
     { strand: 'Arguing', rows: [
       { key: 'skill:arguing.evidence', name: 'Evidence', counts: { below: 1, capable: 0, skilled: 0, accomplished: 0, excellent: 0 }, now: 'below', story: { kind: 'now', step: 'below' }, i_can: null, next_move: 'Put the quotation inside your own sentence. Cut it to the 2 to 5 words you analyse.', next_rung: 'capable', rungs: rungs('Support a claim with a quotation and name a technique in it.', 'Quote short evidence inside my own sentence.', 'Choose evidence where two techniques work together.', 'Build a pattern of evidence from across the text.') }
     ] }
   ],
   codes: [],
+  focus: { kind: 'do', line: 'After “this shows”, add a sentence starting “This matters because”.' },
   feedback: {
     pieces,
     rows: [
@@ -99,13 +102,35 @@ const payload: ProfilePayload = {
   pointer: new URLSearchParams(location.search).get('pointer') !== 'off'
 };
 
+/** Returned work, newest first: written, spoken and short answer, two on one day, two still to open. */
+const RETURNED: ReturnedItem[] = [
+  { id: 'w:l4:b', kind: 'written', title: 'Tidewater review Q3', date: '10 Nov', day: '2026-11-10', new: true, codes: ['c2', 'c3'], work: ['c2'], good: ['c3'], verdict: { kind: 'better' } },
+  { id: 'v:l4', kind: 'viva', title: 'Tidewater viva practice', date: '10 Nov', day: '2026-11-10', new: true, codes: ['c1'], work: ['c1'], good: [], verdict: { kind: 'same' } },
+  { id: 'w:l4:a', kind: 'written', title: 'Tidewater review', date: '9 Nov', day: '2026-11-09', new: false, codes: ['c1', 'c3'], work: ['c1'], good: ['c3'], verdict: { kind: 'mixed' } },
+  { id: 'q:l3', kind: 'quiz', title: 'Techniques quiz', date: '6 Nov', day: '2026-11-06', new: false, codes: [], work: [], good: [], verdict: { kind: 'counts', good: 3, work: 1 } },
+  { id: 'w:l1:b', kind: 'written', title: 'Harbour poems Q2', date: '4 Nov', day: '2026-11-04', new: false, codes: ['c1', 'c3'], work: ['c1'], good: ['c3'], verdict: { kind: 'same' } },
+  { id: 'v:l1', kind: 'viva', title: 'Harbour viva practice', date: '30 Oct', day: '2026-10-30', new: false, codes: ['c3'], work: [], good: ['c3'], verdict: { kind: 'first' } },
+  { id: 'w:l1:a', kind: 'written', title: 'Harbour poems Q1', date: '28 Oct', day: '2026-10-28', new: false, codes: [], work: [], good: [], verdict: { kind: 'first' } }
+];
+const PIECE: PiecePayload = {
+  id: 'w:l4:b', kind: 'written', title: 'Tidewater review Q3', date: '10 Nov', comment: 'Your quote does real work here. Now say why it matters.',
+  text: { answers: { q3: 'The poet writes “grey water knits” to show the harbour at dusk. This shows the speaker is sad.' } },
+  tags: [
+    { code_id: 'c3', part: 'answers', field: 'q3', start: 16, end: 35, positive: true, code: 'E', label: 'Evidence', colour: 'blue', action: 'Keep quotes this short.', note: 'Short and well chosen.' },
+    { code_id: 'c2', part: 'answers', field: 'q3', start: 64, end: 94, positive: false, code: 'AD', label: 'Analysis: depth', colour: 'lilac', action: 'After “this shows”, add a sentence starting “This matters because”.', note: 'Go one step further.' }
+  ],
+  criteria: [{ label: 'Analysis', step: 'building', was: 'building' }, { label: 'Evidence', step: 'secure', was: 'building' }],
+  verdict: { kind: 'better', up: ['Evidence'], same: ['Analysis'], down: [] },
+  rubric: { next_step: 'After “this shows”, add a sentence starting “This matters because”.', skills: [{ ref: 'arguing.evidence', name: 'Evidence', rung: 'capable' }] }
+};
+
 const teacher = new URLSearchParams(location.search).has('teacher');
 document.getElementById('mount')!.append(
   renderProfile(payload, {
     classId: CLASS,
     ...(teacher ? { teacher: { name: 'Quinn Zephyr' } } : {}),
-    loadReturned: () => Promise.resolve([]),
+    loadReturned: () => Promise.resolve(RETURNED),
     pointerOff: () => console.info('Preview: pointer turned off'),
-    loadPiece: () => Promise.reject(new Error('Preview: no server.'))
+    loadPiece: (id) => Promise.resolve({ ...PIECE, id, title: RETURNED.find((r) => r.id === id)?.title ?? PIECE.title })
   })
 );

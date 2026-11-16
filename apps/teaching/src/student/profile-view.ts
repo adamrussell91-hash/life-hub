@@ -3,8 +3,8 @@
  *
  * Two tabs: My progress (next steps, where each outcome and concept sits over time, skills,
  * the codes teachers keep writing, and the unit map with the student's To do panel beside it)
- * and Returned work and feedback (each returned piece, then the student's skills and what their
- * feedback keeps saying).
+ * and Returned work and feedback (what is still to open, every piece along one timeline, then
+ * before, now and next, with the skill ladders behind More detail).
  * Steps and stories come from the server already worded; the page never shows a mark or a score.
  */
 import { apiPost } from '@/api/client';
@@ -20,10 +20,14 @@ import { mountProgressMap } from '@/network/coverage-map/progress';
 import { scheduleFromRows, type ScheduleRow } from '@/network/schedule';
 import { stepChart } from '@/progress/step-chart';
 import { skillRow } from '@/progress/skill-row';
-import { feedbackCard, codeChip } from '@/progress/code-grid';
+import { codeChip } from '@/progress/code-grid';
 import { storyText, placeName } from '@/progress/story-text';
 import type { ProgressPayload, ReturnedItem, TargetRow } from '@/progress/types';
-import { pieceView, returnedList, type NotePayload, type PiecePayload } from '@/student/returned-view';
+import { pieceView, returnedHome, type NotePayload, type PiecePayload } from '@/student/returned-view';
+import { pickPatterns } from '@/student/feedback-timeline';
+import { feedbackTrends } from '@/student/feedback-trends';
+import { mountReturnedTour } from '@/student/returned-tour';
+import type { Practise } from '@/student/feedback-card';
 import type { RedraftApi } from '@/student/redraft-editor';
 import { countdownCard, renderTodoPanel, vivaPracticeLine, type TodoPayload } from '@/student/todo-panel';
 import { oneThing, renderNowStrip, showOnList } from '@/student/now-strip';
@@ -147,18 +151,15 @@ function renderSkills(p: ProfilePayload): HTMLElement | null {
   return sec;
 }
 
-/** "What your feedback keeps saying": the newest pieces' codes, each row opening to where it was marked. */
-function renderFeedback(p: ProfilePayload, onOpen: (pieceId: string) => void): HTMLElement | null {
-  const feedback = p.feedback;
-  if (!feedback?.pieces.length || !feedback.rows.length) return null;
-  const sec = el('section', 'pg-codes-sec');
-  sec.append(
-    el('h2', 'pm-map__title', 'What your feedback keeps saying'),
-    el('p', 'pm-key', `Your last ${feedback.pieces.length} marked ${feedback.pieces.length === 1 ? 'piece' : 'pieces'}, newest on the right. Tap a row to see where your teacher marked it.`),
-    feedbackCard(feedback, { onOpen })
-  );
-  return sec;
+/** The next lesson on the To do list: where the student practises their next step. */
+export function practiseFrom(p: ProfilePayload, classId: string): Practise | null {
+  for (const key of ['now', 'next'] as const) {
+    const t = p.todo?.boxes.find((b) => b.key === key)?.items.find((i) => i.kind === 'lesson' && !i.done && !i.feedback);
+    if (t) return { title: t.title, href: `/s/classes/${encodeURIComponent(classId)}/lessons/${encodeURIComponent(t.id)}` };
+  }
+  return null;
 }
+
 
 /** The soonest assessment's countdown, big, at the top of My progress. Other countdowns stay in To do. */
 function topCountdown(payload: ProfilePayload, options: RenderProfileOptions): HTMLElement | null {
@@ -314,12 +315,19 @@ function dropBadge(root: Element | null): void {
  * The Returned work list, or one piece open, drawn into `panel`. `extras` (skills and feedback
  * codes) sit under the list and hide while a piece is open.
  */
-function returnedPanel(panel: HTMLElement, options: RenderProfileOptions, extras?: HTMLElement): { showList: () => void; open: (id: string) => void } {
+function returnedPanel(panel: HTMLElement, options: RenderProfileOptions, extras: HTMLElement | undefined, payload: ProfilePayload): { showList: () => void; open: (id: string) => void } {
+  const practise = practiseFrom(payload, options.classId);
+  let newest: string | null = null;
   const showList = (): void => {
     if (extras) extras.hidden = false;
     panel.replaceChildren(el('p', 'pm-empty', 'Loading…'));
     void (options.loadReturned?.() ?? Promise.resolve([] as ReturnedItem[])).then(
-      (items) => panel.replaceChildren(returnedList(items, open)),
+      (items) => {
+        newest = items[0]?.id ?? null;
+        panel.replaceChildren(returnedHome(items, open, pickPatterns(payload.feedback?.rows)));
+        // The guide shows itself the first time a student sees this tab, then waits in the corner.
+        if (!options.teacher && items.length) mountReturnedTour(panel.closest<HTMLElement>('.pg-panel') ?? panel);
+      },
       (error: unknown) => panel.replaceChildren(el('p', 'pm-empty', errorText(error, 'Couldn’t load your returned work. Try again.')))
     );
   };
@@ -328,7 +336,7 @@ function returnedPanel(panel: HTMLElement, options: RenderProfileOptions, extras
       (piece) => {
         if (extras) extras.hidden = true;
         const redraft = /^[wq]:/.test(id) && 'redraft' in piece && piece.redraft ? options.redraft?.(id) : undefined;
-        panel.replaceChildren(pieceView(piece, showList, redraft ? { redraft, onSent: () => open(id) } : {}));
+        panel.replaceChildren(pieceView(piece, showList, { ...(redraft ? { redraft, onSent: () => open(id) } : {}), practise: id === newest ? practise : null }));
         options.markSeen?.(id);
         if (wasNew) dropBadge(panel.closest('.pm-profile'));
       },
@@ -403,25 +411,23 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
   }
   const returned = el('div', 'pg-panel');
   returned.setAttribute('role', 'tabpanel');
-  // The list (or an open piece) first, then skills and what the feedback keeps saying.
+  // What is new and the timeline (or an open piece) first, then how the student is going.
   const listHost = el('div', 'pg-returned');
   const extras = el('div', 'pg-returned__extras');
   returned.append(listHost, extras);
   let loaded = false;
-  const returnedApi = returnedPanel(listHost, options, extras);
-  // "Open this piece" in the feedback rows: over to Returned work, straight to that piece.
-  const openPiece = (id: string): void => {
-    loaded = true;
-    const tab = root.querySelector<HTMLButtonElement>('.pg-tab[data-tab="returned"]');
-    tab?.click();
-    returnedApi.open(id);
-    tab?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
-  };
+  const returnedApi = returnedPanel(listHost, options, extras, payload);
   progress.append(renderNext(payload), renderLearning(payload), map);
+  // Under the timeline: before, now and next; the skill ladders wait behind More detail.
+  const trends = feedbackTrends(payload, practiseFrom(payload, options.classId));
+  if (trends) extras.append(trends);
   const skills = renderSkills(payload);
-  if (skills) extras.append(skills);
-  const feedback = renderFeedback(payload, openPiece);
-  if (feedback) extras.append(feedback);
+  if (skills) {
+    const more = el('details', 'pg-more');
+    more.dataset.tour = 'more';
+    more.append(el('summary', 'pg-more__sum', 'More detail'), skills);
+    extras.append(more);
+  }
   root.append(
     // A student with new feedback lands on it; a teacher looking in starts on the overview.
     tabs(
