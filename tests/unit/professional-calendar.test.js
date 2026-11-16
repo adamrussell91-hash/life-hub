@@ -126,3 +126,20 @@ test('non-PD events project event_type and filter to Events', () => {
   assert.equal(row.record.event_type, 'ceremony');
   assert.equal(filterKeyForItem(row), 'events');
 });
+
+test('cancelled and deleted meetings and PD events stay off the calendar', () => {
+  const base = {
+    start: '2026-11-18T01:00:00.000Z',
+    end: '2026-11-18T02:00:00.000Z',
+    time_zone: 'Australia/Sydney',
+    all_day: false
+  };
+  const events = professionalEventsFromProjections([
+    { ...base, projection_id: 'm_live', kind: 'meeting', title: 'Live', status: 'scheduled' },
+    { ...base, projection_id: 'm_moved', kind: 'meeting', title: 'Moved', status: 'rescheduled' },
+    { ...base, projection_id: 'm_off', kind: 'meeting', title: 'Off', status: 'cancelled' },
+    { ...base, projection_id: 'e_off', kind: 'event', title: 'PD off', status: 'cancelled' },
+    { ...base, projection_id: 'e_gone', kind: 'event', title: 'PD gone', status: 'deleted' }
+  ]);
+  assert.deepEqual(events.map((e) => e.record.title), ['Live', 'Moved']);
+});

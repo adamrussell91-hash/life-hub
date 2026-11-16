@@ -1,6 +1,11 @@
+/** Meetings and PD events in these states are off the calendar in every hub. */
+const OFF_CALENDAR = new Set(['cancelled', 'deleted']);
+
 /**
  * Map Professional schedule projections into Life calendar event rows.
  * Source of truth remains Professional Meeting/Event records.
+ * Cancelled and deleted meetings and events are left out; the Professional
+ * Meetings list still shows them under its Cancelled filter.
  */
 export function professionalEventsFromProjections(projections) {
   const out = [];
@@ -8,6 +13,7 @@ export function professionalEventsFromProjections(projections) {
   for (const projection of projections ?? []) {
     if (!projection?.projection_id || seen.has(projection.projection_id)) continue;
     seen.add(projection.projection_id);
+    if (projection.kind !== 'communication' && OFF_CALENDAR.has(projection.status)) continue;
     const event = lifeEventFromProjection(projection);
     if (event) out.push(event);
   }
