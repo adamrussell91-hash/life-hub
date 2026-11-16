@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Classroom Observation</title>
+<style>
+  /* Same paper-and-ink set as the Meeting Guides mockups. Each agreed descriptor gets its own
+     colour, and that colour follows it from planning keys through the log to the reflection. */
+  :root {
+    --paper: #f7f4ec; --card: #fffdf8; --ink: #1b2230; --muted: #6b7380; --line: rgba(27, 34, 48, 0.12);
+    --navy: #1f3a5f; --navy-tint: #e3e9f2;
+    --lilac: #ece6f7; --lilac-ink: #5a3f8c;
+    --sage: #e2efe4; --sage-ink: #2f6a3d;
+    --amber: #fbefd5; --amber-ink: #8a5a00;
+    --rose: #f8e1e1; --rose-ink: #9b2c2c;
+    --d1: #3d6fb4; --d1-t: #e1ebf8;
+    --d2: #2f8a6e; --d2-t: #dcf0e8;
+    --d3: #b0632a; --d3-t: #f8e7da;
+    --d4: #8656b8; --d4-t: #efe6f8;
+    --font: Inter, ui-sans-serif, system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9e6dd; font-family: var(--font); color: var(--ink); font-size: 15px; }
+  .sheet { max-width: 1280px; margin: 0 auto; padding: 24px 16px 64px; }
+  .sheet > h1 { font-size: 22px; margin: 0 0 4px; }
+  .sheet > p { color: var(--muted); margin: 0 0 16px; max-width: 78ch; line-height: 1.5; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; position: sticky; top: 0; z-index: 20; background: #e9e6dd; padding: 10px 0; }
+  .tabs button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .view { display: none; }
+  .view.on { display: block; }
+  .label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 24px 0 8px; }
+  .why { background: var(--card); border-left: 4px solid var(--navy); border-radius: 8px; padding: 10px 14px; font-size: 14px; color: #333a45; line-height: 1.5; margin: 0 0 16px; max-width: 90ch; }
+  .why b { color: var(--ink); }
+  .frame { background: var(--paper); border-radius: 18px; box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 8px 24px rgba(27,34,48,.08); overflow: hidden; }
+  .pad { padding: 22px 26px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .crumbs { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  h2.title { font-size: 26px; margin: 6px 0 12px; }
+  .btn { font: inherit; font-size: 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 7px 12px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+  .btn--on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .btn--primary { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 600; }
+  .btn--quiet { border-color: transparent; background: transparent; color: var(--muted); }
+  .btn--sm { font-size: 13px; padding: 5px 10px; border-radius: 10px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; }
+  .card h3 { margin: 0 0 8px; font-size: 16px; display: flex; gap: 8px; align-items: center; }
+  .card h3 .count { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .chip { font-size: 13px; border-radius: 999px; padding: 3px 10px; background: var(--card); border: 1px solid var(--line); display: inline-flex; gap: 6px; align-items: center; }
+  .pill { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 2px 9px; display: inline-flex; align-items: center; gap: 4px; }
+  .av { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; background: #7a5cc0; flex: none; }
+  .av--s { background: var(--sage-ink); }
+  textarea, input[type=text], input[type=date], select { font: inherit; font-size: 14px; width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: #fff; color: var(--ink); }
+  textarea { min-height: 64px; resize: vertical; line-height: 1.45; }
+  .prefill { background: var(--navy-tint); border-color: transparent; }
+  .src { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--navy); display: inline-flex; gap: 4px; align-items: center; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .spacer { flex: 1; }
+  .ask { font-size: 13px; font-weight: 600; margin: 0 0 4px; }
+  .ask i { font-style: normal; color: var(--muted); font-weight: 400; }
+
+  /* Descriptor colour helpers */
+  .c1 { --c: var(--d1); --ct: var(--d1-t); } .c2 { --c: var(--d2); --ct: var(--d2-t); }
+  .c3 { --c: var(--d3); --ct: var(--d3-t); } .c4 { --c: var(--d4); --ct: var(--d4-t); }
+  .code { font-family: var(--mono); font-weight: 700; font-size: 13px; color: var(--c); background: var(--ct); border-radius: 8px; padding: 2px 7px; }
+
+  /* ── Layout view: the new meeting page ── */
+  .mp-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  .phase { display: inline-flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .phase span { padding: 5px 12px; font-size: 13px; }
+  .phase .on { background: var(--ink); color: #fff; }
+  .purpose { background: var(--lilac); color: var(--lilac-ink); border-radius: 14px; padding: 12px 14px; margin: 14px 0; font-size: 14px; }
+  .mp-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .mp-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .mp-full { margin-top: 16px; }
+  .ghost-line { height: 9px; border-radius: 5px; background: rgba(27,34,48,.08); margin: 8px 0; }
+  .ghost-line.s { width: 55%; } .ghost-line.m { width: 75%; }
+  .zone { outline: 2px dashed rgba(31,58,95,.35); outline-offset: 4px; border-radius: 18px; position: relative; }
+  .zone-tag { position: absolute; top: -12px; right: 14px; background: var(--navy); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; }
+  .notes-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .notes-head h3 { margin: 0; }
+  .notes-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 12px; }
+  .notes-body p { margin: 4px 0; line-height: 1.5; color: #333a45; }
+  .divider { display: flex; align-items: center; gap: 10px; margin: 18px 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .guide-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .gcard { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; background: #fff; font-size: 14px; }
+  .gcard b { display: block; margin-bottom: 4px; }
+
+  /* ── Series strip ── */
+  .series { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: #fff; }
+  .series a { display: block; padding: 10px 14px; color: inherit; text-decoration: none; border-right: 1px solid var(--line); font-size: 13px; }
+  .series a:last-child { border-right: 0; }
+  .series a b { display: block; font-size: 14px; }
+  .series a.done { background: var(--sage); }
+  .series a.done b::after { content: " ✓"; color: var(--sage-ink); }
+  .series a.now { background: var(--navy); color: #fff; }
+  .series a.now .muted { color: #cfd8e6; }
+  .window { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .window b { color: var(--ink); }
+
+  /* ── Start: picker ── */
+  .picker { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 520px; }
+  .picker__list { border-right: 1px solid var(--line); padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+  .shelf { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; cursor: pointer; }
+  .shelf b { display: block; font-size: 15px; }
+  .shelf span { font-size: 13px; color: var(--muted); }
+  .shelf.on { border-color: var(--navy); box-shadow: 0 0 0 2px var(--navy) inset; }
+  .shelf.soon { opacity: .45; border-style: dashed; cursor: default; }
+  .emb { width: 40px; height: 40px; border-radius: 12px; background: var(--navy-tint); display: grid; place-items: center; flex: none; }
+  .picker__main { padding: 22px 26px; display: flex; flex-direction: column; gap: 16px; }
+  .phasecards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .phasecard { border: 1px solid var(--line); border-radius: 16px; padding: 14px; background: #fff; display: flex; flex-direction: column; gap: 6px; cursor: pointer; }
+  .phasecard .n { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--navy); }
+  .phasecard b { font-size: 16px; }
+  .phasecard p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .phasecard.on { border-color: var(--navy); box-shadow: 0 0 0 2px var(--navy) inset; }
+
+  /* ── Planning ── */
+  .desc-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+  .desc-opt { font-size: 13px; border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; background: #fff; display: flex; gap: 8px; align-items: baseline; cursor: pointer; }
+  .desc-opt code { font-family: var(--mono); font-weight: 700; font-size: 12px; color: var(--muted); }
+  .desc-opt.on { border-color: var(--c); background: var(--ct); }
+  .desc-opt.on code { color: var(--c); }
+  .desc-opt.dim { opacity: .5; }
+  .stdgroup { font-size: 12px; font-weight: 700; color: var(--muted); margin: 10px 0 4px; }
+  .dcard { border: 1px solid var(--line); border-left: 5px solid var(--c); border-radius: 14px; background: #fff; padding: 14px 16px; }
+  .dcard__head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .dcard__head b { font-size: 15px; }
+  .dcard__text { font-size: 13px; color: var(--muted); margin: 4px 0 12px; line-height: 1.45; }
+  .looks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .look { font-size: 13px; border-radius: 999px; padding: 4px 10px; background: var(--ct); color: var(--c); font-weight: 600; display: inline-flex; gap: 6px; align-items: center; }
+  .look kbd, .key kbd { font-family: var(--mono); font-size: 11px; background: rgba(255,255,255,.75); color: var(--ink); border-radius: 4px; padding: 0 4px; font-weight: 600; }
+  .look--add { background: transparent; border: 1px dashed var(--line); color: var(--muted); font-weight: 500; }
+  .col3h { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .colh { font-size: 13px; font-weight: 700; color: var(--navy); border-bottom: 2px solid var(--navy); padding-bottom: 4px; margin-bottom: 8px; }
+  .lessonlink { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; background: #fff; font-size: 14px; }
+  .lessonlink .ic { width: 28px; height: 28px; border-radius: 8px; background: var(--sage); display: grid; place-items: center; color: var(--sage-ink); font-weight: 700; }
+
+  /* ── Observing ── */
+  .obs { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .clock { font-family: var(--mono); font-size: 22px; font-weight: 700; }
+  .rec { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--rose-ink); }
+  .rec i { width: 9px; height: 9px; border-radius: 50%; background: #d23b3b; animation: pulse 1.4s infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .log { display: flex; flex-direction: column; gap: 8px; max-height: 470px; overflow: auto; padding-right: 4px; }
+  .entry { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; background: #fff; font-size: 14px; }
+  .entry .t { font-family: var(--mono); font-size: 12px; color: var(--muted); padding-top: 2px; }
+  .entry .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 3px; }
+  .entry.new { animation: flash 1s ease; }
+  @keyframes flash { from { background: #fff7d6; } to { background: #fff; } }
+  .kind { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; }
+  .k-str { background: var(--sage); color: var(--sage-ink); }
+  .k-next { background: var(--amber); color: var(--amber-ink); }
+  .k-ask { background: var(--lilac); color: var(--lilac-ink); }
+  .k-said { background: #eef0f3; color: #3c4553; }
+  .lk { font-size: 11px; font-weight: 600; border-radius: 6px; padding: 1px 6px; background: var(--ct); color: var(--c); }
+  .dock { border: 1px solid var(--line); border-radius: 16px; background: var(--card); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .dock__row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .dock__lbl { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+  .key { font: inherit; font-size: 13px; border-radius: 10px; border: 1px solid var(--line); background: #fff; padding: 6px 10px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+  .key--d { border-color: var(--c); color: var(--c); font-weight: 700; }
+  .key--d.on { background: var(--c); color: #fff; }
+  .key--look { background: var(--ct); border-color: transparent; color: var(--c); font-weight: 600; }
+  .key--look.on { box-shadow: 0 0 0 2px var(--c) inset; }
+  .key--kind.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .compose { display: flex; gap: 8px; align-items: center; }
+  .compose input { flex: 1; }
+  .draftchips { display: flex; flex-wrap: wrap; gap: 4px; min-height: 22px; }
+  .tally { display: flex; flex-direction: column; gap: 10px; }
+  .trow { border: 1px solid var(--line); border-left: 5px solid var(--c); border-radius: 12px; padding: 10px 12px; background: #fff; }
+  .trow__top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .bars { display: flex; gap: 3px; margin: 8px 0 6px; height: 8px; }
+  .bars i { border-radius: 3px; }
+  .bars .s { background: var(--sage-ink); } .bars .n { background: #d99a2b; }
+  .lookhits { display: flex; flex-wrap: wrap; gap: 4px; font-size: 12px; }
+  .lookhits span { background: var(--ct); color: var(--c); border-radius: 6px; padding: 1px 6px; }
+  .lookhits span.zero { background: #f1f1f1; color: #999; text-decoration: line-through; }
+  .decide { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .decide button { font: inherit; font-size: 12px; border: 0; background: #fff; padding: 5px 9px; cursor: pointer; border-right: 1px solid var(--line); }
+  .decide button:last-child { border-right: 0; }
+  .decide button.on.o { background: var(--sage-ink); color: #fff; }
+  .decide button.on.p { background: #d99a2b; color: #fff; }
+  .decide button.on.x { background: var(--rose-ink); color: #fff; }
+
+  /* NESA table write-up */
+  .nesa { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
+  .nesa th { text-align: left; font-size: 13px; color: var(--navy); background: var(--navy-tint); padding: 8px 10px; vertical-align: top; }
+  .nesa th small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; margin-top: 2px; line-height: 1.35; }
+  .nesa td { border-top: 1px solid var(--line); padding: 10px; vertical-align: top; }
+  .nesa td:first-child { width: 90px; }
+  .nesa textarea { min-height: 96px; }
+
+  /* Reflecting */
+  .refl { border: 1px solid var(--line); border-left: 5px solid var(--c); border-radius: 14px; background: #fff; padding: 14px 16px; display: grid; grid-template-columns: 240px minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  .evid { background: var(--paper); border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.45; }
+  .evid ul { margin: 6px 0 0; padding-left: 16px; }
+  .evid li { margin: 2px 0; }
+  .sign { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  .sigbox { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #fff; }
+
+  /* Phone */
+  .phones { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+  .phones > div { min-width: 0; max-width: 100%; }
+  .phone { width: 390px; max-width: 100%; height: 780px; display: flex; flex-direction: column; position: relative; }
+  .phone__top { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); background: var(--card); }
+  .phone__body { flex: 1; overflow: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .phone__dock { border-top: 1px solid var(--line); background: var(--card); padding: 10px 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .phone .key { font-size: 13px; padding: 8px 10px; }
+  .cap { font-size: 13px; color: var(--muted); margin: 8px 4px 0; max-width: 390px; line-height: 1.45; }
+
+  @media (max-width: 900px) {
+    .mp-grid, .obs, .grid2, .picker, .refl, .sign { grid-template-columns: minmax(0, 1fr); }
+    .grid3, .col3h, .phasecards { grid-template-columns: minmax(0, 1fr); }
+    .picker__list { border-right: 0; border-bottom: 1px solid var(--line); }
+    .series { grid-template-columns: minmax(0, 1fr); }
+    .series a { border-right: 0; border-bottom: 1px solid var(--line); }
+    .pad { padding: 16px; }
+    .nesa, .nesa tbody, .nesa tr, .nesa td { display: block; width: 100% !important; }
+    .nesa thead { display: none; }
+    .nesa td { border-top: 0; padding: 6px 0; }
+    .nesa tr { border-top: 1px solid var(--line); padding: 10px 0; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1>Classroom observation guide · mockup</h1>
+  <p>A third guide beside Run a guide and Coaching sheet. It follows the NESA Proficient Teacher observation template (June 2026) field for field, split across three linked meetings. Everything typed in Planning flows forward. All names here are invented.</p>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" data-v="layout" aria-selected="true">1 · New page layout</button>
+    <button role="tab" data-v="start">2 · Start a guide</button>
+    <button role="tab" data-v="plan">3 · Before: Planning</button>
+    <button role="tab" data-v="obs">4 · During: Observing</button>
+    <button role="tab" data-v="refl">5 · After: Reflecting</button>
+    <button role="tab" data-v="phone">6 · 390px</button>
+  </div>
+
+  <!-- ═════════ 1 LAYOUT ═════════ -->
+  <section class="view on" id="v-layout">
+    <div class="why"><b>The change.</b> Right column stays as it is (the room, task links, tags). Left column now holds only Minutes, Actions and Who said what. Notes moves below both columns at full width, and Guides lives inside Notes instead of being its own card. Wide guides like this one get the whole page width.</div>
+    <div class="frame pad">
+      <div class="crumbs">Professional · Meetings</div>
+      <div class="mp-head">
+        <h2 class="title">Observation · Year 9 English with S. Okafor</h2>
+        <span class="phase"><span>Before</span><span class="on">During</span><span>After</span></span>
+        <span class="chip">Wed 18 Nov · Period 3 · Room B12</span>
+      </div>
+      <div class="purpose"><b>Why you’re there</b> · Observe the three agreed descriptors and gather evidence for the report.</div>
+
+      <div class="mp-grid">
+        <div class="mp-col zone"><span class="zone-tag">Left column</span>
+          <div class="card"><h3>Minutes</h3><div class="ghost-line m"></div><div class="ghost-line s"></div></div>
+          <div class="card"><h3>Actions</h3>
+            <div class="grid2 small"><div><b>You</b><div class="ghost-line m"></div></div><div><b>They</b><div class="ghost-line s"></div></div></div>
+          </div>
+          <div class="card"><h3>Who said what</h3><div class="ghost-line m"></div><div class="ghost-line s"></div></div>
+        </div>
+        <div class="mp-col zone"><span class="zone-tag">Right column · unchanged</span>
+          <div class="card"><h3>In the room</h3>
+            <div class="row"><span class="chip"><span class="av">SO</span> S. Okafor</span><span class="chip"><span class="av" style="background:#1f3a5f">ME</span> You</span></div>
+          </div>
+          <div class="card"><h3>Preparation · Follow-up</h3><div class="ghost-line m"></div></div>
+          <div class="card"><h3>Tags</h3><div class="row"><span class="chip">Accreditation</span><span class="chip">Mentoring</span></div></div>
+        </div>
+      </div>
+
+      <div class="mp-full zone"><span class="zone-tag">Full width · Notes + guides</span>
+        <div class="card">
+          <div class="notes-head">
+            <h3>Notes</h3>
+            <span class="spacer"></span>
+            <button class="btn btn--sm">◐ Run a guide</button>
+            <button class="btn btn--sm">◇ Coaching sheet</button>
+            <button class="btn btn--sm btn--primary">◉ Classroom observation</button>
+          </div>
+          <p class="muted small" style="margin:4px 0 0">Start a line with »me to log something you owe, »Name for something they owe, ✓ for a decision, @Name for who said what.</p>
+          <div class="notes-body">
+            <p><b>Before the lesson</b></p>
+            <p>Seating plan changed since Monday; two students on modified tasks.</p>
+          </div>
+          <div class="divider">Guides in this meeting</div>
+          <div class="series">
+            <a class="done" href="#"><b>1 · Planning</b><span class="muted">Mon 16 Nov · 3 descriptors agreed</span></a>
+            <a class="now" href="#"><b>2 · Observing</b><span class="muted">This meeting</span></a>
+            <a href="#"><b>3 · Reflecting</b><span class="muted">Thu 26 Nov · booked</span></a>
+          </div>
+          <div class="window">Planning to reflecting within two weeks: <b>10 days left</b> (by Mon 30 Nov).</div>
+          <p class="muted small" style="margin:14px 0 4px">The observation workspace opens here at full width. See tab 4.</p>
+          <div class="guide-cards" style="margin-top:10px">
+            <div class="gcard"><b>Motivation · English</b><span class="muted small">Older guide cards sit in a grid here instead of one tall column.</span></div>
+            <div class="gcard"><b>Coaching sheet</b><span class="muted small">Same card, wider shelf.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="label">What moves where, per phase</div>
+    <div class="why" style="border-left-color:var(--muted)"><b>Before:</b> left = Clare’s brief, open promises, Minutes · full width = Agenda and notes + guides.<br><b>During:</b> left = live strip, Minutes, Actions, Who said what · full width = Notes + guides.<br><b>After:</b> left = Minutes, Did you get what you came for, Wrap-up, Actions, Who said what · full width = Notes + guides.<br>Below 900px everything stacks in one column, and the right column comes after the left, as now.</div>
+  </section>
+
+  <!-- ═════════ 2 START ═════════ -->
+  <section class="view" id="v-start">
+    <div class="why"><b>Picking it.</b> Classroom observation opens a shelf of observation types. Proficient Teacher (NESA) is the first; the others are placeholders. Then pick which part of the template this meeting is for. Each part is its own meeting, and the three are linked.</div>
+    <div class="frame">
+      <div class="picker">
+        <div class="picker__list">
+          <b>Classroom observation</b>
+          <span class="muted small">Who is being observed?</span>
+          <select><option>S. Okafor (in the room)</option></select>
+          <div class="shelf on"><div class="emb"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1f3a5f" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/></svg></div><div><b>Proficient Teacher</b><span>NESA observation report · 3 phases</span></div></div>
+          <div class="shelf soon"><div class="emb">·</div><div><b>Maintenance</b><span>Later</span></div></div>
+          <div class="shelf soon"><div class="emb">·</div><div><b>Highly Accomplished / Lead</b><span>Later</span></div></div>
+          <div class="shelf soon"><div class="emb">·</div><div><b>Informal walkthrough</b><span>Later</span></div></div>
+        </div>
+        <div class="picker__main">
+          <div>
+            <div class="crumbs">Proficient Teacher · S. Okafor</div>
+            <h2 class="title" style="margin-bottom:4px">Which part is this meeting?</h2>
+            <span class="muted small">The whole observation, planning to reflecting, should be done within two weeks.</span>
+          </div>
+          <div class="phasecards">
+            <div class="phasecard"><span class="n">Before · Phase 1</span><b>Planning</b><p>You meet, agree the lesson and 2 to 4 Standard Descriptors, and set what you’ll look for. The teacher’s answers.</p></div>
+            <div class="phasecard on"><span class="n">During · Phase 2</span><b>Observing</b><p>You watch the lesson. Planning comes over as quick keys. Tap to log what you see, then write it up.</p></div>
+            <div class="phasecard"><span class="n">After · Phase 3</span><b>Reflecting</b><p>Teacher’s reflection and your feedback for each descriptor, prefilled from the observation. Sign and export.</p></div>
+          </div>
+          <div class="card">
+            <h3>Link to the planning meeting</h3>
+            <div class="row">
+              <span class="chip" style="background:var(--sage);border-color:transparent">✓ Planning · Mon 16 Nov · S. Okafor</span>
+              <span class="muted small">Found the open observation for this person. Its descriptors and look-fors come with it.</span>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Book the next part</h3>
+            <div class="row">
+              <span class="small">Reflecting meeting</span>
+              <input type="date" value="2026-11-26" style="width:auto">
+              <button class="btn btn--sm">Make linked meeting</button>
+              <span class="muted small">Same people, same tags, opens on Reflecting.</span>
+            </div>
+          </div>
+          <div class="row"><span class="spacer"></span><button class="btn btn--quiet">Cancel</button><button class="btn btn--primary">Start observing</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ 3 PLANNING ═════════ -->
+  <section class="view" id="v-plan">
+    <div class="why"><b>Phase 1, field for field.</b> The template’s three columns (Standard Descriptors · Teaching and learning strategies · Impact of practice) become three columns per descriptor, so each answer sits next to the descriptor it is about. One addition of ours: <b>look-fors</b>, the observable behaviours you agree on. They become the quick keys in the observation.</div>
+    <div class="frame pad stack">
+      <div class="series">
+        <a class="now" href="#"><b>1 · Planning</b><span class="muted">This meeting</span></a>
+        <a href="#"><b>2 · Observing</b><span class="muted">Wed 18 Nov · P3 · booked</span></a>
+        <a href="#"><b>3 · Reflecting</b><span class="muted">Not booked</span></a>
+      </div>
+
+      <div class="card">
+        <h3>Details <span class="count">· from people profiles, change here if needed</span></h3>
+        <div class="grid2">
+          <div class="stack" style="gap:6px">
+            <b class="small">Teacher</b>
+            <input type="text" value="Sam Okafor" aria-label="Full name">
+            <input type="text" value="NESA 1234567" aria-label="NESA account number">
+            <input type="text" value="s.okafor@example.edu.au" aria-label="Email">
+            <input type="text" value="Riverbend High School" aria-label="School">
+          </div>
+          <div class="stack" style="gap:6px">
+            <b class="small">Accreditation Supervisor</b>
+            <input type="text" value="You" aria-label="Supervisor name">
+            <input type="text" value="NESA 7654321" aria-label="Supervisor NESA number">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Which 2–4 Standard Descriptors will be observed? <span class="count">· 3 picked</span></h3>
+        <div class="stdgroup">Standard 1 · Know students and how they learn</div>
+        <div class="desc-pick">
+          <div class="desc-opt"><code>1.1.2</code>Physical, social, intellectual development</div>
+          <div class="desc-opt"><code>1.2.2</code>How students learn</div>
+          <div class="desc-opt"><code>1.3.2</code>Diverse backgrounds</div>
+          <div class="desc-opt"><code>1.4.2</code>Aboriginal and Torres Strait Islander students</div>
+          <div class="desc-opt c3 on"><code>1.5.2</code>Differentiate for the full range of abilities</div>
+          <div class="desc-opt"><code>1.6.2</code>Students with disability</div>
+        </div>
+        <div class="stdgroup">Standard 3 · Plan for and implement effective teaching and learning</div>
+        <div class="desc-pick">
+          <div class="desc-opt"><code>3.1.2</code>Challenging learning goals</div>
+          <div class="desc-opt"><code>3.2.2</code>Plan, structure and sequence</div>
+          <div class="desc-opt"><code>3.3.2</code>Teaching strategies</div>
+          <div class="desc-opt"><code>3.4.2</code>Select and use resources</div>
+          <div class="desc-opt c1 on"><code>3.5.2</code>Effective classroom communication</div>
+          <div class="desc-opt dim"><code>3.6.2</code>Evaluate and improve programs</div>
+          <div class="desc-opt dim"><code>3.7.2</code>Engage parents and carers</div>
+        </div>
+        <div class="stdgroup">Standard 5 · Assess, provide feedback and report on student learning</div>
+        <div class="desc-pick">
+          <div class="desc-opt"><code>5.1.2</code>Assess student learning</div>
+          <div class="desc-opt c2 on"><code>5.2.2</code>Feedback to students</div>
+          <div class="desc-opt dim"><code>5.3.2</code>Consistent and comparable judgements</div>
+          <div class="desc-opt dim"><code>5.4.2</code>Interpret student data</div>
+          <div class="desc-opt dim"><code>5.5.2</code>Report on achievement</div>
+        </div>
+        <p class="muted small" style="margin:8px 0 0">Standards 2 and 4 fold out the same way. Faded ones are hard to see in a single lesson; still pickable. Standards 6 and 7 are folded away by default.</p>
+      </div>
+
+      <div class="col3h">
+        <div class="colh">Standard Descriptors</div>
+        <div class="colh">Teaching and learning strategies</div>
+        <div class="colh">Impact of practice</div>
+      </div>
+
+      <div class="dcard c1">
+        <div class="dcard__head"><span class="code">3.5.2</span><b>Use effective classroom communication</b></div>
+        <div class="dcard__text">Use effective verbal and non-verbal communication strategies to support student understanding, participation, engagement and achievement.</div>
+        <div class="grid3">
+          <div class="stack" style="gap:8px">
+            <div><p class="ask">Why this one?</p><textarea>Wants to tighten instructions before independent tasks; students often start the wrong thing.</textarea></div>
+            <div><p class="ask">What practice does it describe?</p><textarea>Clear, chunked instructions; checking understanding before release; using non-verbal cues to hold attention.</textarea></div>
+          </div>
+          <div class="stack" style="gap:8px">
+            <div><p class="ask">What will you do to show it?</p><textarea>Instructions on slide + verbal, two-step max, then a hinge question before students start.</textarea></div>
+          </div>
+          <div class="stack" style="gap:8px">
+            <div><p class="ask">Planned impact?</p><textarea>Students start the task within a minute with fewer “what are we doing?” questions.</textarea></div>
+            <div><p class="ask">How will you know?</p><textarea>Count of students on task at the 2-minute mark; hinge question responses.</textarea></div>
+          </div>
+        </div>
+        <p class="ask" style="margin-top:12px">Look-fors <i>· what you’ll actually see; each becomes a quick key</i></p>
+        <div class="looks">
+          <span class="look"><kbd>Q</kbd>Instructions chunked</span>
+          <span class="look"><kbd>W</kbd>Checks before release</span>
+          <span class="look"><kbd>E</kbd>Non-verbal cue used</span>
+          <span class="look look--add">+ Add look-for</span>
+        </div>
+      </div>
+
+      <div class="dcard c2">
+        <div class="dcard__head"><span class="code">5.2.2</span><b>Provide feedback to students on their learning</b></div>
+        <div class="dcard__text">Provide timely, effective and appropriate feedback to students about their achievement relative to their learning goals.</div>
+        <div class="grid3">
+          <div><p class="ask">Why this one?</p><textarea>Feedback is mostly written and late; trying live feedback during drafting.</textarea></div>
+          <div><p class="ask">What will you do to show it?</p><textarea>Circulate during drafting with the success criteria; one specific next step per student.</textarea></div>
+          <div><p class="ask">How will you know?</p><textarea>Students revise their opening line in the lesson after feedback.</textarea></div>
+        </div>
+        <div class="looks" style="margin-top:10px">
+          <span class="look"><kbd>A</kbd>Specific to criteria</span>
+          <span class="look"><kbd>S</kbd>Student acts on it</span>
+          <span class="look"><kbd>D</kbd>Reaches most students</span>
+        </div>
+      </div>
+
+      <div class="dcard c3">
+        <div class="dcard__head"><span class="code">1.5.2</span><b>Differentiate teaching for the full range of abilities</b></div>
+        <div class="dcard__text">Develop teaching activities that incorporate differentiated strategies to meet the specific learning needs of students across the full range of abilities.</div>
+        <div class="looks"><span class="look"><kbd>Z</kbd>Scaffold offered</span><span class="look"><kbd>X</kbd>Extension offered</span><span class="look"><kbd>C</kbd>Choice of entry point</span></div>
+        <p class="muted small" style="margin:8px 0 0">Answers folded. Tap to open.</p>
+      </div>
+
+      <div class="card">
+        <h3>For the whole lesson</h3>
+        <div class="grid2">
+          <div class="stack" style="gap:8px">
+            <p class="ask">What lesson will be observed?</p>
+            <div class="lessonlink"><span class="ic">L</span><div><b>Persuasive openings</b><div class="muted small">Year 9 English · Teaching hub lesson</div></div><span class="spacer"></span><button class="btn btn--sm btn--quiet">Change</button></div>
+            <p class="ask">How does it link to the syllabus / program?</p>
+            <textarea class="prefill">EN5-URC-01 · from the lesson’s Syllabus card</textarea>
+            <span class="src">↳ pulled from the linked lesson</span>
+          </div>
+          <div class="stack" style="gap:8px">
+            <p class="ask">How will you plan for all students?</p>
+            <textarea>Two students on modified sentence starters; extension prompt on the back of the sheet.</textarea>
+            <p class="ask">What assessment / feedback / measurement will you use?</p>
+            <textarea>Exit ticket: rewrite of opening line; hinge question results.</textarea>
+          </div>
+        </div>
+      </div>
+      <p class="muted small" style="margin:0">Where the template asks a question once for all descriptors, it sits here once. Where the answer differs per descriptor, it sits on the descriptor. Export puts it all back in NESA’s three columns.</p>
+    </div>
+  </section>
+
+  <!-- ═════════ 4 OBSERVING ═════════ -->
+  <section class="view" id="v-obs">
+    <div class="why"><b>During the lesson.</b> The descriptors and look-fors arrive from Planning. Tap a descriptor, a look-for and a kind (or press the keys), add a few words if you like, and press Enter. Every line gets the lesson clock. The tally on the right is only a guide; you make the call on each descriptor. Try it: the keys below work.</div>
+    <div class="frame pad stack">
+      <div class="series">
+        <a class="done" href="#"><b>1 · Planning</b><span class="muted">Mon 16 Nov</span></a>
+        <a class="now" href="#"><b>2 · Observing</b><span class="muted">This meeting</span></a>
+        <a href="#"><b>3 · Reflecting</b><span class="muted">Thu 26 Nov · booked</span></a>
+      </div>
+
+      <div class="row">
+        <span class="rec"><i></i> Lesson running</span>
+        <span class="clock" id="clock">14:32</span>
+        <span class="muted small">· Persuasive openings · Year 9 · S. Okafor</span>
+        <span class="spacer"></span>
+        <button class="btn btn--sm">Pause</button>
+        <button class="btn btn--sm">End lesson</button>
+      </div>
+
+      <div class="obs">
+        <div class="stack">
+          <div class="dock" id="dock">
+            <div class="dock__lbl">Descriptor <span style="font-weight:400;text-transform:none">· keys 1–3</span></div>
+            <div class="dock__row">
+              <button class="key key--d c1" data-d="1"><kbd>1</kbd>3.5.2 Communication</button>
+              <button class="key key--d c2" data-d="2"><kbd>2</kbd>5.2.2 Feedback</button>
+              <button class="key key--d c3" data-d="3"><kbd>3</kbd>1.5.2 Differentiation</button>
+            </div>
+            <div class="dock__lbl">Look-for</div>
+            <div class="dock__row" id="looks"></div>
+            <div class="dock__lbl">Kind</div>
+            <div class="dock__row">
+              <button class="key key--kind" data-k="str"><kbd>+</kbd>Strength</button>
+              <button class="key key--kind" data-k="next"><kbd>&gt;</kbd>Next step</button>
+              <button class="key key--kind" data-k="ask"><kbd>?</kbd>Ask about</button>
+              <button class="key key--kind" data-k="said"><kbd>"</kbd>Student said</button>
+              <button class="key" data-mark>⏱ Transition</button>
+            </div>
+            <div class="draftchips" id="draft"></div>
+            <div class="compose">
+              <input type="text" id="note" placeholder="A few words (optional) · Enter to log">
+              <button class="btn btn--primary btn--sm" id="logbtn">Log</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Log <span class="count" id="logcount">· 9 lines</span><span class="spacer"></span><button class="btn btn--sm btn--quiet">Pre-lesson notes</button></h3>
+            <div class="log" id="log"></div>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="card">
+            <h3>Against each descriptor</h3>
+            <div class="tally" id="tally"></div>
+            <p class="muted small" style="margin:10px 0 0">Green is strengths, amber next steps. Struck-through look-fors haven’t been seen yet.</p>
+          </div>
+          <div class="card">
+            <h3>Planned impact, from Planning</h3>
+            <p class="small" style="margin:0 0 6px"><span class="code c1">3.5.2</span> Students start the task within a minute.</p>
+            <p class="small" style="margin:0 0 6px"><span class="code c2">5.2.2</span> Students revise their opening line after feedback.</p>
+            <p class="small" style="margin:0"><span class="code c3">1.5.2</span> All students produce an opening.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider">Write-up · Phase 2 of the report</div>
+      <div class="row"><span class="muted small">Each cell starts from the log lines tagged with that descriptor. Edit freely; nothing goes to NESA until you export.</span><span class="spacer"></span><button class="btn btn--sm">↻ Gather from log again</button><button class="btn btn--sm">✦ Clare tidies the wording (~A$0.02)</button></div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table class="nesa">
+          <thead><tr>
+            <th>Standard Descriptor</th>
+            <th>Teaching practice<small>What teaching and learning strategies did you observe aligned to the agreed Standard Descriptors? What teaching practice did you observe? How did this demonstrate the agreed Standard Descriptors?</small></th>
+            <th>Observation strengths<small>Evaluate how well the teacher’s practice demonstrated the agreed Standard Descriptors.</small></th>
+            <th>Record of decision<small>Observed / Partially observed / Not observed. Other comments.</small></th>
+          </tr></thead>
+          <tbody>
+            <tr class="c1">
+              <td><span class="code">3.5.2</span></td>
+              <td><textarea class="prefill">14:05 Instructions given in two chunks, slide and voice together.
+14:09 Hinge question before release; 24 of 27 correct.
+14:21 Hand raised + pause to regain attention.</textarea><span class="src">↳ 3 log lines</span></td>
+              <td><textarea class="prefill">Instructions chunked and checked before release; most students started within a minute.</textarea></td>
+              <td><div class="decide"><button class="on o">Observed</button><button class="p">Partially</button><button class="x">Not</button></div><textarea style="margin-top:8px;min-height:60px" placeholder="Other comments"></textarea></td>
+            </tr>
+            <tr class="c2">
+              <td><span class="code">5.2.2</span></td>
+              <td><textarea class="prefill">14:14 Circulated with success criteria; feedback named the criterion.
+14:18 Two students rewrote their first line after feedback.</textarea><span class="src">↳ 2 log lines</span></td>
+              <td><textarea class="prefill">Feedback was specific and acted on. Next step: reached about a third of the class in the time.</textarea></td>
+              <td><div class="decide"><button class="o">Observed</button><button class="on p">Partially</button><button class="x">Not</button></div><textarea style="margin-top:8px;min-height:60px">Reach was limited; whole-class feedback mid-task could extend it.</textarea></td>
+            </tr>
+            <tr class="c3">
+              <td><span class="code">1.5.2</span></td>
+              <td><textarea class="prefill">14:11 Sentence starters given to two students.
+14:24 Extension prompt taken up by four students.</textarea><span class="src">↳ 2 log lines</span></td>
+              <td><textarea class="prefill">Scaffold and extension both used; no choice of entry point seen.</textarea></td>
+              <td><div class="decide"><button class="on o">Observed</button><button class="p">Partially</button><button class="x">Not</button></div><textarea style="margin-top:8px;min-height:60px" placeholder="Other comments"></textarea></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ 5 REFLECTING ═════════ -->
+  <section class="view" id="v-refl">
+    <div class="why"><b>Phase 3.</b> Each descriptor row brings its decision, strengths and next steps from the observation. Your feedback box is drafted from that: strengths for Observed, advice for Partially and Not observed. The teacher’s reflection is theirs to write, with the template’s two prompts. Sign, date, and export the full report in NESA’s layout.</div>
+    <div class="frame pad stack">
+      <div class="series">
+        <a class="done" href="#"><b>1 · Planning</b><span class="muted">Mon 16 Nov</span></a>
+        <a class="done" href="#"><b>2 · Observing</b><span class="muted">Wed 18 Nov · 18 log lines</span></a>
+        <a class="now" href="#"><b>3 · Reflecting</b><span class="muted">This meeting</span></a>
+      </div>
+      <div class="window">Planning to reflecting: <b>day 10 of 14</b>. On time.</div>
+
+      <div class="col3h" style="grid-template-columns:240px minmax(0,1fr) minmax(0,1fr)">
+        <div class="colh">From the observation</div>
+        <div class="colh">Teacher’s reflection</div>
+        <div class="colh">Accreditation Supervisor’s feedback</div>
+      </div>
+
+      <div class="refl c1">
+        <div class="evid">
+          <div class="row"><span class="code">3.5.2</span><span class="pill" style="background:var(--sage);color:var(--sage-ink)">Observed</span></div>
+          <ul><li>Instructions chunked, slide + voice</li><li>Hinge question, 24/27</li><li>Hand-raise cue held attention</li></ul>
+          <a class="small" href="#" style="color:var(--navy)">3 log lines →</a>
+        </div>
+        <div><p class="ask">Key reflections? How did you show the descriptor?</p><textarea style="min-height:120px" placeholder="The teacher writes this. Read it back together."></textarea></div>
+        <div><p class="ask">Feedback on what was shown</p><textarea class="prefill" style="min-height:120px">Instructions were chunked and paired with the slide, and the hinge question confirmed understanding before release; most students started within a minute.</textarea><span class="src">↳ drafted from strengths</span></div>
+      </div>
+
+      <div class="refl c2">
+        <div class="evid">
+          <div class="row"><span class="code">5.2.2</span><span class="pill" style="background:var(--amber);color:var(--amber-ink)">Partially</span></div>
+          <ul><li>Specific to criteria ✓</li><li>Students acted on it ✓</li><li><b>Next:</b> reached about a third of the class</li></ul>
+          <a class="small" href="#" style="color:var(--navy)">2 log lines →</a>
+        </div>
+        <div><p class="ask">Key reflections? How did you show the descriptor?</p><textarea style="min-height:120px">I spent too long with the first table. Next time I’ll…</textarea></div>
+        <div><p class="ask">Advice to develop it further</p><textarea class="prefill" style="min-height:120px">Feedback was specific and acted on. To reach more students, pause the class after ten minutes and share one common next step aloud.</textarea><span class="src">↳ drafted from next steps</span></div>
+      </div>
+
+      <div class="refl c3">
+        <div class="evid">
+          <div class="row"><span class="code">1.5.2</span><span class="pill" style="background:var(--sage);color:var(--sage-ink)">Observed</span></div>
+          <ul><li>Sentence starters for two students</li><li>Extension taken up by four</li></ul>
+        </div>
+        <div><p class="ask">Key reflections?</p><textarea style="min-height:90px"></textarea></div>
+        <div><p class="ask">Feedback on what was shown</p><textarea class="prefill" style="min-height:90px">Scaffolds and an extension were planned and used by the students they were meant for.</textarea></div>
+      </div>
+
+      <div class="sign">
+        <div class="sigbox"><b class="small">Teacher’s signature</b><div class="row" style="margin-top:8px"><input type="text" placeholder="Type full name to sign" style="flex:1"><input type="date" style="width:auto"></div></div>
+        <div class="sigbox"><b class="small">Accreditation Supervisor’s signature</b><div class="row" style="margin-top:8px"><input type="text" value="You" style="flex:1"><input type="date" value="2026-11-26" style="width:auto"></div></div>
+      </div>
+      <div class="row">
+        <span class="muted small">Export builds all four pages of the NESA template from the three linked meetings.</span>
+        <span class="spacer"></span>
+        <button class="btn">Preview report</button>
+        <button class="btn btn--primary">Export NESA report (PDF)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ 6 PHONE ═════════ -->
+  <section class="view" id="v-phone">
+    <div class="why"><b>At 390px.</b> The keys dock to the bottom of the screen, like the voice marking codes, so you can log with a thumb at the back of the room. Log scrolls above. Tally and write-up come after the log.</div>
+    <div class="phones">
+      <div>
+        <div class="frame phone">
+          <div class="phone__top">
+            <div class="row"><span class="rec"><i></i></span><span class="clock" style="font-size:18px">14:32</span><span class="spacer"></span><span class="small muted">Observing · S. Okafor</span></div>
+          </div>
+          <div class="phone__body">
+            <div class="entry"><span class="t">14:24</span><div><div class="tags"><span class="lk c3">1.5.2</span><span class="lk c3">Extension offered</span><span class="kind k-str">Strength</span></div>Four took the extension prompt.</div></div>
+            <div class="entry"><span class="t">14:21</span><div><div class="tags"><span class="lk c1">3.5.2</span><span class="lk c1">Non-verbal cue</span><span class="kind k-str">Strength</span></div>Hand raise + pause.</div></div>
+            <div class="entry"><span class="t">14:18</span><div><div class="tags"><span class="lk c2">5.2.2</span><span class="lk c2">Student acts on it</span></div>Two rewrote first line.</div></div>
+            <div class="entry"><span class="t">14:14</span><div><div class="tags"><span class="lk c2">5.2.2</span><span class="kind k-next">Next step</span></div>Still at table 1 after 5 min.</div></div>
+          </div>
+          <div class="phone__dock">
+            <div class="dock__row"><button class="key key--d c1 on">3.5.2</button><button class="key key--d c2">5.2.2</button><button class="key key--d c3">1.5.2</button></div>
+            <div class="dock__row"><button class="key key--look c1">Chunked</button><button class="key key--look c1 on">Checks first</button><button class="key key--look c1">Non-verbal</button></div>
+            <div class="dock__row"><button class="key key--kind on">+</button><button class="key key--kind">&gt; Next</button><button class="key key--kind">?</button><button class="key key--kind">"</button></div>
+            <div class="compose"><input type="text" placeholder="A few words"><button class="btn btn--primary btn--sm">Log</button></div>
+          </div>
+        </div>
+        <p class="cap">Observing on a phone. Short labels on the keys; the full look-for shows in the log line.</p>
+      </div>
+      <div>
+        <div class="frame phone">
+          <div class="phone__top"><div class="crumbs">Meetings</div><b>Observation · Year 9 English</b></div>
+          <div class="phone__body">
+            <div class="card" style="padding:12px"><h3 style="font-size:14px">Minutes</h3><div class="ghost-line m"></div></div>
+            <div class="card" style="padding:12px"><h3 style="font-size:14px">Actions</h3><div class="ghost-line s"></div></div>
+            <div class="card" style="padding:12px"><h3 style="font-size:14px">Who said what</h3><div class="ghost-line m"></div></div>
+            <div class="card" style="padding:12px"><h3 style="font-size:14px">In the room</h3><div class="ghost-line s"></div></div>
+            <div class="card" style="padding:12px"><h3 style="font-size:14px">Tags</h3><div class="ghost-line s"></div></div>
+            <div class="card" style="padding:12px"><h3 style="font-size:14px">Notes</h3><div class="ghost-line m"></div><div class="divider" style="margin:10px 0 6px">Guides</div><div class="series"><a class="done" href="#"><b>1 · Planning</b></a><a class="now" href="#"><b>2 · Observing</b></a><a href="#"><b>3 · Reflecting</b></a></div></div>
+          </div>
+        </div>
+        <p class="cap">The new page order on a phone: left column, then right column, then Notes with guides.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  // Tabs
+  document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+    document.querySelectorAll('.view').forEach((v) => v.classList.toggle('on', v.id === 'v-' + b.dataset.v));
+  }));
+
+  // Observation quick keys
+  const D = {
+    1: { code: '3.5.2', c: 'c1', looks: [['Q', 'Instructions chunked'], ['W', 'Checks before release'], ['E', 'Non-verbal cue used']] },
+    2: { code: '5.2.2', c: 'c2', looks: [['A', 'Specific to criteria'], ['S', 'Student acts on it'], ['D', 'Reaches most students']] },
+    3: { code: '1.5.2', c: 'c3', looks: [['Z', 'Scaffold offered'], ['X', 'Extension offered'], ['C', 'Choice of entry point']] }
+  };
+  const KIND = { str: ['Strength', 'k-str'], next: ['Next step', 'k-next'], ask: ['Ask about', 'k-ask'], said: ['Student said', 'k-said'] };
+  let entries = [
+    ['14:03', 1, 'Instructions chunked', 'str', 'Two-step instructions, slide and voice together.'],
+    ['14:05', 0, null, 'mark', 'Transition: into drafting'],
+    ['14:09', 1, 'Checks before release', 'str', 'Hinge question; 24 of 27 correct.'],
+    ['14:11', 3, 'Scaffold offered', 'str', 'Sentence starters to two students.'],
+    ['14:14', 2, 'Specific to criteria', 'str', 'Named the criterion in feedback.'],
+    ['14:14', 2, 'Reaches most students', 'next', 'Still at table 1 after 5 min.'],
+    ['14:16', 0, null, 'said', '“Is it allowed to start with a question?”'],
+    ['14:18', 2, 'Student acts on it', 'str', 'Two rewrote first line.'],
+    ['14:21', 1, 'Non-verbal cue used', 'str', 'Hand raise + pause.']
+  ];
+  const sel = { d: 1, look: null, kind: 'str' };
+  let mins = 32, secs = 0;
+
+  const $ = (id) => document.getElementById(id);
+  function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+
+  function paintKeys() {
+    document.querySelectorAll('#dock .key--d').forEach((k) => k.classList.toggle('on', Number(k.dataset.d) === sel.d));
+    document.querySelectorAll('#dock .key--kind').forEach((k) => k.classList.toggle('on', k.dataset.k === sel.kind));
+    const looks = $('looks'); looks.replaceChildren();
+    const d = D[sel.d];
+    for (const [key, name] of d.looks) {
+      const b = el('button', 'key key--look ' + d.c + (sel.look === name ? ' on' : ''));
+      b.append(Object.assign(el('kbd'), { textContent: key }), name);
+      b.addEventListener('click', () => { sel.look = sel.look === name ? null : name; paintKeys(); });
+      looks.append(b);
+    }
+    const draft = $('draft'); draft.replaceChildren();
+    draft.append(el('span', 'lk ' + d.c, d.code));
+    if (sel.look) draft.append(el('span', 'lk ' + d.c, sel.look));
+    if (sel.kind) draft.append(el('span', 'kind ' + KIND[sel.kind][1], KIND[sel.kind][0]));
+  }
+
+  function paintLog(fresh) {
+    const log = $('log'); log.replaceChildren();
+    [...entries].reverse().forEach((e, i) => {
+      const [t, d, look, kind, text] = e;
+      const row = el('div', 'entry' + (fresh && i === 0 ? ' new' : ''));
+      row.append(el('span', 't', t));
+      const body = el('div'); const tags = el('div', 'tags');
+      if (d) { tags.append(el('span', 'lk ' + D[d].c, D[d].code)); if (look) tags.append(el('span', 'lk ' + D[d].c, look)); }
+      if (KIND[kind]) tags.append(el('span', 'kind ' + KIND[kind][1], KIND[kind][0]));
+      if (kind === 'mark') tags.append(el('span', 'kind k-said', '⏱ Transition'));
+      body.append(tags, document.createTextNode(text || ''));
+      row.append(body); log.append(row);
+    });
+    $('logcount').textContent = '· ' + entries.length + ' lines';
+    paintTally();
+  }
+
+  function paintTally() {
+    const host = $('tally'); host.replaceChildren();
+    for (const n of [1, 2, 3]) {
+      const d = D[n];
+      const mine = entries.filter((e) => e[1] === n);
+      const s = mine.filter((e) => e[3] === 'str').length, nx = mine.filter((e) => e[3] === 'next').length;
+      const row = el('div', 'trow ' + d.c);
+      const top = el('div', 'trow__top');
+      top.append(el('span', 'code', d.code), el('span', 'small muted', s + (s === 1 ? ' strength · ' : ' strengths · ') + nx + (nx === 1 ? ' next step' : ' next steps')), el('span', 'spacer'));
+      const dec = el('div', 'decide');
+      const pick = nx > 0 ? 'p' : 'o';
+      for (const [cls, label] of [['o', 'Observed'], ['p', 'Partially'], ['x', 'Not']]) {
+        const b = el('button', cls + (cls === pick ? ' on' : ''), label);
+        b.addEventListener('click', () => { dec.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); });
+        dec.append(b);
+      }
+      top.append(dec);
+      const bars = el('div', 'bars');
+      for (let i = 0; i < s; i++) bars.append(Object.assign(el('i', 's'), { style: 'flex:1' }));
+      for (let i = 0; i < nx; i++) bars.append(Object.assign(el('i', 'n'), { style: 'flex:1' }));
+      if (!s && !nx) bars.append(Object.assign(el('i'), { style: 'flex:1;background:#eee' }));
+      const hits = el('div', 'lookhits');
+      for (const [, name] of d.looks) {
+        const c = mine.filter((e) => e[2] === name).length;
+        hits.append(el('span', c ? '' : 'zero', name + (c ? ' ×' + c : '')));
+      }
+      row.append(top, bars, hits);
+      host.append(row);
+    }
+  }
+
+  function logIt(mark) {
+    const t = '14:' + String(mins).padStart(2, '0');
+    if (mark) entries.push([t, 0, null, 'mark', 'Transition']);
+    else entries.push([t, sel.kind === 'said' ? 0 : sel.d, sel.kind === 'said' ? null : sel.look, sel.kind, $('note').value.trim()]);
+    $('note').value = ''; sel.look = null;
+    paintKeys(); paintLog(true);
+  }
+
+  document.querySelectorAll('#dock .key--d').forEach((k) => k.addEventListener('click', () => { sel.d = Number(k.dataset.d); sel.look = null; paintKeys(); }));
+  document.querySelectorAll('#dock .key--kind').forEach((k) => k.addEventListener('click', () => { sel.kind = k.dataset.k; paintKeys(); }));
+  document.querySelector('#dock [data-mark]').addEventListener('click', () => logIt(true));
+  $('logbtn').addEventListener('click', () => logIt(false));
+  $('note').addEventListener('keydown', (e) => { if (e.key === 'Enter') logIt(false); });
+  document.addEventListener('keydown', (e) => {
+    if (!$('v-obs').classList.contains('on') || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    const k = e.key.toUpperCase();
+    if (D[k]) { sel.d = Number(k); sel.look = null; paintKeys(); return; }
+    const hit = D[sel.d].looks.find(([key]) => key === k);
+    if (hit) { sel.look = hit[1]; paintKeys(); return; }
+    const kinds = { '+': 'str', '=': 'str', '>': 'next', '.': 'next', '?': 'ask', '/': 'ask', '"': 'said', "'": 'said' };
+    if (kinds[e.key]) { sel.kind = kinds[e.key]; paintKeys(); return; }
+    if (e.key === 'Enter') { e.preventDefault(); $('note').focus(); }
+  });
+  setInterval(() => { secs++; if (secs === 60) { secs = 0; mins++; } $('clock').textContent = '14:' + String(mins).padStart(2, '0'); }, 1000);
+  paintKeys(); paintLog(false);
+</script>
+</body>
+</html>
