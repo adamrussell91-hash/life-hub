@@ -1,6 +1,7 @@
 import { apiGet, apiPatch, apiPost, ApiClientError } from './client';
 import type { GuideRun } from '@/guides/types';
 import type { CoachingSheet } from '@/guides/coaching-sheet';
+import type { MeetingObservationLink } from '@/observation/types';
 import type { MeetingDecision, MeetingMinutes, MeetingMinutesPending, MeetingRecord, MinutesItemNote } from '@/domain/types';
 
 export interface MeetingLinkInput {
@@ -62,6 +63,7 @@ export function updateMeeting(
     decisions?: MeetingDecision[];
     guide_runs?: GuideRun[];
     coaching_sheets?: CoachingSheet[];
+    observation?: MeetingObservationLink | null;
     minutes?: MeetingMinutes | null;
     minutes_pending?: MeetingMinutesPending | null;
     minutes_draft?: string | null;

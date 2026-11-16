@@ -189,6 +189,23 @@ export function validateCoachingSheets(value) {
   });
 }
 
+const OBSERVATION_ID_RE = /^obs_[a-z0-9-]{8,64}$/;
+const OBSERVATION_PHASES = ['planning', 'observing', 'reflecting'];
+
+function normalizeObservationLink(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (typeof raw.id !== 'string' || !OBSERVATION_ID_RE.test(raw.id) || !OBSERVATION_PHASES.includes(raw.phase)) return null;
+  return { id: raw.id, phase: raw.phase };
+}
+
+/** A meeting's link to a classroom observation: { id, phase }, or null to unlink. The notes live in the observation store. */
+export function validateObservationLink(value) {
+  if (value === null) return null;
+  const link = normalizeObservationLink(value);
+  if (!link) throw validationError('invalid_observation', 'observation: needs an observation id and a phase of planning, observing or reflecting, or null.');
+  return link;
+}
+
 /** Adam's own notes under each minutes item. Kept apart from the minutes, so replacing them leaves these alone. */
 export function validateMinutesNotes(value) {
   const fail = (why) => validationError('invalid_minutes_notes', `minutes_notes: ${why}`);
@@ -272,6 +289,7 @@ const STORED_KEYS = new Set([
   'decisions',
   'guide_runs',
   'coaching_sheets',
+  'observation',
   'minutes',
   'minutes_pending',
   'minutes_draft',
@@ -345,6 +363,7 @@ export function parseMeetingRecord(raw) {
     decisions: Array.isArray(raw.decisions) ? raw.decisions : [],
     guide_runs: Array.isArray(raw.guide_runs) ? raw.guide_runs : [],
     coaching_sheets: Array.isArray(raw.coaching_sheets) ? raw.coaching_sheets : [],
+    observation: normalizeObservationLink(raw.observation),
     minutes: raw.minutes && typeof raw.minutes === 'object' ? raw.minutes : null,
     minutes_pending: raw.minutes_pending && typeof raw.minutes_pending === 'object' && !Array.isArray(raw.minutes_pending) ? raw.minutes_pending : null,
     minutes_draft: typeof raw.minutes_draft === 'string' ? raw.minutes_draft : null,
@@ -399,7 +418,7 @@ export function validateMeetingCreateInput(input) {
   };
 }
 
-const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'minutes', 'minutes_pending', 'minutes_draft', 'minutes_notes']);
+const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'observation', 'minutes', 'minutes_pending', 'minutes_draft', 'minutes_notes']);
 
 export function validateMeetingFieldUpdate(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -428,6 +447,7 @@ export function validateMeetingFieldUpdate(input) {
   if (input.decisions !== undefined) patch.decisions = validateDecisions(input.decisions);
   if (input.guide_runs !== undefined) patch.guide_runs = validateGuideRuns(input.guide_runs);
   if (input.coaching_sheets !== undefined) patch.coaching_sheets = validateCoachingSheets(input.coaching_sheets);
+  if (input.observation !== undefined) patch.observation = validateObservationLink(input.observation);
   if (input.minutes !== undefined) patch.minutes = validateMinutes(input.minutes);
   if (input.minutes_pending !== undefined) patch.minutes_pending = validateMinutesPending(input.minutes_pending);
   if (input.minutes_draft !== undefined) patch.minutes_draft = trimBounded(input.minutes_draft, 'minutes_draft', MINUTES_DRAFT_MAX_LENGTH);
@@ -504,6 +524,7 @@ export function projectMeeting(record, incompleteLinks = null) {
     decisions: record.decisions ?? [],
     guide_runs: record.guide_runs ?? [],
     coaching_sheets: record.coaching_sheets ?? [],
+    observation: record.observation ?? null,
     minutes: record.minutes ?? null,
     minutes_pending: record.minutes_pending ?? null,
     minutes_draft: record.minutes_draft ?? null,
