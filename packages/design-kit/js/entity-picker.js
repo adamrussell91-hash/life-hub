@@ -24,6 +24,7 @@ const DEFAULT_DEBOUNCE_MS = 200;
  *   allowedKinds?: string[],
  *   onSelect: (item: EntitySuggestion) => void,
  *   onCreate?: (query: string, kind: string) => void,
+ *   createLabel?: (query: string, kind: string) => string,
  *   emptyText?: string,
  *   debounceMs?: number,
  *   mode?: 'mention' | 'field',
@@ -44,6 +45,7 @@ export function createEntityPicker(options) {
   const search = options.search;
   const onSelect = options.onSelect;
   const onCreate = options.onCreate ?? null;
+  const createLabel = options.createLabel ?? ((query, kind) => `Create ${kind} “${query}”`);
   const allowedKinds = options.allowedKinds ? [...options.allowedKinds] : null;
   const emptyText = options.emptyText ?? 'No matching entities.';
   const debounceMs = Math.min(250, Math.max(150, options.debounceMs ?? DEFAULT_DEBOUNCE_MS));
@@ -144,7 +146,7 @@ export function createEntityPicker(options) {
         const createBtn = document.createElement('button');
         createBtn.type = 'button';
         createBtn.className = 'entity-picker__create btn btn--secondary';
-        createBtn.textContent = `Create ${allowedKinds[0]} “${mentionQuery.trim()}”`;
+        createBtn.textContent = createLabel(mentionQuery.trim(), allowedKinds[0]);
         createBtn.addEventListener('click', () => {
           onCreate(mentionQuery.trim(), allowedKinds[0]);
           close();

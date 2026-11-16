@@ -26,6 +26,7 @@ import { utcIsoToWallLocal, wallLocalToUtcIso, isValidTimeZone } from '@/lib/wal
 import { isPriorityArea, PRIORITY_AREAS, priorityAreaName, splitEventLabels } from '@/domain/priority-area';
 import { loadEntityRelationships, mountKnowledgePagePicker, mountTaskLinkPanel } from '@/components/schedule-relationships';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
+import { openQuickPersonCard } from '@/components/quick-person-card';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -284,21 +285,36 @@ export async function renderEventNewView(
   const status = el('p', 'event-form__status');
   status.hidden = true;
 
-  const chipsHost = el('div', 'event-form__chips');
-  const chipList = createEntityChipList({
-    container: chipsHost,
-    chips: draft?.chips ?? [],
-    onRemovePending: () => undefined,
-    onEndSaved: (chip: { id: string }) => {
-      void endUniversalLink(chip.id)
-        .then(() => chipList.removeById(chip.id))
-        .catch((err: unknown) => {
-          status.hidden = false;
-          status.textContent = err instanceof ApiClientError ? err.message : 'Could not remove that link.';
-        });
-    },
-    endLabel: 'Remove'
-  });
+  // Each field keeps its own picks right under it, so a provider sits under
+  // Provider / venue rather than in one list at the bottom of the section.
+  const draftChips = draft?.chips ?? [];
+  function makeChipList(types: readonly string[]) {
+    const host = el('div', 'event-form__chips');
+    const list = createEntityChipList({
+      container: host,
+      chips: draftChips.filter((chip) => types.includes(String(chip.relationshipType ?? ''))),
+      onRemovePending: () => undefined,
+      onEndSaved: (chip: { id: string }) => {
+        void endUniversalLink(chip.id)
+          .then(() => list.removeById(chip.id))
+          .catch((err: unknown) => {
+            status.hidden = false;
+            status.textContent = err instanceof ApiClientError ? err.message : 'Could not remove that link.';
+          });
+      },
+      endLabel: 'Remove'
+    });
+    return { host, list };
+  }
+  const orgChips = makeChipList(['provider', 'venue']);
+  const presenterChips = makeChipList(['presenter']);
+  const attendeeChips = makeChipList(['attendee']);
+  const knowledgeChips = makeChipList(['related_to']);
+  const chipLists = [orgChips, presenterChips, attendeeChips, knowledgeChips];
+  const otherDraftChips = draftChips.filter(
+    (chip) => !['provider', 'venue', 'presenter', 'attendee', 'related_to'].includes(String(chip.relationshipType ?? ''))
+  );
+  if (otherDraftChips.length) attendeeChips.list.setChips([...attendeeChips.list.getChips(), ...otherDraftChips]);
 
   const picker = createEntityPicker({
     mode: 'field',
@@ -317,17 +333,44 @@ export async function renderEventNewView(
     },
     onSelect: (item) => {
       const relationshipType = orgRel.value as 'provider' | 'venue';
-      chipList.addPending({
+      orgChips.list.addPending({
         id: `pending:${item.ref}:${relationshipType}`,
         ref: item.ref,
-        label: `${item.display_label} (${relationshipType})`,
+        label: item.display_label,
         relationshipType,
         state: 'pending',
-        supportingLabel: relationshipType,
+        supportingLabel: null,
         href: item.href ?? null
       });
     }
   });
+
+  function addPresenter(item: { ref: string; display_label: string; href?: string | null }): void {
+    presenterChips.list.addPending({
+      id: `pending:${item.ref}:presenter`,
+      ref: item.ref,
+      label: item.display_label,
+      relationshipType: 'presenter',
+      state: 'pending',
+      supportingLabel: null,
+      href: item.href ?? null
+    });
+  }
+
+  // Nobody found: "Add … to People" opens a small card to fill in a few
+  // details; the new person then joins this event like a picked one.
+  function addNewPerson(name: string, input: HTMLInputElement, note: string, add: typeof addPresenter): void {
+    openQuickPersonCard({
+      name,
+      note,
+      onAdded: ({ person }) => {
+        input.value = '';
+        add({ ref: person.ref, display_label: person.display_name, href: null });
+        input.focus();
+      }
+    });
+  }
+  const addToPeopleLabel = (query: string) => `Add “${query}” to People`;
 
   const presenterPicker = createEntityPicker({
     mode: 'field',
@@ -338,23 +381,15 @@ export async function renderEventNewView(
       const result = await searchEntities(query, 'person', { signal });
       return { groups: { person: result.groups.person } };
     },
-    onSelect: (item) => {
-      chipList.addPending({
-        id: `pending:${item.ref}:presenter`,
-        ref: item.ref,
-        label: `${item.display_label} (presenter)`,
-        relationshipType: 'presenter',
-        state: 'pending',
-        supportingLabel: 'presenter',
-        href: item.href ?? null
-      });
-    }
+    onSelect: addPresenter,
+    createLabel: addToPeopleLabel,
+    onCreate: (query) => addNewPerson(query, presenterInput, 'They’ll be added to this event as a presenter.', addPresenter)
   });
 
   const knowledgePicker = mountKnowledgePagePicker({
     input: knowledgeInput,
     onSelect: (item) => {
-      chipList.addPending({
+      knowledgeChips.list.addPending({
         id: `pending:${item.ref}:related_to`,
         ref: item.ref,
         label: item.display_label,
@@ -384,6 +419,19 @@ export async function renderEventNewView(
     attendeeRole.append(option);
   }
 
+  function addAttendee(item: { ref: string; display_label: string; href?: string | null }): void {
+    const role = attendeeRole.value || null;
+    attendeeChips.list.addPending({
+      id: `pending:${item.ref}:attendee:${role ?? ''}`,
+      ref: item.ref,
+      label: item.display_label,
+      relationshipType: 'attendee',
+      state: 'pending',
+      supportingLabel: role,
+      href: item.href ?? null
+    });
+  }
+
   const attendeePicker = createEntityPicker({
     mode: 'field',
     input: attendeeInput,
@@ -399,18 +447,9 @@ export async function renderEventNewView(
         }
       };
     },
-    onSelect: (item) => {
-      const role = attendeeRole.value || null;
-      chipList.addPending({
-        id: `pending:${item.ref}:attendee:${role ?? ''}`,
-        ref: item.ref,
-        label: role ? `${item.display_label} (${role})` : item.display_label,
-        relationshipType: 'attendee',
-        state: 'pending',
-        supportingLabel: role,
-        href: item.href ?? null
-      });
-    }
+    onSelect: addAttendee,
+    createLabel: addToPeopleLabel,
+    onCreate: (query) => addNewPerson(query, attendeeInput, 'They’ll be added to this event’s people.', addAttendee)
   });
 
   const save = el('button', 'btn btn--primary', 'Save') as HTMLButtonElement;
@@ -435,12 +474,18 @@ export async function renderEventNewView(
   endTime.type = 'time';
   endTime.setAttribute('aria-label', 'End time');
 
-  function field(label: string, control: HTMLElement, extra?: HTMLElement): HTMLElement {
+  function field(label: string, control: HTMLElement, ...extra: HTMLElement[]): HTMLElement {
     const wrap = el('div', 'event-compose__field');
-    wrap.append(el('label', 'event-compose__label', label), control);
-    if (extra) wrap.append(extra);
+    wrap.append(el('label', 'event-compose__label', label), control, ...extra);
     return wrap;
   }
+
+  // The provider/venue choice and the role for the next person sit beside
+  // their search box, so one row reads "venue: [search]".
+  const orgRow = el('div', 'event-compose__pick-row');
+  orgRow.append(orgRel, orgInput);
+  const attendeeRow = el('div', 'event-compose__pick-row');
+  attendeeRow.append(attendeeRole, attendeeInput);
 
   const calHost = el('div', 'event-compose__cal');
   const monthTitleEl = el('h2', 'event-compose__month-title');
@@ -723,19 +768,16 @@ export async function renderEventNewView(
     section('When', whenGrid, start, end),
     section(
       'People',
-      field('Organisation relationship', orgRel),
-      field('Provider / venue', orgInput, picker.root),
-      field('Presenter', presenterInput, presenterPicker.root),
-      field('Attendee role for next pick', attendeeRole),
-      field('People', attendeeInput, attendeePicker.root),
-      chipsHost
+      field('Provider / venue', orgRow, picker.root, orgChips.host),
+      field('Presenter', presenterInput, presenterPicker.root, presenterChips.host),
+      field('People', attendeeRow, attendeePicker.root, attendeeChips.host)
     ),
     section(
       'Evidence',
       field('Certificate name', certName),
       field('Certificate reference', certReference),
       field('Certificate issued at', certIssuedAt),
-      field('Related Knowledge page', knowledgeInput, knowledgePicker.root)
+      field('Related Knowledge page', knowledgeInput, knowledgePicker.root, knowledgeChips.host)
     ),
     footer
   );
@@ -764,7 +806,9 @@ export async function renderEventNewView(
       save.disabled = false;
       return;
     }
-    const pending = chipList.getChips().filter((chip) => chip.state === 'pending');
+    const pending = chipLists
+      .flatMap(({ list }) => list.getChips())
+      .filter((chip) => chip.state === 'pending');
     const links: EventLinkInput[] = pending.map((chip) => {
       const relationshipType = chip.relationshipType as EventLinkInput['relationship_type'];
       return {
