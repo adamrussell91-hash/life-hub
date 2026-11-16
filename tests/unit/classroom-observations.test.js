@@ -63,6 +63,10 @@ test('records are validated and ids are checked', async () => {
   const d = (n) => Array.from({ length: n }, (_, i) => ({ code: `3.${i + 1}.2` }));
   await assert.rejects(saveObservation(store, record({ id: 'nope' })), { status: 400 });
   await assert.rejects(saveObservation(store, record({ descriptors: d(5) })), { status: 400 });
+  // 4 agreed + 2 extras is fine; a third extra or a fifth agreed is not.
+  const extras = (n) => Array.from({ length: n }, (_, i) => ({ code: `6.${i + 1}.2`, extra: true }));
+  await assert.rejects(saveObservation(store, record({ descriptors: [...d(4), ...extras(3)] })), { status: 400 });
+  await assert.rejects(saveObservation(store, record({ descriptors: [...d(5), ...extras(1)] })), { status: 400 });
   await assert.rejects(saveObservation(store, record({ descriptors: [{ code: '3.5.2' }, { code: '3.5.2' }] })), { status: 400 });
   await assert.rejects(saveObservation(store, record({ meetings: { planning: 'meeting_x' } })), { status: 400 });
   await assert.rejects(saveObservation(store, record({ planned_on: 'tomorrow' })), { status: 400 });
@@ -115,4 +119,16 @@ test('a meeting patch accepts an observation link, or null to unlink, and refuse
   assert.throws(() => validateMeetingFieldUpdate({ observation: { id: 'nope', phase: 'observing' } }), { code: 'invalid_observation' });
   assert.throws(() => validateMeetingFieldUpdate({ observation: { id: link.id, phase: 'later' } }), { code: 'invalid_observation' });
   assert.throws(() => validateMeetingFieldUpdate({ observation: 'obs_aaaaaaaa-0001' }), { code: 'invalid_observation' });
+});
+
+test('keeps extra descriptors and the counts-as-partial flag', async () => {
+  const store = storeFixture();
+  const d = (n) => Array.from({ length: n }, (_, i) => ({ code: `3.${i + 1}.2` }));
+  const extras = (n) => Array.from({ length: n }, (_, i) => ({ code: `6.${i + 1}.2`, extra: true }));
+  const six = await saveObservation(store, record({
+    descriptors: [...d(4), ...extras(2)],
+    log: [{ id: 'log_1', at: '2026-11-18T01:00:00.000Z', clock: '01:00', descriptor: '3.1.2', look_for: null, kind: 'next', text: 'Lorem', counts_partial: false }]
+  }));
+  assert.deepEqual(six.descriptors.map((x) => x.extra ?? false), [false, false, false, false, true, true]);
+  assert.equal(six.log[0].counts_partial, false);
 });
