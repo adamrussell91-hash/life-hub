@@ -243,6 +243,35 @@ describe('observing', () => {
     expect((root.querySelector('tr[data-code="3.5.2"] textarea[data-cell="practice"]') as HTMLTextAreaElement).value).toContain('12:30 Chunked instructions');
   });
 
+  it('edits a whole log line and adds a missed one', async () => {
+    let obs = startClock(planned(), T0);
+    obs = logEntry(obs, { descriptor: '3.5.2', kind: 'strength', text: 'Chunked instructions' }, T0 + 60_000);
+    const root = await mount(obs, 'observing', MEETING_OBS);
+    (root.querySelector('[data-part="obs-log-edit"]') as HTMLButtonElement).click();
+    const form = root.querySelector('[data-part="obs-log"] [data-part="obs-lineform"]') as HTMLElement;
+    const field = (f: Element, k: string) => f.querySelector(`[data-field="${k}"]`) as HTMLInputElement & HTMLSelectElement;
+    field(form, 'clock').value = '4:00';
+    field(form, 'descriptor').value = '5.2.2';
+    field(form, 'descriptor').dispatchEvent(new Event('change'));
+    field(form, 'kind').value = 'next';
+    field(form, 'text').value = 'Name the criterion';
+    (form.querySelector('[data-part="obs-line-save"]') as HTMLButtonElement).click();
+    let saved = await lastSaved();
+    expect(saved.log[0]).toMatchObject({ clock: '04:00', descriptor: '5.2.2', kind: 'next', text: 'Name the criterion' });
+    expect(root.querySelector('[data-part="obs-log"]')!.textContent).toContain('04:00');
+
+    (root.querySelector('[data-part="obs-log-add"]') as HTMLButtonElement).click();
+    const add = root.querySelector('.obs-log__addhost [data-part="obs-lineform"]') as HTMLElement;
+    field(add, 'clock').value = '02:15';
+    field(add, 'kind').value = 'transition';
+    field(add, 'kind').dispatchEvent(new Event('change'));
+    field(add, 'text').value = 'Into pairs';
+    (add.querySelector('[data-part="obs-line-save"]') as HTMLButtonElement).click();
+    saved = await lastSaved();
+    expect(saved.log.map((l) => `${l.clock} ${l.text}`)).toEqual(['02:15 Into pairs', '04:00 Name the criterion']);
+    expect(root.querySelector('.obs-log__addhost')!.childElementCount).toBe(0);
+  });
+
   it('gathers from the log into cells Adam has not edited', async () => {
     let obs = planned();
     obs = logEntry(obs, { descriptor: '3.5.2', kind: 'strength', text: 'Chunked instructions' }, T0);
