@@ -1,7 +1,6 @@
 /**
  * The 37 Proficient Teacher (career stage) descriptors from the Australian Professional Standards for
- * Teachers. Public AITSL text, kept in code. `hardInOneLesson` marks the ones that are hard to see in a
- * single lesson, so the picker can fade them (still pickable).
+ * Teachers. Public AITSL text, kept in code.
  */
 export interface ProficientDescriptor {
   code: string;
@@ -10,7 +9,6 @@ export interface ProficientDescriptor {
   focus: string;
   /** The Proficient descriptor wording. */
   text: string;
-  hardInOneLesson: boolean;
 }
 
 export const STANDARD_NAMES: Record<number, string> = {
@@ -22,8 +20,6 @@ export const STANDARD_NAMES: Record<number, string> = {
   6: 'Engage in professional learning',
   7: 'Engage professionally with colleagues, parents/carers and the community'
 };
-
-const HARD = new Set(['3.6.2', '3.7.2', '5.3.2', '5.4.2', '5.5.2']);
 
 const RAW: Array<[string, string, string]> = [
   ['1.1.2', 'Physical, social and intellectual development and characteristics of students', 'Use teaching strategies based on knowledge of students’ physical, social and intellectual development and characteristics to improve student learning.'],
@@ -67,7 +63,7 @@ const RAW: Array<[string, string, string]> = [
 
 export const PROFICIENT_DESCRIPTORS: ProficientDescriptor[] = RAW.map(([code, focus, text]) => {
   const standard = Number(code[0]);
-  return { code, standard, focus, text, hardInOneLesson: HARD.has(code) || standard >= 6 };
+  return { code, standard, focus, text };
 });
 
 export function descriptorByCode(code: string): ProficientDescriptor | undefined {

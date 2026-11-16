@@ -5,6 +5,7 @@
  * fields print blank.
  */
 import { descriptorByCode } from './descriptors';
+import { agreedDescriptors } from './model';
 import type { Observation } from './types';
 import { DECISIONS, h, NESA } from './ui';
 
@@ -36,7 +37,7 @@ export function openObservationReport(doc: Document, obs: Observation): { close(
 
   // ---------------------------------------------------------------- page 2 · Planning
   const p1 = NESA.p1;
-  const planRows = obs.descriptors.map((d) => h(doc, 'tr', {},
+  const planRows = agreedDescriptors(obs).map((d) => h(doc, 'tr', {},
     h(doc, 'td', {},
       h(doc, 'div', { class: 'obs-r-desc' }, h(doc, 'b', {}, d.code), h(doc, 'div', { class: 'obs-r-desc__text' }, descriptorByCode(d.code)?.text ?? '')),
       labelled('Why', d.why), labelled('Practice described', d.practice)),
@@ -58,7 +59,7 @@ export function openObservationReport(doc: Document, obs: Observation): { close(
 
   // ---------------------------------------------------------------- page 3 · Observing
   const p2 = NESA.p2;
-  const obsRows = obs.descriptors.map((d) => {
+  const obsRows = agreedDescriptors(obs).map((d) => {
     const row = obs.write_up[d.code];
     const choices = h(doc, 'ul', { class: 'obs-r-choices' }, ...DECISIONS.map((c) =>
       h(doc, 'li', { class: row?.decision === c.value ? 'is-on' : '' }, h(doc, 'span', { class: 'obs-r-box', 'aria-hidden': 'true' }, row?.decision === c.value ? '☒' : '☐'), ` ${c.full}`)));
@@ -80,7 +81,7 @@ export function openObservationReport(doc: Document, obs: Observation): { close(
 
   // ---------------------------------------------------------------- page 4 · Reflecting
   const p3 = NESA.p3;
-  const reflRows = obs.descriptors.map((d) => {
+  const reflRows = agreedDescriptors(obs).map((d) => {
     const r = obs.reflection[d.code];
     return h(doc, 'tr', {}, descriptorCell(d.code), h(doc, 'td', {}, para(t(r?.teacher))), h(doc, 'td', {}, para(t(r?.feedback))));
   });
