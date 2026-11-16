@@ -37,6 +37,8 @@ export const MAX_PART_BYTES = 4.5 * 1024 * 1024;
 export const MAX_PARTS = 4;
 export const MAX_TAGS = 300;
 export const MAX_TRANSCRIBE_ATTEMPTS = 3;
+/** A take still waiting this long after it was queued is stuck: the teacher gets a retry. */
+export const TRANSCRIBE_STUCK_MS = 10 * 60 * 1000;
 /** A point's label; a follow-up point carries its whole question. */
 const MAX_POINT_TEXT = 320;
 /** Up to 8 dot points plus 3 follow-ups. */
@@ -427,6 +429,14 @@ export function goalText(value) {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, 300) : '';
 }
 
+/** Pending with a failed try behind it, or queued long enough ago that it should have landed. */
+export function transcriptStuck(record, now = Date.now()) {
+  if (record.transcript_status !== 'pending' || !record.audio_key) return false;
+  if (record.transcript_error) return true;
+  const queued = Date.parse(record.transcribe_queued_at ?? record.submitted_at ?? '');
+  return Number.isFinite(queued) && now - queued > TRANSCRIBE_STUCK_MS;
+}
+
 function teacherRow(record) {
   return {
     id: record.id,
@@ -438,6 +448,7 @@ function teacherRow(record) {
     duration_s: record.duration_s,
     status: record.status,
     transcript_status: record.transcript_status,
+    transcript_stuck: transcriptStuck(record),
     audio_deleted: !record.audio_key,
     audio_delete_after: record.audio_delete_after,
     tag_count: (record.tags ?? []).filter((t) => t.confirmed !== false).length
@@ -446,7 +457,7 @@ function teacherRow(record) {
 
 export function teacherRecord(record) {
   const { device_hash: hash, audio_key: audioKey, ...rest } = record;
-  return { ...rest, device_hash: hash.slice(0, 6), audio_url: audioKey ? audioPath(audioKey) : null, audio_deleted: !audioKey };
+  return { ...rest, device_hash: hash.slice(0, 6), audio_url: audioKey ? audioPath(audioKey) : null, audio_deleted: !audioKey, transcript_stuck: transcriptStuck(record) };
 }
 
 export async function listVoiceSubmissions(store, lesson, block) {
@@ -629,7 +640,7 @@ export async function deleteVoiceSubmission(store, lesson, block, id) {
 export async function requeueTranscription(store, lesson, block, id) {
   const record = await readSubmission(store, lesson, block, id);
   if (!record.audio_key) reject(409, 'audio_deleted', 'The audio has been removed, so it can’t be transcribed again.');
-  const next = { ...record, transcript_status: 'pending', transcribe_attempts: 0, transcript_error: undefined };
+  const next = { ...record, transcript_status: 'pending', transcribe_attempts: 0, transcript_error: undefined, transcribe_queued_at: new Date().toISOString() };
   await store.setJSON(voiceKeys.submission(lesson, block, id), next);
   await store.setJSON(voiceKeys.queue(lesson, block, id), {});
   await store.delete(voiceKeys.aiRead(lesson, block, id)).catch(() => undefined);
