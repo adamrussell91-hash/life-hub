@@ -260,6 +260,114 @@ function isTextField(target: EventTarget | null): boolean {
   return target.isContentEditable;
 }
 
+/** The block whose editor is in full screen, and how to put it back. */
+let liftedBlockId: string | null = null;
+let liftedExit: (() => void) | null = null;
+
+/**
+ * Full screen button for the annotation editor. The editor is lifted into a
+ * layer over the whole window (moved, not copied, so every listener and unsaved
+ * edit comes along) and put back where it was on exit. A narrow column, such as
+ * a mentoring page's notes, no longer squeezes the text being annotated.
+ * Fixed in place would not do: a hub card with a transform or filter traps it.
+ * A host that rebuilds the editor after a change gets the new one lifted in
+ * place of the old, so full screen survives the rebuild.
+ */
+function createFullScreenToggle(fields: HTMLElement, blockId: string): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn--ghost block-editor__annotation-full';
+  let slot: Comment | null = null;
+  let layer: HTMLElement | null = null;
+
+  const paint = () => {
+    const on = layer !== null;
+    btn.textContent = on ? 'Exit full screen' : 'Full screen';
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  };
+
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || event.defaultPrevented || isTextField(event.target)) return;
+    // A note menu or technique sheet takes Escape first.
+    if (document.querySelector('.block-editor__annotation-bar-menu, .annotation-technique-sheet-overlay')) return;
+    event.preventDefault();
+    exit();
+  };
+
+  const onLeave = () => exit();
+
+  /** Takes the layer down; `restore` puts this editor back in its slot. */
+  function lower(restore: boolean): void {
+    if (!layer) return;
+    document.removeEventListener('keydown', onKey);
+    window.removeEventListener('hashchange', onLeave);
+    fields.classList.remove('is-fullscreen');
+    // The block may have gone (or been rebuilt) while lifted out; then it goes with the layer.
+    if (restore && slot?.isConnected) slot.replaceWith(fields);
+    else {
+      slot?.remove();
+      fields.remove();
+    }
+    slot = null;
+    layer.remove();
+    layer = null;
+    if (liftedExit === exit) liftedExit = null;
+    paint();
+  }
+
+  function enter(): void {
+    if (layer || !fields.isConnected) return;
+    // Another editor (or this block's old one, before a rebuild) steps down first.
+    liftedExit?.();
+    slot = document.createComment('annotation editor in full screen');
+    fields.before(slot);
+    layer = document.createElement('div');
+    layer.className = 'block-editor__annotation-fullscreen';
+    layer.setAttribute('role', 'dialog');
+    layer.setAttribute('aria-modal', 'true');
+    layer.setAttribute('aria-label', 'Annotation, full screen');
+    fields.classList.add('is-fullscreen');
+    layer.append(fields);
+    document.body.append(layer);
+    document.documentElement.classList.add('annotation-fullscreen-open');
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('hashchange', onLeave);
+    liftedBlockId = blockId;
+    liftedExit = () => lower(false);
+    paint();
+  }
+
+  function exit(): void {
+    if (!layer) return;
+    lower(true);
+    liftedBlockId = null;
+    document.documentElement.classList.remove('annotation-fullscreen-open');
+    if (fields.isConnected) {
+      btn.focus();
+      fields.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  btn.addEventListener('click', () => {
+    if (layer) exit();
+    else {
+      enter();
+      btn.focus();
+    }
+  });
+  paint();
+  // Rebuilt while in full screen: lift this editor once the host has placed it.
+  if (liftedBlockId === blockId) {
+    queueMicrotask(() => {
+      if (liftedBlockId !== blockId || !fields.isConnected) return;
+      const focusedInOld = document.activeElement?.closest('.block-editor__annotation-fullscreen') != null;
+      enter();
+      if (focusedInOld) btn.focus();
+    });
+  }
+  return btn;
+}
+
 /**
  * Teacher editor: poem paste, select-to-annotate, layers / annotations /
  * attachments hub-lists, note panel with rich text, marker / default-layer settings.
@@ -2878,7 +2986,7 @@ export function createAnnotationEditorFields(
 
   const modeRow = document.createElement('div');
   modeRow.className = 'block-editor__annotation-mode-row';
-  modeRow.append(modePills.el);
+  modeRow.append(modePills.el, createFullScreenToggle(fields, block.id));
 
   const textHead = document.createElement('div');
   textHead.className = 'block-editor__annotation-text-head';

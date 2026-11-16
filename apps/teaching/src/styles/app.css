@@ -11439,6 +11439,43 @@ body.is-lesson-builder-full-page .hub-utilities {
   min-width: 0;
 }
 
+.block-editor__annotation-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* Full screen: the editor lifted over the whole window, so a narrow column
+   (mentoring notes, meeting notes) no longer squeezes the text. */
+html.annotation-fullscreen-open {
+  overflow: hidden;
+}
+
+.block-editor__annotation-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-4) clamp(var(--space-3), 3vw, var(--space-6));
+  background: var(--paper);
+}
+
+.block-editor__annotation.is-fullscreen {
+  max-width: 110rem;
+  margin-inline: auto;
+}
+
+.block-editor__annotation.is-fullscreen .block-editor__annotation-mode-row {
+  position: sticky;
+  top: calc(-1 * var(--space-4));
+  z-index: 4;
+  padding-block: var(--space-2);
+  background: var(--paper);
+}
+
 .block-editor__annotation-note-list {
   display: grid;
   gap: var(--space-3);
@@ -13359,7 +13396,8 @@ body.is-lesson-builder-full-page .hub-utilities {
 .annotation-technique-sheet-overlay {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  /* Above the full screen annotation layer (900). */
+  z-index: 1100;
   display: grid;
   align-items: end;
   background: color-mix(in srgb, #000 35%, transparent);
