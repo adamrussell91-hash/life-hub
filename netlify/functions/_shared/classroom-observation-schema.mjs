@@ -26,7 +26,9 @@ const DescriptorSchema = z.object({
   demonstrate: Text(),
   planned_impact: Text(),
   how_know: Text(),
-  look_fors: z.array(LookForSchema).max(12).default([])
+  look_fors: z.array(LookForSchema).max(12).default([]),
+  // Extra descriptor watched for future evidence sets; never on the NESA report.
+  extra: z.boolean().optional()
 });
 
 const LogEntrySchema = z.object({
@@ -36,7 +38,9 @@ const LogEntrySchema = z.object({
   descriptor: Code.nullable().default(null),
   look_for: Id.nullable().default(null),
   kind: z.enum(['strength', 'next', 'ask', 'said', 'transition']),
-  text: Text(2000)
+  text: Text(2000),
+  // Next steps only: false stops the line pulling the suggestion to Partially.
+  counts_partial: z.boolean().optional()
 });
 
 const WriteUpRowSchema = z.object({
@@ -76,8 +80,11 @@ export const ObservationSchema = z.object({
   lesson: z.object({ title: Text(300), link: Text(600), syllabus_link: Text(600) }).default({ title: '', link: '', syllabus_link: '' }),
   plan_all_students: Text(),
   plan_measure: Text(),
-  descriptors: z.array(DescriptorSchema).max(4).default([])
-    .refine((d) => new Set(d.map((x) => x.code)).size === d.length, 'descriptors must be unique'),
+  // Up to 4 agreed (on the report) plus up to 2 extras.
+  descriptors: z.array(DescriptorSchema).max(6).default([])
+    .refine((d) => new Set(d.map((x) => x.code)).size === d.length, 'descriptors must be unique')
+    .refine((d) => d.filter((x) => !x.extra).length <= 4, 'at most 4 agreed descriptors')
+    .refine((d) => d.filter((x) => x.extra).length <= 2, 'at most 2 extra descriptors'),
   clock: z.object({
     started_at: Stamp.nullable().default(null),
     paused_ms: z.number().int().min(0).max(1e9).default(0),
