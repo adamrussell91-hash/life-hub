@@ -265,14 +265,16 @@ describe('what a student reads', () => {
     expect(returnedRubric({ skills: [], pieces_used: [], next_step: null })).toBeNull();
   });
 
-  it('sits on the returned piece, with no second next step from the codes', () => {
+  it('sits on the returned piece behind More detail, with one next step on the card above', () => {
     const code = { id: 'ts', code: 'TS', label: 'Topic', colour: 'peach', group: 'composition', descriptor: 'Open with a claim.', ladder: ['a', 'b', 'c', 'd', 'e'] };
     const base = { id: 'p', kind: 'answer', title: 'T', date: 'd', comment: '', text: null, tags: [{ code_id: 'ts', part: '', field: '', start: 0, end: 1, positive: false, code: 'TS', label: 'Topic', colour: 'peach', action: 'x' }], criteria: [], codes: [code] } as never;
     const plain = pieceView(base, () => undefined);
     expect(plain.querySelector('.rr')).toBeNull();
-    expect(plain.querySelector('.voice-focus')).not.toBeNull();
+    expect(plain.querySelector('.fb3__do')!.textContent).toBe('b');
     const view = pieceView({ ...(base as object), rubric } as never, () => undefined);
-    expect(view.querySelector('.rr')).not.toBeNull();
-    expect(view.querySelector('.voice-focus')).toBeNull();
+    expect(view.querySelector('details.pg-more .rr')).not.toBeNull();
+    expect(view.querySelectorAll('.fb3__do').length).toBe(1);
+    expect(view.querySelector('.fb3__do')!.textContent).toBe(rubric.next_step);
+    expect(view.querySelector('.rr-next')).toBeNull();
   });
 });

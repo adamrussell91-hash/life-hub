@@ -2,7 +2,7 @@
 
 A student opens `/s/classes/<class>/profile` (the **My progress** link at the top of the class page) and sees their unit map in grey. It fills in colour as they finish lessons, and four bars fill as their work shows consistent top-end capacity. No login, no names stored, no new student data beyond done records.
 
-Spec: `docs/superpowers/specs/2026-10-27-student-profile-progress-map-design.md`.
+Spec: `docs/superpowers/specs/2026-10-27-student-profile-progress-map-design.md`. The **Returned work and feedback** tab (what is new, one timeline of every piece, then before, now and next, with a first-visit guide) is specified in `docs/superpowers/specs/2026-11-16-returned-feedback-timeline-design.md`.
 
 ## Running it
 

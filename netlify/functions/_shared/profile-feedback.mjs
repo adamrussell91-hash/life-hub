@@ -18,6 +18,7 @@ import { audioPath, mineView } from './voice-submissions.mjs';
 import { readStoredSkills } from './skills-continuum.mjs';
 import { rubricPlaces, studentRubric } from './rubric-model.mjs';
 import { rubricForStudent } from './rubric.mjs';
+import { verdictOf, earlierOf, codeSides, sydneyDayOf } from './feedback-story.mjs';
 
 const day = (iso) => new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'Australia/Sydney' });
 
@@ -154,7 +155,7 @@ async function skillGroups(store, skillRows) {
     const sub = strand?.sub_strands.find((s) => s.id === subId);
     const counts = Object.fromEntries(RUNGS.map((r) => [r, row.cells.filter((c) => c === r).length]));
     const nextRung = RUNGS[Math.max(1, RUNGS.indexOf(row.now) + 1)];
-    const entry = { key: row.key, name: sub?.name ?? subId, counts, now: row.now, story: row.story, i_can: row.now !== 'below' ? sub?.rungs?.[row.now]?.i_can ?? null : null, next_move: nextRung ? sub?.rungs?.[nextRung]?.build?.next_move ?? null : null, next_rung: nextRung ?? null, rungs: Object.fromEntries(SHOWN_RUNGS.map((r) => [r, sub?.rungs?.[r]?.i_can ?? null])) };
+    const entry = { key: row.key, name: sub?.name ?? subId, counts, now: row.now, first: row.cells.find(Boolean) ?? null, story: row.story, i_can: row.now !== 'below' ? sub?.rungs?.[row.now]?.i_can ?? null : null, next_move: nextRung ? sub?.rungs?.[nextRung]?.build?.next_move ?? null : null, next_rung: nextRung ?? null, rungs: Object.fromEntries(SHOWN_RUNGS.map((r) => [r, sub?.rungs?.[r]?.i_can ?? null])) };
     // At the top rung there is no next one: the top rung's own move keeps the skill sharp.
     if (row.now === 'excellent') {
       const move = sub?.rungs?.excellent?.build?.next_move;
@@ -311,6 +312,8 @@ export async function progressFor(store, roster, student) {
     outcomes, concepts, skills, codes: grid, next,
     // `codes` stays across the chart's pieces for the teacher's Over time tab; this is the newest few.
     feedback: feedbackRows(all, library),
+    // The same one step the writing boxes show, so the page and the lesson never disagree.
+    focus: focusFor(all, codes),
     unseen: backToRead.filter((p) => !p.seen_at).length + notes.filter((d) => !d.seen_at).length,
     // A note isn't a piece, so a student with only notes has no pieces but still has something to open.
     has_returned: backToRead.length + notes.length > 0
@@ -337,12 +340,20 @@ export async function stepsFor(store, classId, studentId) {
   return { need: null, skills: stepsBySkill(ranked(pieces, library, false), codes, rungs), directive: writingDirective(pieces, codes, rungs) };
 }
 
+function focusFor(pieces, codes) {
+  const d = writingDirective(pieces, codes, rungsFrom(pieces));
+  return d?.line ? { kind: d.kind, line: d.line } : null;
+}
+
+/** What a list row says of how the piece went: the kind, and the counts when that is all there is. */
+const rowVerdict = (v) => (!v ? null : v.kind === 'counts' ? v : { kind: v.kind });
+
 /** Returned pieces and notes, newest first, each with when the student first opened it (or null). */
 export async function returnedRows(store, roster, student) {
   const pieces = await studentPieces(store, roster.cls.id, student.id);
-  const rows = pieces.filter((p) => p.kind !== 'assessment').map((p) => ({ at: p.at, seen_at: p.seen_at, item: { id: p.id, kind: p.kind, title: p.title, date: day(p.at), new: !p.seen_at, codes: [...new Set(p.tags.map((t) => t.code_id))], ...(p.redraft ? { redraft: p.redraft } : {}) } }));
+  const rows = pieces.filter((p) => p.kind !== 'assessment').map((p) => ({ at: p.at, seen_at: p.seen_at, item: { id: p.id, kind: p.kind, title: p.title, date: day(p.at), day: sydneyDayOf(p.at), new: !p.seen_at, codes: [...new Set(p.tags.map((t) => t.code_id))], ...codeSides(p.tags), verdict: rowVerdict(verdictOf(p, earlierOf(pieces, p))), ...(p.redraft ? { redraft: p.redraft } : {}) } }));
   for (const doc of await studentNotes(store, roster.cls.id, student.id)) {
-    rows.push({ at: doc.returned_at, seen_at: doc.seen_at ?? null, item: { id: `n:${doc.id}`, kind: 'note', title: doc.title, date: day(doc.returned_at), new: !doc.seen_at, codes: [] } });
+    rows.push({ at: doc.returned_at, seen_at: doc.seen_at ?? null, item: { id: `n:${doc.id}`, kind: 'note', title: doc.title, date: day(doc.returned_at), day: sydneyDayOf(doc.returned_at), new: !doc.seen_at, codes: [], good: [], work: [], verdict: null } });
   }
   return rows.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 }
@@ -383,6 +394,16 @@ export async function pieceFor(store, roster, student, item) {
   const shownDraft = row.sent ? stored.draft - 1 : stored?.draft ?? 1;
   const drafts = shownDraft > 1 ? await readDrafts(store, row.lesson_id, row.block_id, student.id, shownDraft) : [];
   const used = new Set([...tags, ...takes.flatMap((t) => t.tags ?? [])].map((t) => t.code_id));
+  const placeKeyOf = (c) => (c.skill ? `skill:${c.skill}` : c.outcomes?.[0] ? `out:${c.outcomes[0]}` : `con:${c.concepts?.[0]}`);
+  const rubric = row.rubric ? await rubricForStudent(store, row.rubric, row.lesson_id, row.unit_id ?? null) : null;
+  const takeViews = row.kind === 'viva' ? await Promise.all(takes.map((t) => mineView(store, t))) : [];
+  // What a place is called, for the words on how the piece went: the criterion's label, or the skill's name.
+  const names = new Map((column?.criteria ?? []).map((c) => [placeKeyOf(c), c.label]));
+  for (const r of [rubric, ...takeViews.map((t) => t.rubric)]) for (const sk of r?.skills ?? []) if (sk?.ref && sk.name) names.set(`skill:${sk.ref}`, sk.name);
+  const mine = history.find((p) => p.id === item);
+  const went = mine ? verdictOf(mine, earlier ?? null) : null;
+  const named = (keys) => (keys ?? []).map((k) => names.get(k)).filter(Boolean);
+  const verdict = !went ? null : went.kind === 'counts' ? went : { kind: went.kind, up: named(went.up), same: named(went.same), down: named(went.down) };
   return {
     id: item, kind: row.kind, title: row.title, date: day(row.returned_at), comment: row.comment ?? '',
     text: row.text ?? (handin?.text ? writingParts(handin.text) : null),
@@ -391,12 +412,13 @@ export async function pieceFor(store, roster, student, item) {
     drafts: drafts.map((d) => ({ n: d.n, text: d.text, comment: d.comment ?? '', date: day(d.returned_at), tags: (d.tags ?? []).map((t) => ({ part: t.part, field: t.field, start: t.start, end: t.end, ...explain(t, codes.get(t.code_id)) })) })),
     ...(row.sent ? { sent: true } : {}),
     ...(stored?.redraft ? { redraft: { scope: stored.redraft.scope } } : {}),
-    ...(row.rubric ? { rubric: await rubricForStudent(store, row.rubric, row.lesson_id, row.unit_id ?? null) } : {}),
-    ...(row.kind === 'viva' ? { takes: await Promise.all(takes.map((t) => mineView(store, t))) } : {}),
+    ...(rubric ? { rubric } : {}),
+    ...(row.kind === 'viva' ? { takes: takeViews } : {}),
+    verdict,
     codes: library.filter((c) => used.has(c.id)),
     rungs: rungsFrom(history),
     criteria: (column?.criteria ?? []).map((c) => {
-      const placeKey = c.skill ? `skill:${c.skill}` : c.outcomes?.[0] ? `out:${c.outcomes[0]}` : `con:${c.concepts?.[0]}`;
+      const placeKey = placeKeyOf(c);
       const step = placesFor({ criteria: [c] }, mark)[placeKey] ?? null;
       const first = stored?.first ? placesFor({ criteria: [c] }, { steps: stored.first.steps })[placeKey] ?? null : null;
       return { label: c.label, step, was: earlier?.places?.[placeKey] ?? null, ...(first ? { first } : {}) };

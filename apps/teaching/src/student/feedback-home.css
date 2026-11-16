@@ -1,0 +1,102 @@
+/* Returned work and feedback in time order: what is new, the timeline, then before / now / next.
+   Tokens only. Colour is never the only signal: every dot kind and chip has its word. */
+
+.fh-sec { display: grid; gap: var(--space-3); min-width: 0; }
+.fh-sec + .fh-sec { margin-top: var(--space-4); }
+/* The guide scrolls each part to the top on a phone: leave room for the page header and the Do this now strip. */
+.pg-panel [data-tour] { scroll-margin-top: 13rem; }
+.fh-sec > .pg-group { margin: 0; font-weight: var(--weight-semibold); }
+
+/* Chips shared by the card, the timeline and the trends. */
+.fb-chip { display: inline-block; font-size: var(--text-xs); font-weight: var(--weight-bold); border-radius: var(--radius-full); padding: 3px 10px; }
+.fb-chip--up { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.fb-chip--same { background: var(--shore); color: var(--muted); }
+.fb-chip--work { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.fb-kind { justify-self: start; font-size: var(--text-xs); font-weight: var(--weight-bold); border-radius: var(--radius-full); padding: 2px 8px; }
+.fb-kind--written { background: var(--pastel-blue); color: var(--pastel-blue-ink); }
+.fb-kind--spoken { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.fb-kind--short { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
+
+/* ── Still to open ─────────────────────────────────────────────────── */
+.ru { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: var(--space-3); }
+.ru__card { display: grid; gap: var(--space-1); justify-items: start; align-content: start; padding: var(--space-3) var(--space-4); background: var(--paper); border: 1px solid var(--line); border-left: 4px solid var(--wave); border-radius: var(--radius-md); font: inherit; color: inherit; text-align: left; cursor: pointer; min-width: 0; }
+.ru__title { font-weight: var(--weight-bold); color: var(--navy); line-height: var(--leading-snug); overflow-wrap: anywhere; }
+.ru__new { margin-left: var(--space-2); font-size: var(--text-xs); font-weight: var(--weight-regular); color: var(--wave); }
+.ru__meta { font-size: var(--text-sm); color: var(--muted); }
+.ru__verdict { margin-top: var(--space-1); font-weight: var(--weight-semibold); color: var(--ink); }
+.ru__go { display: inline-flex; align-items: center; min-height: 44px; font-weight: var(--weight-bold); color: var(--wave); }
+
+/* ── The three lines on a returned piece ───────────────────────────── */
+.fb3 { display: grid; gap: var(--space-3); padding: var(--space-4); background: var(--paper); border: 1px solid var(--line); border-left: 4px solid var(--wave); border-radius: var(--radius-md); min-width: 0; }
+.fb3__lines { display: grid; gap: var(--space-3); margin: 0; }
+.fb3__line { display: grid; gap: var(--space-1); min-width: 0; }
+.fb3__line dt { font-size: var(--text-2xs); font-weight: var(--weight-semibold); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.fb3__line dd { margin: 0; min-width: 0; }
+.fb3__verdict { font-size: var(--text-lg); font-weight: var(--weight-bold); color: var(--navy); line-height: var(--leading-snug); }
+.fb3__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.fb3__next { display: grid; gap: var(--space-1); padding: var(--space-3) var(--space-4); background: var(--pastel-blue); border-radius: var(--radius-sm); }
+.fb3__do { margin: 0; font-weight: var(--weight-semibold); color: var(--navy); line-height: 1.4; overflow-wrap: anywhere; }
+.fb3__where { margin: 0; font-size: var(--text-sm); color: var(--pastel-blue-ink); }
+.fb3__lesson { font-weight: var(--weight-semibold); color: var(--wave); }
+
+/* ── More detail ───────────────────────────────────────────────────── */
+.pg-more { border-top: 1px solid var(--line); min-width: 0; }
+.pg-more__sum { display: flex; align-items: center; min-height: 44px; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--wave); cursor: pointer; }
+.pg-more__in { display: grid; gap: var(--space-3); min-width: 0; }
+.pg-more[open] { display: grid; gap: var(--space-3); }
+
+/* ── Timeline ──────────────────────────────────────────────────────── */
+.ft { display: grid; gap: var(--space-3); padding: var(--space-4); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); min-width: 0; }
+.ft-filter { display: grid; gap: var(--space-2); min-width: 0; }
+.ft-filter__label { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--navy); }
+.ft-filter__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ft-chip { min-height: 44px; padding: 0 var(--space-4); border: 2px solid transparent; border-radius: var(--radius-full); font: inherit; font-size: var(--text-sm); font-weight: var(--weight-bold); text-align: left; cursor: pointer; }
+.ft-chip--work { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.ft-chip--good { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.ft-chip[aria-pressed='true'] { border-color: var(--navy); }
+.ft-say { margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); background: var(--cotton); line-height: 1.45; }
+.ft-say[hidden] { display: none; }
+.ft-say b { color: var(--navy); }
+.ft-say__do { display: block; margin-top: var(--space-1); font-weight: var(--weight-semibold); color: var(--navy); }
+
+.ft-scroll { overflow-x: auto; min-width: 0; }
+.ft-line { display: flex; align-items: flex-end; min-width: max-content; }
+.ft-day { flex: 1 0 3.25rem; display: grid; justify-items: center; }
+/* Pieces returned on one day stack upward from the line. */
+.ft-day__dots { display: flex; flex-direction: column-reverse; align-items: center; }
+.ft-dot { --ft-c: var(--wave); width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-full); background: none; cursor: pointer; }
+.ft-day__dots .ft-dot + .ft-dot { margin-bottom: calc(var(--space-3) * -1); }
+.ft-dot::before, .ft-key__dot { content: ''; box-sizing: border-box; width: 18px; height: 18px; border-radius: var(--radius-full); background: var(--ft-c); }
+.ft-dot--written { --ft-c: var(--wave); }
+.ft-dot--spoken { --ft-c: var(--pastel-lilac-ink); }
+.ft-dot--short { --ft-c: var(--high-sea-ink); }
+.ft-dot.is-new::before { background: var(--paper); border: 4px solid var(--ft-c); }
+.ft-dot.is-on::before { box-shadow: 0 0 0 3px var(--paper), 0 0 0 5px var(--navy); }
+.ft-dot.is-dim::before { opacity: 0.22; }
+.ft-day__stem { width: 100%; height: 10px; border-bottom: 2px solid var(--shore); background: linear-gradient(var(--shore), var(--shore)) center / 2px 100% no-repeat; }
+.ft-day__date { padding-top: var(--space-1); font-size: var(--text-2xs); color: var(--muted); white-space: nowrap; }
+
+.ft-key { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: 0; }
+.ft-key__dot { display: inline-block; width: 12px; height: 12px; margin-right: var(--space-1); vertical-align: -1px; }
+.ft-key__dot.is-new { background: var(--paper); border: 3px solid var(--muted); }
+
+.ft-peek { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-3) var(--space-4); background: var(--cotton); border-radius: var(--radius-sm); }
+.ft-peek:empty { display: none; }
+.ft-peek__text { display: grid; flex: 1 1 14rem; min-width: 0; }
+.ft-peek__title { font-weight: var(--weight-bold); color: var(--navy); overflow-wrap: anywhere; }
+.ft-peek__meta { font-size: var(--text-sm); color: var(--muted); }
+.ft-peek__open { min-height: 44px; }
+
+.ru__card:focus-visible, .ft-dot:focus-visible, .ft-chip:focus-visible, .pg-more__sum:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+
+/* ── Before / now / next ───────────────────────────────────────────── */
+.ftr { display: grid; gap: var(--space-3); min-width: 0; }
+.ftr__row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: var(--space-3); }
+.ftr__col { display: grid; gap: var(--space-2); align-content: start; justify-items: start; padding: var(--space-3) var(--space-4); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); min-width: 0; }
+.ftr__col--next .fb3__next { justify-self: stretch; }
+.ftr__say { margin: 0; line-height: 1.45; }
+.ftr__ican { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .ft-dot::before { transition: opacity 0.15s ease, box-shadow 0.15s ease; }
+}
