@@ -265,6 +265,18 @@ export function createHingeQuestionEditor(block: HingeBlock, onChange: (b: Hinge
   const independentHint = el('p', 'pf-field__hint block-secondary', 'In independent mode, a student who misses the main question gets this as one fresh try before moving on.');
   backup.append(summary, backupHint, independentHint, bq.wrap, backupAnswers);
 
+  // Independent only: hold back the rest of the page until each student finishes.
+  const gate = el('label', 'hq-editor__gate');
+  const gateBox = document.createElement('input');
+  gateBox.type = 'checkbox';
+  gateBox.checked = current.content.gate === true;
+  gateBox.addEventListener('change', () => set({ gate: gateBox.checked }));
+  gate.append(
+    gateBox,
+    el('span', '', 'Hide the rest of the lesson until each student finishes this question'),
+    el('span', 'pf-field__hint block-secondary', 'Use it before a reveal. Students who can’t answer on their device get a Carry on button. In a lecture, the Gate tick on the canvas does this.')
+  );
+
   const runNote = el('p', 'pf-note block-secondary');
   const paceHint = el('p', 'pf-field__hint block-secondary', '');
   const applyPace = () => {
@@ -272,6 +284,7 @@ export function createHingeQuestionEditor(block: HingeBlock, onChange: (b: Hinge
     time.hidden = independent;
     thresholds.hidden = independent;
     independentHint.hidden = !independent;
+    gate.hidden = !independent;
     paceHint.textContent = independent
       ? 'Each student answers alone, says why and how sure they are, then gets feedback on their own answer. A miss gets one try at the back-up question. In a lecture it runs as a solo check.'
       : 'You open and close the question; students answer together and you see the spread.';
@@ -288,6 +301,6 @@ export function createHingeQuestionEditor(block: HingeBlock, onChange: (b: Hinge
   pace.append(paceHint);
   applyPace();
 
-  root.append(q.wrap, pace, optionsWrap, time, thresholds, backup, runNote);
+  root.append(q.wrap, pace, gate, optionsWrap, time, thresholds, backup, runNote);
   return root;
 }

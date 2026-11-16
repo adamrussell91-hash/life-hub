@@ -1,6 +1,7 @@
 import { apiPost } from '@/api/client';
 import { button, el, errorText, readJSON, writeJSON } from '@/blocks/peer-feedback-ui';
 import { LETTERS, REASON_MAX, independentFeedback, type HingeBlock, type HingeTier } from './shared';
+import { emitHingeDone, gatesRest } from './gate';
 
 type Choice = { id: string; text: string };
 type TryView = { pick: string; sure: boolean | null; tier: HingeTier; note: string };
@@ -144,6 +145,16 @@ export function mountIndependent(block: HingeBlock, lessonId: string): HTMLEleme
   alert.hidden = true;
   root.append(body, alert);
   let view: IndependentView | null = null;
+  const gated = gatesRest(block.content);
+  // A gate must never strand a student: if this question can't run here, they carry on without it.
+  const carryOn = () => {
+    const b = button('Carry on without answering', 'ghost', function () {
+      this.remove();
+      emitHingeDone(root, block.id);
+    });
+    b.classList.add('hq-ind__carry');
+    return b;
+  };
 
   async function send(action: string, extra: Record<string, unknown> = {}): Promise<void> {
     try {
@@ -153,12 +164,14 @@ export function mountIndependent(block: HingeBlock, lessonId: string): HTMLEleme
     } catch (error) {
       alert.textContent = errorText(error);
       alert.hidden = false;
+      if (gated && !view?.done && !root.querySelector('.hq-ind__carry')) alert.after(carryOn());
     }
   }
 
   function paint(): void {
     if (!token) {
       body.replaceChildren(el('p', 'pf-alert', 'Open a normal (not private) window to answer here.'));
+      if (gated) queueMicrotask(() => emitHingeDone(root, block.id));
       return;
     }
     if (!view) {
@@ -196,6 +209,7 @@ export function mountIndependent(block: HingeBlock, lessonId: string): HTMLEleme
       parts.push(retry);
     }
     if (v.done) {
+      if (gated) queueMicrotask(() => emitHingeDone(root, block.id));
       parts.push(
         el(
           'p',
