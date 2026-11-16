@@ -482,7 +482,10 @@ export function mountToMarkPage(canvas: HTMLElement, load: () => Promise<FlowLoa
   headRow.append(el('h1', 'tf-title', 'To mark'), progress, count, addWriting, queueToggle);
   const pills = el('div', 'tf-pills');
   const ai = el('div', 'tf-ai');
-  head.append(headRow, pills, ai);
+  // Filters and the AI line share one row, so the work below keeps the height.
+  const subRow = el('div', 'tf-head__sub');
+  subRow.append(pills, ai);
+  head.append(headRow, subRow);
   const body = el('div', 'tf-body');
   const queue = el('nav', 'tf-queue');
   queue.setAttribute('aria-label', 'Queue');

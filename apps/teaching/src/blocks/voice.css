@@ -1083,6 +1083,22 @@
   background: transparent;
 }
 
+/* Folded: the player stays, the code buttons go, typed tags still show. */
+.voice-mark__dock.is-folded .voice-strip__group { display: none; }
+.voice-mark__dock.is-folded .voice-strip__typing:empty { display: none; }
+.voice-player__fold { margin-left: auto; font-size: var(--text-sm); }
+
+/* In To mark the dock is compact, so the transcript gets most of the pane. */
+.tf .voice-mark__dock { gap: var(--space-1); padding: var(--space-2) var(--space-3); }
+.tf .voice-player { gap: var(--space-1) var(--space-2); }
+.tf .voice-player .btn, .tf .voice-player .pa-mode__option { min-height: 2rem; padding-block: 0; }
+.tf .voice-strip { gap: var(--space-1); }
+.tf .voice-strip__group { gap: 4px; }
+.tf .voice-strip__label { min-width: 5.5rem; }
+.tf .voice-strip__code.voice-strip__code { min-height: 1.75rem; min-width: 0; padding: 0 6px; }
+.tf .voice-strip__typing { min-height: 0; }
+.tf .voice-strip__typing:empty { display: none; }
+
 /* On a phone the dock keeps to letters, so most of the screen stays transcript. */
 @media (max-width: 560px) {
   .voice-mark__dock .voice-strip__label {
