@@ -1,5 +1,6 @@
 import type { GuideRun } from '@/guides/types';
 import type { CoachingSheet } from '@/guides/coaching-sheet';
+import type { MeetingObservationLink } from '@/observation/types';
 
 /**
  * Shapes mirroring the server contracts this hub consumes.
@@ -371,6 +372,7 @@ export interface MeetingRecord {
   decisions?: MeetingDecision[];
   guide_runs?: GuideRun[];
   coaching_sheets?: CoachingSheet[];
+  observation?: MeetingObservationLink | null;
   minutes?: MeetingMinutes | null;
   /** Minutes Clare filed from chat, waiting for Adam to review or dismiss. */
   minutes_pending?: MeetingMinutesPending | null;

@@ -286,6 +286,8 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
   );
   const relationships = [...(seedData.relationships as RelationshipSeed[])];
   const observations = new Map<string, Record<string, unknown>>();
+  // Classroom observation (NESA Proficient) records, served at /api/classroom-observations.
+  const classroomObservations = new Map<string, Record<string, unknown>>();
   const communications = new Map<string, CommunicationRecord>(
     ((seedData as { communications?: CommunicationRecord[] }).communications ?? []).map((comm) => [
       comm.id,
@@ -553,6 +555,83 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
         temporal_mode: 'point', valid_from: null, valid_to: null, occurred_at: start, role: null
       });
     });
+    // Classroom observation: one open observation for Priya, planned in 'Priya: standard 3 planning' and
+    // observed in a second meeting two days later, so the Planning and Observing views can be walked.
+    {
+      const planningId = 'meeting_00000000-0000-4000-8000-000000000112';
+      const observingId = 'meeting_00000000-0000-4000-8000-000000000199';
+      const planningMeeting = meetings.get(planningId);
+      if (planningMeeting) {
+        const obsId = 'obs_00000000-mock-priya';
+        const planningStart = String(planningMeeting.scheduled_start);
+        const observingStart = at(-7);
+        const lf = (id: string, label: string, key: string) => ({ id, label, key });
+        const entry = (n: number, clock: string, descriptor: string | null, look_for: string | null, kind: string, text: string) => ({
+          id: `log_mock_${n}`, at: new Date(Date.parse(observingStart) + n * 60_000).toISOString(), clock, descriptor, look_for, kind, text
+        });
+        classroomObservations.set(obsId, {
+          id: obsId, kind: 'nesa_proficient', status: 'open',
+          teacher: { person_ref: `shared:person:${personId('f1')}`, name: 'Priya Anand', nesa_number: '', email: 'priya@example.test', school: 'Harbourview High School' },
+          supervisor: { name: 'Jo Supervisor', nesa_number: '' },
+          planned_on: planningStart.slice(0, 10),
+          meetings: { planning: planningId, observing: observingId },
+          lesson: { title: 'Year 9 persuasive writing: opening paragraphs', link: '', syllabus_link: '' },
+          plan_all_students: 'Mixed-ability groups; sentence starters for students who need them; extension prompt for early finishers.',
+          plan_measure: 'Exit ticket: one persuasive opening paragraph, marked against two success criteria.',
+          descriptors: [
+            {
+              code: '3.5.2', why: 'My instructions are sometimes too long and students lose the thread.',
+              practice: 'Short, chunked instructions with a visual cue and a check for understanding.',
+              demonstrate: 'Give instructions in two steps and ask a student to restate the first step.',
+              planned_impact: 'Students start the task quickly and ask fewer repeat questions.',
+              how_know: 'Count how many students need the instruction repeated.',
+              look_fors: [lf('lf_mock_1', 'Instruction given in short chunks', 'Q'), lf('lf_mock_2', 'Students restate the task', 'W'), lf('lf_mock_3', 'Non-verbal cue for transitions', 'E')]
+            },
+            {
+              code: '5.2.2', why: 'Feedback comes late in the lesson, when it can no longer change the work.',
+              practice: 'Feedback while students draft, linked to the success criteria.',
+              demonstrate: 'Circulate with a short list of criteria and give one point of feedback per student.',
+              planned_impact: 'Students revise their opening paragraph before the exit ticket.',
+              how_know: 'Compare the first draft with the exit ticket.',
+              look_fors: [lf('lf_mock_4', 'Feedback names a success criterion', 'A'), lf('lf_mock_5', 'Student acts on feedback', 'S'), lf('lf_mock_6', 'Feedback reaches quieter students', 'D')]
+            },
+            {
+              code: '1.5.2', why: 'The class has a wide range of writing confidence.',
+              practice: 'Three entry points to the same task.',
+              demonstrate: 'Offer sentence starters, a model paragraph, or a free start.',
+              planned_impact: 'Every student has a paragraph on the page within ten minutes.',
+              how_know: 'Look at the page count at the ten-minute mark.',
+              look_fors: [lf('lf_mock_7', 'Students choose an entry point', 'Z'), lf('lf_mock_8', 'Extension prompt used', 'X'), lf('lf_mock_9', 'Support offered without taking over', 'C')]
+            }
+          ],
+          clock: { started_at: observingStart, paused_ms: 0, paused_at: null, ended_at: new Date(Date.parse(observingStart) + 52 * 60_000).toISOString() },
+          log: [
+            entry(1, '01:20', '3.5.2', 'lf_mock_1', 'strength', 'Two-step instruction, hand signal for the second step.'),
+            entry(2, '04:05', '3.5.2', 'lf_mock_2', 'strength', 'Asked a student to restate; three more nodded along.'),
+            entry(3, '11:40', '1.5.2', 'lf_mock_7', 'strength', 'Most students picked a starter card without being told.'),
+            entry(4, '18:15', '5.2.2', 'lf_mock_4', 'strength', 'Told a student the second sentence met the first criterion.'),
+            entry(5, '23:30', '5.2.2', 'lf_mock_6', 'next', 'Only the front table received feedback in this stretch.'),
+            entry(6, '31:00', null, null, 'said', 'Student: "So I start with the question?"'),
+            entry(7, '38:45', '3.5.2', 'lf_mock_3', 'next', 'Transition to the exit ticket needed three repeats.')
+          ],
+          write_up: {}, reflection: {},
+          signatures: { teacher: { name: '', date: '' }, supervisor: { name: '', date: '' } },
+          created_at: planningStart, updated_at: observingStart
+        });
+        planningMeeting.observation = { id: obsId, phase: 'planning' };
+        meetings.set(observingId, {
+          schema_version: 1, id: observingId, title: 'Priya: lesson observation', scheduled_start: observingStart,
+          scheduled_end: new Date(Date.parse(observingStart) + 3_600_000).toISOString(), time_zone: 'Australia/Sydney',
+          location_text: null, agenda: null, notes: null, state: 'completed', occurrence_history: [],
+          observation: { id: obsId, phase: 'observing' }, created_at: stamp, updated_at: stamp
+        });
+        relationships.push({
+          id: 'link_mentoring_meeting_observing', source_ref: `professional:meeting:${observingId}`, target_ref: `shared:person:${personId('f1')}`,
+          relationship_type: 'attendee', inverse_label: 'attends', context_key: null, status: 'current',
+          temporal_mode: 'point', valid_from: null, valid_to: null, occurred_at: observingStart, role: null
+        });
+      }
+    }
     // Ledger: one thing you owe and one thing they owe the first mentee.
     const firstRef = `shared:person:${personId('f1')}`;
     for (const [direction, text, due] of [
@@ -2181,6 +2260,44 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
       return json(201, { ok: true, data: { ref: refFor(record), ...record } });
     }
 
+    if (path === '/api/classroom-observations' && method === 'GET') {
+      const id = url.searchParams.get('id');
+      if (id) {
+        const found = classroomObservations.get(id);
+        if (!found) return json(404, { ok: false, error: { code: 'not_found', message: 'That observation isn’t there.' } });
+        return json(200, { ok: true, data: { observation: found } });
+      }
+      const personRef = url.searchParams.get('person_ref');
+      const open = url.searchParams.get('open') === '1';
+      const list = [...classroomObservations.values()]
+        .filter((o) => (personRef ? (o.teacher as { person_ref: string }).person_ref === personRef : true))
+        .filter((o) => (open ? o.status === 'open' : true))
+        .map((o) => ({
+          id: o.id, kind: o.kind, status: o.status, person_ref: (o.teacher as { person_ref: string }).person_ref,
+          teacher_name: (o.teacher as { name: string }).name, planned_on: o.planned_on, meetings: o.meetings, updated_at: o.updated_at
+        }))
+        .sort((a, b) => Date.parse(String(b.updated_at)) - Date.parse(String(a.updated_at)));
+      return json(200, { ok: true, data: { observations: list } });
+    }
+
+    if (path === '/api/classroom-observations' && method === 'POST') {
+      const input = body as { action?: string; observation?: Record<string, unknown>; id?: string };
+      if (input.action === 'save') {
+        const record = input.observation;
+        if (!record || typeof record.id !== 'string' || !/^obs_[a-z0-9-]{8,64}$/.test(record.id)) {
+          return json(400, { ok: false, error: { code: 'invalid_observation', message: 'Invalid observation.' } });
+        }
+        const saved = { ...record, updated_at: new Date().toISOString() };
+        classroomObservations.set(record.id, saved);
+        return json(200, { ok: true, data: { observation: saved } });
+      }
+      if (input.action === 'delete') {
+        classroomObservations.delete(String(input.id));
+        return json(200, { ok: true, data: { deleted: true } });
+      }
+      return json(400, { ok: false, error: { code: 'bad_request', message: 'Unknown action.' } });
+    }
+
     if (path === '/api/observations' && method === 'GET') {
       const aboutRef = url.searchParams.get('about_ref');
       if (!aboutRef) {
@@ -2677,7 +2794,7 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
         return json(404, { ok: false, error: { code: 'meeting_not_found', message: 'Meeting not found.' } });
       }
       const patch = body as Record<string, unknown>;
-      for (const key of ['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'minutes', 'minutes_pending', 'minutes_draft', 'minutes_notes']) {
+      for (const key of ['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions', 'guide_runs', 'coaching_sheets', 'observation', 'minutes', 'minutes_pending', 'minutes_draft', 'minutes_notes']) {
         if (patch[key] !== undefined) meeting[key] = patch[key];
       }
       meeting.updated_at = new Date().toISOString();

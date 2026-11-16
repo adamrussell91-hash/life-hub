@@ -1,7 +1,8 @@
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { createEntityPicker } from '../../design-kit/js/entity-picker.js';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
-import { getMeeting, listMeetings, meetingStateAction, rescheduleMeeting, updateMeeting } from '@/api/meetings';
+import { createMeeting, getMeeting, isMeetingIncompleteLinksError, listMeetings, meetingStateAction, rescheduleMeeting, updateMeeting } from '@/api/meetings';
+import { meetingRoute } from '@/app/router';
 import {
   createTask,
   createUniversalLink,
@@ -58,6 +59,10 @@ import { ACHIEVEMENT_ID, ACHIEVEMENT_LINE, ACHIEVEMENT_NAME } from '@/guides/ach
 import { deleteCheckIn, getCheckIn, listMeetingCheckIns, saveCheckIn } from '@/guides/check-in/api';
 import { followUpTaskTitle, newFollowUps } from '@/guides/check-in/model';
 import type { CheckInRecord, CheckInSummary } from '@/guides/check-in/types';
+import { openObservationStart } from '@/observation/start-panel';
+import { mountObservationWorkspace } from '@/observation/workspace';
+import { getObservation } from '@/observation/api';
+import type { ObservationPhase } from '@/observation/types';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -85,6 +90,18 @@ function isOpenState(state: string): boolean {
 export function saveGuideRun(runs: GuideRun[], run: GuideRun): { runs: GuideRun[]; note: string | null } {
   const first = !runs.some((r) => r.id === run.id);
   return { runs: first ? [...runs, run] : runs.map((r) => (r.id === run.id ? run : r)), note: first ? noteLine(run) : null };
+}
+
+const PHASE_LABEL: Record<ObservationPhase, string> = { planning: 'Planning', observing: 'Observing', reflecting: 'Reflecting' };
+
+/** Title for the next observation meeting: this title with its phase word swapped, else `<teacher> · observation <phase>`. */
+export function linkedMeetingTitle(current: string, teacherName: string, next: ObservationPhase): string {
+  const label = PHASE_LABEL[next];
+  const phaseWord = /\b(planning|observing|reflecting)\b/i;
+  if (phaseWord.test(current)) {
+    return current.replace(phaseWord, (word) => (word[0] === word[0]!.toUpperCase() ? label : label.toLowerCase()));
+  }
+  return `${teacherName.trim() || current} · observation ${label.toLowerCase()}`;
 }
 
 /** `Wed 30/09/26 · 3:30 pm – 4:30 pm` in the meeting's own zone. */
@@ -373,7 +390,9 @@ export async function renderMeetingPage(
   side.append(roomHost, taskLinks, tagCard);
   const grid = el('div', 'meeting-page__grid');
   grid.append(main, side);
-  root.append(head, editor, purpose, grid);
+  // Notes and the guides under them run the full width, below both columns (and last on a phone).
+  const full = el('div', 'meeting-page__full');
+  root.append(head, editor, purpose, grid, full);
   canvas.replaceChildren(root);
   paintRoom();
 
@@ -612,9 +631,10 @@ export async function renderMeetingPage(
     if (alreadyPainted) return;
     // Keep the live notes editor. Disposing it on recycle/autosave left the
     // remounted block as a preview with no contenteditable surface.
-    if (notesCardEl?.parentElement === main) notesCardEl.remove();
+    if (notesCardEl?.parentElement === full) notesCardEl.remove();
     if (minutesCardEl?.parentElement === main) minutesCardEl.remove();
     main.replaceChildren();
+    full.replaceChildren();
     if (next === 'before') paintBefore();
     else if (next === 'during') paintDuring();
     else paintAfter();
@@ -653,16 +673,25 @@ export async function renderMeetingPage(
     });
   }
 
+  let notesHeadingEl: HTMLElement | null = null;
+  let notesHintEl: HTMLElement | null = null;
+  /** Full width under both columns: the notes, the guide buttons in its header, and the guides under it. */
   function notesCard(heading: string, hint: string): HTMLElement {
     if (!notesCardEl) {
       notesCardEl = el('section', 'card meeting-page__notes-card');
       notesCardEl.dataset.part = 'notes';
+      const top = el('div', 'meeting-page__notes-head');
+      notesHeadingEl = el('h3', undefined, heading);
+      top.append(notesHeadingEl, ...guideButtons());
+      notesHintEl = el('p', 'muted meeting-page__hint', hint);
       const body = el('div', 'meeting-page__notes');
-      notesCardEl.append(el('h3', undefined, heading), el('p', 'muted meeting-page__hint', hint), body);
+      notesCardEl.append(top, notesHintEl, body, guidesHost);
       mountNotes(body);
+      void paintGuides();
+      paintObservation();
     } else {
-      notesCardEl.querySelector('h3')!.textContent = heading;
-      notesCardEl.querySelector('.meeting-page__hint')!.textContent = hint;
+      notesHeadingEl!.textContent = heading;
+      notesHintEl!.textContent = hint;
     }
     return notesCardEl;
   }
@@ -738,8 +767,16 @@ export async function renderMeetingPage(
   const mentions = el('section', 'card');
   mentions.dataset.part = 'mentions';
 
-  const guidesHost = el('section', 'card meeting-guides');
+  // Guides live inside the notes card: a divider, then the observation workspace, check-ins and a grid
+  // of guide and coaching cards. Kept across phase repaints with the notes card.
+  const guidesHost = el('div', 'meeting-guides');
   guidesHost.dataset.part = 'guides';
+  const observationHost = el('div', 'meeting-guides__observation');
+  observationHost.dataset.part = 'observation';
+  const guideCards = el('div', 'meeting-guides__cards');
+  const guidesEmpty = el('p', 'muted', 'Structured reads you run with someone in the room land here.');
+  guidesEmpty.dataset.part = 'guides-empty';
+  let checkInCount = 0;
   let placedCache: Promise<PlacedRun[]> | null = null;
   const placed = () => (placedCache ??= listMeetings().then((r) => placeRuns(r.meetings)).catch(() => placeRuns([record])));
 
@@ -801,11 +838,19 @@ export async function renderMeetingPage(
   }
 
   const checkInHost = el('div', 'meeting-check-ins');
+  guidesHost.append(el('p', 'meeting-guides__divider', 'Guides in this meeting'), observationHost, checkInHost, guideCards, guidesEmpty);
   async function paintCheckIns(): Promise<void> {
     const list = await meetingCheckIns();
+    checkInCount = list.length;
     checkInHost.replaceChildren(...list.map((summary) => renderCheckInCard(document, summary, async () => {
       openCheckIn(await getCheckIn(summary.id));
     })));
+    paintGuidesEmpty();
+  }
+
+  /** The empty line shows only when there is nothing at all under the divider. */
+  function paintGuidesEmpty(): void {
+    guidesEmpty.hidden = Boolean((record.guide_runs ?? []).length || (record.coaching_sheets ?? []).length || checkInCount || record.observation);
   }
 
   // Achievement has its own branching panel but saves an ordinary guide run on this meeting.
@@ -843,11 +888,12 @@ export async function renderMeetingPage(
     });
   }
 
-  let guidesPaint = 0;
-  async function paintGuides(): Promise<void> {
-    const seq = ++guidesPaint;
-    const runs = record.guide_runs ?? [];
-    const head = el('div', 'meeting-guides__head');
+  const observationBtn = el('button', 'btn btn--secondary', '◉ Classroom observation') as HTMLButtonElement;
+  observationBtn.type = 'button';
+  observationBtn.dataset.part = 'observation-start';
+  observationBtn.addEventListener('click', () => openObservation());
+
+  function guideButtons(): HTMLElement[] {
     const run = el('button', 'btn btn--secondary', '◐ Run a guide') as HTMLButtonElement;
     run.type = 'button';
     run.dataset.part = 'run-guide';
@@ -856,25 +902,30 @@ export async function renderMeetingPage(
     coach.type = 'button';
     coach.dataset.part = 'coaching-sheet';
     coach.addEventListener('click', () => openCoaching());
-    head.append(el('h3', undefined, 'Guides'), run, coach);
-    guidesHost.replaceChildren(head, checkInHost);
+    const wrap = el('div', 'meeting-page__notes-actions');
+    wrap.append(run, coach, observationBtn);
+    return [wrap];
+  }
+
+  let guidesPaint = 0;
+  async function paintGuides(): Promise<void> {
+    const seq = ++guidesPaint;
+    const runs = record.guide_runs ?? [];
+    guideCards.replaceChildren(...(record.coaching_sheets ?? []).map((sheet) => renderCoachingCard(document, sheet, () => openCoaching(sheet))));
+    paintGuidesEmpty();
     void paintCheckIns();
-    for (const sheet of record.coaching_sheets ?? []) guidesHost.append(renderCoachingCard(document, sheet, () => openCoaching(sheet)));
-    if (!runs.length) {
-      guidesHost.append(el('p', 'muted', 'Structured reads you run with someone in the room land here.'));
-      return;
-    }
+    if (!runs.length) return;
     const all = await placed();
     // A newer paint started while this one waited: let it draw, or the cards double up.
     if (seq !== guidesPaint) return;
     for (const saved of runs) {
       if (saved.guide === ACHIEVEMENT_ID) {
-        guidesHost.append(renderAchievementCard(document, { run: saved, history: historyFor(all, saved, 1), onEdit: () => openAchievement(saved) }));
+        guideCards.append(renderAchievementCard(document, { run: saved, history: historyFor(all, saved, 1), onEdit: () => openAchievement(saved) }));
         continue;
       }
       const guide = guideById(saved.guide);
       if (!guide) continue;
-      guidesHost.append(renderGuideCard(document, {
+      guideCards.append(renderGuideCard(document, {
         guide,
         run: saved,
         history: historyFor(all, saved),
@@ -887,19 +938,117 @@ export async function renderMeetingPage(
     }
   }
 
+  // ── Classroom observation: a link on this meeting, the record in its own store ──
+  const meetingDay = () => utcIsoToWallLocal(record.scheduled_start, record.time_zone || 'Australia/Sydney').slice(0, 10);
+  let workspace: { destroy(): void } | null = null;
+
+  /** Everyone in the room but you, staff before students: the teacher being observed is usually staff. */
+  function observedCandidates(): Array<{ ref: string; name: string }> {
+    const { byRef, byName } = indexDirectory(directory);
+    const all = attendees.map((a) => ({ ref: a.ref, name: a.name, student: directoryRowFor(a, byRef, byName)?.person_type === 'student' }));
+    return [...all.filter((p) => !p.student), ...all.filter((p) => p.student)].map(({ ref, name }) => ({ ref, name }));
+  }
+
+  function openObservation(): void {
+    openObservationStart(document, {
+      about: observedCandidates(),
+      meetingId: id,
+      meetingDate: meetingDay(),
+      supervisorName: selfRow?.display_name,
+      onLinked: async (link) => {
+        record = { ...(await updateMeeting(id, { observation: link })).meeting, observation: link };
+        paintObservation();
+      }
+    });
+  }
+
+  /** Mounted once while linked and kept across phase repaints; unmounted on unlink. */
+  function paintObservation(): void {
+    observationBtn.hidden = Boolean(record.observation);
+    const link = record.observation;
+    if (!link) {
+      workspace?.destroy();
+      workspace = null;
+      observationHost.replaceChildren();
+    } else if (!workspace) {
+      workspace = mountObservationWorkspace(observationHost, {
+        document,
+        observationId: link.id,
+        phase: link.phase,
+        meetingId: id,
+        meetingDate: meetingDay(),
+        openMeeting: (meetingId) => { window.location.hash = meetingRoute(meetingId); },
+        makeLinkedMeeting,
+        onUnlink: async () => {
+          record = { ...(await updateMeeting(id, { observation: null })).meeting, observation: null };
+          paintObservation();
+        }
+      });
+    }
+    paintGuidesEmpty();
+  }
+
+  /**
+   * The next part of the observation as its own meeting: same people (and the organisation each is
+   * here for), same tags, this meeting's time of day on the chosen date, already linked at `next`.
+   */
+  async function makeLinkedMeeting(next: ObservationPhase, date: string): Promise<string> {
+    const link = record.observation;
+    if (!link) throw new Error('Link an observation to this meeting first.');
+    const zone = record.time_zone || 'Australia/Sydney';
+    const clockTime = utcIsoToWallLocal(record.scheduled_start, zone).slice(11, 16);
+    const span = Date.parse(record.scheduled_end) - Date.parse(record.scheduled_start);
+    const start = wallLocalToUtcIso(`${date}T${clockTime}`, zone);
+    const end = new Date(Date.parse(start) + (span > 0 ? span : 60 * 60_000)).toISOString();
+    let teacherName = '';
+    try {
+      teacherName = (await getObservation(link.id)).teacher.name;
+    } catch {
+      // The title falls back to this meeting's own.
+    }
+    let newId: string;
+    try {
+      newId = (await createMeeting({
+        title: linkedMeetingTitle(record.title, teacherName, next),
+        scheduled_start: start,
+        scheduled_end: end,
+        time_zone: zone,
+        links: attendees.map((attendee) => ({
+          target_ref: attendee.ref,
+          relationship_type: 'attendee' as const,
+          occurred_at: start,
+          role: attendee.role,
+          ...(attendee.organisationRef ? { metadata: { organisation_ref: attendee.organisationRef } } : {})
+        }))
+      })).meeting.id;
+    } catch (err) {
+      if (!isMeetingIncompleteLinksError(err)) throw err;
+      newId = err.data.meeting_id;
+    }
+    await updateMeeting(newId, { observation: { id: link.id, phase: next } });
+    try {
+      const { outgoing } = await listUniversalLinksForEntity(meetingRef);
+      for (const entry of outgoing) {
+        if (entry.link.relationship_type !== 'tagged_with' || entry.link.status !== 'current') continue;
+        await createUniversalLink({ source_ref: `professional:meeting:${newId}`, target_ref: entry.link.target_ref, relationship_type: 'tagged_with' });
+      }
+    } catch {
+      // The meeting is made and linked; a missed tag is not worth failing over.
+    }
+    return newId;
+  }
+
   function paintBefore(): void {
-    main.append(briefCard(), openPromisesCard(), notesCard(
-      'Agenda and notes',
-      'Each agenda item is a heading. Add what you want to raise under it.'
-    ), minutesCard());
+    main.append(briefCard(), openPromisesCard(), minutesCard());
+    full.append(notesCard('Agenda and notes', 'Each agenda item is a heading. Add what you want to raise under it.'));
   }
 
   function paintDuring(): void {
-    main.append(liveStrip(), notesCard(
+    main.append(liveStrip(), minutesCard(), actions, mentions);
+    full.append(notesCard(
       'Notes',
       'Start a line with »me to log something you owe, »Name for something they owe, ✓ for a decision, @Name for who said what.'
-    ), minutesCard(), guidesHost, actions, mentions);
-    void paintGuides();
+    ));
     paintActions();
     paintMentions(blockPage?.current() ?? record.blocks ?? []);
   }
@@ -907,8 +1056,8 @@ export async function renderMeetingPage(
   function paintAfter(): void {
     main.append(minutesCard());
     if (record.purpose) main.append(purposeCheckCard());
-    main.append(wrapUpCard(), actions, notesCard('Notes', 'Your notes from the meeting. Still editable.'), guidesHost, mentions);
-    void paintGuides();
+    main.append(wrapUpCard(), actions, mentions);
+    full.append(notesCard('Notes', 'Your notes from the meeting. Still editable.'));
     paintActions();
     paintMentions(blockPage?.current() ?? record.blocks ?? []);
   }

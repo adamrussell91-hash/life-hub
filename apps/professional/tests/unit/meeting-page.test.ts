@@ -14,7 +14,21 @@ vi.mock('@/api/meetings', () => ({
   updateMeeting: vi.fn(async (_id: string, patch: object) => ({ meeting: { ...meeting, ...patch } })),
   rescheduleMeeting: vi.fn(async (_id: string, body: object) => ({ meeting: { ...meeting, ...body, state: 'rescheduled' } })),
   meetingStateAction: vi.fn(async () => ({ meeting: { ...meeting, state: 'completed' } })),
-  listMeetings: vi.fn(async () => ({ meetings: [] }))
+  listMeetings: vi.fn(async () => ({ meetings: [] })),
+  createMeeting: vi.fn(async () => ({ meeting: { ...meeting, id: 'meeting_new' }, links: [], created: true })),
+  isMeetingIncompleteLinksError: () => false
+}));
+const workspaceDestroy = vi.fn();
+vi.mock('@/observation/workspace', () => ({
+  mountObservationWorkspace: vi.fn((host: HTMLElement) => {
+    host.append(Object.assign(document.createElement('div'), { className: 'obs-stub' }));
+    return { destroy: workspaceDestroy };
+  })
+}));
+vi.mock('@/observation/api', () => ({
+  getObservation: vi.fn(async () => ({ id: 'obs_abcdefgh', teacher: { name: 'Jo Teacher' } })),
+  listObservations: vi.fn(async () => []),
+  saveObservation: vi.fn(async (record: object) => record)
 }));
 vi.mock('@/views/meetings', () => ({
   buildMeetingTaskLinks: () => {
@@ -103,6 +117,9 @@ import { getMeeting, meetingStateAction, rescheduleMeeting, updateMeeting } from
 import { fetchMinutesFile } from '@/api/meeting-minutes-file';
 import { clareMinutes } from '@/api/clare-comms';
 import { createUniversalLink, suppressUniversalLink, listUniversalLinksForEntity } from '@/api/universal-links';
+import { createMeeting } from '@/api/meetings';
+import { mountObservationWorkspace } from '@/observation/workspace';
+import { saveObservation } from '@/observation/api';
 
 describe('meeting page', () => {
   beforeEach(() => {
@@ -163,7 +180,7 @@ describe('meeting page', () => {
     expect(createLedgerItem).toHaveBeenCalledWith(expect.objectContaining({ direction: 'you_owe', text: expect.stringContaining('Carried:') }));
   });
 
-  it('After: Minutes sits at the top, above actions and notes', async () => {
+  it('After: Minutes sits at the top of the left column, above actions; notes run full width below', async () => {
     const canvas = await render();
     canvas.querySelector<HTMLButtonElement>('[data-set-phase="after"]')!.click();
     await vi.advanceTimersByTimeAsync(0);
@@ -171,7 +188,8 @@ describe('meeting page', () => {
     expect(main.firstElementChild?.getAttribute('data-part')).toBe('minutes');
     const parts = [...main.children].map((node) => node.getAttribute('data-part'));
     expect(parts.indexOf('minutes')).toBeLessThan(parts.indexOf('actions'));
-    expect(parts.indexOf('minutes')).toBeLessThan(parts.indexOf('notes'));
+    expect(parts).not.toContain('notes');
+    expect(canvas.querySelector('.meeting-page__full > [data-part="notes"]')).not.toBeNull();
   });
 
   it('shows when, where and who in the header', async () => {
@@ -289,10 +307,15 @@ describe('meeting page', () => {
   it('the three phases show different work: brief + open promises / live strip / wrap-up', async () => {
     const canvas = await render();
     const parts = () => [...canvas.querySelectorAll('.meeting-page__main > [data-part]')].map((node) => node.getAttribute('data-part'));
+    const fullParts = () => [...canvas.querySelectorAll('.meeting-page__full > [data-part]')].map((node) => node.getAttribute('data-part'));
+    const notesHeading = () => canvas.querySelector('[data-part="notes"] h3')!.textContent;
 
     canvas.querySelector<HTMLButtonElement>('[data-set-phase="before"]')!.click();
     await vi.advanceTimersByTimeAsync(0);
-    expect(parts()).toEqual(['clare-brief', 'open-promises', 'notes', 'minutes']);
+    expect(parts()).toEqual(['clare-brief', 'open-promises', 'minutes']);
+    expect(fullParts()).toEqual(['notes']);
+    expect(notesHeading()).toBe('Agenda and notes');
+    expect(canvas.querySelector('[data-part="notes"] [data-part="guides"]')).not.toBeNull();
     expect(canvas.querySelector('[data-part="open-promises"]')!.textContent).toContain('Send Rachel the medal list');
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-preparation"]')!.hidden).toBe(false);
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-follow_up"]')!.hidden).toBe(true);
@@ -301,13 +324,114 @@ describe('meeting page', () => {
     expect(canvas.querySelector('[data-part="clare-brief"]')!.textContent).toContain('Rachel wants the date locked');
 
     canvas.querySelector<HTMLButtonElement>('[data-set-phase="during"]')!.click();
-    expect(parts()).toEqual(['live-strip', 'notes', 'minutes', 'guides', 'actions', 'mentions']);
+    expect(parts()).toEqual(['live-strip', 'minutes', 'actions', 'mentions']);
+    expect(fullParts()).toEqual(['notes']);
+    expect(notesHeading()).toBe('Notes');
     expect(canvas.querySelector('[data-part="live-strip"]')!.textContent).toContain('30 min in · 45 min left');
 
     canvas.querySelector<HTMLButtonElement>('[data-set-phase="after"]')!.click();
-    expect(parts()).toEqual(['minutes', 'purpose-check-card', 'wrap-up', 'actions', 'notes', 'guides', 'mentions']);
+    expect(parts()).toEqual(['minutes', 'purpose-check-card', 'wrap-up', 'actions', 'mentions']);
+    expect(fullParts()).toEqual(['notes']);
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-preparation"]')!.hidden).toBe(true);
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-follow_up"]')!.hidden).toBe(false);
+  });
+
+  it('notes sit full width after the two columns, with the guide buttons in their header and guides under them', async () => {
+    const canvas = await render();
+    const root = canvas.querySelector('.meeting-page')!;
+    const grid = [...root.children].find((node) => node.classList.contains('meeting-page__grid'))!;
+    const full = [...root.children].find((node) => node.classList.contains('meeting-page__full'))!;
+    expect(grid.nextElementSibling).toBe(full);
+    const notes = full.querySelector('[data-part="notes"]')!;
+    const head = notes.querySelector('.meeting-page__notes-head')!;
+    expect([...head.querySelectorAll('button')].map((b) => b.dataset.part)).toEqual(['run-guide', 'coaching-sheet', 'observation-start']);
+    const guides = notes.querySelector('[data-part="guides"]')!;
+    expect(guides.classList.contains('card')).toBe(false);
+    expect(canvas.querySelectorAll('[data-part="guides"]').length).toBe(1);
+    expect(guides.textContent).toContain('Guides in this meeting');
+    expect(guides.querySelector<HTMLElement>('[data-part="guides-empty"]')!.hidden).toBe(false);
+    // Notes body comes before the guides.
+    expect(notes.querySelector('.meeting-page__notes')!.compareDocumentPosition(guides) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('Classroom observation: the button opens the start panel with staff first; linking mounts the workspace and hides the button', async () => {
+    const canvas = await render();
+    const button = canvas.querySelector<HTMLButtonElement>('[data-part="observation-start"]')!;
+    expect(button.hidden).toBe(false);
+    button.click();
+    const panel = document.querySelector<HTMLElement>('.obs-start')!;
+    expect(panel).not.toBeNull();
+    expect([...panel.querySelectorAll<HTMLOptionElement>('[data-part="obs-who"] option')].map((o) => o.value)).toEqual([
+      'shared:person:rachel', 'shared:person:ben', 'shared:person:blob-rohan'
+    ]);
+    panel.querySelector<HTMLButtonElement>('[data-phase="planning"]')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    panel.querySelector<HTMLButtonElement>('[data-part="obs-start-go"]')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    const saved = vi.mocked(saveObservation).mock.calls[0]![0];
+    expect(saved.planned_on).toBe('2026-09-24');
+    expect(saved.supervisor.name).toBe('Sam Writer');
+    expect(updateMeeting).toHaveBeenCalledWith(MEETING_ID, { observation: { id: saved.id, phase: 'planning' } });
+    expect(mountObservationWorkspace).toHaveBeenCalledTimes(1);
+    expect(canvas.querySelector('[data-part="observation"] .obs-stub')).not.toBeNull();
+    expect(button.hidden).toBe(true);
+    expect(canvas.querySelector<HTMLElement>('[data-part="guides-empty"]')!.hidden).toBe(true);
+  });
+
+  it('Classroom observation: a linked meeting mounts the workspace once, keeps it across phases, and unlinks', async () => {
+    vi.mocked(getMeeting).mockResolvedValueOnce({ meeting: { ...meeting, observation: { id: 'obs_abcdefgh', phase: 'observing' } } } as never);
+    const canvas = await render();
+    expect(mountObservationWorkspace).toHaveBeenCalledTimes(1);
+    const opts = vi.mocked(mountObservationWorkspace).mock.calls[0]![1];
+    expect(opts).toMatchObject({ observationId: 'obs_abcdefgh', phase: 'observing', meetingId: MEETING_ID, meetingDate: '2026-09-24' });
+    expect(canvas.querySelector<HTMLElement>('[data-part="observation-start"]')!.hidden).toBe(true);
+    const stub = canvas.querySelector('.obs-stub');
+    for (const next of ['before', 'after', 'during']) {
+      canvas.querySelector<HTMLButtonElement>(`[data-set-phase="${next}"]`)!.click();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(canvas.querySelector('.obs-stub')).toBe(stub);
+    }
+    expect(mountObservationWorkspace).toHaveBeenCalledTimes(1);
+
+    opts.openMeeting('meeting_other');
+    expect(window.location.hash).toBe('#/meeting/meeting_other');
+
+    await opts.onUnlink();
+    expect(updateMeeting).toHaveBeenCalledWith(MEETING_ID, { observation: null });
+    expect(workspaceDestroy).toHaveBeenCalled();
+    expect(canvas.querySelector('.obs-stub')).toBeNull();
+    expect(canvas.querySelector<HTMLElement>('[data-part="observation-start"]')!.hidden).toBe(false);
+  });
+
+  it('Classroom observation: makeLinkedMeeting books the next part with the same people, time of day and tags, already linked', async () => {
+    vi.mocked(getMeeting).mockResolvedValueOnce({ meeting: { ...meeting, title: 'Jo: lesson planning', observation: { id: 'obs_abcdefgh', phase: 'planning' } } } as never);
+    vi.mocked(listUniversalLinksForEntity).mockImplementation(async () => ({ outgoing: [
+      { link: { id: 'a1', source_ref: MEETING_REF, target_ref: 'shared:person:rachel', relationship_type: 'attendee', role: 'chair', status: 'current' },
+        endpoint: { ref: 'shared:person:rachel', kind: 'person', display_label: 'Rachel Ford', href: null }, direction: 'outgoing' },
+      { link: { id: 't1', source_ref: MEETING_REF, target_ref: 'shared:tag:mentoring', relationship_type: 'tagged_with', role: null, status: 'current' },
+        endpoint: { ref: 'shared:tag:mentoring', kind: 'tag', display_label: 'Mentoring', href: null }, direction: 'outgoing' }
+    ], incoming: [] }) as never);
+    await render();
+    const opts = vi.mocked(mountObservationWorkspace).mock.calls[0]![1];
+    const made = await opts.makeLinkedMeeting('reflecting', '2026-10-02');
+    expect(made).toBe('meeting_new');
+    expect(createMeeting).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Jo: lesson reflecting',
+      // 6:00 pm Sydney, the same as this meeting, on the new day; same length.
+      scheduled_start: '2026-10-02T08:00:00.000Z',
+      scheduled_end: '2026-10-02T09:15:00.000Z',
+      time_zone: 'Australia/Sydney',
+      links: [expect.objectContaining({ target_ref: 'shared:person:rachel', relationship_type: 'attendee', role: 'chair' })]
+    }));
+    expect(updateMeeting).toHaveBeenCalledWith('meeting_new', { observation: { id: 'obs_abcdefgh', phase: 'reflecting' } });
+    expect(createUniversalLink).toHaveBeenCalledWith({ source_ref: 'professional:meeting:meeting_new', target_ref: 'shared:tag:mentoring', relationship_type: 'tagged_with' });
+    vi.mocked(listUniversalLinksForEntity).mockReset();
+  });
+
+  it('linkedMeetingTitle swaps the phase word, else names the teacher', async () => {
+    const { linkedMeetingTitle } = await import('@/views/meeting-page');
+    expect(linkedMeetingTitle('Observation Planning · Year 9', 'Jo Teacher', 'observing')).toBe('Observation Observing · Year 9');
+    expect(linkedMeetingTitle('Catch-up', 'Jo Teacher', 'reflecting')).toBe('Jo Teacher · observation reflecting');
   });
 
   it('End completes the meeting and opens the wrap-up', async () => {
@@ -438,6 +562,16 @@ describe('meeting page', () => {
     expect(panel).not.toBeNull();
     // Nobody in this fixture is a student, so everyone in the room (you excluded) can be chosen.
     expect(panel.querySelector('[data-guide="motivation_sdt"]')?.hasAttribute('disabled')).toBe(false);
+  });
+
+  it('Guides show in every phase, inside the notes card', async () => {
+    const canvas = await render();
+    const guides = canvas.querySelector('[data-part="guides"]');
+    for (const next of ['before', 'during', 'after']) {
+      canvas.querySelector<HTMLButtonElement>(`[data-set-phase="${next}"]`)!.click();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(canvas.querySelector('[data-part="notes"] [data-part="guides"]')).toBe(guides);
+    }
   });
 
   it('saveGuideRun stores the run and returns the note line only the first time', async () => {
