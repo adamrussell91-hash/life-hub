@@ -87,6 +87,11 @@
 .tf-progress { flex: 1 1 160px; min-width: 120px; height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--navy) 10%, transparent); overflow: hidden; }
 .tf-progress i { display: block; height: 100%; background: var(--pastel-sage-ink); transition: width .25s; }
 .tf-count { font-size: var(--text-sm); font-weight: 600; color: var(--navy); white-space: nowrap; }
+.tf-head__sub { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.tf-head__sub .tf-ai { flex: 1 1 18rem; min-width: 0; flex-wrap: nowrap; padding: 4px 6px 4px 12px; line-height: 1.3; }
+.tf-head__sub .tf-ai button { flex: none; min-height: 2rem; padding-block: 0; }
+.tf-head__sub .tf-ai[hidden] { display: none; }
+.tf-head__sub .tf-pills { min-width: 0; max-width: 100%; }
 .tf-pills { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .tf-pill { flex: none; min-height: 32px; border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 3px 12px; font: inherit; font-size: var(--text-sm); font-weight: 500; color: var(--navy); cursor: pointer; }
 .tf-pill[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
@@ -156,6 +161,7 @@ small.tf-first { display: block; color: var(--muted); font-style: normal; }
   .tf-body.show-queue .tf-queue { display: grid; }
   .tf-body.show-queue .tf-work { display: none; }
   .tf-queue-toggle { display: inline-block; }
+  .tf-head__sub .tf-ai { flex-basis: 100%; flex-wrap: wrap; }
   .tf-head, .tf-work { padding-left: var(--space-3); padding-right: var(--space-3); }
   .tf-bar { padding: var(--space-2) var(--space-3); }
   .tf-bar kbd { display: none; }

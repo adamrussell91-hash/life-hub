@@ -92,6 +92,7 @@ const FILTERS: Array<{ value: Status | 'all'; label: string }> = [
 const SPEEDS = [1, 1.25, 1.5, 2];
 const REACTIONS = [0, 0.5, 1, 1.5, 2];
 const REACTION_KEY = 'voice:reaction';
+const CODES_FOLDED_KEY = 'voice:codes-folded';
 const SAVE_DELAY_MS = 1200;
 const POLL_MS = 8000;
 const MAX_POLLS = 40;
@@ -450,6 +451,20 @@ export function mountVoiceTeacher(
     // Player and codes stick together, so the codes stay in reach while the transcript scrolls.
     const dock = el('div', 'voice-mark__dock');
     dock.append(player, strip);
+    // Folding the code buttons gives the transcript the room; keys still tag while folded.
+    const setFolded = (folded: boolean) => {
+      dock.classList.toggle('is-folded', folded);
+      foldCodes.textContent = folded ? 'Show codes' : 'Hide codes';
+      foldCodes.setAttribute('aria-expanded', String(!folded));
+    };
+    const foldCodes = button('Hide codes', 'ghost', () => {
+      const folded = !dock.classList.contains('is-folded');
+      writeJSON(CODES_FOLDED_KEY, folded);
+      setFolded(folded);
+    });
+    foldCodes.classList.add('voice-player__fold');
+    player.append(foldCodes);
+    setFolded(readJSON<boolean>(CODES_FOLDED_KEY) === true);
     if (typeof ResizeObserver === 'function') {
       new ResizeObserver(() => screen.style.setProperty('--voice-dock-h', `${dock.offsetHeight}px`)).observe(dock);
     }
