@@ -272,6 +272,20 @@ describe('observing', () => {
     expect(root.querySelector('.obs-log__addhost')!.childElementCount).toBe(0);
   });
 
+  it('says what Gather did, or why there was nothing', async () => {
+    const root = await mount(planned(), 'observing', MEETING_OBS);
+    const gather = root.querySelector('[data-part="obs-gather"]') as HTMLButtonElement;
+    const msg = () => root.querySelector('[data-part="obs-gather-msg"]')!.textContent;
+    gather.click();
+    expect(msg()).toMatch(/^Nothing to gather yet/);
+    const obs = logEntry(planned(), { descriptor: '3.5.2', kind: 'strength', text: 'Chunked' }, T0);
+    ws?.destroy();
+    host.replaceChildren();
+    const r2 = await mount({ ...obs, write_up: {} }, 'observing', MEETING_OBS);
+    (r2.querySelector('[data-part="obs-gather"]') as HTMLButtonElement).click();
+    expect(r2.querySelector('[data-part="obs-gather-msg"]')!.textContent).toBe('Already up to date.');
+  });
+
   it('gathers from the log into cells Adam has not edited', async () => {
     let obs = planned();
     obs = logEntry(obs, { descriptor: '3.5.2', kind: 'strength', text: 'Chunked instructions' }, T0);

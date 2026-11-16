@@ -500,9 +500,32 @@ export function mountObserving(ctx: ObsCtx): ObsView {
   }
 
   const gather = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--sm', 'data-part': 'obs-gather' }, '↻ Gather from Planning and log');
+  const gatherMsg = h(doc, 'span', { class: 'obs-small obs-gather__msg', 'data-part': 'obs-gather-msg', role: 'status', 'aria-live': 'polite' });
   gather.addEventListener('click', () => {
-    ctx.change(withGather, 'now');
+    const before = ctx.obs();
+    const after = withGather(before);
+    let changed = 0;
+    let kept = 0;
+    for (const d of before.descriptors) {
+      const a = before.write_up[d.code] ?? emptyRow();
+      const b = after.write_up[d.code]!;
+      if (a.practice !== b.practice) changed++;
+      if (a.strengths !== b.strengths) changed++;
+      kept += a.edited.filter((k) => a[k].trim()).length;
+    }
+    ctx.change(() => after, 'now');
     syncWriteUp();
+    const hasSource = before.descriptors.some((d) => [d.demonstrate, d.practice, d.planned_impact, d.how_know].some((t) => t.trim()))
+      || before.log.some((l) => l.descriptor);
+    const keptNote = kept ? ` ${kept} edited ${kept === 1 ? 'cell' : 'cells'} left as you wrote ${kept === 1 ? 'it' : 'them'}.` : '';
+    gatherMsg.textContent = changed
+      ? `Filled ${changed} ${changed === 1 ? 'cell' : 'cells'}.${keptNote}`
+      : hasSource
+        ? `Already up to date.${keptNote}`
+        : 'Nothing to gather yet. Cells fill from the Planning form (what you’ll demonstrate, planned impact) and from log lines tagged with a descriptor.';
+    gatherMsg.classList.remove('is-flash');
+    void gatherMsg.offsetWidth;
+    gatherMsg.classList.add('is-flash');
   });
 
   // ---------------------------------------------------------------- mount
@@ -530,7 +553,7 @@ export function mountObserving(ctx: ObsCtx): ObsView {
     h(doc, 'div', { class: 'obs-divider' }, 'Write-up · Phase 2 of the report'),
     h(doc, 'div', { class: 'obs-row' },
       h(doc, 'span', { class: 'obs-muted obs-small' }, 'Each cell starts from what you planned for that descriptor, then the log lines tagged with it. Edit freely; gathering again leaves edited cells alone.'),
-      h(doc, 'span', { class: 'obs-spacer' }), gather),
+      h(doc, 'span', { class: 'obs-spacer' }), gatherMsg, gather),
     table);
 
   return {

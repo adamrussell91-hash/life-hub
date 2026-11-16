@@ -123,6 +123,9 @@ button.obs-series__step:hover { background: var(--obs-paper); }
 .obs-look__add { width: 14em; border-style: dashed; border-radius: 999px; padding: 4px 10px; font-size: 13px; background: transparent; }
 
 /* Observing */
+.obs-gather__msg { color: var(--obs-navy, var(--obs-ink)); font-weight: 600; max-width: 34em; text-align: right; }
+.obs-gather__msg.is-flash { animation: obs-flash 1s ease; }
+.obs-btn:active { transform: translateY(1px); }
 .obs-clockrow { gap: 10px; flex-wrap: wrap; }
 .obs-starttime { gap: 6px; align-items: center; flex-wrap: nowrap; }
 .obs-starttime label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
