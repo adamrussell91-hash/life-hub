@@ -35,6 +35,8 @@ export interface AddPersonResult {
 export interface AddPersonFormOptions {
   onCreated: (result: AddPersonResult) => void;
   onCancel?: () => void;
+  /** Starts the Name box with this text (what was typed in a search). */
+  initialName?: string;
 }
 
 function todayIsoDate(): string {
@@ -71,6 +73,7 @@ export function mountAddPersonForm(
   nameInput.type = 'text';
   nameInput.required = true;
   nameInput.setAttribute('aria-label', 'Name');
+  if (options.initialName) nameInput.value = options.initialName;
 
   const whereInput = document.createElement('input');
   whereInput.type = 'text';

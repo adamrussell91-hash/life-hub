@@ -840,6 +840,24 @@ describe('renderEventNewView', () => {
     ) as HTMLElement | undefined;
     option?.click();
 
+    // The pick stays under Provider / venue, not at the bottom of the section.
+    const orgField = orgInput.closest('.event-compose__field') as HTMLElement;
+    expect(orgField.querySelector('.event-form__chips')?.textContent).toMatch(/NESA\s*provider/);
+
+    // A second pick (same organisation, now as venue) adds alongside it.
+    const orgRel = canvas.querySelector('[aria-label="Organisation relationship"]') as HTMLSelectElement;
+    orgRel.value = 'venue';
+    orgInput.value = '@NES';
+    orgInput.setSelectionRange(orgInput.value.length, orgInput.value.length);
+    orgInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[role="option"]')).toBeTruthy();
+    });
+    ([...canvas.querySelectorAll('[role="option"]')].find((node) =>
+      node.textContent?.includes('NESA')
+    ) as HTMLElement).click();
+    expect(orgField.querySelector('.event-form__chips')?.textContent).toMatch(/NESA\s*venue/);
+
     const titleInput = canvas.querySelector('[aria-label="Title"]') as HTMLInputElement;
     titleInput.value = 'PD Day';
     (canvas.querySelector('form.event-form') as HTMLFormElement).requestSubmit();
@@ -851,8 +869,74 @@ describe('renderEventNewView', () => {
       expect.objectContaining({
         relationship_type: 'provider',
         target_ref: 'shared:organisation:org_new'
+      }),
+      expect.objectContaining({
+        relationship_type: 'venue',
+        target_ref: 'shared:organisation:org_new'
       })
     ]);
+  });
+
+  it('adds a presenter nobody could find through the quick Add to People card', async () => {
+    const posted: unknown[] = [];
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const href = String(input);
+      if (href.includes('/api/entities/search')) {
+        return Response.json({ ok: true, data: { groups: { person: [], organisation: [], task: [] } } });
+      }
+      if (href.endsWith('/api/entities') && init?.method === 'POST') {
+        posted.push(JSON.parse(String(init.body)));
+        return Response.json({
+          ok: true,
+          data: {
+            ref: 'shared:person:person_00000000-0000-4000-8000-0000000000aa',
+            kind: 'person',
+            display_name: 'Rowan Vale'
+          }
+        });
+      }
+      return Response.json({ ok: true, data: { groups: { person: [], organisation: [], task: [] } } });
+    });
+
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    const saved: Array<{ pendingLinks: unknown }> = [];
+    await renderEventNewView(canvas, { onSave: async (payload) => { saved.push(payload); } });
+
+    const presenterInput = canvas.querySelector('[aria-label="Presenter"]') as HTMLInputElement;
+    presenterInput.value = 'Rowan Vale';
+    presenterInput.dispatchEvent(new Event('input', { bubbles: true }));
+    let addBtn: HTMLButtonElement | undefined;
+    await vi.waitFor(() => {
+      addBtn = [...canvas.querySelectorAll('button')].find((b) => b.textContent === 'Create person “Rowan Vale”');
+      expect(addBtn).toBeTruthy();
+    });
+    addBtn!.click();
+
+    const card = document.querySelector('dialog.quick-person-card') as HTMLDialogElement;
+    expect(card).toBeTruthy();
+    expect(card.closest('form.event-form')).toBeNull();
+    const nameInput = card.querySelector('[aria-label="Name"]') as HTMLInputElement;
+    expect(nameInput.value).toBe('Rowan Vale');
+    (card.querySelector('form') as HTMLFormElement).requestSubmit();
+
+    const presenterField = presenterInput.closest('.event-compose__field') as HTMLElement;
+    await vi.waitFor(() => {
+      expect(presenterField.querySelector('.event-form__chips')?.textContent).toMatch(/Rowan Vale\s*presenter/);
+    });
+    expect(document.querySelector('dialog.quick-person-card')).toBeNull();
+    expect(posted).toEqual([{ kind: 'person', display_name: 'Rowan Vale' }]);
+
+    (canvas.querySelector('[aria-label="Title"]') as HTMLInputElement).value = 'PD Day';
+    (canvas.querySelector('form.event-form') as HTMLFormElement).requestSubmit();
+    await vi.waitFor(() => expect(saved.length).toBe(1));
+    expect(saved[0]?.pendingLinks).toEqual([
+      expect.objectContaining({
+        relationship_type: 'presenter',
+        target_ref: 'shared:person:person_00000000-0000-4000-8000-0000000000aa'
+      })
+    ]);
+    canvas.remove();
   });
 
   it('posts a picked attendee as relationship_type "attendee", not "provider"', async () => {
