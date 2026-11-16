@@ -259,3 +259,19 @@
 .guide-panel.achv { position: fixed; }
 @media (max-width: 720px) { .achv-reads__pick { font-size: 16px; } }
 @media (prefers-reduced-motion: reduce) { .achv-switch__knob::after { transition: none; } }
+
+/* Classroom observation: start panel (mockup docs/mockups/classroom-observation/set.html, tab 2) */
+.obs-start__shelf { display: grid; gap: 8px; }
+.obs-start__kind[aria-pressed='true'] { border-color: var(--g-ink); box-shadow: 0 0 0 2px var(--g-ink) inset; }
+.obs-start__kind:disabled { border-style: dashed; }
+.obs-start__emblem { width: 40px; height: 40px; border-radius: 12px; background: var(--g-slate-tint); display: grid; place-items: center; flex: none; color: var(--g-ink); }
+.obs-start__phases { display: grid; gap: 8px; }
+.obs-start__phase { font: inherit; color: inherit; text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px;
+  border: 1px solid var(--g-line); border-radius: 16px; background: var(--g-card); cursor: pointer; }
+.obs-start__phase:disabled { opacity: .45; cursor: default; }
+.obs-start__phase b { font-size: 15px; }
+.obs-start__phase[aria-pressed='true'], .obs-start__choice[aria-pressed='true'] { border-color: var(--g-ink); box-shadow: 0 0 0 2px var(--g-ink) inset; }
+.obs-start__kicker { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--g-teal-3); }
+.obs-start__line { font-size: 13px; color: var(--g-muted); line-height: 1.45; }
+.obs-start__choices { display: grid; gap: 8px; }
+.obs-start__choice { display: flex; flex-direction: column; gap: 2px; color: inherit; cursor: pointer; }
