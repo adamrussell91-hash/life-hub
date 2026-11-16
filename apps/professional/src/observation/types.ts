@@ -28,6 +28,8 @@ export interface PlannedDescriptor {
   planned_impact: string;
   how_know: string;
   look_fors: LookFor[];
+  /** An extra descriptor Adam watches for future evidence sets. Logged and gathered, never on the NESA report. */
+  extra?: boolean;
 }
 
 export interface LogEntry {
@@ -41,6 +43,8 @@ export interface LogEntry {
   look_for: string | null;
   kind: LogKind;
   text: string;
+  /** Next steps only: whether this line counts toward Partially in the tally's suggestion. Missing = yes. */
+  counts_partial?: boolean;
 }
 
 export interface WriteUpRow {

@@ -7,10 +7,10 @@
  * box and Enter there logs.
  */
 import {
-  addLogLineAt, clockLabel, clockMs, deleteLogEntry, editLogEntry, endClock, gatherWriteUp, logEntry, notesFor, pauseClock, resumeClock, setLessonStart, startClock, tally
+  addLogLineAt, addLookFor, agreedDescriptors, extraDescriptors, clockLabel, clockMs, deleteLogEntry, editLogEntry, endClock, gatherWriteUp, logEntry, notesFor, pauseClock, resumeClock, setLessonStart, startClock, tally
 } from './model';
 import type { Decision, LogEntry, LogKind, Observation, WriteUpRow } from './types';
-import { DECISIONS, focusOf, h, KIND_KEYS, kindMeta, KINDS, NESA, slotClass, slotOf, syncValue, type ObsCtx, type ObsView } from './ui';
+import { DECISIONS, focusOf, guideSuggestions, h, KIND_KEYS, kindMeta, KINDS, NESA, slotClass, slotOf, syncValue, type ObsCtx, type ObsView } from './ui';
 
 const emptyRow = (): WriteUpRow => ({ practice: '', strengths: '', decision: null, comments: '', edited: [] });
 
@@ -26,6 +26,7 @@ export function mountObserving(ctx: ObsCtx): ObsView {
   const withGather = (o: Observation): Observation => ({ ...o, write_up: gatherWriteUp(o, ctx.notes?.() ?? {}) });
   const el = h(doc, 'div', { class: 'obs-view obs-observing', 'data-part': 'obs-observing' });
   const sel: { code: string | null; look: string | null; kind: LogKind } = { code: null, look: null, kind: 'strength' };
+  let guideOpen = false;
   let tick: ReturnType<typeof setInterval> | null = null;
   let freshId: string | null = null;
 
@@ -134,7 +135,8 @@ export function mountObserving(ctx: ObsCtx): ObsView {
       const b = h(doc, 'button', {
         type: 'button', class: `obs-key obs-key--d ${slotClass(i)}${sel.code === d.code ? ' is-on' : ''}`,
         'aria-pressed': String(sel.code === d.code), 'data-code': d.code, title: focusOf(d.code)
-      }, h(doc, 'kbd', {}, String(i + 1)), d.code, h(doc, 'span', { class: 'obs-key__long obs-key__focus' }, focusOf(d.code)));
+      }, h(doc, 'kbd', {}, String(i + 1)), d.code, h(doc, 'span', { class: 'obs-key__long obs-key__focus' }, focusOf(d.code)),
+        d.extra ? h(doc, 'span', { class: 'obs-extra-tag', title: 'Extra: not on the report' }, 'extra') : null);
       b.addEventListener('click', () => pickDescriptor(d.code));
       return b;
     }));
@@ -151,7 +153,34 @@ export function mountObserving(ctx: ObsCtx): ObsView {
       b.addEventListener('click', () => pickLook(lf.id));
       return b;
     }));
-    if (!d) lookRow.append(h(doc, 'span', { class: 'obs-muted obs-small' }, sel.code ? 'No look-fors planned.' : 'Pick a descriptor to see its look-fors.'));
+    if (!d) lookRow.append(h(doc, 'span', { class: 'obs-muted obs-small' }, 'Pick a descriptor to see its look-fors.'));
+    else {
+      if (!d.look_fors.length) lookRow.append(h(doc, 'span', { class: 'obs-muted obs-small' }, 'No look-fors planned.'));
+      const more = h(doc, 'button', { type: 'button', class: `obs-btn obs-btn--xs obs-btn--quiet${guideOpen ? ' is-on' : ''}`, 'aria-expanded': String(guideOpen), 'data-part': 'obs-guide-toggle' },
+        guideOpen ? 'Hide the guide' : '+ From the guide');
+      more.addEventListener('click', () => { guideOpen = !guideOpen; paintDock(); });
+      lookRow.append(more);
+      if (guideOpen) {
+        const code = d.code;
+        lookRow.append(guideSuggestions(doc, {
+          code,
+          have: d.look_fors.map((l) => l.label),
+          onLook: (text) => {
+            const before = new Set(d.look_fors.map((l) => l.id));
+            ctx.change((o) => addLookFor(o, code, text), 'now');
+            const added = ctx.obs().descriptors.find((x) => x.code === code)?.look_fors.find((l) => !before.has(l.id));
+            sel.look = added?.id ?? null;
+            paintDock();
+            renderTally();
+          },
+          onProficient: (text) => {
+            note.value = note.value.trim() ? `${note.value.trim()} ${text}` : text;
+            note.focus();
+          },
+          proficientAction: 'Put in the note box'
+        }));
+      }
+    }
     kindRow.replaceChildren(...KINDS.map((k) => {
       const b = h(doc, 'button', {
         type: 'button', class: `obs-key obs-key--kind${sel.kind === k.kind ? ' is-on' : ''}`,
@@ -326,9 +355,20 @@ export function mountObserving(ctx: ObsCtx): ObsView {
     const text = h(doc, 'div', { class: 'obs-entry__text' }, line.text);
     const edit = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--xs obs-btn--quiet', 'aria-label': `Edit line at ${line.clock}`, 'data-part': 'obs-log-edit' }, 'Edit');
     const del = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--xs obs-btn--quiet', 'aria-label': `Delete line at ${line.clock}`, 'data-part': 'obs-log-delete' }, '×');
+    let partial: HTMLElement | null = null;
+    if (line.kind === 'next' && line.descriptor) {
+      const counts = line.counts_partial !== false;
+      const box = h(doc, 'input', { type: 'checkbox', 'data-part': 'obs-counts-partial', 'aria-label': `Line at ${line.clock} counts toward Partially` });
+      box.checked = counts;
+      box.addEventListener('change', () => {
+        ctx.change((o) => editLogEntry(o, line.id, { counts_partial: box.checked }), 'now');
+        renderTally();
+      });
+      partial = h(doc, 'label', { class: 'obs-partial', title: 'Whether this next step pulls the suggestion to Partially' }, box, ' Counts as partial');
+    }
     const li = h(doc, 'li', { class: `obs-entry${line.id === freshId ? ' is-new' : ''}`, 'data-id': line.id },
       h(doc, 'span', { class: 'obs-entry__t' }, line.clock),
-      h(doc, 'div', { class: 'obs-entry__body' }, tags(obs, line), text),
+      h(doc, 'div', { class: 'obs-entry__body' }, tags(obs, line), text, partial),
       h(doc, 'div', { class: 'obs-entry__tools' }, edit, del));
     edit.addEventListener('click', () => {
       const form = lineForm({ clock: line.clock, descriptor: line.descriptor, look_for: line.look_for, kind: line.kind, text: line.text }, 'Save', (dft) => {
@@ -417,7 +457,7 @@ export function mountObserving(ctx: ObsCtx): ObsView {
           h(doc, 'span', { class: 'obs-small obs-muted' },
             `${row.strengths} ${row.strengths === 1 ? 'strength' : 'strengths'} · ${row.next} ${row.next === 1 ? 'next step' : 'next steps'}`),
           h(doc, 'span', { class: 'obs-spacer' }),
-          decide(d.code)),
+          d.extra ? h(doc, 'span', { class: 'obs-extra-tag', title: 'Evidence for future sets; not on the report' }, 'Extra') : decide(d.code)),
         bars, hits);
     }));
     if (!obs.descriptors.length) tallyHost.append(h(doc, 'p', { class: 'obs-muted obs-small' }, 'No descriptors planned.'));
@@ -428,7 +468,7 @@ export function mountObserving(ctx: ObsCtx): ObsView {
   function impactCard(): HTMLElement {
     const obs = ctx.obs();
     return h(doc, 'div', { class: 'obs-card' }, h(doc, 'h3', {}, 'Planned impact, from Planning'),
-      ...obs.descriptors.map((d, i) => h(doc, 'p', { class: 'obs-small obs-impact' },
+      ...agreedDescriptors(obs).map((d, i) => h(doc, 'p', { class: 'obs-small obs-impact' },
         h(doc, 'span', { class: `obs-code ${slotClass(i)}` }, d.code), ' ', d.planned_impact || h(doc, 'span', { class: 'obs-muted' }, 'Nothing written in Planning.'))));
   }
 
@@ -467,7 +507,7 @@ export function mountObserving(ctx: ObsCtx): ObsView {
   function writeUpTable(): HTMLElement {
     const obs = ctx.obs();
     const th = (title: string, small: string) => h(doc, 'th', { scope: 'col' }, title, small ? h(doc, 'small', {}, small) : null);
-    const rows = obs.descriptors.map((d, i) => {
+    const rows = agreedDescriptors(obs).map((d, i) => {
       const row = obs.write_up[d.code] ?? emptyRow();
       const c = { practice: cellInput(d.code, 'practice', row.practice), strengths: cellInput(d.code, 'strengths', row.strengths), comments: cellInput(d.code, 'comments', row.comments) };
       cells.set(d.code, c);
@@ -496,6 +536,35 @@ export function mountObserving(ctx: ObsCtx): ObsView {
       syncValue(c.strengths, row.strengths);
       syncValue(c.comments, row.comments);
     }
+    for (const [code, c] of extraCells) {
+      const row = obs.write_up[code] ?? emptyRow();
+      syncValue(c.practice, row.practice);
+      syncValue(c.strengths, row.strengths);
+    }
+  }
+
+  // ---------------------------------------------------------------- extras (off the report)
+  const extraCells = new Map<string, { practice: HTMLTextAreaElement; strengths: HTMLTextAreaElement }>();
+
+  /** Extra descriptors gather like the agreed ones but sit here, outside the report table. */
+  function extrasCard(): HTMLElement | null {
+    const obs = ctx.obs();
+    const extras = extraDescriptors(obs);
+    if (!extras.length) return null;
+    const base = agreedDescriptors(obs).length;
+    return h(doc, 'div', { class: 'obs-card obs-extras', 'data-part': 'obs-extras' },
+      h(doc, 'h3', {}, 'Extra descriptors · evidence for future sets'),
+      h(doc, 'p', { class: 'obs-muted obs-small' }, 'Not on the NESA report. Gathered from the log and Notes like the others, to use when the teacher builds a set on these.'),
+      ...extras.map((d, j) => {
+        const row = obs.write_up[d.code] ?? emptyRow();
+        const c = { practice: cellInput(d.code, 'practice', row.practice), strengths: cellInput(d.code, 'strengths', row.strengths) };
+        extraCells.set(d.code, c);
+        return h(doc, 'div', { class: `obs-extra ${slotClass(base + j)}`, 'data-code': d.code },
+          h(doc, 'div', { class: 'obs-row' }, h(doc, 'span', { class: 'obs-code' }, d.code), h(doc, 'b', { class: 'obs-small' }, focusOf(d.code))),
+          h(doc, 'div', { class: 'obs-extra__cells' },
+            h(doc, 'label', { class: 'obs-small' }, 'What you saw', c.practice),
+            h(doc, 'label', { class: 'obs-small' }, 'Strengths and next steps', c.strengths)));
+      }));
   }
 
   const gather = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--sm', 'data-part': 'obs-gather' }, '↻ Gather from Planning and log');
@@ -560,7 +629,8 @@ export function mountObserving(ctx: ObsCtx): ObsView {
     h(doc, 'div', { class: 'obs-row' },
       h(doc, 'span', { class: 'obs-muted obs-small' }, 'Each cell starts from what you planned for that descriptor, then the log lines tagged with it, then paragraphs in the meetings’ Notes that name it. Edit freely; gathering again leaves edited cells alone.'),
       h(doc, 'span', { class: 'obs-spacer' }), gatherMsg, gather),
-    table);
+    table,
+    extrasCard() ?? '');
 
   return {
     el,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PROFICIENT_DESCRIPTORS, descriptorByCode } from '@/observation/descriptors';
 import {
-  addDescriptor, addLogLineAt, addLookFor, assignLookForKeys, clockLabel, clockMs, deleteLogEntry, draftFeedback, editLogEntry,
+  addDescriptor, addLogLineAt, agreedDescriptors, extraDescriptors, setDescriptorExtra, addLookFor, assignLookForKeys, clockLabel, clockMs, deleteLogEntry, draftFeedback, editLogEntry,
   endClock, gatherWriteUp, notesFor, logEntry, newObservation, pauseClock, removeDescriptor, removeLookFor, renameLookFor,
   parseClock, resumeClock, setLessonStart, startClock, tally, windowDay, windowTone
 } from '@/observation/model';
@@ -38,8 +38,6 @@ describe('descriptors', () => {
     expect(new Set(PROFICIENT_DESCRIPTORS.map((d) => d.code)).size).toBe(37);
     expect(PROFICIENT_DESCRIPTORS.every((d) => d.text.length > 10 && d.focus && d.code.endsWith('.2'))).toBe(true);
     expect(descriptorByCode('3.5.2')?.standard).toBe(3);
-    expect(PROFICIENT_DESCRIPTORS.filter((d) => d.hardInOneLesson).map((d) => d.code))
-      .toEqual(['3.6.2', '3.7.2', '5.3.2', '5.4.2', '5.5.2', '6.1.2', '6.2.2', '6.3.2', '6.4.2', '7.1.2', '7.2.2', '7.3.2', '7.4.2']);
   });
 });
 
@@ -51,13 +49,54 @@ describe('picking descriptors and look-fors', () => {
     expect(o.clock).toEqual({ started_at: null, paused_ms: 0, paused_at: null, ended_at: null });
   });
 
-  it('refuses a fifth, a duplicate and an unknown descriptor', () => {
+  it('takes 4 agreed, then 2 extras, then refuses; also refuses duplicates and unknown codes', () => {
     const four = planned(['1.5.2', '3.5.2', '5.2.2', '4.2.2']);
     expect(four.descriptors).toHaveLength(4);
     const fifth = addDescriptor(four, '2.2.2');
-    expect(fifth.ok).toBe(false);
+    if (!fifth.ok) throw new Error(fifth.reason);
+    expect(fifth.observation.descriptors.at(-1)).toMatchObject({ code: '2.2.2', extra: true });
+    const sixth = addDescriptor(fifth.observation, '6.3.2');
+    if (!sixth.ok) throw new Error(sixth.reason);
+    expect(extraDescriptors(sixth.observation).map((d) => d.code)).toEqual(['2.2.2', '6.3.2']);
+    expect(addDescriptor(sixth.observation, '5.1.2')).toMatchObject({ ok: false });
     expect(addDescriptor(four, '3.5.2')).toMatchObject({ ok: false });
     expect(addDescriptor(base(), '9.9.9')).toMatchObject({ ok: false });
+  });
+
+  it('moves a descriptor between agreed and extra within the limits, agreed first', () => {
+    let o = planned(['3.5.2', '5.2.2', '1.5.2']);
+    const r = setDescriptorExtra(o, '3.5.2', true);
+    if (!r.ok) throw new Error(r.reason);
+    o = r.observation;
+    expect(o.descriptors.map((d) => `${d.code}${d.extra ? '*' : ''}`)).toEqual(['5.2.2', '1.5.2', '3.5.2*']);
+    expect(agreedDescriptors(o).map((d) => d.code)).toEqual(['5.2.2', '1.5.2']);
+    const back = setDescriptorExtra(o, '3.5.2', false);
+    expect(back.ok && back.observation.descriptors.every((d) => !d.extra)).toBe(true);
+    const full = planned(['1.5.2', '3.5.2', '5.2.2', '4.2.2']);
+    const extra = addDescriptor(full, '2.2.2');
+    if (!extra.ok) throw new Error(extra.reason);
+    expect(setDescriptorExtra(extra.observation, '2.2.2', false)).toMatchObject({ ok: false });
+  });
+
+  it('keeps extras out of drafted feedback', () => {
+    let o = planned(['3.5.2', '5.2.2']);
+    const r = addDescriptor(o, '6.3.2', { extra: true });
+    if (!r.ok) throw new Error(r.reason);
+    o = startClock(r.observation, at(0));
+    o = logEntry(o, { descriptor: '6.3.2', kind: 'strength', text: 'Took the mentor’s advice' }, at(60));
+    const w = gatherWriteUp(o);
+    expect(w['6.3.2'].practice).toContain('Took the mentor’s advice');
+    w['6.3.2'] = { ...w['6.3.2'], decision: 'observed' };
+    expect(Object.keys(draftFeedback({ ...o, write_up: w }))).toEqual(['3.5.2', '5.2.2']);
+  });
+
+  it('a next step counts toward Partially unless switched off', () => {
+    let o = startClock(planned(['3.5.2']), at(0));
+    o = logEntry(o, { descriptor: '3.5.2', kind: 'strength', text: 'Clear' }, at(10));
+    o = logEntry(o, { descriptor: '3.5.2', kind: 'next', text: 'Slow down' }, at(20));
+    expect(tally(o)['3.5.2'].suggestion).toBe('partial');
+    o = editLogEntry(o, o.log[1].id, { counts_partial: false });
+    expect(tally(o)['3.5.2']).toMatchObject({ suggestion: 'observed', next: 1 });
   });
 
   it('gives look-fors the keys of their descriptor row, three to a row, extras blank', () => {

@@ -9,9 +9,11 @@ import type {
 } from './types';
 
 export const MAX_DESCRIPTORS = 4;
+/** Extra descriptors watched for future evidence sets, on top of the agreed ones. */
+export const MAX_EXTRA = 2;
 export const MIN_DESCRIPTORS = 2;
 /** Quick-key rows: the first descriptor's look-fors use Q W E, the second A S D, and so on. */
-export const LOOK_FOR_ROWS = ['QWE', 'ASD', 'ZXC', 'RTY'] as const;
+export const LOOK_FOR_ROWS = ['QWE', 'ASD', 'ZXC', 'RTY', 'FGH', 'VBN'] as const;
 
 type Instant = Date | number | string;
 const ms = (t: Instant): number => (t instanceof Date ? t.getTime() : typeof t === 'number' ? t : Date.parse(t));
@@ -72,14 +74,42 @@ export function assignLookForKeys(descriptors: PlannedDescriptor[]): PlannedDesc
 
 export type ChangeResult = { ok: true; observation: Observation } | { ok: false; reason: string };
 
-export function addDescriptor(obs: Observation, code: string): ChangeResult {
+/** The 2-4 descriptors agreed with the teacher: the ones on the NESA report. */
+export const agreedDescriptors = (obs: Observation): PlannedDescriptor[] => obs.descriptors.filter((d) => !d.extra);
+/** Extra descriptors watched quietly for future evidence sets. */
+export const extraDescriptors = (obs: Observation): PlannedDescriptor[] => obs.descriptors.filter((d) => d.extra);
+
+/** Agreed first, then extras, each keeping its order; look-for keys follow the order. */
+const ordered = (ds: PlannedDescriptor[]): PlannedDescriptor[] => assignLookForKeys([...ds.filter((d) => !d.extra), ...ds.filter((d) => d.extra)]);
+
+/** Adds as agreed while there's room (4), then as an extra (2 more). */
+export function addDescriptor(obs: Observation, code: string, opts: { extra?: boolean } = {}): ChangeResult {
   if (obs.descriptors.some((d) => d.code === code)) return { ok: false, reason: 'That descriptor is already picked.' };
   if (!descriptorByCode(code)) return { ok: false, reason: 'That isn’t a Proficient descriptor.' };
-  if (obs.descriptors.length >= MAX_DESCRIPTORS) {
-    return { ok: false, reason: `Pick at most ${MAX_DESCRIPTORS}: more than that can’t be watched in one lesson.` };
+  const agreed = agreedDescriptors(obs).length;
+  const extras = extraDescriptors(obs).length;
+  const extra = opts.extra ?? agreed >= MAX_DESCRIPTORS;
+  if (!extra && agreed >= MAX_DESCRIPTORS) return { ok: false, reason: `The report takes at most ${MAX_DESCRIPTORS} agreed descriptors.` };
+  if (extra && extras >= MAX_EXTRA) {
+    return { ok: false, reason: `That’s ${MAX_DESCRIPTORS} agreed and ${MAX_EXTRA} extra already. Remove one first.` };
   }
-  const added: PlannedDescriptor = { code, why: '', practice: '', demonstrate: '', planned_impact: '', how_know: '', look_fors: [] };
-  return { ok: true, observation: { ...obs, descriptors: assignLookForKeys([...obs.descriptors, added]) } };
+  const added: PlannedDescriptor = { code, why: '', practice: '', demonstrate: '', planned_impact: '', how_know: '', look_fors: [], ...(extra ? { extra: true } : {}) };
+  return { ok: true, observation: { ...obs, descriptors: ordered([...obs.descriptors, added]) } };
+}
+
+/** Move a descriptor between agreed (on the report) and extra (for future sets). */
+export function setDescriptorExtra(obs: Observation, code: string, extra: boolean): ChangeResult {
+  const d = obs.descriptors.find((x) => x.code === code);
+  if (!d) return { ok: false, reason: 'That descriptor isn’t picked.' };
+  if (!!d.extra === extra) return { ok: true, observation: obs };
+  if (!extra && agreedDescriptors(obs).length >= MAX_DESCRIPTORS) return { ok: false, reason: `The report already has ${MAX_DESCRIPTORS} agreed descriptors.` };
+  if (extra && extraDescriptors(obs).length >= MAX_EXTRA) return { ok: false, reason: `There are already ${MAX_EXTRA} extra descriptors.` };
+  const descriptors = ordered(obs.descriptors.map((x) => {
+    if (x.code !== code) return x;
+    const { extra: _drop, ...rest } = x;
+    return extra ? { ...rest, extra: true } : rest;
+  }));
+  return { ok: true, observation: { ...obs, descriptors } };
 }
 
 export function removeDescriptor(obs: Observation, code: string): Observation {
@@ -229,7 +259,7 @@ function keepLook(obs: Observation, descriptor: string | null, lookFor: string |
 export function editLogEntry(
   obs: Observation,
   id: string,
-  patch: Partial<Pick<LogEntry, 'text' | 'kind' | 'descriptor' | 'look_for' | 'clock'>>
+  patch: Partial<Pick<LogEntry, 'text' | 'kind' | 'descriptor' | 'look_for' | 'clock' | 'counts_partial'>>
 ): Observation {
   const clock = patch.clock !== undefined ? parseClock(patch.clock) : null;
   if (patch.clock !== undefined && !clock) return obs;
@@ -275,6 +305,7 @@ export function deleteLogEntry(obs: Observation, id: string): Observation {
 
 export interface DescriptorTally {
   strengths: number;
+  /** All next steps, including ones Adam set not to count toward Partially. */
   next: number;
   lookHits: Record<string, number>;
   suggestion: Decision | null;
@@ -288,10 +319,11 @@ export function tally(obs: Observation): Record<string, DescriptorTally> {
     for (const lf of d.look_fors) lookHits[lf.id] = 0;
     let strengths = 0;
     let next = 0;
+    let partial = 0;
     for (const l of obs.log) {
       if (l.descriptor !== d.code) continue;
       if (l.kind === 'strength') strengths += 1;
-      else if (l.kind === 'next') next += 1;
+      else if (l.kind === 'next') { next += 1; if (l.counts_partial !== false) partial += 1; }
       else continue;
       if (l.look_for && l.look_for in lookHits) lookHits[l.look_for] += 1;
     }
@@ -299,7 +331,7 @@ export function tally(obs: Observation): Record<string, DescriptorTally> {
       strengths,
       next,
       lookHits,
-      suggestion: strengths + next === 0 ? null : next > 0 ? 'partial' : 'observed'
+      suggestion: partial > 0 ? 'partial' : strengths > 0 ? 'observed' : null
     };
   }
   return out;
@@ -373,7 +405,7 @@ export function gatherWriteUp(obs: Observation, notes: GatherNotes = {}): Observ
 /** Draft the supervisor's feedback from the write-up decisions; rows Adam edited, or with no decision, stay. */
 export function draftFeedback(obs: Observation): Observation['reflection'] {
   const out: Observation['reflection'] = {};
-  for (const d of obs.descriptors) {
+  for (const d of agreedDescriptors(obs)) {
     const existing: ReflectionRow = obs.reflection[d.code] ?? { teacher: '', feedback: '', feedback_edited: false };
     const row = obs.write_up[d.code];
     if (existing.feedback_edited || !row?.decision) {

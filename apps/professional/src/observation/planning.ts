@@ -4,9 +4,9 @@
  */
 import { getObservation, listObservations } from './api';
 import { PROFICIENT_DESCRIPTORS, STANDARD_NAMES } from './descriptors';
-import { addDescriptor, addLookFor, MAX_DESCRIPTORS, MIN_DESCRIPTORS, removeDescriptor, removeLookFor, renameLookFor } from './model';
+import { addDescriptor, addLookFor, agreedDescriptors, extraDescriptors, MAX_DESCRIPTORS, MAX_EXTRA, MIN_DESCRIPTORS, removeDescriptor, removeLookFor, renameLookFor, setDescriptorExtra } from './model';
 import type { Observation, PlannedDescriptor } from './types';
-import { field, h, NESA, slotClass, type ObsCtx, type ObsView } from './ui';
+import { field, guideSuggestions, h, NESA, slotClass, type ObsCtx, type ObsView } from './ui';
 
 type DescriptorText = 'why' | 'practice' | 'demonstrate' | 'planned_impact' | 'how_know';
 
@@ -82,17 +82,20 @@ export function mountPlanning(ctx: ObsCtx): ObsView {
   function renderPicker(): void {
     const obs = ctx.obs();
     const picked = obs.descriptors.map((d) => d.code);
-    const count = h(doc, 'span', { class: 'obs-count' }, ` · ${picked.length} picked`);
+    const agreed = agreedDescriptors(obs).length;
+    const extras = extraDescriptors(obs).length;
+    const count = h(doc, 'span', { class: 'obs-count' }, ` · ${agreed} agreed${extras ? ` · ${extras} extra` : ''}`);
     const groups = [1, 2, 3, 4, 5, 6, 7].map((standard) => {
       const options = PROFICIENT_DESCRIPTORS.filter((d) => d.standard === standard).map((d) => {
         const slot = picked.indexOf(d.code);
+        const isExtra = slot >= 0 && !!obs.descriptors[slot]!.extra;
         const btn = h(doc, 'button', {
           type: 'button',
-          class: `obs-opt${slot >= 0 ? ` is-on ${slotClass(slot)}` : ''}${d.hardInOneLesson ? ' is-dim' : ''}`,
+          class: `obs-opt${slot >= 0 ? ` is-on ${slotClass(slot)}` : ''}${isExtra ? ' is-extra' : ''}`,
           'aria-pressed': String(slot >= 0),
           'data-code': d.code,
-          title: d.hardInOneLesson ? 'Hard to see in one lesson' : d.text
-        }, h(doc, 'code', {}, d.code), d.focus);
+          title: isExtra ? `${d.text} (extra: not on the report)` : d.text
+        }, h(doc, 'code', {}, d.code), d.focus, isExtra ? h(doc, 'span', { class: 'obs-extra-tag' }, 'extra') : null);
         btn.addEventListener('click', () => toggle(d.code));
         return btn;
       });
@@ -101,9 +104,9 @@ export function mountPlanning(ctx: ObsCtx): ObsView {
         h(doc, 'summary', {}, `Standard ${standard} · ${STANDARD_NAMES[standard]}`),
         h(doc, 'div', { class: 'obs-desc-pick' }, ...options));
     });
-    const need = picked.length < MIN_DESCRIPTORS
-      ? h(doc, 'p', { class: 'obs-muted obs-small' }, `Pick ${MIN_DESCRIPTORS} to ${MAX_DESCRIPTORS}. Faded ones are hard to see in a single lesson; still pickable.`)
-      : h(doc, 'p', { class: 'obs-muted obs-small' }, 'Faded ones are hard to see in a single lesson; still pickable.');
+    const extraNote = `Once ${MAX_DESCRIPTORS} are agreed, up to ${MAX_EXTRA} more can be picked as extras: you log and gather them like the others, but they stay off the report, as evidence for future sets.`;
+    const need = h(doc, 'p', { class: 'obs-muted obs-small' },
+      agreed < MIN_DESCRIPTORS ? `Pick ${MIN_DESCRIPTORS} to ${MAX_DESCRIPTORS} agreed with the teacher. ${extraNote}` : extraNote);
     picker.replaceChildren(h(doc, 'h3', {}, NESA.p1.descriptors.which, count), refusal, ...groups, need);
   }
 
@@ -191,8 +194,33 @@ export function mountPlanning(ctx: ObsCtx): ObsView {
       ctx.change((o) => addLookFor(o, code, add.value), 'now');
       renderLooks(code, host, true);
     });
-    host.replaceChildren(...chips, add);
+    const suggest = guideSuggestions(doc, {
+      code,
+      have: d.look_fors.map((l) => l.label),
+      onLook: (text) => {
+        const before = new Set(ctx.obs().descriptors.find((x) => x.code === code)?.look_fors.map((l) => l.id));
+        ctx.change((o) => addLookFor(o, code, text), 'now');
+        renderLooks(code, host);
+        // Open the new look-for for editing straight away.
+        const added = ctx.obs().descriptors.find((x) => x.code === code)?.look_fors.find((l) => !before.has(l.id));
+        (host.querySelector(`[data-look="${added?.id}"] .obs-look__name`) as HTMLButtonElement | null)?.click();
+      },
+      onProficient: (text) => appendTo(code, 'practice', text),
+      proficientAction: 'Add to “What teaching practice is described”'
+    });
+    host.replaceChildren(...chips, add, suggest);
     if (focusAdd) add.focus();
+  }
+
+  /** Add a line to one of a descriptor's planning answers, then show it in its box. */
+  function appendTo(code: string, key: DescriptorText, text: string): void {
+    ctx.change((o) => ({
+      ...o,
+      descriptors: o.descriptors.map((x) => (x.code === code ? { ...x, [key]: x[key].trim() ? `${x[key].trimEnd()}\n${text}.` : `${text}.` } : x))
+    }), 'now');
+    const box = cards.querySelector(`[name="${code}-${key}"]`) as HTMLTextAreaElement | null;
+    const now = ctx.obs().descriptors.find((x) => x.code === code)?.[key] ?? '';
+    if (box) { box.value = now; box.focus(); box.setSelectionRange(now.length, now.length); }
   }
 
   function card(d: PlannedDescriptor, index: number): HTMLElement {
@@ -201,8 +229,20 @@ export function mountPlanning(ctx: ObsCtx): ObsView {
     const looks = h(doc, 'div', { class: 'obs-looks' });
     renderLooks(code, looks);
     const inlineHead = (t: string) => h(doc, 'div', { class: 'obs-colh obs-colh--inline' }, t);
-    return h(doc, 'article', { class: `obs-dcard ${slotClass(index)}`, 'data-code': code },
-      h(doc, 'div', { class: 'obs-dcard__head' }, h(doc, 'span', { class: 'obs-code' }, code), h(doc, 'b', {}, desc?.focus ?? code)),
+    const move = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--xs obs-btn--quiet', 'data-part': 'obs-extra-toggle' },
+      d.extra ? 'Make agreed (on the report)' : 'Make extra (off the report)');
+    const moveMsg = h(doc, 'span', { class: 'obs-refuse obs-small', role: 'status' });
+    move.addEventListener('click', () => {
+      const r = setDescriptorExtra(ctx.obs(), code, !d.extra);
+      if (!r.ok) { moveMsg.textContent = r.reason; return; }
+      ctx.change(() => r.observation, 'now');
+      renderPicker();
+      renderCards();
+    });
+    return h(doc, 'article', { class: `obs-dcard ${slotClass(index)}${d.extra ? ' is-extra' : ''}`, 'data-code': code },
+      h(doc, 'div', { class: 'obs-dcard__head' }, h(doc, 'span', { class: 'obs-code' }, code), h(doc, 'b', {}, desc?.focus ?? code),
+        d.extra ? h(doc, 'span', { class: 'obs-extra-tag', title: 'Watched for future evidence sets; not on the NESA report' }, 'Extra · not on the report') : null,
+        h(doc, 'span', { class: 'obs-spacer' }), moveMsg, move),
       h(doc, 'p', { class: 'obs-dcard__text' }, desc?.text ?? ''),
       h(doc, 'div', { class: 'obs-grid3' },
         h(doc, 'div', { class: 'obs-stack obs-stack--tight' }, inlineHead(NESA.p1.descriptors.head),

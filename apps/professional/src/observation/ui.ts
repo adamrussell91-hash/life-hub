@@ -4,6 +4,7 @@
  * same text. Template: NESA Observation Report (June 2026).
  */
 import { descriptorByCode } from './descriptors';
+import { guideFor } from './guide';
 import type { GatherNotes } from './model';
 import type { Decision, LogKind, Observation } from './types';
 
@@ -47,8 +48,8 @@ export interface ObsView {
   destroy(): void;
 }
 
-/** Slot colour class for the descriptor at `index` (0-based): obs-c1 … obs-c4. */
-export const slotClass = (index: number): string => `obs-c${Math.min(Math.max(index, 0), 3) + 1}`;
+/** Slot colour class for the descriptor at `index` (0-based): obs-c1 … obs-c6 (5 and 6 are extras). */
+export const slotClass = (index: number): string => `obs-c${Math.min(Math.max(index, 0), 5) + 1}`;
 
 export function slotOf(obs: Observation, code: string | null): string {
   const i = code ? obs.descriptors.findIndex((d) => d.code === code) : -1;
@@ -181,3 +182,51 @@ export const NESA = {
     date: 'Date:'
   }
 } as const;
+
+/**
+ * The NESA evidence guide for one descriptor, kept small: its look-fors as short click-to-add chips (ones
+ * already added drop out; the guide's full sentence is on hover), and, with `onProficient`, its "A Proficient
+ * Teacher …" points as one card you step through with ‹ › rather than a long list.
+ */
+export function guideSuggestions(doc: Document, opts: {
+  code: string;
+  have: string[];
+  onLook: (text: string) => void;
+  onProficient?: (text: string) => void;
+  proficientAction?: string;
+}): HTMLElement {
+  const g = guideFor(opts.code);
+  const have = new Set(opts.have.map((t) => t.trim().toLowerCase()));
+  const looks = g.look_fors.filter((l) => !have.has(l.short.toLowerCase()));
+  const wrap = h(doc, 'div', { class: 'obs-guide', 'data-part': 'obs-guide-suggest' });
+  if (looks.length) {
+    wrap.append(h(doc, 'div', { class: 'obs-guide__row' },
+      h(doc, 'span', { class: 'obs-guide__lbl' }, 'From the guide'),
+      ...looks.map((l) => {
+        const b = h(doc, 'button', { type: 'button', class: 'obs-suggest', 'data-part': 'obs-suggest-look', title: `${l.full}. Click to add, then edit.` }, '+ ', l.short);
+        b.addEventListener('click', () => opts.onLook(l.short));
+        return b;
+      })));
+  }
+  if (opts.onProficient && g.proficient.length) {
+    let at = 0;
+    const text = h(doc, 'p', { class: 'obs-guide__text', 'data-part': 'obs-proficient-text' });
+    const pos = h(doc, 'span', { class: 'obs-guide__pos' });
+    const prev = h(doc, 'button', { type: 'button', class: 'obs-guide__step', 'aria-label': 'Previous point', 'data-part': 'obs-proficient-prev' }, '‹');
+    const next = h(doc, 'button', { type: 'button', class: 'obs-guide__step', 'aria-label': 'Next point', 'data-part': 'obs-proficient-next' }, '›');
+    const add = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--xs', 'data-part': 'obs-proficient-add' }, opts.proficientAction ?? 'Add');
+    const paint = () => {
+      text.textContent = g.proficient[at]!;
+      pos.textContent = `${at + 1} of ${g.proficient.length}`;
+    };
+    prev.addEventListener('click', () => { at = (at - 1 + g.proficient.length) % g.proficient.length; paint(); });
+    next.addEventListener('click', () => { at = (at + 1) % g.proficient.length; paint(); });
+    add.addEventListener('click', () => opts.onProficient!(g.proficient[at]!));
+    paint();
+    wrap.append(h(doc, 'div', { class: 'obs-guide__card' },
+      h(doc, 'div', { class: 'obs-guide__head' }, h(doc, 'span', { class: 'obs-guide__lbl' }, 'A Proficient teacher'), h(doc, 'span', { class: 'obs-spacer' }), prev, pos, next),
+      text,
+      h(doc, 'div', { class: 'obs-guide__foot' }, add)));
+  }
+  return wrap;
+}

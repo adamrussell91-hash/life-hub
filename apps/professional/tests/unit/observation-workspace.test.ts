@@ -123,21 +123,43 @@ describe('observation workspace', () => {
 });
 
 describe('planning', () => {
-  it('toggles descriptors and refuses a fifth with the reason', async () => {
+  it('toggles descriptors; past 4 they become extras, and a seventh is refused', async () => {
     const root = await mount(base(), 'planning');
     for (const code of ['1.5.2', '3.5.2', '5.2.2', '4.2.2']) (root.querySelector(`.obs-opt[data-code="${code}"]`) as HTMLButtonElement).click();
     expect(root.querySelectorAll('.obs-opt[aria-pressed="true"]')).toHaveLength(4);
     expect(root.querySelectorAll('.obs-dcard')).toHaveLength(4);
-    (root.querySelector('.obs-opt[data-code="2.2.2"]') as HTMLButtonElement).click();
-    expect(root.querySelector('[data-part="obs-refuse"]')!.textContent).toMatch(/at most 4/);
-    expect((await lastSaved()).descriptors.map((d) => d.code)).toEqual(['1.5.2', '3.5.2', '5.2.2', '4.2.2']);
-    // Click again to take one off.
-    (root.querySelector('.obs-opt[data-code="4.2.2"]') as HTMLButtonElement).click();
+    for (const code of ['2.2.2', '6.3.2']) (root.querySelector(`.obs-opt[data-code="${code}"]`) as HTMLButtonElement).click();
+    expect(root.querySelectorAll('.obs-opt.is-extra')).toHaveLength(2);
+    expect(root.querySelectorAll('.obs-dcard.is-extra')).toHaveLength(2);
+    (root.querySelector('.obs-opt[data-code="5.1.2"]') as HTMLButtonElement).click();
+    expect(root.querySelector('[data-part="obs-refuse"]')!.textContent).toMatch(/4 agreed and 2 extra/);
+    expect((await lastSaved()).descriptors.map((d) => `${d.code}${d.extra ? '*' : ''}`)).toEqual(['1.5.2', '3.5.2', '5.2.2', '4.2.2', '2.2.2*', '6.3.2*']);
+    // Click again to take them off.
+    for (const code of ['2.2.2', '6.3.2', '4.2.2']) (root.querySelector(`.obs-opt[data-code="${code}"]`) as HTMLButtonElement).click();
     expect((await lastSaved()).descriptors).toHaveLength(3);
     // The template's questions are the labels.
     expect(root.textContent).toContain(NESA.p1.descriptors.why);
     expect(root.textContent).toContain(NESA.p1.strategies.syllabus);
-    expect(root.querySelector('.obs-opt[data-code="5.4.2"]')!.getAttribute('title')).toBe('Hard to see in one lesson');
+    expect(root.querySelector('.obs-opt.is-dim')).toBeNull();
+  });
+
+  it('adds a guide look-for in one click, opens it to edit, and steps through the Proficient points', async () => {
+    const root = await mount(base(['4.5.2']), 'planning');
+    const card = root.querySelector('.obs-dcard[data-code="4.5.2"]') as HTMLElement;
+    const chips = () => [...card.querySelectorAll('[data-part="obs-suggest-look"]')].map((b) => b.textContent);
+    expect(chips()).toEqual(['+ Teaches and models safe ICT use', '+ Students apply ICT ethics in new contexts', '+ Strategies for safe, ethical ICT']);
+    (card.querySelector('[data-part="obs-suggest-look"]') as HTMLButtonElement).click();
+    expect((await lastSaved()).descriptors[0].look_fors.map((l) => l.label)).toEqual(['Teaches and models safe ICT use']);
+    expect(card.querySelector('.obs-look__edit')).not.toBeNull();
+    expect(chips()).toHaveLength(2);
+    // One Proficient point at a time.
+    const text = () => card.querySelector('[data-part="obs-proficient-text"]')!.textContent;
+    const first = text();
+    (card.querySelector('[data-part="obs-proficient-next"]') as HTMLButtonElement).click();
+    expect(text()).not.toBe(first);
+    const shown = text();
+    (card.querySelector('[data-part="obs-proficient-add"]') as HTMLButtonElement).click();
+    expect((await lastSaved()).descriptors[0].practice).toBe(`${shown}.`);
   });
 
   it('adds a look-for with Enter and gives it its row key', async () => {
@@ -270,6 +292,27 @@ describe('observing', () => {
     saved = await lastSaved();
     expect(saved.log.map((l) => `${l.clock} ${l.text}`)).toEqual(['02:15 Into pairs', '04:00 Name the criterion']);
     expect(root.querySelector('.obs-log__addhost')!.childElementCount).toBe(0);
+  });
+
+  it('keeps extras off the report table, lists them apart, and lets a next step stop counting as partial', async () => {
+    let obs = planned();
+    const r = addDescriptor(obs, '6.3.2', { extra: true });
+    if (!r.ok) throw new Error(r.reason);
+    obs = startClock(r.observation, T0);
+    obs = logEntry(obs, { descriptor: '6.3.2', kind: 'strength', text: 'Acted on mentor feedback' }, T0 + 60_000);
+    obs = logEntry(obs, { descriptor: '3.5.2', kind: 'next', text: 'Pause for questions' }, T0 + 90_000);
+    const root = await mount(obs, 'observing', MEETING_OBS);
+    expect(root.querySelector('[data-part="obs-writeup"] tr[data-code="6.3.2"]')).toBeNull();
+    const extra = root.querySelector('[data-part="obs-extras"] [data-code="6.3.2"]') as HTMLElement;
+    expect((extra.querySelector('textarea[data-cell="practice"]') as HTMLTextAreaElement).value).toContain('Acted on mentor feedback');
+    const suggested = () => root.querySelector('[data-part="obs-tally"] [data-code="3.5.2"] .is-suggested')?.getAttribute('data-decision');
+    expect(suggested()).toBe('partial');
+    const box = root.querySelector('[data-part="obs-counts-partial"]') as HTMLInputElement;
+    expect(box.checked).toBe(true);
+    box.checked = false;
+    box.dispatchEvent(new Event('change'));
+    expect((await lastSaved()).log.find((l) => l.kind === 'next')!.counts_partial).toBe(false);
+    expect(suggested()).toBeUndefined();
   });
 
   it('says what Gather did, or why there was nothing', async () => {

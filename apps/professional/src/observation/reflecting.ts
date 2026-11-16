@@ -4,7 +4,7 @@
  * signatures, export, and Mark observation done.
  */
 import { openObservationReport } from './export';
-import { draftFeedback } from './model';
+import { agreedDescriptors, draftFeedback } from './model';
 import type { Decision, Observation, ReflectionRow } from './types';
 import { DECISIONS, h, NESA, slotClass, syncValue, type ObsCtx, type ObsView } from './ui';
 
@@ -163,7 +163,7 @@ export function mountReflecting(ctx: ObsCtx): ObsView {
   renderActions();
   el.append(
     heads,
-    ...(obs.descriptors.length ? obs.descriptors.map((d, i) => row(d.code, i)) : [h(doc, 'p', { class: 'obs-muted' }, 'No descriptors were planned for this observation.')]),
+    ...(agreedDescriptors(obs).length ? agreedDescriptors(obs).map((d, i) => row(d.code, i)) : [h(doc, 'p', { class: 'obs-muted' }, 'No descriptors were planned for this observation.')]),
     h(doc, 'div', { class: 'obs-sign' }, signature('teacher', 'Teacher’s signature'), signature('supervisor', 'Accreditation Supervisor’s signature')),
     actions);
 
