@@ -7,6 +7,7 @@ import { createKnowledgeNote } from '@/api/knowledge-notes';
 import { mountBlockPage } from '@/components/block-page';
 import { buildEventTaskPanel, buildEventConnections, buildPdFields, renderEventNewView } from '@/views/events';
 import { groupTotals, talkHoursNote } from '@/lib/pd-totals';
+import { formatTalkLength, parseTalkLength, talkLengthInputValue } from '@/lib/talk-length';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import type { EventRecord, EventTalk, PdGroupRecord } from '@/domain/types';
 
@@ -329,33 +330,137 @@ export async function renderEventPage(
     const title = el('input', 'hub-input') as HTMLInputElement;
     title.placeholder = 'Talk or activity';
     title.setAttribute('aria-label', 'Talk title');
-    const hours = el('input', 'hub-input') as HTMLInputElement;
-    hours.type = 'number';
-    hours.step = '0.25';
-    hours.min = '0';
-    hours.placeholder = 'h';
-    hours.setAttribute('aria-label', 'Talk hours');
+    const hours = lengthInput();
     const add = el('button', 'btn btn--ghost', '＋ Add') as HTMLButtonElement;
     add.type = 'submit';
-    form.append(time, title, hours, add);
+    const error = el('p', 'hub-field__error talk-add__error');
+    error.setAttribute('role', 'status');
+    form.append(time, title, hours, add, error);
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      if (!title.value.trim()) return;
-      const talks: EventTalk[] = [...(data.record.talks ?? []), {
-        id: `t_${Date.now()}`, time: time.value || null, title: title.value.trim(), presenter: null, hours: hours.value ? Number(hours.value) : null
-      }];
-      data.record = (await updateEvent(id, { talks })).event;
-      await rerender();
+      error.textContent = '';
+      if (!title.value.trim()) {
+        error.textContent = 'Give the talk or activity a name.';
+        return;
+      }
+      const length = parseTalkLength(hours.value);
+      if (length === undefined) {
+        error.textContent = lengthHelp;
+        return;
+      }
+      add.disabled = true;
+      const talk: EventTalk = {
+        id: `t_${Date.now()}`, time: time.value || null, title: title.value.trim(), presenter: null, hours: length
+      };
+      try {
+        await saveTalks([...(data.record.talks ?? []), talk]);
+      } catch (err) {
+        add.disabled = false;
+        error.textContent = err instanceof Error ? err.message : 'Could not add that.';
+      }
     });
     card.append(form);
     return card;
+  }
+
+  const lengthHelp = 'Type a length like 20m, 0.25, 1h 30m or 1:30.';
+
+  function lengthInput(): HTMLInputElement {
+    const input = el('input', 'hub-input') as HTMLInputElement;
+    input.type = 'text';
+    input.inputMode = 'decimal';
+    input.placeholder = 'Length';
+    input.title = 'Hours or minutes: 20m, 0.25, 1h 30m, 1:30';
+    input.setAttribute('aria-label', 'Talk length');
+    return input;
+  }
+
+  async function saveTalks(talks: EventTalk[]): Promise<void> {
+    data.record = (await updateEvent(id, { talks })).event;
+    await rerender();
+  }
+
+  // A talk row opens into a small form to fix its time, name, presenter or
+  // length, or to delete it.
+  function talkEditor(talk: EventTalk, row: HTMLElement): HTMLElement {
+    const form = el('form', 'talk-edit');
+    form.dataset.talkEdit = talk.id;
+    const time = el('input', 'hub-input') as HTMLInputElement;
+    time.type = 'time';
+    time.value = talk.time ?? '';
+    time.setAttribute('aria-label', 'Talk time');
+    const title = el('input', 'hub-input') as HTMLInputElement;
+    title.value = talk.title;
+    title.setAttribute('aria-label', 'Talk title');
+    const presenter = el('input', 'hub-input') as HTMLInputElement;
+    presenter.value = talk.presenter ?? '';
+    presenter.placeholder = 'Presenter';
+    presenter.setAttribute('aria-label', 'Talk presenter');
+    const length = lengthInput();
+    length.value = talkLengthInputValue(talk.hours);
+    const save = el('button', 'btn btn--primary', 'Save') as HTMLButtonElement;
+    save.type = 'submit';
+    const cancel = el('button', 'btn btn--ghost', 'Cancel') as HTMLButtonElement;
+    cancel.type = 'button';
+    const remove = el('button', 'btn btn--ghost talk-edit__delete', 'Delete') as HTMLButtonElement;
+    remove.type = 'button';
+    const error = el('p', 'hub-field__error talk-edit__error');
+    error.setAttribute('role', 'status');
+    const actions = el('div', 'talk-edit__actions');
+    actions.append(remove, cancel, save);
+    form.append(time, title, presenter, length, actions, error);
+
+    const others = () => (data.record.talks ?? []).filter((t) => t.id !== talk.id);
+    async function run(talks: EventTalk[], failText: string): Promise<void> {
+      save.disabled = remove.disabled = true;
+      try {
+        await saveTalks(talks);
+      } catch (err) {
+        save.disabled = remove.disabled = false;
+        error.textContent = err instanceof Error ? err.message : failText;
+      }
+    }
+    cancel.addEventListener('click', () => form.replaceWith(row));
+    remove.addEventListener('click', () => {
+      void run(others(), 'Could not delete that.');
+    });
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      error.textContent = '';
+      if (!title.value.trim()) {
+        error.textContent = 'Give the talk or activity a name.';
+        return;
+      }
+      const hours = parseTalkLength(length.value);
+      if (hours === undefined) {
+        error.textContent = lengthHelp;
+        return;
+      }
+      const next: EventTalk = {
+        ...talk,
+        time: time.value || null,
+        title: title.value.trim(),
+        presenter: presenter.value.trim() || null,
+        hours
+      };
+      void run((data.record.talks ?? []).map((t) => (t.id === talk.id ? next : t)), 'Could not save that.');
+    });
+    return form;
   }
 
   function talkRow(talk: EventTalk): HTMLElement {
     const row = el('div', 'pi');
     row.dataset.talkId = talk.id;
     row.append(el('span', 'pi__time', talk.time ?? ''), el('span', 'pi__title', talk.title),
-      el('span', 'pi__who', [talk.presenter, talk.hours != null ? `${talk.hours} h` : null].filter(Boolean).join(' · ')));
+      el('span', 'pi__who', [talk.presenter, talk.hours != null ? formatTalkLength(talk.hours) : null].filter(Boolean).join(' · ')));
+    const edit = el('button', 'pi__edit', 'Edit') as HTMLButtonElement;
+    edit.type = 'button';
+    edit.setAttribute('aria-label', `Edit ${talk.title}`);
+    edit.addEventListener('click', () => {
+      const editor = talkEditor(talk, row);
+      row.replaceWith(editor);
+      (editor.querySelector('[aria-label="Talk title"]') as HTMLInputElement | null)?.focus();
+    });
     const href = data.notedTalks.get(talk.id);
     if (href !== undefined) {
       const link = el('a', 'kn', '✓ Knowledge note') as HTMLAnchorElement;
@@ -379,6 +484,7 @@ export async function renderEventPage(
       });
       row.append(make);
     }
+    row.append(edit);
     return row;
   }
 }

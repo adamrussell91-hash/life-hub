@@ -216,6 +216,40 @@ describe('event page', () => {
     } finally {finish({outgoing:[], incoming:[]}); await rendering;}
   });
 
+  it('a talk can be edited (time, name, short length) and deleted', async () => {
+    const canvas = await render();
+    canvas.querySelector<HTMLButtonElement>('[data-talk-id="t1"] .pi__edit')!.click();
+    const form = canvas.querySelector<HTMLFormElement>('[data-talk-edit="t1"]')!;
+    expect(form.querySelector<HTMLInputElement>('[aria-label="Talk length"]')!.value).toBe('1.5h');
+    form.querySelector<HTMLInputElement>('[aria-label="Talk time"]')!.value = '09:30';
+    form.querySelector<HTMLInputElement>('[aria-label="Talk length"]')!.value = '0.2';
+    form.requestSubmit();
+    await vi.waitFor(() => expect(updateEvent).toHaveBeenCalledWith(EVENT_ID, {
+      talks: [{ id: 't1', time: '09:30', title: 'Keynote · Reading against the grain', presenter: 'Dr Mia L.', hours: 0.2 }]
+    }));
+    await vi.waitFor(() => expect(canvas.querySelector('[data-talk-id="t1"]')?.textContent).toContain('12 min'));
+
+    canvas.querySelector<HTMLButtonElement>('[data-talk-id="t1"] .pi__edit')!.click();
+    canvas.querySelector<HTMLButtonElement>('[data-talk-edit="t1"] .talk-edit__delete')!.click();
+    await vi.waitFor(() => expect(updateEvent).toHaveBeenCalledWith(EVENT_ID, { talks: [] }));
+    await vi.waitFor(() => expect(canvas.querySelector('[data-talk-id="t1"]')).toBeNull());
+  });
+
+  it('adding a talk takes minutes and says when a length cannot be read', async () => {
+    const canvas = await render();
+    const form = canvas.querySelector<HTMLFormElement>('.talk-add')!;
+    form.querySelector<HTMLInputElement>('[aria-label="Talk title"]')!.value = 'Panel';
+    const length = form.querySelector<HTMLInputElement>('[aria-label="Talk length"]')!;
+    length.value = 'about a while';
+    form.requestSubmit();
+    expect(form.querySelector('.talk-add__error')?.textContent).toMatch(/20m/);
+    length.value = '20m';
+    form.requestSubmit();
+    await vi.waitFor(() => expect(updateEvent).toHaveBeenCalledWith(EVENT_ID, {
+      talks: [expect.objectContaining({ id: 't1' }), expect.objectContaining({ title: 'Panel', hours: 0.33 })]
+    }));
+  });
+
   it('Make note creates a Knowledge page and links it to the talk', async () => {
     const canvas = await render();
     canvas.querySelector<HTMLButtonElement>('[data-talk-note="t1"]')!.click();
