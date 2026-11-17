@@ -244,3 +244,26 @@ test('join page: a short code asks for six numbers; a closed one says so and let
   assert.match(page.nodes.msg.textContent, /isn’t open/);
   assert.equal(page.assigned.length, 0);
 });
+
+test('progress share links and their lessons boot the student shell', () => {
+  const token = 'A9Q85kiczahCCvrxIJTGT-fV'.replace(/./g, 'b');
+  assert.equal(studentPath(`/s/share/${token}`), `/s/share/${token}`);
+  assert.equal(studentPath(`/s/share/${token}/lessons/lesson_1`), `/s/share/${token}/lessons/lesson_1`);
+  assert.equal(studentPath('/s/share/short'), null);
+});
+
+test('every /s/ route the Teaching app knows is on the class site list', async () => {
+  const { readFileSync } = await import('node:fs');
+  const router = readFileSync(new URL('../../apps/teaching/src/app/router.ts', import.meta.url), 'utf8');
+  const sources = [...router.matchAll(/path\.match\(\/(\^\\\/s\\\/.*?\$)\/\)/g)].map((m) => m[1]);
+  assert.ok(sources.length >= 8, `found ${sources.length} student routes`);
+  for (const source of sources) {
+    const sample = source
+      .replace(/^\^|\$$/g, '')
+      .replace(/\\\//g, '/')
+      .replace(/\(\[A-Za-z0-9_-\]\{(\d+)\}\)/g, (_m, n) => 'a'.repeat(Number(n)))
+      .replace(/\(\[\^\/\]\+\)/g, 'x1');
+    assert.match(sample, new RegExp(source), `sample for ${source}`);
+    assert.equal(studentPath(sample), sample, `class site worker blocks ${sample}`);
+  }
+});

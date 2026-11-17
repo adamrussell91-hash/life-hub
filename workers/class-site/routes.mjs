@@ -21,7 +21,9 @@ const STUDENT_PATHS = [
   /^\/s\/classes\/[^/]+\/lessons\/[^/]+$/,
   /^\/s\/classes\/[^/]+\/profile$/,
   /^\/s\/feedback\/[^/]+$/,
-  /^\/s\/sheets\/[^/]+$/
+  /^\/s\/sheets\/[^/]+$/,
+  /^\/s\/share\/[A-Za-z0-9_-]{24}$/,
+  /^\/s\/share\/[A-Za-z0-9_-]{24}\/lessons\/[^/]+$/
 ];
 
 const ASSET_PATH =
