@@ -7,7 +7,7 @@
  * box and Enter there logs.
  */
 import {
-  addLogLineAt, addLookFor, agreedDescriptors, extraDescriptors, clockLabel, clockMs, deleteLogEntry, editLogEntry, endClock, gatherWriteUp, logEntry, notesFor, pauseClock, resumeClock, setLessonStart, startClock, tally
+  addLogLineAt, addLookFor, agreedDescriptors, extraDescriptors, clockLabel, clockMs, deleteLogEntry, editLogEntry, endClock, gatherWriteUp, logEntry, notesFor, pauseClock, resumeClock, setLessonEnd, setLessonStart, startClock, tally
 } from './model';
 import type { Decision, LogEntry, LogKind, Observation, WriteUpRow } from './types';
 import { DECISIONS, focusOf, guideSuggestions, h, KIND_KEYS, kindMeta, KINDS, NESA, slotClass, slotOf, syncValue, type ObsCtx, type ObsView } from './ui';
@@ -50,28 +50,37 @@ export function mountObserving(ctx: ObsCtx): ObsView {
   const pad = (n: number) => String(n).padStart(2, '0');
   const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
-  /** Set when the lesson began by hand, e.g. when Start lesson was missed. Log times are redone to match. */
-  function startTimeControl(): HTMLElement {
+  /**
+   * Set when the lesson began or ended by hand, e.g. when Start or End lesson was missed or pressed late.
+   * A new start retimes the log; a new end only changes the clock.
+   */
+  function timeControl(which: 'start' | 'end'): HTMLElement {
     const obs = ctx.obs();
-    const started = obs.clock.started_at ? new Date(obs.clock.started_at) : null;
-    const input = h(doc, 'input', { type: 'time', class: 'obs-input obs-input--time', 'data-part': 'obs-start-time', 'aria-label': 'Lesson started at' });
-    input.value = started ? hhmm(started) : '';
-    const set = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--sm', 'data-part': 'obs-start-set' }, started ? 'Change start' : 'Set start');
+    const isStart = which === 'start';
+    const stamp = isStart ? obs.clock.started_at : obs.clock.ended_at;
+    const current = stamp ? new Date(stamp) : null;
+    const input = h(doc, 'input', { type: 'time', class: 'obs-input obs-input--time', 'data-part': `obs-${which}-time`, 'aria-label': isStart ? 'Lesson started at' : 'Lesson ended at' });
+    input.value = current ? hhmm(current) : '';
+    const word = isStart ? 'start' : 'end';
+    const set = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--sm', 'data-part': `obs-${which}-set` }, current ? `Change ${word}` : `Set ${word}`);
     const msg = h(doc, 'span', { class: 'obs-muted obs-small', 'aria-live': 'polite' });
     set.addEventListener('click', () => {
       const m = /^(\d{2}):(\d{2})$/.exec(input.value);
       if (!m) { msg.textContent = 'Pick a time first.'; return; }
       // The lesson's day: when it started, else its first log line, else today.
       const o = ctx.obs();
-      const day = started ?? (o.log[0] ? new Date(o.log[0].at) : ctx.now());
+      const day = o.clock.started_at ? new Date(o.clock.started_at) : o.log[0] ? new Date(o.log[0].at) : ctx.now();
       const when = new Date(day.getFullYear(), day.getMonth(), day.getDate(), Number(m[1]), Number(m[2]), 0, 0);
       if (when.getTime() > ctx.now().getTime()) { msg.textContent = 'That time hasn’t happened yet.'; return; }
-      ctx.change((x) => withGather(setLessonStart(x, when, ctx.now())), 'now');
+      if (!isStart && o.clock.started_at && when.getTime() <= new Date(o.clock.started_at).getTime()) {
+        msg.textContent = 'The end has to come after the start.'; return;
+      }
+      ctx.change((x) => withGather(isStart ? setLessonStart(x, when, ctx.now()) : setLessonEnd(x, when, ctx.now())), 'now');
       renderClock();
       renderLog();
       syncWriteUp();
     });
-    return h(doc, 'span', { class: 'obs-row obs-starttime' }, h(doc, 'label', { class: 'obs-small' }, 'Started at ', input), set, msg);
+    return h(doc, 'span', { class: 'obs-row obs-starttime' }, h(doc, 'label', { class: 'obs-small' }, isStart ? 'Started at ' : 'Ended at ', input), set, msg);
   }
 
   function renderClock(): void {
@@ -90,7 +99,7 @@ export function mountObserving(ctx: ObsCtx): ObsView {
         : [c.paused_at ? clockButton('Resume', 'obs-clock-resume', resumeClock) : clockButton('Pause', 'obs-clock-pause', pauseClock),
           clockButton('End lesson', 'obs-clock-end', endClock)];
     paintClock();
-    clockRow.replaceChildren(state ?? '', clockText, about ? h(doc, 'span', { class: 'obs-muted obs-small' }, `· ${about}`) : '', h(doc, 'span', { class: 'obs-spacer' }), startTimeControl(), ...buttons);
+    clockRow.replaceChildren(state ?? '', clockText, about ? h(doc, 'span', { class: 'obs-muted obs-small' }, `· ${about}`) : '', h(doc, 'span', { class: 'obs-spacer' }), timeControl('start'), c.started_at ? timeControl('end') : '', ...buttons);
     if (running && !tick) tick = setInterval(paintClock, 1000);
     if (!running && tick) { clearInterval(tick); tick = null; }
   }

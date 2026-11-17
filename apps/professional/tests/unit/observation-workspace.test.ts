@@ -13,7 +13,7 @@ vi.mock('@/observation/api', () => api);
 vi.mock('@/api/meetings', () => meetings);
 
 import { openObservationReport } from '@/observation/export';
-import { addDescriptor, addLookFor, logEntry, newObservation, startClock } from '@/observation/model';
+import { addDescriptor, addLookFor, endClock, logEntry, newObservation, startClock } from '@/observation/model';
 import { NESA } from '@/observation/ui';
 import { mountObservationWorkspace } from '@/observation/workspace';
 
@@ -263,6 +263,22 @@ describe('observing', () => {
     expect(root.querySelector('[data-part="obs-clock"]')!.textContent).toContain('Lesson running');
     expect(root.textContent).toContain('12:30');
     expect((root.querySelector('tr[data-code="3.5.2"] textarea[data-cell="practice"]') as HTMLTextAreaElement).value).toContain('12:30 Chunked instructions');
+  });
+
+  it('changes when the lesson ended', async () => {
+    const now = Date.now();
+    const start = new Date(now - 90 * 60_000);
+    start.setSeconds(0, 0);
+    const end = new Date(start.getTime() + 50 * 60_000);
+    const obs = endClock(startClock(planned(), start), now - 60_000);
+    const root = await mount(obs, 'observing', MEETING_OBS);
+    expect(root.querySelector('[data-part="obs-end-set"]')!.textContent).toBe('Change end');
+    const input = root.querySelector('[data-part="obs-end-time"]') as HTMLInputElement;
+    input.value = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
+    (root.querySelector('[data-part="obs-end-set"]') as HTMLButtonElement).click();
+    const saved = await lastSaved();
+    expect(saved.clock.ended_at).toBe(end.toISOString());
+    expect(root.querySelector('[data-part="obs-clock"]')!.textContent).toContain('50:00');
   });
 
   it('edits a whole log line and adds a missed one', async () => {
