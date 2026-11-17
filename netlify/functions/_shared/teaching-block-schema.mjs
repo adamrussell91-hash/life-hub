@@ -1176,10 +1176,14 @@ var RichTextBlockSchema = z12.object({
   ...blockLayout,
   ...blockTimestamps
 });
-var NarrationSchema = z12.object({
+var NarrationPartSchema = z12.object({
   url: z12.string().min(1),
   duration_s: z12.number().min(0).max(900),
-  transcript: z12.string().max(8e3).optional()
+  end_s: z12.number().min(0).max(900).optional()
+});
+var NarrationSchema = NarrationPartSchema.extend({
+  transcript: z12.string().max(8e3).optional(),
+  more: z12.array(NarrationPartSchema).max(20).optional()
 });
 var RevealSchema = z12.enum(["all", "one"]);
 var HeadingBlockSchema = z12.object({
@@ -3255,6 +3259,7 @@ export {
   MediaSizeVariantSchema,
   MindMapBlockSchema,
   NOTE_CUE_KINDS,
+  NarrationPartSchema,
   NarrationSchema,
   NetworkLineModeSchema,
   NetworkLineSchema,

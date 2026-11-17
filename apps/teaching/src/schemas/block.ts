@@ -161,11 +161,21 @@ export const RichTextBlockSchema = z.object({
   ...blockTimestamps
 });
 
-/** A scene's voiceover in a lecture: one short clip the teacher records. */
-export const NarrationSchema = z.object({
+/** One recorded take. `end_s` keeps only the take's start, up to that second (the rest stays in the file). */
+export const NarrationPartSchema = z.object({
   url: z.string().min(1),
   duration_s: z.number().min(0).max(900),
-  transcript: z.string().max(8000).optional()
+  end_s: z.number().min(0).max(900).optional()
+});
+export type NarrationPart = z.infer<typeof NarrationPartSchema>;
+
+/**
+ * A scene's voiceover in a lecture. The first take sits on the object itself;
+ * `more` holds later takes, played straight after it in order.
+ */
+export const NarrationSchema = NarrationPartSchema.extend({
+  transcript: z.string().max(8000).optional(),
+  more: z.array(NarrationPartSchema).max(20).optional()
 });
 export type Narration = z.infer<typeof NarrationSchema>;
 

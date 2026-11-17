@@ -266,6 +266,74 @@ describe('narration field', () => {
     }
   });
 
+  it('cuts a take where it was paused, and undoes the cut', async () => {
+    const { createNarrationField } = await import('@/lecture/narration-field');
+    const onChange = vi.fn();
+    const field = createNarrationField({ label: 'Scene', value: saved, onChange });
+    const button = (text: string) => Array.from(field.querySelectorAll('button')).find((el) => el.textContent === text);
+    button('Cut here')!.click();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(field.textContent).toContain('pause where it should end');
+    field.querySelector('audio')!.currentTime = 21.34;
+    button('Cut here')!.click();
+    expect(onChange).toHaveBeenLastCalledWith({ ...saved, end_s: 21.3 });
+    expect(field.textContent).toContain('0:21 of 0:30');
+    button('Undo cut')!.click();
+    expect(onChange).toHaveBeenLastCalledWith(saved);
+  });
+
+  it('records more as a new part, keeping the transcript', async () => {
+    vi.resetModules();
+    let onUploaded: ((url: string) => void) | null = null;
+    vi.doMock('@/blocks/upload-button', async (orig) => ({
+      ...(await orig<typeof import('@/blocks/upload-button')>()),
+      createUploadButton: (opts: { onUploaded: (url: string) => void }) => {
+        onUploaded = opts.onUploaded;
+        return { el: document.createElement('div'), button: document.createElement('button'), input: document.createElement('input'), uploadFiles: async () => {} };
+      }
+    }));
+    const RealAudio = globalThis.Audio;
+    class KnownAudio extends EventTarget {
+      duration = 15;
+      preload = '';
+      currentTime = 0;
+      set src(_url: string) { queueMicrotask(() => this.dispatchEvent(new Event('loadedmetadata'))); }
+      removeAttribute() {}
+    }
+    globalThis.Audio = KnownAudio as unknown as typeof Audio;
+    try {
+      const { createNarrationField } = await import('@/lecture/narration-field');
+      const onChange = vi.fn();
+      const cut = { ...saved, end_s: 20 };
+      const field = createNarrationField({ label: 'Scene', value: cut, onChange });
+      const button = (text: string) => Array.from(field.querySelectorAll('button')).find((el) => el.textContent === text);
+      button('Record more')!.click();
+      expect(field.textContent).toContain('Part 2: plays straight after part 1.');
+      onUploaded!('/more.webm');
+      await new Promise((r) => setTimeout(r, 0));
+      const two = { ...cut, more: [{ url: '/more.webm', duration_s: 15 }] };
+      expect(onChange).toHaveBeenLastCalledWith(two);
+      expect(field.querySelectorAll('audio')).toHaveLength(2);
+      expect(field.textContent).toContain('Part 2');
+
+      // Re-record just part 2.
+      Array.from(field.querySelectorAll('.narration-field__part'))[1]!
+        .querySelectorAll('button').forEach((b) => { if (b.textContent === 'Re-record') b.click(); });
+      onUploaded!('/again.webm');
+      await new Promise((r) => setTimeout(r, 0));
+      expect(onChange).toHaveBeenLastCalledWith({ ...cut, more: [{ url: '/again.webm', duration_s: 15 }] });
+
+      // Removing part 1 makes part 2 the whole narration, transcript kept.
+      Array.from(field.querySelectorAll('.narration-field__part'))[0]!
+        .querySelectorAll('button').forEach((b) => { if (b.textContent === 'Remove') b.click(); });
+      expect(onChange).toHaveBeenLastCalledWith({ url: '/again.webm', duration_s: 15, transcript: 'Old words' });
+    } finally {
+      globalThis.Audio = RealAudio;
+      vi.doUnmock('@/blocks/upload-button');
+      vi.resetModules();
+    }
+  });
+
   it('shows the script before recording and starts a new take’s transcript from it', async () => {
     vi.resetModules();
     let onUploaded: ((url: string) => void) | null = null;

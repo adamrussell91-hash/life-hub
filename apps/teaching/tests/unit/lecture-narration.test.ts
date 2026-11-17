@@ -46,3 +46,49 @@ describe('lecture narration', () => {
     expect(idle).not.toHaveBeenCalled();
   });
 });
+
+describe('lecture narration with several takes', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function playing() {
+    let audio: HTMLMediaElement | null = null;
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(function (this: HTMLMediaElement) {
+      audio = this;
+      Object.defineProperty(this, 'paused', { configurable: true, value: false });
+      return Promise.resolve();
+    });
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function (this: HTMLMediaElement) {
+      Object.defineProperty(this, 'paused', { configurable: true, value: true });
+    });
+    return () => audio!;
+  }
+
+  it('moves to the next take at the cut, and counts time across takes', async () => {
+    const audio = playing();
+    const narration = createNarration();
+    const idle = vi.fn();
+    narration.onIdle(idle);
+    narration.load({ url: '/one.webm', duration_s: 180, end_s: 120, more: [{ url: '/two.webm', duration_s: 60 }] });
+    await flush();
+    expect(audio().getAttribute('src')).toBe('/one.webm');
+    audio().currentTime = 120.2;
+    audio().dispatchEvent(new Event('timeupdate'));
+    expect(audio().getAttribute('src')).toBe('/two.webm');
+    expect(idle).not.toHaveBeenCalledWith(true);
+    audio().currentTime = 5;
+    expect(narration.time()).toBe(125);
+    audio().dispatchEvent(new Event('ended'));
+    expect(idle).toHaveBeenCalledWith(true);
+    narration.dispose();
+  });
+
+  it('plays an uncut first take to its end before the next', async () => {
+    const audio = playing();
+    const narration = createNarration();
+    narration.load({ url: '/one.webm', duration_s: 30, more: [{ url: '/two.webm', duration_s: 20 }] });
+    await flush();
+    audio().dispatchEvent(new Event('ended'));
+    expect(audio().getAttribute('src')).toBe('/two.webm');
+    narration.dispose();
+  });
+});
