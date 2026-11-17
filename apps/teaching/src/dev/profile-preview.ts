@@ -2,6 +2,7 @@ import { renderProfile, type ProfilePayload } from '@/student/profile-view';
 import type { NetworkLine } from '@/schemas/block';
 import type { ReturnedItem } from '@/progress/types';
 import type { PiecePayload } from '@/student/returned-view';
+import { renderSharePage } from '@/student/share-view';
 import '../styles/app.css';
 
 /**
@@ -124,8 +125,30 @@ const PIECE: PiecePayload = {
   rubric: { next_step: 'After “this shows”, add a sentence starting “This matters because”.', skills: [{ ref: 'arguing.evidence', name: 'Evidence', rung: 'capable' }] }
 };
 
-const teacher = new URLSearchParams(location.search).has('teacher');
-document.getElementById('mount')!.append(
+const query = new URLSearchParams(location.search);
+const teacher = query.has('teacher');
+// ?share=1: the Progress share page a parent or pastoral teacher sees, built on the same payload.
+if (query.has('share')) {
+  const token = 'Demo_share_token_0000000';
+  const { initials: _i, code: _c, pointer: _p, unseen: _u, ...profile } = payload;
+  document.getElementById('mount')!.append(
+    renderSharePage(
+      {
+        student: { first_name: 'Quinn' },
+        class_title: '10 English',
+        viewer_initials: 'PT',
+        lesson_ids: LESSONS.map((l) => l.id),
+        ticks: [
+          { lesson_id: 'l2', title: 'Salt and stone', at: `${day(-1)}T00:12:00Z`, via: 'tick', record: [{ at: `${day(-1)}T00:12:00Z`, kind: 'tick' }] },
+          { lesson_id: 'l1', title: 'Harbour poems', at: `${day(-6)}T01:02:00Z`, via: 'quiz', record: [{ at: `${day(-6)}T01:02:00Z`, kind: 'quiz' }] }
+        ],
+        bursts: [],
+        profile
+      },
+      { token, today: day(0), onSignOut: () => console.info('Preview: sign out') }
+    )
+  );
+} else document.getElementById('mount')!.append(
   renderProfile(payload, {
     classId: CLASS,
     ...(teacher ? { teacher: { name: 'Quinn Zephyr' } } : {}),

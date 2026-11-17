@@ -119,12 +119,12 @@ try {
     const card = p.locator('.tour-card');
     await card.filter({ hasText: 'Welcome' }).waitFor();
     const total = Number((await card.locator('.tour-card__dots').textContent()).match(/of (\d+)/)[1]);
-    assert.ok(total >= 8, `tour has its steps (${total})`);
+    assert.ok(total >= 4, `tour has its steps (${total})`);
     await p.screenshot({ path: `${OUT}/progress-share-${label}-tour-1.png` });
 
     // 4. Next walks every step; each spotlight sits on its section, and on a phone the docked card sits below it.
     for (let i = 1; i < total; i += 1) {
-      await p.getByRole('button', { name: 'Next' }).click();
+      await card.getByRole('button', { name: 'Next' }).click();
       await card.locator('.tour-card__dots').filter({ hasText: `${i + 1} of ${total}` }).waitFor();
       await p.waitForTimeout(350);
       const title = (await card.locator('.tour-card__title').textContent()).trim();
@@ -137,7 +137,7 @@ try {
       }
       if (i === 4) await p.screenshot({ path: `${OUT}/progress-share-${label}-tour-ticks.png` });
     }
-    await p.getByRole('button', { name: 'Done' }).click();
+    await card.getByRole('button', { name: 'Done' }).click();
     // Mid-flight: the card's shape is travelling toward the Help button, smaller than the card was.
     await p.waitForTimeout(220);
     const ghost = await p.locator('.tour-ghost').boundingBox();
@@ -151,13 +151,14 @@ try {
     assert.ok(hb.x + hb.width >= viewport.width - 24 && hb.y <= 24 && hb.width <= 40, `Help sits small at top right (${JSON.stringify(hb)})`);
     assert.equal(await p.locator('.tour-layer').count(), 0, 'no tour layer left behind');
 
-    // 5. Every section is there, with times, planned day, the tick record and the burst.
+    // 5. It is the student's own progress page, view only, with the tick times folded at the foot.
+    await p.locator('.share-ticks-fold__sum').click();
     const text = await p.locator('.share-page').textContent();
-    for (const want of ['Ana’s English', '9 English', 'Up next', 'Speaker and voice', '3 of 5 core lessons', 'Coming up', 'Poem task: your own ghost poem', 'in 6 days', 'Ticked off', 'ticked within', 'planned', 'Ticked 2 times', 'Practice', 'Today’s organiser', 'Feedback to act on']) {
+    for (const want of ['Ana’s progress', 'View only · 9 English', 'Your unit', 'To do', 'Speaker and voice', 'When lessons were ticked off', 'ticked within', 'planned', 'Ticked 2 times']) {
       assert.ok(text.includes(want), `page shows "${want}"`);
     }
-    assert.equal(await p.locator('.share-grid__day').count(), 28);
-    assert.ok((await p.locator('.share-grid__day.is-on').count()) >= 3, 'practice days filled');
+    assert.equal(await p.locator('.share-page [role="tab"]').count(), 0, 'no Returned work tab');
+    assert.equal(await p.locator('.pm-profile .pm-map').count(), 1, 'the student’s unit map');
     await noSideScroll(p, `${label} page`);
     await p.screenshot({ path: `${OUT}/progress-share-${label}.png`, fullPage: true });
 
@@ -174,8 +175,9 @@ try {
     assert.ok(await help.isVisible(), 'Help is still there after reload');
 
     // 7. A lesson link leads to the locked lesson; typing changes nothing; Back to progress is there.
-    const href = await p.getByRole('link', { name: 'Speaker and voice' }).first().getAttribute('href');
-    assert.ok(href.endsWith(`/s/share/${token}/lessons/l2`), `lesson link (${href})`);
+    const hrefs = await p.locator('.share-page a[href*="/lessons/"]').evaluateAll((links) => links.map((a) => a.getAttribute('href')));
+    assert.ok(hrefs.length > 0, 'the page links lessons');
+    for (const href of hrefs) assert.ok(href.includes(`/s/share/${token}/lessons/`), `lesson link goes to the locked view (${href})`);
     await p.goto(`${origin}/share-check?lesson=l2`);
     await p.getByText('Viewing only. Nothing here can be changed.').waitFor();
     await p.getByText('Who is speaking in the poem?').waitFor();
@@ -197,7 +199,7 @@ try {
 
     assert.deepEqual(errors.map(String), [], 'no page errors');
     await context.close();
-    console.log(`PASS ${label}: sign-in, tour and Help, every section, locked lesson`);
+    console.log(`PASS ${label}: sign-in, tour and Help, the student’s page, locked lesson`);
   }
 
   // 9. The used PIN no longer works in a new browser.

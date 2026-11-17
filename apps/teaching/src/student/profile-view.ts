@@ -450,6 +450,28 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
 }
 
 /**
+ * A viewer's copy of the student's own progress page (Progress share): the same strip, countdown,
+ * next steps, step charts, unit map and To do, read only, with "How you're going" at the foot.
+ * No tabs: returned work stays with the student.
+ */
+export function renderViewerProfile(payload: ProfilePayload, options: { classId: string; title: string }): HTMLElement {
+  const root = el('article', 'pm-profile pm-profile--viewer');
+  root.append(el('h1', 'pm-title', options.title));
+  const look: RenderProfileOptions = { classId: options.classId, teacher: { name: options.title } };
+  const strip = renderNowStrip(payload.todo, { classId: options.classId, pointer: false });
+  if (strip) root.append(strip);
+  const panel = el('div', 'pg-panel');
+  const countdown = topCountdown(payload, look);
+  if (countdown) panel.append(countdown);
+  if (payload.pieces?.length) panel.append(renderNext(payload), renderLearning(payload));
+  if (payload.map) panel.append(withTodo(renderMap(payload.map, options.classId, payload), payload, look));
+  const trends = feedbackTrends(payload, null);
+  if (trends) panel.append(trends);
+  root.append(panel);
+  return root;
+}
+
+/**
  * The teacher-only Over time tab: built only with both `teacher` and `overTime`, mounted the
  * first time it opens. Its tab follows the URL (`?tab=over-time`), and every pick after the first
  * rewrites `tab` in place so a refresh keeps the teacher where they were.

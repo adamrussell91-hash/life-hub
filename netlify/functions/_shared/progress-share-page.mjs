@@ -1,12 +1,11 @@
 /**
- * The Progress share page: one student's progress for a signed-in viewer, built from the same
- * helpers as the student's own page and cut down to SHARE_PAGE_KEYS. No marks, feedback text,
- * written work, notes, codes or announcements ever leave here.
+ * The Progress share page: one student's progress for a signed-in viewer. `profile` is the
+ * student's own My progress payload (progressPage), so the viewer sees the page the student
+ * sees, with SHARE_DROP taken out: no returned-work list, no quoted words or teacher comments,
+ * no sign-in code, initials or unread counts. The top level stays inside SHARE_PAGE_KEYS.
  */
 import { read, reject } from './question-drop.mjs';
-import { unitState } from './profile.mjs';
-import { todoFor } from './profile-todo.mjs';
-import { organiserHabits } from './organiser.mjs';
+import { progressPage, unitState } from './profile.mjs';
 import { listTickRecords } from './profile-done.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
 import { SCHEDULED_LESSON_PREFIX } from './teaching-blobs.mjs';
@@ -14,17 +13,23 @@ import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { requestStore } from './request-store.mjs';
 import { deviceIn, noteOpened, openShare, signIn, signOut } from './progress-share.mjs';
 
-/** Every key the page may carry, at any depth. The allowlist test holds the page to it. */
+/** Every key the page may carry outside `profile`, at any depth. The allowlist test holds the page to it. */
 export const SHARE_PAGE_KEYS = new Set([
-  'need', 'student', 'first_name', 'class_title', 'viewer_initials', 'lesson_ids',
-  'next', 'title', 'lesson_id', 'box',
-  'unit', 'core_done', 'core_total',
-  'countdowns', 'due_date', 'due_time', 'assessment',
-  'ticks', 'at', 'via', 'planned', 'record', 'kind',
-  'bursts', 'from', 'to', 'count',
-  'practice', 'streak', 'days', 'weekly', 'week_start', 'right', 'seen', 'today', 'left', 'answered',
-  'feedback', 'to_act', 'redraft', 'waiting'
+  'need', 'student', 'first_name', 'class_title', 'viewer_initials', 'lesson_ids', 'profile',
+  'ticks', 'lesson_id', 'title', 'at', 'via', 'planned', 'record', 'kind',
+  'bursts', 'from', 'to', 'count'
 ]);
+
+/** What the student's own payload carries that a viewer never gets. */
+export const SHARE_DROP = ['initials', 'code', 'pointer', 'unseen', 'has_returned'];
+
+/** The student's My progress payload, cut for a viewer. Feedback rows keep their counts, never the words. */
+export function shareProfile(full) {
+  const profile = { ...full };
+  for (const key of SHARE_DROP) delete profile[key];
+  if (profile.feedback) profile.feedback = { pieces: profile.feedback.pieces ?? [], rows: (profile.feedback.rows ?? []).map((r) => ({ ...r, hits: [] })) };
+  return profile;
+}
 
 const BURST_MIN = 3;
 const BURST_WINDOW_MS = 10 * 60 * 1000;
@@ -92,9 +97,8 @@ export async function buildSharePage(rawStore, roster, student, share, { now = n
   const classId = roster.cls.id;
   const state = await unitState(store, roster, student);
   const lessonIds = state.lessons.map((l) => l.id);
-  const [todo, habits, records, planned] = await Promise.all([
-    todoFor(store, roster, student, { ...state, now }),
-    organiserHabits(store, classId, student.id, { now }),
+  const [full, records, planned] = await Promise.all([
+    progressPage(store, roster, student, now),
     listTickRecords(store, classId, student.id),
     plannedDates(store, classId, lessonIds)
   ]);
@@ -104,35 +108,18 @@ export async function buildSharePage(rawStore, roster, student, share, { now = n
     if (at) submitted[q.lesson_id] = at;
   }
   const doneIds = new Set(state.rows.filter((r) => r.done).map((r) => r.id));
-  const ticks = tickRows({ lessons: state.lessons, doneIds, done: state.done, records, submitted, planned });
   const unitLessons = new Set(lessonIds);
   const events = Object.entries(records)
     .filter(([lesson_id]) => unitLessons.has(lesson_id))
     .flatMap(([lesson_id, list]) => list.map((e) => ({ lesson_id, at: e.at, kind: e.kind })));
-  const core = state.rows.filter((r) => r.role === 'core');
-  const boxItems = (todo.boxes ?? []).flatMap((b) => b.items.map((item) => ({ box: b.key, item })));
   return {
     student: { first_name: String(student.name ?? '').trim().split(/\s+/)[0] ?? '' },
     class_title: String(roster.cls.display_name || roster.cls.title || ''),
     viewer_initials: share.initials,
     lesson_ids: lessonIds,
-    next: boxItems
-      .filter(({ box, item }) => (box === 'now' || box === 'next') && item.kind !== 'feedback' && !item.done)
-      .map(({ box, item }) => ({ title: String(item.title ?? ''), lesson_id: item.id, box })),
-    unit: { title: String(state.unit?.title ?? ''), core_done: core.filter((r) => r.done).length, core_total: core.length },
-    countdowns: (todo.countdowns ?? []).map((c) => ({ title: c.title, lesson_id: c.lesson_id, due_date: c.due_date, due_time: c.due_time, assessment: c.assessment })),
-    ticks,
+    ticks: tickRows({ lessons: state.lessons, doneIds, done: state.done, records, submitted, planned }),
     bursts: burstsOf(events),
-    practice: {
-      streak: habits?.streak ?? 0,
-      days: habits?.days ?? [],
-      weekly: (habits?.weekly ?? []).slice(-4).map((w) => ({ week_start: w.week_start, right: w.right, seen: w.seen })),
-      today: todo.practice ? { left: todo.practice.today, answered: todo.practice.answered } : null
-    },
-    feedback: {
-      to_act: boxItems.filter(({ item }) => item.kind === 'feedback' && !item.done).map(({ item }) => ({ title: String(item.title ?? ''), redraft: item.feedback?.state === 'redraft' })),
-      waiting: Array.isArray(todo.waiting) ? todo.waiting.length : 0
-    }
+    profile: shareProfile(full)
   };
 }
 

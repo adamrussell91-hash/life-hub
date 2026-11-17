@@ -2,7 +2,9 @@ import { ApiClientError } from '@/api/client';
 import { el } from '@/quiz/dom';
 import { createStudentShell, renderStudentChrome, renderStudentStatus, studentAnchor } from '@/student/shell';
 import { isSignInNeeded, sharePage, shareSignIn, shareSignOut, type SharePage, type ShareTick } from '@/student/share-api';
-import { burstLabel, formatDay, formatPlanned, formatTickTime, sydneyToday } from '@/student/share-format';
+import { burstLabel, formatPlanned, formatTickTime, sydneyToday } from '@/student/share-format';
+import { renderViewerProfile } from '@/student/profile-view';
+import { navigate } from '@/app/router';
 import { mountTour, type TourHandle } from '@/app/tour';
 import './share-view.css';
 
@@ -15,36 +17,57 @@ import './share-view.css';
 const SHOW_TICKS = 20;
 const VIA: Record<ShareTick['via'], string> = { tick: 'Ticked', quiz: 'Quiz submitted', teacher: 'Marked by teacher' };
 const KIND: Record<string, string> = { tick: 'Ticked', untick: 'Unticked', quiz: 'Quiz submitted' };
-export const SHARE_TOUR_KEY = 'progress-share-tour:v1';
+export const SHARE_TOUR_KEY = 'progress-share-tour:v2';
+/** The student page's links carry this in place of a class; the share page sends them to the locked lesson view. */
+export const SHARE_CLASS = 'share';
 
 export type RenderShareOptions = { token: string; today: string; onSignOut: () => void };
 
 export const shareLessonPath = (token: string, lessonId: string) => `/s/share/${token}/lessons/${encodeURIComponent(lessonId)}`;
 
-function section(key: string, title: string): { box: HTMLElement; body: HTMLElement } {
-  const box = el('section', `share-card share-card--${key}`);
-  box.dataset.tour = key;
-  box.append(el('h2', 'share-card__title', title));
-  const body = el('div', 'share-card__body');
-  box.append(body);
-  return { box, body };
-}
+const LESSON_HREF = /\/s\/classes\/[^/]+\/lessons\/([^/?#]+)/;
 
-function lessonLink(token: string, lessonId: string, title: string): HTMLElement {
-  return studentAnchor(shareLessonPath(token, lessonId), 'share-lesson-link', title || 'Lesson');
-}
-
-function addDays(day: string, n: number): string {
-  const d = new Date(`${day}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
+/**
+ * Points every lesson link the student page draws (strip, To do, map cards, countdown) at the
+ * locked share lesson, now and as the map adds cards. A capture listener runs before the
+ * student link's own click handler, which steps aside once the click is handled.
+ */
+export function routeLessonLinks(root: HTMLElement, token: string, go: (path: string) => void): () => void {
+  const fix = (scope: ParentNode) => {
+    for (const a of scope.querySelectorAll<HTMLAnchorElement>('a[href]')) {
+      const m = a.getAttribute('href')?.match(LESSON_HREF);
+      if (m) a.setAttribute('href', shareLessonPath(token, decodeURIComponent(m[1])));
+    }
+  };
+  fix(root);
+  const watch = typeof MutationObserver === 'undefined' ? null : new MutationObserver(() => fix(root));
+  watch?.observe(root, { childList: true, subtree: true });
+  const onClick = (event: MouseEvent) => {
+    const a = (event.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+    if (!a || !root.contains(a)) return;
+    const href = a.getAttribute('href') ?? '';
+    const m = href.match(LESSON_HREF);
+    const path = m ? shareLessonPath(token, decodeURIComponent(m[1])) : href.startsWith(`/s/share/${token}/lessons/`) ? href : null;
+    if (!path) return;
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      a.setAttribute('href', path);
+      return;
+    }
+    event.preventDefault();
+    go(path);
+  };
+  root.addEventListener('click', onClick, true);
+  return () => {
+    watch?.disconnect();
+    root.removeEventListener('click', onClick, true);
+  };
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 function tickRow(token: string, tick: ShareTick): HTMLElement {
   const li = el('li', 'share-tick');
-  li.append(lessonLink(token, tick.lesson_id, tick.title));
+  li.append(studentAnchor(shareLessonPath(token, tick.lesson_id), 'share-lesson-link', tick.title || 'Lesson'));
   const meta = el('p', 'share-tick__meta', `${VIA[tick.via]} ${formatTickTime(tick.at)}`);
   if (tick.planned) meta.append(el('span', 'share-tick__planned', ` · ${formatPlanned(tick.planned)}`));
   li.append(meta);
@@ -60,137 +83,49 @@ function tickRow(token: string, tick: ShareTick): HTMLElement {
   return li;
 }
 
-function dueIn(due: string, today: string): string {
-  const days = Math.round((Date.parse(`${due}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
-  if (days <= 0) return 'today';
-  if (days === 1) return 'tomorrow';
-  return `in ${days} days`;
+/** When each lesson was ticked, folded at the foot: the one thing a viewer gets that the student page hasn't. */
+function ticksFold(page: SharePage, token: string): HTMLElement {
+  const fold = el('details', 'share-ticks-fold');
+  fold.dataset.tour = 'ticks';
+  fold.append(el('summary', 'share-ticks-fold__sum', `When lessons were ticked off (${page.ticks.length})`));
+  for (const b of page.bursts) fold.append(el('p', 'share-burst', `${burstLabel(b)} · ${formatTickTime(b.from)}`));
+  if (!page.ticks.length) {
+    fold.append(el('p', 'share-empty', 'Nothing ticked off in this unit yet.'));
+    return fold;
+  }
+  const list = el('ol', 'share-ticks');
+  page.ticks.forEach((t, i) => {
+    const row = tickRow(token, t);
+    if (i >= SHOW_TICKS) row.hidden = true;
+    list.append(row);
+  });
+  fold.append(list);
+  if (page.ticks.length > SHOW_TICKS) {
+    const more = el('button', 'btn btn--ghost share-more', 'Show earlier');
+    more.type = 'button';
+    more.addEventListener('click', () => {
+      list.querySelectorAll<HTMLElement>('.share-tick[hidden]').forEach((r) => (r.hidden = false));
+      more.remove();
+    });
+    fold.append(more);
+  }
+  return fold;
 }
 
-/** The page itself, from the payload. Pure: no calls, so tests and the tour can use it directly. */
+/** The page itself, from the payload: the student's own progress page, read only. Pure: no calls. */
 export function renderSharePage(page: SharePage, options: RenderShareOptions): HTMLElement {
-  const { token, today } = options;
+  const { token } = options;
   const root = el('div', 'share-page');
-
-  const head = el('header', 'share-head');
   const name = page.student.first_name || 'Student';
-  head.append(el('h1', 'share-head__title', `${name}’s English`));
-  if (page.class_title) head.append(el('p', 'share-head__class', page.class_title));
+  const bar = el('div', 'share-bar-top');
   const who = el('p', 'share-head__who');
-  who.append(el('span', 'share-head__initials', page.viewer_initials), el('span', 'share-head__note', 'View only'));
-  const out = el('button', 'btn btn--ghost share-head__out', 'Sign out of this browser');
+  who.append(el('span', 'share-head__initials', page.viewer_initials), el('span', 'share-head__note', page.class_title ? `View only · ${page.class_title}` : 'View only'));
+  const out = el('button', 'btn btn--ghost share-head__out', 'Sign out');
   out.type = 'button';
+  out.setAttribute('aria-label', 'Sign out of this browser');
   out.addEventListener('click', options.onSignOut);
-  who.append(out);
-  head.append(who);
-  root.append(head);
-
-  const next = section('next', 'Up next');
-  if (page.next.length) {
-    const list = el('ul', 'share-list');
-    for (const item of page.next) {
-      const li = el('li', `share-list__item is-${item.box}`);
-      li.append(el('span', 'share-list__box', item.box === 'now' ? 'Do now' : 'Do next'), lessonLink(token, item.lesson_id, item.title));
-      list.append(li);
-    }
-    next.body.append(list);
-  } else next.body.append(el('p', 'share-empty', 'Nothing waiting right now.'));
-  root.append(next.box);
-
-  const unit = section('unit', page.unit.title ? `Unit: ${page.unit.title}` : 'Unit progress');
-  const bar = el('div', 'share-bar');
-  bar.setAttribute('role', 'progressbar');
-  bar.setAttribute('aria-label', 'Core lessons done');
-  bar.setAttribute('aria-valuemin', '0');
-  bar.setAttribute('aria-valuemax', String(page.unit.core_total));
-  bar.setAttribute('aria-valuenow', String(page.unit.core_done));
-  const fill = el('span', 'share-bar__fill');
-  fill.style.width = `${page.unit.core_total ? Math.round((page.unit.core_done / page.unit.core_total) * 100) : 0}%`;
-  bar.append(fill);
-  unit.body.append(bar, el('p', 'share-bar__label', `${page.unit.core_done} of ${page.unit.core_total} core lessons`));
-  root.append(unit.box);
-
-  if (page.countdowns.length) {
-    const coming = section('coming', 'Coming up');
-    const list = el('ul', 'share-list');
-    for (const c of page.countdowns) {
-      const li = el('li', 'share-list__item');
-      li.append(el('span', 'share-list__what', c.title), el('span', 'share-list__when', `${dueIn(c.due_date, today)} · ${formatDay(c.due_date)}`));
-      list.append(li);
-    }
-    coming.body.append(list);
-    root.append(coming.box);
-  }
-
-  const ticks = section('ticks', 'Ticked off');
-  for (const b of page.bursts) {
-    ticks.body.append(el('p', 'share-burst', `${burstLabel(b)} · ${formatTickTime(b.from)}`));
-  }
-  if (page.ticks.length) {
-    const list = el('ol', 'share-ticks');
-    page.ticks.forEach((t, i) => {
-      const row = tickRow(token, t);
-      if (i >= SHOW_TICKS) row.hidden = true;
-      list.append(row);
-    });
-    ticks.body.append(list);
-    if (page.ticks.length > SHOW_TICKS) {
-      const more = el('button', 'btn btn--ghost share-more', 'Show earlier');
-      more.type = 'button';
-      more.addEventListener('click', () => {
-        list.querySelectorAll<HTMLElement>('.share-tick[hidden]').forEach((r) => (r.hidden = false));
-        more.remove();
-      });
-      ticks.body.append(more);
-    }
-  } else ticks.body.append(el('p', 'share-empty', 'Nothing ticked off in this unit yet.'));
-  root.append(ticks.box);
-
-  const practice = section('practice', 'Practice');
-  practice.body.append(el('p', 'share-streak', page.practice.streak ? `${plural(page.practice.streak, 'day')} in a row` : 'No streak right now'));
-  const on = new Set(page.practice.days);
-  // Four weeks ending this week, Monday first.
-  const back = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7;
-  const start = addDays(today, -back - 21);
-  const grid = el('div', 'share-grid');
-  grid.setAttribute('role', 'img');
-  let practised = 0;
-  for (let i = 0; i < 28; i += 1) {
-    const day = addDays(start, i);
-    const did = on.has(day);
-    if (did && day <= today) practised += 1;
-    const cell = el('span', `share-grid__day${did ? ' is-on' : ''}${day > today ? ' is-future' : ''}${day === today ? ' is-today' : ''}`);
-    cell.title = `${formatDay(day)}${did ? ': practised' : ''}`;
-    grid.append(cell);
-  }
-  grid.setAttribute('aria-label', `Practised on ${plural(practised, 'day')} in the last four weeks`);
-  const heads = el('div', 'share-grid__heads');
-  heads.setAttribute('aria-hidden', 'true');
-  for (const d of ['M', 'T', 'W', 'T', 'F', 'S', 'S']) heads.append(el('span', '', d));
-  practice.body.append(heads, grid);
-  if (page.practice.weekly.length) {
-    const weeks = el('ul', 'share-weeks');
-    for (const w of page.practice.weekly) weeks.append(el('li', '', `Week of ${formatDay(w.week_start)}: ${w.right} of ${w.seen} right`));
-    practice.body.append(weeks);
-  } else if (!practised) practice.body.append(el('p', 'share-empty', 'No practice in the last 4 weeks.'));
-  root.append(practice.box);
-
-  const organiser = section('organiser', 'Today’s organiser');
-  organiser.body.append(el('p', 'share-organiser', page.practice.today ? `${plural(page.practice.today.left, 'card')} left today · ${page.practice.today.answered} answered` : 'No organiser cards today.'));
-  root.append(organiser.box);
-
-  const feedback = section('feedback', 'Feedback to act on');
-  if (page.feedback.to_act.length) {
-    const list = el('ul', 'share-list');
-    for (const f of page.feedback.to_act) {
-      const li = el('li', 'share-list__item');
-      li.append(el('span', 'share-list__what', f.title), el('span', `share-list__when${f.redraft ? ' is-redraft' : ''}`, f.redraft ? 'Redraft asked for' : 'To read'));
-      list.append(li);
-    }
-    feedback.body.append(list);
-  } else feedback.body.append(el('p', 'share-empty', 'Nothing to act on.'));
-  if (page.feedback.waiting) feedback.body.append(el('p', 'share-waiting', `${plural(page.feedback.waiting, 'piece')} waiting to be marked`));
-  root.append(feedback.box);
+  bar.append(who, out);
+  root.append(bar, renderViewerProfile(page.profile, { classId: SHARE_CLASS, title: `${name}’s progress` }), ticksFold(page, token));
   return root;
 }
 
@@ -242,23 +177,21 @@ export function renderShareSignIn(options: ShareSignInOptions): HTMLElement {
   return form;
 }
 
-/** The tour's steps for this page; a step whose section isn't there is left out. */
+/** The tour's steps for this page; a step whose part isn't there is left out. */
 export function mountShareTour(content: HTMLElement, page: SharePage): TourHandle {
   const name = page.student.first_name || 'the student';
-  const at = (key: string) => () => content.querySelector<HTMLElement>(`[data-tour="${key}"]`);
+  const at = (selector: string) => () => content.querySelector<HTMLElement>(selector);
   return mountTour({
     host: content,
     storageKey: SHARE_TOUR_KEY,
     steps: [
-      { title: 'Welcome', body: `This page shows how ${name} is getting on in English. You can look at anything, but nothing here can be changed.` },
-      { target: at('next'), title: 'Up next', body: `What ${name} should work on now and next.` },
-      { target: at('unit'), title: 'Unit progress', body: `How far through the current unit ${name} is, counting the core lessons.` },
-      { target: at('coming'), title: 'Coming up', body: 'Assessments on the way, soonest first.' },
-      { target: at('ticks'), title: 'Ticked off', body: `Everything ${name} has finished, with the time it was done. When lots are ticked within a few minutes, you’ll see a label saying so.` },
-      { target: at('practice'), title: 'Practice', body: `Each square is a day ${name} practised with their organiser. The weeks show how many cards they got right.` },
-      { target: at('organiser'), title: 'Today’s organiser', body: 'Cards left to practise today, and how many are done.' },
-      { target: at('feedback'), title: 'Feedback to act on', body: `Work handed back that ${name} still needs to read or redraft, and work waiting to be marked.` },
-      { target: () => content.querySelector<HTMLElement>('.share-lesson-link'), title: 'Lessons', body: `Tap any lesson to read it as ${name} sees it. It opens locked, so you can help without changing anything.` }
+      { title: 'Welcome', body: `This is ${name}’s own progress page, the same one ${name} sees. You can look at anything, but nothing here can be changed.` },
+      { target: at('.ns-strip'), title: 'Do this now', body: `The one thing ${name} should do next.` },
+      { target: at('.pg-next'), title: 'Next steps', body: `What the teacher keeps writing on ${name}’s work.` },
+      { target: at('.pm-map'), title: 'The unit', body: `Every lesson in the unit. Colour means done, the gold ring is next. Tap a lesson to read it as ${name} sees it, locked.` },
+      { target: at('.td-panel'), title: 'To do', body: `${name}’s list. It ticks off as they work.` },
+      { target: at('[data-tour="trends"]'), title: 'How they’re going', body: 'Where they started, where they are now, and what to focus on next.' },
+      { target: at('[data-tour="ticks"]'), title: 'When lessons were ticked', body: 'The time each lesson was ticked off. Lots ticked within a few minutes gets a label.' }
     ]
   });
 }
@@ -271,6 +204,7 @@ export function mountShareView(options: MountShareViewOptions): ShareViewHandle 
   const today = options.today ?? (() => sydneyToday());
   let disposed = false;
   let tour: TourHandle | null = null;
+  let unroute: (() => void) | null = null;
   root.replaceChildren();
   const { surface, header, content } = createStudentShell('share-shell');
   root.append(surface);
@@ -286,10 +220,14 @@ export function mountShareView(options: MountShareViewOptions): ShareViewHandle 
         if (live()) showSignIn();
       }, () => undefined);
     };
+    unroute?.();
     content.replaceChildren(renderSharePage(page, { token, today: today(), onSignOut: signOut }));
+    unroute = routeLessonLinks(content, token, (path) => navigate(path));
     tour = mountShareTour(content, page);
   };
   const showSignIn = () => {
+    unroute?.();
+    unroute = null;
     tour?.dispose();
     tour = null;
     content.replaceChildren(
@@ -318,6 +256,7 @@ export function mountShareView(options: MountShareViewOptions): ShareViewHandle 
   return {
     dispose() {
       disposed = true;
+      unroute?.();
       tour?.dispose();
     }
   };

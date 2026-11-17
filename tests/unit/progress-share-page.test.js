@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { claimInitials, loadRoster } from '../../netlify/functions/_shared/class-claims.mjs';
 import { profileAction } from '../../netlify/functions/_shared/profile.mjs';
 import { teacherShareAction } from '../../netlify/functions/_shared/progress-share.mjs';
-import { burstsOf, tickRows, shareAction, SHARE_PAGE_KEYS } from '../../netlify/functions/_shared/progress-share-page.mjs';
+import { burstsOf, tickRows, shareAction, shareProfile, SHARE_DROP, SHARE_PAGE_KEYS } from '../../netlify/functions/_shared/progress-share-page.mjs';
 
 function storeFixture(entries = []) {
   const data = new Map(entries.map(([k, v]) => [k, structuredClone(v)]));
@@ -93,23 +93,35 @@ test('page before sign-in asks for it and says nothing else', async () => {
   assert.deepEqual(await shareAction(store, token, { action: 'page', device_token: VIEWER }, { now: NOW }), { need: 'sign_in' });
 });
 
-test('signed in, the page carries only allowlisted keys', async () => {
+test('signed in, the page is the student’s own progress, cut for a viewer', async () => {
   const { store, token, pin } = await setup();
   const page = await shareAction(store, token, { action: 'sign_in', device_token: VIEWER, initials: 'PT', pin }, { now: NOW });
-  for (const key of keysDeep(page)) assert.ok(SHARE_PAGE_KEYS.has(key), `unexpected key ${key}`);
-  for (const banned of ['name', 'code', 'rubric', 'score', 'scores', 'text', 'feedback_text', 'marks', 'notes', 'announcements']) assert.equal(keysDeep(page).has(banned), false, banned);
+  const { profile, ...rest } = page;
+  for (const key of keysDeep(rest)) assert.ok(SHARE_PAGE_KEYS.has(key), `unexpected key ${key}`);
+  for (const banned of ['name', 'code', 'rubric', 'score', 'scores', 'text', 'feedback_text', 'marks', 'notes', 'announcements']) assert.equal(keysDeep(rest).has(banned), false, banned);
+  for (const key of SHARE_DROP) assert.equal(key in profile, false, key);
+  assert.equal(JSON.stringify(page).includes('Ana Ames'), false);
   assert.equal(page.student.first_name, 'Ana');
   assert.equal(page.viewer_initials, 'PT');
-  assert.equal(page.unit.core_done, 1);
-  assert.equal(page.unit.core_total, 3);
+  // The same map and To do the student gets.
+  const own = await profileAction(store, 'class1', { action: 'progress', class_token: DEVICE }, { now: NOW });
+  assert.deepEqual(profile.map, own.map);
+  assert.deepEqual(profile.todo, own.todo);
+  assert.equal(profile.map.lessons.filter((l) => l.done).length, 1);
   assert.equal(page.ticks[0].lesson_id, 'l1');
   assert.equal(page.ticks[0].planned, '2026-11-03');
-  assert.deepEqual(page.ticks[0].record.map((e) => e.kind), ['tick']);
   assert.deepEqual(page.lesson_ids, ['l1', 'l2', 'l3']);
-  assert.equal(page.next[0].title, 'Speaker and voice');
   // Later visits from the same browser need only the link.
   const again = await shareAction(store, token, { action: 'page', device_token: VIEWER }, { now: NOW });
   assert.equal(again.viewer_initials, 'PT');
+});
+
+test('shareProfile drops the returned-work hooks and every quoted word or comment', () => {
+  const cut = shareProfile({ need: null, initials: 'AA', code: 'bird-88', pointer: true, unseen: 2, has_returned: true, next: [{ action: 'Quote more' }], feedback: { pieces: [{ id: 'p1' }], rows: [{ code_id: 'c1', label: 'Evidence', hit: 2, of: 3, positive: false, hits: [{ piece_id: 'p1', words: 'their sentence', note: 'teacher comment' }] }] } });
+  assert.deepEqual(Object.keys(cut).sort(), ['feedback', 'need', 'next']);
+  assert.deepEqual(cut.feedback.rows[0].hits, []);
+  assert.equal(cut.feedback.rows[0].label, 'Evidence');
+  assert.equal(JSON.stringify(cut).includes('teacher comment'), false);
 });
 
 test('sign out sends the browser back to the form', async () => {

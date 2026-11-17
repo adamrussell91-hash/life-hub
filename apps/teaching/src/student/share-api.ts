@@ -1,5 +1,6 @@
 import { apiPost } from '@/api/client';
 import { deviceToken } from '@/quiz/dom';
+import type { ProfilePayload } from '@/student/profile-view';
 
 export type ShareTickKind = 'tick' | 'untick' | 'quiz';
 export type ShareTick = { lesson_id: string; title: string; at: string; via: 'tick' | 'quiz' | 'teacher'; planned?: string; record: Array<{ at: string; kind: ShareTickKind }> };
@@ -9,13 +10,10 @@ export type SharePage = {
   class_title: string;
   viewer_initials: string;
   lesson_ids: string[];
-  next: Array<{ title: string; lesson_id: string; box: 'now' | 'next' }>;
-  unit: { title: string; core_done: number; core_total: number };
-  countdowns: Array<{ title: string; lesson_id: string; due_date: string; due_time: string; assessment: boolean }>;
   ticks: ShareTick[];
   bursts: ShareBurst[];
-  practice: { streak: number; days: string[]; weekly: Array<{ week_start: string; right: number; seen: number }>; today: { left: number; answered: number } | null };
-  feedback: { to_act: Array<{ title: string; redraft: boolean }>; waiting: number };
+  /** The student's own My progress payload, cut for a viewer (progress-share-page.mjs). */
+  profile: ProfilePayload;
 };
 export type ShareReply = SharePage | { need: 'sign_in' };
 
