@@ -81,3 +81,58 @@ describe('audio block Record', () => {
     expect(handle.el.textContent).toContain('Allow the microphone');
   });
 });
+
+describe('Record with Pause', () => {
+  class PausingRecorder extends EventTarget {
+    static isTypeSupported = (mime: string) => mime === 'audio/webm;codecs=opus';
+    state: 'inactive' | 'recording' | 'paused' = 'inactive';
+    mimeType = 'audio/webm;codecs=opus';
+    start() { this.state = 'recording'; }
+    pause() { this.state = 'paused'; }
+    resume() { this.state = 'recording'; }
+    stop() {
+      this.state = 'inactive';
+      this.dispatchEvent(Object.assign(new Event('dataavailable'), { data: new Blob(['abc'], { type: 'audio/webm' }) }));
+      this.dispatchEvent(new Event('stop'));
+    }
+  }
+
+  it('pauses and resumes one take, and the take still uploads once', async () => {
+    vi.stubGlobal('MediaRecorder', PausingRecorder);
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: async () => ({ getTracks: () => [{ stop: vi.fn() }] }) }
+    });
+    const files: File[] = [];
+    const handle = createAudioRecordButton({ upload: async (f) => { files.push(f); }, uploaded: () => true, pausable: true });
+    document.body.append(handle.el);
+    const [record, hold] = Array.from(handle.el.querySelectorAll('button'));
+    expect(hold!.hidden).toBe(true);
+    record!.click();
+    await flush();
+    expect(hold!.hidden).toBe(false);
+    hold!.click();
+    expect(hold!.textContent).toBe('Resume');
+    expect(handle.el.classList.contains('is-paused')).toBe(true);
+    hold!.click();
+    expect(hold!.textContent).toBe('Pause');
+    record!.click();
+    await flush();
+    expect(files).toHaveLength(1);
+    expect(hold!.hidden).toBe(true);
+  });
+
+  it('shows no Pause unless asked', async () => {
+    vi.stubGlobal('MediaRecorder', PausingRecorder);
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: async () => ({ getTracks: () => [{ stop: vi.fn() }] }) }
+    });
+    const handle = createAudioRecordButton({ upload: async () => {}, uploaded: () => true });
+    document.body.append(handle.el);
+    handle.el.querySelector('button')!.click();
+    await flush();
+    expect(handle.el.querySelector<HTMLButtonElement>('.block-editor__record-pause')!.hidden).toBe(true);
+    handle.dispose();
+  });
+});

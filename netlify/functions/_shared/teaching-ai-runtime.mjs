@@ -1320,10 +1320,14 @@ var RichTextBlockSchema = z13.object({
   ...blockLayout,
   ...blockTimestamps
 });
-var NarrationSchema = z13.object({
+var NarrationPartSchema = z13.object({
   url: z13.string().min(1),
   duration_s: z13.number().min(0).max(900),
-  transcript: z13.string().max(8e3).optional()
+  end_s: z13.number().min(0).max(900).optional()
+});
+var NarrationSchema = NarrationPartSchema.extend({
+  transcript: z13.string().max(8e3).optional(),
+  more: z13.array(NarrationPartSchema).max(20).optional()
 });
 var RevealSchema = z13.enum(["all", "one"]);
 var HeadingBlockSchema = z13.object({

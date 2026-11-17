@@ -16,6 +16,8 @@ export type AudioRecordButtonOptions = {
   /** True once the upload has put the take into the block. */
   uploaded: () => boolean;
   fileTitle?: () => string;
+  /** Show a Pause button while recording, so an interruption doesn't end the take. */
+  pausable?: boolean;
 };
 
 export type AudioRecordButtonHandle = {
@@ -67,13 +69,22 @@ export function createAudioRecordButton(options: AudioRecordButtonOptions): Audi
   rescue.textContent = 'Download the recording';
   rescue.hidden = true;
 
-  el.append(button, status, rescue);
+  const hold = document.createElement('button');
+  hold.type = 'button';
+  hold.className = 'btn btn--ghost block-editor__record-pause';
+  hold.textContent = 'Pause';
+  hold.hidden = true;
+
+  el.append(button, hold, status, rescue);
 
   let stream: MediaStream | null = null;
   let recorder: MediaRecorder | null = null;
   let chunks: BlobPart[] = [];
   let recordedBytes = 0;
   let startedAt = 0;
+  /** Time spent paused, and when the current pause began (0 when not paused). */
+  let pausedMs = 0;
+  let pausedAt = 0;
   let timer = 0;
   let disposed = false;
 
@@ -87,7 +98,8 @@ export function createAudioRecordButton(options: AudioRecordButtonOptions): Audi
     timer = 0;
     stream?.getTracks().forEach((track) => track.stop());
     stream = null;
-    el.classList.remove('is-recording');
+    el.classList.remove('is-recording', 'is-paused');
+    hold.hidden = true;
     label.textContent = 'Record';
     button.setAttribute('aria-pressed', 'false');
   }
@@ -125,10 +137,14 @@ export function createAudioRecordButton(options: AudioRecordButtonOptions): Audi
     recorder.addEventListener('stop', () => void finish(recorder?.mimeType || mime), { once: true });
     recorder.start(1000);
     startedAt = Date.now();
+    pausedMs = 0;
+    pausedAt = 0;
     el.classList.add('is-recording');
     button.setAttribute('aria-pressed', 'true');
+    hold.textContent = 'Pause';
+    hold.hidden = !options.pausable || typeof recorder.pause !== 'function';
     const tick = () => {
-      const elapsed = Date.now() - startedAt;
+      const elapsed = (pausedAt || Date.now()) - startedAt - pausedMs;
       label.textContent = `Stop · ${clock(elapsed)}`;
       // Stop at the cap, or when the editor closes mid-take (the take still uploads).
       if (
@@ -142,6 +158,24 @@ export function createAudioRecordButton(options: AudioRecordButtonOptions): Audi
     tick();
     timer = window.setInterval(tick, 250);
     say('Recording… press Stop when you are done.');
+  }
+
+  function togglePause(): void {
+    if (!recorder) return;
+    if (recorder.state === 'recording') {
+      recorder.pause();
+      pausedAt = Date.now();
+      el.classList.add('is-paused');
+      hold.textContent = 'Resume';
+      say('Paused. Press Resume to carry on, or Stop to finish this take.');
+    } else if (recorder.state === 'paused') {
+      recorder.resume();
+      pausedMs += Date.now() - pausedAt;
+      pausedAt = 0;
+      el.classList.remove('is-paused');
+      hold.textContent = 'Pause';
+      say('Recording… press Stop when you are done.');
+    }
   }
 
   function stop(): void {
@@ -175,6 +209,8 @@ export function createAudioRecordButton(options: AudioRecordButtonOptions): Audi
       rescue.hidden = false;
     }
   }
+
+  hold.addEventListener('click', togglePause);
 
   button.addEventListener('click', () => {
     if (recorder && recorder.state !== 'inactive') stop();

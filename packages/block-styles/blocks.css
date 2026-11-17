@@ -280,8 +280,28 @@
 }
 .block-editor__record {
   display: grid;
-  gap: var(--space-1);
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-2);
   justify-items: start;
+  align-items: center;
+}
+
+.block-editor__record > .block-editor__upload-status,
+.block-editor__record > .block-editor__record-rescue {
+  grid-column: 1 / -1;
+}
+
+.block-editor__record-pause {
+  min-height: 44px;
+}
+
+.block-editor__record-pause[hidden] {
+  display: none;
+}
+
+.block-editor__record.is-paused .block-editor__record-dot {
+  animation: none;
+  background: var(--muted, #6b6b6b);
 }
 
 .block-editor__record-btn {

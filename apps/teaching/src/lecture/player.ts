@@ -7,6 +7,7 @@ import { isGate, lectureScenes, noteCues } from './scenes';
 import { act, answer, goTo, mainAction, restoreState, startState, type LectureState } from './state';
 import { LECTURE_ANSWERED, type AnsweredDetail } from './answered';
 import { createNarration } from './narration';
+import { narrationLength } from './narration-parts';
 import type { LectureClient, LectureStatus } from './api';
 import { clearPreviewAnswers } from '@/blocks/hinge-question/solo';
 import './lecture.css';
@@ -92,7 +93,7 @@ export function mountLecturePlayer(host: HTMLElement, options: LecturePlayerOpti
     narration.pause();
     const card = el('section', 'lecture-title');
     options.renderHero(card);
-    const total = scenes.reduce((sum, s) => sum + (s.narration?.duration_s ?? 0), 0);
+    const total = scenes.reduce((sum, s) => sum + narrationLength(s.narration), 0);
     if (total > 0) card.append(el('p', 'lecture-title__time', `About ${Math.max(1, Math.round(total / 60))} min`));
     card.append(el('p', 'lecture-title__book', 'You’ll need your book and a pen.'));
     const who = el('div', 'lecture-title__who');
