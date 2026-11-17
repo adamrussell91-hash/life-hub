@@ -3,7 +3,7 @@ import { PROFICIENT_DESCRIPTORS, descriptorByCode } from '@/observation/descript
 import {
   addDescriptor, addLogLineAt, agreedDescriptors, extraDescriptors, setDescriptorExtra, addLookFor, assignLookForKeys, clockLabel, clockMs, deleteLogEntry, draftFeedback, editLogEntry,
   endClock, gatherWriteUp, notesFor, logEntry, newObservation, pauseClock, removeDescriptor, removeLookFor, renameLookFor,
-  parseClock, resumeClock, setLessonStart, startClock, tally, windowDay, windowTone
+  parseClock, resumeClock, setLessonEnd, setLessonStart, startClock, tally, windowDay, windowTone
 } from '@/observation/model';
 import type { Observation } from '@/observation/types';
 
@@ -211,6 +211,33 @@ describe('setting the start by hand', () => {
   it('refuses a start in the future', () => {
     const o = planned();
     expect(setLessonStart(o, at(500), at(100))).toBe(o);
+  });
+});
+
+describe('setting the lesson end by hand', () => {
+  it('moves an end that was pressed late, keeping log times', () => {
+    let o = startClock(planned(), at(0));
+    o = logEntry(o, { kind: 'transition', text: 'Pack up' }, at(600));
+    o = endClock(o, at(6000));
+    o = setLessonEnd(o, at(3000), at(7000));
+    expect(o.clock.ended_at).toBe(at(3000).toISOString());
+    expect(clockMs(o, at(7000))).toBe(3_000_000);
+    expect(o.log[0].clock).toBe('10:00');
+  });
+
+  it('ends a running or paused clock, counting time up to the end', () => {
+    let o = pauseClock(startClock(planned(), at(0)), at(600));
+    o = setLessonEnd(o, at(1200), at(1500));
+    expect(o.clock.paused_at).toBeNull();
+    expect(clockMs(o, at(1500))).toBe(1_200_000);
+  });
+
+  it('refuses no start, an end at or before the start, and the future', () => {
+    const none = planned();
+    expect(setLessonEnd(none, at(100), at(200))).toBe(none);
+    const o = startClock(planned(), at(100));
+    expect(setLessonEnd(o, at(100), at(200))).toBe(o);
+    expect(setLessonEnd(o, at(500), at(200))).toBe(o);
   });
 });
 

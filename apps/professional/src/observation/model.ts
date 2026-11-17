@@ -214,6 +214,18 @@ export function setLessonStart(obs: Observation, start: Instant, now: Instant): 
   return { ...obs, clock, log };
 }
 
+/**
+ * Set or move when the lesson ended, after the fact (End lesson pressed late, early or never). Ends a running
+ * or paused clock at `end`; an open pause is dropped, so the time up to `end` counts. Log lines keep their
+ * times. Refused before the lesson has a start, at or before the start, or in the future.
+ */
+export function setLessonEnd(obs: Observation, end: Instant, now: Instant): Observation {
+  const endMs = ms(end);
+  const c = obs.clock;
+  if (!c.started_at || !Number.isFinite(endMs) || endMs <= ms(c.started_at) || endMs > ms(now)) return obs;
+  return { ...obs, clock: { ...c, ended_at: iso(end), paused_at: null } };
+}
+
 // ---------------------------------------------------------------- log
 
 export function logEntry(
