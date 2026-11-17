@@ -235,7 +235,7 @@ export async function unitState(store, roster, student, t = untimed) {
 }
 
 /** The My progress payload: feedback, the map and the To do panel beside it. The teacher's read gets the same. */
-async function progressPage(rawStore, roster, student, now, t = untimed) {
+export async function progressPage(rawStore, roster, student, now, t = untimed) {
   // The page's helpers share the class, markbook, schedule and pieces: each is read once.
   const store = requestStore(t.store(rawStore));
   warmSchedule(store);

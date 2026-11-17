@@ -2,28 +2,36 @@
 .share-page {
   display: grid;
   gap: var(--space-4, 16px);
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 0 16px 64px;
-  box-sizing: border-box;
+  padding-bottom: 64px;
+  min-width: 0;
 }
 
-.share-head {
-  display: grid;
-  gap: 4px;
-  padding: 8px 40px 0 0;
+/* The viewer's line above the student's own page: who is looking, and the way out. */
+.share-bar-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.share-head__title {
-  font-family: var(--font-display, inherit);
-  font-size: var(--font-size-page, 1.6rem);
+.share-bar-top .share-head__who {
   margin: 0;
-  overflow-wrap: anywhere;
 }
 
-.share-head__class {
-  margin: 0;
+.share-ticks-fold {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-3, 12px);
+}
+
+.share-ticks-fold__sum {
+  cursor: pointer;
+  font-weight: 600;
   color: var(--ink-muted);
+}
+
+.share-ticks-fold[open] .share-ticks-fold__sum {
+  margin-bottom: var(--space-3, 12px);
 }
 
 .share-head__who {
@@ -56,57 +64,12 @@
   scroll-margin-top: 80px;
 }
 
-.share-card {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg, 12px);
-  padding: 16px;
-  background: var(--paper);
-  box-shadow: var(--elev-1);
-  min-width: 0;
-}
-
-.share-card__title {
-  font-size: 1.05rem;
-  margin: 0 0 10px;
-}
-
-.share-list,
-.share-ticks,
-.share-weeks {
+.share-ticks {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   gap: 8px;
-}
-
-.share-list__item {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  align-items: baseline;
-}
-
-.share-list__box {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--ink-muted);
-  min-width: 4.5em;
-}
-
-.share-list__what {
-  font-weight: 500;
-  overflow-wrap: anywhere;
-}
-
-.share-list__when {
-  font-size: 0.9rem;
-  color: var(--ink-muted);
-}
-
-.share-list__when.is-redraft {
-  color: var(--warning);
-  font-weight: 600;
 }
 
 .share-lesson-link {
@@ -116,23 +79,6 @@
 .share-empty {
   color: var(--ink-muted);
   margin: 0;
-}
-
-.share-bar {
-  height: 10px;
-  border-radius: var(--radius-full, 999px);
-  background: var(--line);
-  overflow: hidden;
-}
-
-.share-bar__fill {
-  display: block;
-  height: 100%;
-  background: var(--wave);
-}
-
-.share-bar__label {
-  margin: 6px 0 0;
 }
 
 .share-burst {
@@ -175,61 +121,6 @@
 
 .share-more {
   margin-top: 8px;
-}
-
-.share-streak {
-  margin: 0 0 6px;
-  font-weight: 600;
-}
-
-.share-grid,
-.share-grid__heads {
-  display: grid;
-  grid-template-columns: repeat(7, 32px);
-  gap: 6px;
-}
-
-.share-grid__heads {
-  font-size: 0.75rem;
-  color: var(--ink-muted);
-  text-align: center;
-}
-
-.share-grid {
-  margin: 4px 0 10px;
-}
-
-.share-grid__day {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  background: var(--line);
-}
-
-.share-grid__day.is-on {
-  background: var(--wave);
-}
-
-.share-grid__day.is-today {
-  outline: 2px solid var(--ink-muted);
-  outline-offset: 1px;
-}
-
-.share-grid__day.is-future {
-  opacity: 0.35;
-}
-
-.share-weeks {
-  font-size: 0.9rem;
-}
-
-.share-organiser,
-.share-waiting {
-  margin: 8px 0 0;
-}
-
-.share-organiser {
-  margin-top: 0;
 }
 
 .share-signin {
