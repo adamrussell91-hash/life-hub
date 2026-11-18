@@ -66,8 +66,19 @@ export function withCors(response, request, env) {
   const headers = new Headers(response.headers);
   // A class-host request never had the session, so it must not clear or refresh it either.
   if (isStudentOnlyOrigin(request.headers.get('origin'))) headers.delete('set-cookie');
-  for (const [key, value] of Object.entries(corsHeaders(request, env))) headers.set(key, value);
+  for (const [key, value] of Object.entries(corsHeaders(request, env))) {
+    if (key === 'vary') headers.set('vary', mergeVary(headers.get('vary'), value));
+    else headers.set(key, value);
+  }
   return new Response(response.body, { status: response.status, headers });
+}
+
+// A route's own Vary (e.g. `cookie` on per-viewer media) must survive the CORS one.
+function mergeVary(existing, addition) {
+  if (!existing) return addition;
+  const listed = existing.split(',').map(entry => entry.trim().toLowerCase());
+  if (listed.includes('*') || listed.includes(addition.toLowerCase())) return existing;
+  return `${existing}, ${addition}`;
 }
 
 export function preflightResponse(request, env) {
