@@ -22,6 +22,8 @@ import { blockPlainText, extractInlinePromises, resolvePromiseOwner } from '@/li
 import { agendaToBlocks, extractDecisions, extractItemNoteDecisions, extractMentions } from '@/lib/meeting-notes';
 import { keepMinutesDecisions, saveMinutesReview } from '@/lib/meeting-minutes';
 import { mountMinutesCard } from '@/views/meeting-minutes-card';
+import { askConfirm, createRecordingModel, mountRecordingStrip } from '@/views/meeting-recording-strip';
+import { mountRecordingCard } from '@/views/meeting-recording-card';
 import { directoryRowFor, groupRoom, indexDirectory, initialsFor, isSelfAttendee, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
 import { fetchSelfPerson } from '@/api/network-ecology';
 import { createPillGroup } from '@/lib/pills';
@@ -103,6 +105,35 @@ export function linkedMeetingTitle(current: string, teacherName: string, next: O
     return current.replace(phaseWord, (word) => (word[0] === word[0]!.toUpperCase() ? label : label.toLowerCase()));
   }
   return `${teacherName.trim() || current} · observation ${label.toLowerCase()}`;
+}
+
+/** The block the recording's kept lines go under, one per meeting. */
+export function recordingNotesBlockId(meetingId: string): string {
+  return `from_recording_${meetingId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+}
+
+/** `?line=13` on the page's hash: open the transcript at that line. */
+export function lineFromHash(hash: string): number | null {
+  const query = hash.split('?')[1];
+  if (!query) return null;
+  const value = new URLSearchParams(query).get('line');
+  const line = value === null ? NaN : Number(value);
+  return Number.isInteger(line) && line >= 0 ? line : null;
+}
+
+const escapeHtml = (text: string) => text.replace(/[<&>]/g, (c) => ({ '<': '&lt;', '&': '&amp;', '>': '&gt;' })[c]!);
+
+/** Adds lines under one "From the recording" rich-text block, making it the first time. */
+export function withRecordingLines(blocks: unknown[], blockId: string, lines: string[]): { blocks: unknown[]; added: unknown | null } {
+  const paras = lines.map((line) => `<p>${escapeHtml(line)}</p>`).join('');
+  const index = blocks.findIndex((block) => (block as { id?: string }).id === blockId);
+  if (index >= 0) {
+    const block = blocks[index] as { content?: { html?: string } };
+    const next = { ...block, content: { ...(block.content ?? {}), html: `${block.content?.html ?? ''}${paras}` } };
+    return { blocks: blocks.map((entry, i) => (i === index ? next : entry)), added: null };
+  }
+  const added = { id: blockId, block_type: 'rich_text', variant: 'medium', content: { html: `<p><strong>From the recording</strong></p>${paras}` } };
+  return { blocks: [...blocks, added], added };
 }
 
 /** `Wed 30/09/26 · 3:30 pm – 4:30 pm` in the meeting's own zone. */
@@ -242,6 +273,7 @@ export async function renderMeetingPage(
   options.onTitleReady(record.title);
 
   const reload = () => renderMeetingPage(canvas, id, { ...routeOptions, meeting: record });
+  const recordingBlockId = recordingNotesBlockId(id);
   let people = attendees.map((attendee) => ({ ref: attendee.ref, name: attendee.name }));
   let manual = false;
   let phase: CommPhase = 'after';
@@ -342,7 +374,7 @@ export async function renderMeetingPage(
       const button = el('button', 'btn btn--ghost', label) as HTMLButtonElement;
       button.type = 'button';
       button.dataset.stateAction = action;
-      button.addEventListener('click', () => void applyStateAction(action));
+      button.addEventListener('click', () => void endMeeting(action));
       headActions.append(button);
     }
   }
@@ -404,6 +436,71 @@ export async function renderMeetingPage(
   // Notes and the guides under them run the full width, below both columns (and last on a phone).
   const full = el('div', 'meeting-page__full');
   root.append(head, followUpBar.el, editor, purpose, grid, full);
+
+  // ── Recording: one strip and one card, kept across phase repaints like the notes ──
+  const recAttendees = () => attendees.map((attendee) => ({ ref: attendee.ref, name: attendee.name, role: attendee.role }));
+  /** Your own note lines (not the lines kept from the recording). */
+  const noteLines = () => blockPlainText((blockPage?.current() ?? record.blocks ?? []).filter((block) => (block as { id?: string }).id !== recordingBlockId))
+    .split('\n').map((line) => line.trim()).filter(Boolean);
+  const recModel = createRecordingModel(id);
+  const recStrip = mountRecordingStrip({ meetingId: id, kind: 'meeting', people: recAttendees, room: false, notes: noteLines, model: recModel });
+  const recCard = mountRecordingCard({
+    meetingId: id,
+    kind: 'meeting',
+    people: recAttendees,
+    room: false,
+    model: recModel,
+    initialLine: lineFromHash(window.location.hash),
+    deps: {
+      appendToNotes: (lines) => {
+        if (!blockPage || !lines.length) return;
+        const current = blockPage.current();
+        const { blocks, added } = withRecordingLines(current, recordingBlockId, lines);
+        if (added) {
+          blockPage.append([added as never]);
+          return;
+        }
+        // The handle only appends: swap the block in the live list, then append nothing so it redraws and saves.
+        const index = current.findIndex((block) => block.id === recordingBlockId);
+        if (index >= 0) current[index] = blocks[index] as never;
+        blockPage.append([]);
+      },
+      createTask: async ({ title, due_date }) => {
+        const task = await createTask({ title, ...(due_date ? { due_date } : {}) });
+        await createUniversalLink({ source_ref: `tasks:task:${task.id}`, target_ref: meetingRef, relationship_type: 'tagged_with' });
+        void tags.refresh();
+      },
+      trackIt: async ({ person_ref, text, due }) => {
+        const out = await createLedgerItem({ direction: 'they_owe', person_ref, text, comm_ref: meetingRef, due });
+        if (out.created) ledger.push(out.item);
+        paintActions();
+      },
+      useAsSummary: async (text) => {
+        const current = (record.notes ?? '').trim();
+        const next = current ? `${current}\n\n${text}` : text;
+        record = (await updateMeeting(id, { notes: next })).meeting;
+        const box = root.querySelector<HTMLTextAreaElement>('.comm-page__summary-text');
+        if (box) box.value = record.notes ?? '';
+      },
+      summaryHas: (text) => Boolean(text) && (record.notes ?? '').includes(text)
+    }
+  });
+
+  /** Ending the meeting while recording asks, stops (keeping the last minute) and only then completes. */
+  async function endMeeting(action: 'complete' | 'cancel' | 'no-show'): Promise<void> {
+    if (recStrip.isActive()) {
+      const yes = await askConfirm({
+        title: 'End the meeting?',
+        body: 'This stops the recording first, uploads the last minute, then completes the meeting.',
+        confirm: 'Stop and end',
+        cancel: 'Keep going'
+      });
+      if (!yes) return;
+      await recStrip.stopForEnd();
+    }
+    await applyStateAction(action);
+  }
+
   canvas.replaceChildren(root);
   paintRoom();
 
@@ -680,6 +777,7 @@ export async function renderMeetingPage(
         await syncPromises(blocks);
         paintActions();
         paintMentions(blocks);
+        recCard.notesChanged(noteLines());
       }
     });
   }
@@ -1055,7 +1153,7 @@ export async function renderMeetingPage(
   }
 
   function paintDuring(): void {
-    main.append(liveStrip(), minutesCard(), actions, mentions);
+    main.append(liveStrip(), recStrip.below, minutesCard(), actions, mentions);
     full.append(notesCard(
       'Notes',
       'Start a line with »me to log something you owe, »Name for something they owe, ✓ for a decision, @Name for who said what.'
@@ -1065,7 +1163,9 @@ export async function renderMeetingPage(
   }
 
   function paintAfter(): void {
-    main.append(minutesCard());
+    // Still recording after the meeting moved to After: the controls stay in reach.
+    if (recStrip.isActive()) main.append(liveStrip(), recStrip.below);
+    main.append(recCard.el, minutesCard());
     if (record.purpose) main.append(purposeCheckCard());
     main.append(wrapUpCard(), actions, mentions);
     full.append(notesCard('Notes', 'Your notes from the meeting. Still editable.'));
@@ -1185,7 +1285,7 @@ export async function renderMeetingPage(
     const end = el('button', 'btn btn--ghost', 'End ›') as HTMLButtonElement;
     end.type = 'button';
     end.dataset.part = 'end-meeting';
-    end.addEventListener('click', () => void applyStateAction('complete'));
+    end.addEventListener('click', () => void endMeeting('complete'));
 
     const photo = el('label', 'btn btn--ghost', '✎ Read a photo');
     const file = el('input') as HTMLInputElement;
@@ -1213,8 +1313,9 @@ export async function renderMeetingPage(
     guidesBtn.type = 'button';
     guidesBtn.dataset.part = 'open-guides';
     guidesBtn.addEventListener('click', () => openGuides());
-    strip.append(el('span', 'live-strip__rec', 'Live'), timer, photo, guidesBtn);
+    strip.append(el('span', 'live-strip__rec', 'Live'), timer, recStrip.controls, photo, guidesBtn);
     if (isOpenState(record.state)) strip.append(end);
+    strip.append(recStrip.health);
     return strip;
   }
 

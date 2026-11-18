@@ -13,6 +13,11 @@ const base = {
 };
 let current: Record<string, unknown> = { ...base };
 
+vi.mock('@/api/meeting-recordings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/meeting-recordings')>()),
+  getRecordingBundle: vi.fn(async () => null),
+  listPeopleSaid: vi.fn(async () => ({ entries: [] }))
+}));
 vi.mock('@/api/events', () => ({
   deleteEvent: vi.fn(async () => ({deleted: true})),
   getEvent: vi.fn(async () => ({ event: current })),
@@ -39,7 +44,8 @@ vi.mock('@/api/universal-links', () => ({
           endpoint: { ref: EVENT_REF, kind: 'event', display_label: 'Warlight 1', href: null }, direction: 'incoming' }
       ] }),
   endUniversalLink: vi.fn(async () => ({})),
-  createUniversalLink: vi.fn(async () => ({ link: { id: 'new' }, created: true }))
+  createUniversalLink: vi.fn(async () => ({ link: { id: 'new' }, created: true })),
+  createTask: vi.fn(async () => ({ id: 'task_new' }))
 }));
 vi.mock('@/api/pd-groups', () => ({
   getPdGroup: vi.fn(async () => ({ group: { id: GROUP_ID, shape: 'series', title: 'Warlight', provider: 'Warlight', schema_version: 1, created_at: '', updated_at: '' } })),

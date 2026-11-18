@@ -3,6 +3,7 @@ import { renderRelationshipTimeline } from '@/components/relationship-timeline';
 import { renderLinkedEverywhere } from '@/components/linked-everywhere';
 import { buildObservationsTab } from '@/components/observations-tab';
 import { buildEvidenceTab } from '@/components/evidence-tab';
+import { buildPersonSaidTab } from '@/components/person-said-tab';
 import { renderProfessionalProfileTab } from '@/components/professional-profile';
 import { classifyRelationshipState, type RelationshipStateInput } from '@/domain/relationship-state';
 import type { EntityOverview, PersonRecord, RelationshipEndpoint, RelationshipEntry } from '@/domain/types';
@@ -49,7 +50,8 @@ export function buildPersonTabs(onRoleChanged: () => void): TabDef[] {
       render: (host, overview) => renderHistoryTab(host, overview)
     },
     buildObservationsTab(),
-    buildEvidenceTab()
+    buildEvidenceTab(),
+    buildPersonSaidTab()
   ];
 }
 
