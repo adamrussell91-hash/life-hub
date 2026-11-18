@@ -135,13 +135,22 @@ function skillTagsFor(skills: SkillsContinuum | null, area: string, id: string):
   return tags;
 }
 
-export function syllabusGrid(evidence: Evidence[], alignment: Alignment | null, labels: readonly OutcomeLabel[], ctx: TagContext, students: readonly string[]): PointRow[] {
+/** `areas`: only these focus areas get rows (the modules a class has been taught); null for all. */
+export function syllabusGrid(
+  evidence: Evidence[],
+  alignment: Alignment | null,
+  labels: readonly OutcomeLabel[],
+  ctx: TagContext,
+  students: readonly string[],
+  areas: ReadonlySet<string> | null = null
+): PointRow[] {
   if (!alignment) return [];
   const listed = new Set(students);
   const mine = evidence.filter((e) => listed.has(e.student));
   const rows: PointRow[] = [];
   let order = 0;
   for (const area of alignment.focus_areas) {
+    if (areas && !areas.has(area.id)) continue;
     for (const point of area.points) {
       const tag = pointTag(area.id, point.id);
       const inside = mine.filter((e) => e.tags.includes(tag));
