@@ -4,6 +4,7 @@
  * signatures, export, and Mark observation done.
  */
 import { openObservationReport } from './export';
+import nesaTemplateUrl from './nesa-observation-template.pdf?url';
 import { agreedDescriptors, draftFeedback } from './model';
 import type { Decision, Observation, ReflectionRow } from './types';
 import { DECISIONS, h, NESA, slotClass, syncValue, type ObsCtx, type ObsView } from './ui';
@@ -135,7 +136,9 @@ export function mountReflecting(ctx: ObsCtx): ObsView {
   const actions = h(doc, 'div', { class: 'obs-row obs-actions', 'data-part': 'obs-actions' });
   function renderActions(): void {
     const done = ctx.obs().status === 'done';
-    const exportBtn = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--primary', 'data-part': 'obs-export' }, 'Export NESA report');
+    const pdfBtn = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--primary', 'data-part': 'obs-nesa-pdf' }, 'Download NESA PDF');
+    pdfBtn.addEventListener('click', () => { void downloadNesaPdf(pdfBtn); });
+    const exportBtn = h(doc, 'button', { type: 'button', class: 'obs-btn', 'data-part': 'obs-export' }, 'Print layout');
     exportBtn.addEventListener('click', () => {
       report?.close();
       report = openObservationReport(doc, ctx.obs());
@@ -151,8 +154,35 @@ export function mountReflecting(ctx: ObsCtx): ObsView {
       toggle = mark;
     }
     actions.replaceChildren(
-      h(doc, 'span', { class: 'obs-muted obs-small' }, 'Export lays out all four pages of the NESA template; save it as a PDF from the print dialog.'),
-      h(doc, 'span', { class: 'obs-spacer' }), toggle, exportBtn);
+      h(doc, 'span', { class: 'obs-muted obs-small' }, 'Download fills the official NESA template with all three phases. Signatures are added in the PDF.'),
+      h(doc, 'span', { class: 'obs-spacer' }), toggle, exportBtn, pdfBtn);
+  }
+
+  // ---------------------------------------------------------------- official NESA PDF
+  const pdfNote = h(doc, 'p', { class: 'obs-small obs-muted', 'data-part': 'obs-nesa-pdf-note', role: 'status' });
+  async function downloadNesaPdf(btn: HTMLButtonElement): Promise<void> {
+    btn.disabled = true;
+    pdfNote.textContent = 'Filling the NESA template…';
+    try {
+      const { fillNesaTemplate, nesaFileName, nesaFieldLabel } = await import('./nesa-pdf');
+      const res = await fetch(nesaTemplateUrl);
+      if (!res.ok) throw new Error(`template ${res.status}`);
+      const obs = ctx.obs();
+      const { bytes, overflow } = await fillNesaTemplate(await res.arrayBuffer(), obs);
+      const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
+      const a = h(doc, 'a', { href: url, download: nesaFileName(obs) });
+      doc.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      pdfNote.textContent = overflow.length
+        ? `Downloaded. Too long to show in full on the page (the whole text is in the box; shorten it here to fit): ${overflow.map((f) => nesaFieldLabel(obs, f)).join(', ')}.`
+        : 'Downloaded.';
+    } catch {
+      pdfNote.textContent = 'That didn’t download. Try again; Print layout still works.';
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   const obs = ctx.obs();
@@ -165,7 +195,8 @@ export function mountReflecting(ctx: ObsCtx): ObsView {
     heads,
     ...(agreedDescriptors(obs).length ? agreedDescriptors(obs).map((d, i) => row(d.code, i)) : [h(doc, 'p', { class: 'obs-muted' }, 'No descriptors were planned for this observation.')]),
     h(doc, 'div', { class: 'obs-sign' }, signature('teacher', 'Teacher’s signature'), signature('supervisor', 'Accreditation Supervisor’s signature')),
-    actions);
+    actions,
+    pdfNote);
 
   // Keep untouched drafts current if the record changed elsewhere before mount finished.
   for (const [code, box] of feedbackBoxes) syncValue(box.ta, ctx.obs().reflection[code]?.feedback ?? '');
