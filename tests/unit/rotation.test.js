@@ -304,6 +304,30 @@ test('written gate through the student endpoint: not yet, appeal, then pass; the
   assert.ok(![...store.data.keys()].some((k) => k.startsWith('quiz/') || k.includes('markbook')));
 });
 
+test('written gate: a checker that gave no verdict leaves the gate open for another check', async () => {
+  const { createWritingChecker } = await import('../../netlify/functions/_shared/rotation-writing.mjs');
+  const { store } = await setup();
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const deps = { checkWriting: createWritingChecker({ complete: async () => ({ content: [], stop_reason: 'max_tokens', usage: { input_tokens: 10, output_tokens: 10 } }), names: ['Repetition', 'Personification'] }) };
+    await claim(store, 1);
+    const s = await act(store, 1, 'check_writing', { station: 's3', text: 'Repetition in "nothing, nothing, nothing" shows isolation.\n\nPersonification in "Its single eye turned" shows isolation.' }, deps);
+    assert.equal(s.writing.retry, true);
+    assert.equal(s.gates.s3.state, 'open');
+    assert.equal(s.gates.s3.checks_left, 3);
+    assert.equal(s.gates.s3.last.retry, true);
+  } finally { console.warn = warn; }
+});
+
+test('written gate: the teacher test phrase opens it with no AI call', async () => {
+  const { store } = await setup();
+  await claim(store, 1);
+  const s = await act(store, 1, 'check_writing', { station: 's3', text: 'Pass pass pass.' }, { checkWriting: async () => { throw new Error('should not be called'); }, testPhrase: 'pass pass pass' });
+  assert.equal(s.gates.s3.state, 'passed');
+  assert.equal(s.gates.s3.checks_left, 3);
+});
+
 // ---------------------------------------------------------------- station locks (s4: rush k1, AI k2, rush k3)
 
 const lockSetup = (over = {}) => setup(over, { locks: true });

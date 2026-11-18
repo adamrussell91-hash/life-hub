@@ -178,6 +178,7 @@
 .rot-opt[data-res='wrong'] { background: var(--danger-surface, #fbe1d9); border-color: var(--danger); }
 .rot-opt:disabled { cursor: default; }
 .rot-feedback { font-size: var(--text-sm); margin: 0; min-height: 1.2em; }
+.rot-feedback--pass { padding: 8px 12px; border-radius: var(--radius-xs); background: var(--success-surface); color: var(--success); font-weight: 600; }
 .rot-levels { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-full); overflow: hidden; }
 .rot-levels button { border: 0; background: #fff; padding: 5px 12px; font: inherit; font-size: var(--text-sm); font-weight: 600; color: var(--ink); cursor: pointer; }
 .rot-levels button[aria-pressed='true'] { background: var(--ink); color: #fff; }

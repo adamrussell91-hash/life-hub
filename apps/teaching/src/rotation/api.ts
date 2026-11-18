@@ -21,7 +21,7 @@ export type PublicGate = {
   backup?: { prompt: string; options: Array<{ id: string; text: string }> };
   /** Written: checks left before the teacher steps in. */
   checks_left?: number;
-  last?: { text: string; at: string; outcome: 'passed' | 'not_yet' | 'teacher'; feedback: string[]; passed: number; need: number; points: WritingPoint[] };
+  last?: { text: string; at: string; outcome: 'passed' | 'not_yet' | 'teacher'; feedback: string[]; passed: number; need: number; points: WritingPoint[]; /** The checker didn't answer: check again, no check used. */ retry?: boolean };
   appeal_at?: string;
   teacher?: { decision: 'pass' | 'keep'; at: string };
 };
