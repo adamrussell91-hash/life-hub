@@ -365,6 +365,7 @@ async function markbookActionInner(store, classId, body) {
     return {
       students: roster.students.map(({ id, name }) => ({ id, name })),
       ticked: ids.filter((id) => book.took?.[id]?.includes(body.lesson_id)),
+      excused: ids.filter((id) => book.excused?.[id]?.includes(body.lesson_id)),
       started: ids.filter((id) => hasStarted(id, body.lesson_id, { ...evidence, done: done[id] }))
     };
   }
@@ -381,6 +382,24 @@ async function markbookActionInner(store, classId, body) {
         else delete took[id];
       }
       book.took = took;
+      return book;
+    });
+    return { markbook };
+  }
+
+  // A core lesson: the students doing it. Everyone else on the class list is left out of it.
+  if (action === 'set_core_students') {
+    if (!isSafeId(body.lesson_id)) reject(400, 'bad_request', 'Unknown lesson.');
+    const doing = new Set(Array.isArray(body.student_ids) ? body.student_ids : []);
+    const markbook = await changeBook(store, classId, (book) => {
+      const excused = { ...(book.excused ?? {}) };
+      for (const { id } of roster.students) {
+        const without = (excused[id] ?? []).filter((l) => l !== body.lesson_id);
+        const next = doing.has(id) ? without : [...without, body.lesson_id].slice(-200);
+        if (next.length) excused[id] = next;
+        else delete excused[id];
+      }
+      book.excused = excused;
       return book;
     });
     return { markbook };

@@ -1,5 +1,6 @@
 /**
- * Who a side lesson is for. Core lessons are for the whole class. A support, extension or optional
+ * Who a lesson is for. A core lesson is for the whole class, less any student the teacher left out
+ * (markbook `excused`). A support, extension or optional
  * lesson shows on a student's map once the teacher ticks them (markbook `took`), once they sit in
  * its tutorial group, or once they have started it, so nobody loses work they have begun.
  * Teachers' own views never go through this.
@@ -33,7 +34,8 @@ export function inTutorial(lesson, classId, studentId) {
 /** The lessons this student's map draws. `view` is the class's markbook load, `done` their own records. */
 export function lessonsForStudent(lessons, view, done, studentId, classId) {
   const ticked = new Set(view.markbook.took?.[studentId] ?? []);
-  return lessons.filter((l) => !SIDE.has(l.route_role)
+  const leftOut = new Set(view.markbook.excused?.[studentId] ?? []);
+  return lessons.filter((l) => (!SIDE.has(l.route_role) && !leftOut.has(l.id))
     || ticked.has(l.id)
     || inTutorial(l, classId, studentId)
     || hasStarted(studentId, l.id, { quizzes: view.quizzes, work: view.work ?? [], done }));

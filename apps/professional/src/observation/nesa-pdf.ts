@@ -47,8 +47,16 @@ export function nesaDate(iso: string): string {
   return m ? `${m[3]}/${m[2]}/${m[1]!.slice(2)}` : clean(iso);
 }
 
-/** Every template field this record fills, keyed by field name. Empty answers leave the field blank. */
-export function nesaFieldValues(obs: Observation): Record<string, string> {
+/** Today as 'YYYY-MM-DD' in local time. */
+export function localIsoDate(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Every template field this record fills, keyed by field name. Empty answers leave the field blank,
+ * except the two signature dates: a date not picked in the app takes `today` (the day the report is made).
+ */
+export function nesaFieldValues(obs: Observation, today: string = localIsoDate()): Record<string, string> {
   const F = NESA_FIELDS;
   const agreed = agreedDescriptors(obs).slice(0, 4);
   const out: Record<string, string> = {
@@ -89,8 +97,8 @@ export function nesaFieldValues(obs: Observation): Record<string, string> {
     out[F.feedback(n)] = clean(refl?.feedback);
   });
 
-  out[F.teacherDate] = nesaDate(obs.signatures.teacher.date);
-  out[F.supervisorDate] = nesaDate(obs.signatures.supervisor.date);
+  out[F.teacherDate] = nesaDate(clean(obs.signatures.teacher.date) || today);
+  out[F.supervisorDate] = nesaDate(clean(obs.signatures.supervisor.date) || today);
   return out;
 }
 
@@ -110,7 +118,7 @@ const PAD = 2;
 const LINE = 1.2;
 
 /** Fill a copy of the template. Pure apart from pdf-lib, which loads on demand. */
-export async function fillNesaTemplate(template: ArrayBuffer | Uint8Array, obs: Observation): Promise<FilledReport> {
+export async function fillNesaTemplate(template: ArrayBuffer | Uint8Array, obs: Observation, today?: string): Promise<FilledReport> {
   const { PDFDocument, PDFHexString, PDFTextField, StandardFonts } = await import('pdf-lib');
   const pdf = await PDFDocument.load(template);
   const font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -149,7 +157,7 @@ export async function fillNesaTemplate(template: ArrayBuffer | Uint8Array, obs: 
   };
 
   const overflow: string[] = [];
-  for (const [name, raw] of Object.entries(nesaFieldValues(obs))) {
+  for (const [name, raw] of Object.entries(nesaFieldValues(obs, today))) {
     const field = form.getFieldMaybe(name);
     if (!(field instanceof PDFTextField)) continue;
     const text = encodable(raw);

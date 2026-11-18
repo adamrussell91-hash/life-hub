@@ -10,6 +10,8 @@ export type ClassEvidence = {
   /** Lesson id → student id → quiz score. */
   scores: Map<string, Map<string, { score: number; max: number }>>;
   took: Record<string, string[]>;
+  /** Student id → core lessons the teacher left them out of. */
+  excused?: Record<string, string[]>;
 };
 
 export type CoverageMapOptions = {
@@ -108,6 +110,7 @@ export function mountCoverageMap(host: HTMLElement, options: CoverageMapOptions)
     route = studentRoute(map, {
       evidence: data.evidence.filter((x) => x.student === studentId),
       took: data.took[studentId] ?? [],
+      excused: data.excused?.[studentId] ?? [],
       scores,
       today
     });
@@ -131,7 +134,11 @@ export function mountCoverageMap(host: HTMLElement, options: CoverageMapOptions)
         if (route) return `${label} ${STATE_WORD[route.nodes.get(`${row.id}|${id}`) ?? 'none']}`;
         return `${label} ${DEPTH_WORD[depth]}`;
       });
-      const took = route && isSideRow(row) ? (route.took.has(row.id) ? ` ${name} took this.` : ` ${name} didn’t take this.`) : '';
+      const took = !route
+        ? ''
+        : isSideRow(row)
+          ? route.took.has(row.id) ? ` ${name} took this.` : ` ${name} didn’t take this.`
+          : data?.excused?.[studentId]?.includes(row.id) ? ` ${name} is left out of this lesson.` : '';
       return `${head}${parts.length ? `: ${parts.join(', ')}` : ''}.${took}`;
     }
     if (route && name) return `${name}: done lessons and quiz scores on the left, their state on each item on the right.`;
