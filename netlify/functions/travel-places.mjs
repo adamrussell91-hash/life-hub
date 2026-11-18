@@ -34,6 +34,38 @@ export function placeNameFromReverse(features) {
   return null;
 }
 
+/**
+ * The parts of a postal address for where a photo was taken, from the same results.
+ * Same care as the name: the street it stands on, never a house number and never the
+ * nearest business. Each part comes from the first result that has it.
+ */
+export function placeAddressFromReverse(features) {
+  const rows = (Array.isArray(features) ? features : []).map((f) => f?.properties || {});
+  const clean = (value) => (typeof value === 'string' ? value.trim() : '');
+  const first = (read) => {
+    for (const p of rows) {
+      const value = read(p);
+      if (value) return value;
+    }
+    return '';
+  };
+  const street = first((p) => clean(p.street) || (p.type === 'street' || p.osm_key === 'highway' ? clean(p.name) : ''));
+  const city = first((p) => clean(p.city) || (p.type === 'city' ? clean(p.name) : ''));
+  const district = first(
+    (p) => clean(p.district) || clean(p.locality) || (p.type === 'district' || p.type === 'locality' ? clean(p.name) : '')
+  );
+  const postcode = first((p) => clean(p.postcode));
+  const country = first((p) => clean(p.country));
+  const address = {
+    ...(street ? { street } : {}),
+    ...(district && district !== city ? { district } : {}),
+    ...(postcode ? { postcode } : {}),
+    ...(city ? { city } : {}),
+    ...(country ? { country } : {})
+  };
+  return Object.keys(address).length ? address : null;
+}
+
 export function createTravelPlacesHandler(deps = {}) {
   const fetchImpl = deps.fetchImpl ?? fetch;
 
@@ -66,7 +98,11 @@ export function createTravelPlacesHandler(deps = {}) {
           return errorResponse(503, 'upstream_unavailable', 'Place names are unavailable right now.', true, PRIVATE_CACHE);
         }
         const body = await response.json();
-        return okResponse(200, { name: placeNameFromReverse(body.features) }, PRIVATE_CACHE);
+        return okResponse(
+          200,
+          { name: placeNameFromReverse(body.features), address: placeAddressFromReverse(body.features) },
+          PRIVATE_CACHE
+        );
       } catch {
         return errorResponse(503, 'upstream_unavailable', 'Place names are unavailable right now.', true, PRIVATE_CACHE);
       } finally {
