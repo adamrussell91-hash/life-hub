@@ -122,6 +122,12 @@ test('activities: every question answered, or anything written in a format or le
   assert.deepEqual(out, [{ id: 'q1', title: 'Warm-up', done: false }, { id: 'q2', title: 'Questions (1)', done: false }, { id: 'q3', title: 'Chart', done: true }]);
 });
 
+test('activities: success criteria ticked for an answer written in the book counts as answered', () => {
+  const lesson = { blocks: [qset('q1', 'Hand this in', ['a'])] };
+  assert.equal(activitiesOf(lesson, { q1: { answers: { 'a.checked': 'c1,c2' } } })[0].done, true);
+  assert.equal(activitiesOf(lesson, { q1: { answers: { 'a.checked': ' ' } } })[0].done, false);
+});
+
 test('progress carries the student’s own To do: started lessons, what is left, countdown and announcements', async () => {
   const { write, ana, ben, progress } = await setup({ announcements: [{ id: 'n1', block_type: 'rich_text', visibility: 'student_teacher', content: { html: '<p>Bring your draft.</p>' }, created_at: '2026-11-09T00:00:00Z' }] });
   write('l2', ana, { q2: { answers: { a: 'one', b: 'two' } } });

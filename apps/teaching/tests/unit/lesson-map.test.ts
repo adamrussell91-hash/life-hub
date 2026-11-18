@@ -77,6 +77,8 @@ describe('lesson map sections', () => {
     expect(setDone({ questionIds: ['a', 'b'] }, { answers: { a: 'yes', b: 'no' } })).toBe(true);
     expect(setDone({ questionIds: ['a'] }, { 'format.because_but_so': { because: 'it rains' } })).toBe(true);
     expect(setDone({ questionIds: ['a'] }, undefined)).toBe(false);
+    // Success criteria ticked for an answer written in the book.
+    expect(setDone({ questionIds: ['a'] }, { answers: { 'a.checked': 'c1,c2' } })).toBe(true);
   });
 });
 
@@ -128,16 +130,13 @@ describe('lesson map', () => {
     expect(again.handle.rail!.querySelector('[data-section="s1"]')!.classList.contains('is-done')).toBe(true);
   });
 
-  it('will not hand-tick a section with work in it; it ticks itself when the work is done', () => {
+  it('ticks a section with work in it itself when the work is done', () => {
     vi.useFakeTimers();
     const { content, handle } = mount();
     const quizRow = rowFor(handle.card!, 's2');
     const tick = quizRow.querySelector<HTMLButtonElement>('.lm-check__tick')!;
-    expect(tick.getAttribute('aria-disabled')).toBe('true');
-    expect(quizRow.querySelector('.lm-check__auto')!.textContent).toBe('ticks itself');
-    tick.click();
-    expect(tick.getAttribute('aria-pressed')).toBe('false');
-    expect(localStorage.getItem('lesson-check:class1:lesson1')).toBeNull();
+    expect(tick.hasAttribute('aria-disabled')).toBe(false);
+    expect(quizRow.querySelector('.lm-check__auto')!.textContent).toBe('ticks itself when answered here');
 
     quizState = { answeredIds: ['q1'], handedIn: false };
     content.dispatchEvent(new CustomEvent('lesson-quiz-change', { bubbles: true }));
@@ -147,12 +146,32 @@ describe('lesson map', () => {
     content.dispatchEvent(new CustomEvent('lesson-quiz-change', { bubbles: true }));
     vi.advanceTimersByTime(300);
     expect(tick.getAttribute('aria-pressed')).toBe('true');
+    // Answered here: pressing it doesn't take the tick off.
+    tick.click();
+    expect(tick.getAttribute('aria-pressed')).toBe('true');
+    expect(localStorage.getItem('lesson-check:class1:lesson1')).toBeNull();
 
     written = new Map([['w1', { answers: { a: 'First idea', b: 'Second idea' } }]]);
     content.dispatchEvent(new Event('input', { bubbles: true }));
     vi.advanceTimersByTime(300);
     expect(rowFor(handle.card!, 's3').classList.contains('is-done')).toBe(true);
     expect(handle.card!.querySelector('.lm-check__count')!.textContent).toBe('2 of 4 done');
+  });
+
+  it('lets a student tick a work section by hand when they did it in their book, and untick it', () => {
+    const { handle } = mount();
+    const row = rowFor(handle.card!, 's3');
+    const tick = row.querySelector<HTMLButtonElement>('.lm-check__tick')!;
+    tick.click();
+    expect(row.classList.contains('is-done')).toBe(true);
+    expect(JSON.parse(localStorage.getItem('lesson-check:class1:lesson1')!)).toEqual(['s3']);
+    tick.click();
+    expect(row.classList.contains('is-done')).toBe(false);
+  });
+
+  it('says the big tick finishes the lesson', () => {
+    const { handle } = mount();
+    expect(handle.card!.querySelector('.lm-check__note')!.textContent).toContain('The big tick below finishes the lesson');
   });
 
   it('counts a handed-in quiz as done', () => {
