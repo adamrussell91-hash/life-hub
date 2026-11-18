@@ -6374,7 +6374,7 @@ The progress views follow what each question checks, so every quiz_question carr
 ### multiple_choice
 - 3 or 4 options. Three good options measure as well as five. Never pad with a weak option to reach four.
 - Every wrong option is plausible to a student with partial or confused knowledge: the same category, era, register and grammatical form as the key, drawn from your list of confusions and from other content in the unit. A question about a poet's Japanese influence offers other Japanese poets or forms, not Shakespeare.
-- Options match in length, detail and tone. The key is not the longest, the most qualified, the most balanced or the most technical-sounding. Wrong options are not absolutes ("all", "only", "never", "line for line"), extremes or jokes.
+- Options match in length, detail and tone. The key is never the longest option: make a wrong one the longest. It is not the most qualified, the most balanced or the most technical-sounding. Wrong options are not absolutes ("all", "only", "never", "line for line"), extremes or jokes.
 - No "all of the above", "none of the above" or "both A and B". Options do not overlap, and none contains another.
 - For an inference or analysis question, give students something to work on: a short quote or line from the lessons' texts in the stem, then ask about its effect or meaning. Wrong options are readings a student might really give: too literal, the right technique with the wrong effect, an effect that belongs to another line.
 - Keep options short; put shared words in the stem, not repeated in each option.
@@ -8812,8 +8812,11 @@ function questionGiveaways(question) {
     if (key && wrong.length) {
       const longestWrong = Math.max(...wrong.map((option) => option.text.trim().length));
       const keyLength = key.text.trim().length;
+      const sentences = wrong.some((option) => option.text.trim().split(/\s+/).length >= 6);
       if (keyLength > longestWrong * 1.5 && keyLength - longestWrong >= 15) {
         issues.push("the right answer is much longer than every wrong one, so students can pick it by length. Make the options match in length and detail.");
+      } else if (sentences && keyLength > longestWrong) {
+        issues.push("the right answer is the longest option, so students can pick it by length. Make a wrong option the longest, or trim the right one.");
       }
       const extreme = wrong.filter((option) => ABSOLUTE.test(option.text)).length;
       if (extreme >= 2 && !ABSOLUTE.test(key.text)) {

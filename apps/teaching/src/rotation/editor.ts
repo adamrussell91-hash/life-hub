@@ -379,8 +379,7 @@ export function mountRotationEditor(o: RotationEditorOptions): RotationEditorHan
     dialTable.append(tbody);
     const dialPanel = panel(`Control dial: ${ROTATION_DIAL_LABELS[r.dial]}`,
       seg(ROTATION_DIALS.map((d) => [d, ROTATION_DIAL_LABELS[d]] as const), r.dial, 'Control dial', (v) => put((d) => { d.dial = v; }, true)),
-      dialTable,
-      check('Fade the dial: clearing Extend at two stations opens route choice', r.fade_dial, (v) => put((d) => { d.fade_dial = v; })));
+      dialTable);
 
     const available = lessonMinutes(r);
     const b = timeBudget(r, available);

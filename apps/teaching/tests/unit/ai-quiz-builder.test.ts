@@ -217,6 +217,26 @@ describe('questions that give their answer away', () => {
     expect(issues).toEqual([expect.stringMatching(/at least 4 pairs \(it has 3\)/)]);
   });
 
+  it('sends back a right answer that is the longest sentence, even by a little', () => {
+    const issues = questionGiveaways({
+      kind: 'multiple_choice',
+      options: [
+        { id: 'a', text: 'He is torn: writing is his job, but the poem ranks it below the land.' },
+        { id: 'b', text: 'It shows that people everywhere struggle with who they are.' }
+      ],
+      correct: ['a']
+    });
+    expect(issues).toEqual([expect.stringMatching(/right answer is the longest option/)]);
+  });
+
+  it('lets a list of names through when the right one is longest', () => {
+    expect(questionGiveaways({
+      kind: 'multiple_choice',
+      options: [{ id: 'a', text: 'The Remedy of Butterflies' }, { id: 'b', text: 'Finn' }, { id: 'c', text: 'El Diablo Highway' }],
+      correct: ['a']
+    })).toEqual([]);
+  });
+
   it('lets a fair question through, and an extreme right answer is not a giveaway', () => {
     expect(questionGiveaways(goodMc.content.question as Record<string, unknown>)).toEqual([]);
     expect(questionGiveaways({

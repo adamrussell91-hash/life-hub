@@ -103,6 +103,8 @@ test('station flow: open, level, hints, recall, exit check, collect', async () =
   s = await act(store, 1, 'exit_answer', { station: 's1', block_id: exit.id, response: { selected: [optionId(exit.content.question, 'Coral turning white as it loses its algae')] } });
   assert.equal(s.work.exits.s1.correct, true);
   assert.ok(s.work.results.s1[exit.id].key);
+  assert.deepEqual(s.work.collected, ['s1'], 'finishing the exit check ticks the station off');
+  assert.equal(s.work.current, null);
   s = await act(store, 1, 'collect', { station: 's1' });
   assert.deepEqual(s.work.collected, ['s1']);
   assert.equal(s.work.current, null);
@@ -120,12 +122,13 @@ test('guided dial keeps the pretest level', async () => {
   await rejects(act(store, 1, 'level', { station: 's1', level: 'support' }), 'guided');
 });
 
-test('a full station still opens; recommendations route round it', async () => {
+test('a full station still opens, and no station is pushed as the next one', async () => {
   const { store } = await setup();
   for (const n of [2, 3]) { await claim(store, n); await act(store, n, 'open_station', { station: 's2' }); }
   const s = await claim(store, 1);
   assert.equal(s.seats.s2, 2);
-  assert.notEqual(s.recommend, 's2');
+  assert.equal(s.recommend, null);
+  assert.equal(s.route_open, true);
   const opened = await act(store, 1, 'open_station', { station: 's2' });
   assert.equal(opened.work.current, 's2');
 });
@@ -471,6 +474,7 @@ test('locks: a later lock can’t be answered, and collect needs every lock', as
   const s = await passRush(store, clock, 'k3', 3);
   assert.deepEqual(chain(s).map((l) => l.state), ['passed', 'passed', 'passed']);
   assert.deepEqual(s.kit.map((c) => c.lock), ['k1', 'k2', 'k3']);
+  assert.deepEqual(s.work.collected, ['s4'], 'passing lock 3 of 3 ticks the station off');
   const done = await act(store, 1, 'collect', { station: 's4' });
   assert.deepEqual(done.work.collected, ['s4']);
 });

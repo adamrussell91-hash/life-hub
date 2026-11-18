@@ -138,7 +138,6 @@
 .rot-seats i { width: 7px; height: 7px; border-radius: 50%; background: var(--shore); }
 .rot-seats i.on { background: var(--navy-2); }
 .rot-node[data-state='done'] { background: var(--pastel-sage); border-color: rgba(47, 122, 79, 0.35); }
-.rot-node[data-state='rec'] { border-color: var(--wave); box-shadow: 0 0 0 3px rgba(55, 111, 183, 0.18), var(--elev-2); }
 .rot-node[data-state='locked'] { opacity: 0.55; background: var(--cotton); border-style: dashed; }
 .rot-node[data-state='full'] .rot-seats i.on { background: var(--high-sea); }
 .rot-node--teacher { background: var(--pastel-gold); border-color: rgba(108, 88, 31, 0.3); }
@@ -441,7 +440,6 @@
 .rot-node__got { font-size: var(--text-2xs); font-weight: 700; letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--on-dark-muted); }
 .rot-legend .rot-legend__sw { display: inline-grid; place-items: center; font-size: 8px; font-weight: 800; }
 .rot-legend__sw--done { background: var(--success); color: var(--warm-white); }
-.rot-legend__sw--rec { background: var(--warm-white); box-shadow: 0 0 0 2px var(--wave); }
 .rot-legend__sw--teacher { background: var(--pastel-gold); }
 .rot-legend__sw--locked { background: var(--cotton); border: 1px dashed var(--muted); }
 
