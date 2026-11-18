@@ -37,6 +37,10 @@ included_files = [
 [functions.property]
   timeout = 26
 
+# Writing out a 30 second voice clip can pass the 10s default.
+[functions.travel-transcribe]
+  timeout = 26
+
 [functions.knowledge-tidy]
   timeout = 26
 
