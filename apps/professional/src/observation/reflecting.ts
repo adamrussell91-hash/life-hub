@@ -1,9 +1,8 @@
 /**
  * Phase 3 · Reflecting. One row per descriptor: what the observation found, the teacher's reflection
  * (typed by Adam with the teacher), and the supervisor's feedback drafted from the write-up. Then
- * signatures, export, and Mark observation done.
+ * signatures, the official NESA PDF (download or print), and Mark observation done.
  */
-import { openObservationReport } from './export';
 import nesaTemplateUrl from './nesa-observation-template.pdf?url';
 import { agreedDescriptors, draftFeedback } from './model';
 import type { Decision, Observation, ReflectionRow } from './types';
@@ -19,7 +18,6 @@ export function mountReflecting(ctx: ObsCtx): ObsView {
   const { doc } = ctx;
   const el = h(doc, 'div', { class: 'obs-view obs-reflecting', 'data-part': 'obs-reflecting' });
   const feedbackBoxes = new Map<string, { ta: HTMLTextAreaElement; src: HTMLElement }>();
-  let report: { close(): void } | null = null;
 
   // Draft feedback for rows that have a decision and haven't been edited.
   {
@@ -138,11 +136,8 @@ export function mountReflecting(ctx: ObsCtx): ObsView {
     const done = ctx.obs().status === 'done';
     const pdfBtn = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--primary', 'data-part': 'obs-nesa-pdf' }, 'Download NESA PDF');
     pdfBtn.addEventListener('click', () => { void downloadNesaPdf(pdfBtn); });
-    const exportBtn = h(doc, 'button', { type: 'button', class: 'obs-btn', 'data-part': 'obs-export' }, 'Print layout');
-    exportBtn.addEventListener('click', () => {
-      report?.close();
-      report = openObservationReport(doc, ctx.obs());
-    });
+    const printBtn = h(doc, 'button', { type: 'button', class: 'obs-btn', 'data-part': 'obs-nesa-print' }, 'Print / Save as PDF');
+    printBtn.addEventListener('click', () => { void printNesaPdf(printBtn); });
     let toggle: HTMLElement;
     if (done) {
       const reopen = h(doc, 'button', { type: 'button', class: 'obs-btn obs-btn--sm obs-btn--quiet', 'data-part': 'obs-reopen' }, 'Reopen');
@@ -154,15 +149,14 @@ export function mountReflecting(ctx: ObsCtx): ObsView {
       toggle = mark;
     }
     actions.replaceChildren(
-      h(doc, 'span', { class: 'obs-muted obs-small' }, 'Download fills the official NESA template with all three phases. Signatures are added in the PDF.'),
-      h(doc, 'span', { class: 'obs-spacer' }), toggle, exportBtn, pdfBtn);
+      h(doc, 'span', { class: 'obs-muted obs-small' }, 'Both fill the official NESA template with all three phases. Print opens it in a new tab to print or save. Signatures are added in the PDF.'),
+      h(doc, 'span', { class: 'obs-spacer' }), toggle, printBtn, pdfBtn);
   }
 
   // ---------------------------------------------------------------- official NESA PDF
   const pdfNote = h(doc, 'p', { class: 'obs-small obs-muted', 'data-part': 'obs-nesa-pdf-note', role: 'status' });
-  async function downloadNesaPdf(btn: HTMLButtonElement): Promise<void> {
-    btn.disabled = true;
-    pdfNote.textContent = 'Filling the NESA template…';
+  /** Fill the official template from the record; null (with a note) if that fails. */
+  async function fillReport(): Promise<{ url: string; name: string; overflowNote: string } | null> {
     try {
       const { fillNesaTemplate, nesaFileName, nesaFieldLabel } = await import('./nesa-pdf');
       const res = await fetch(nesaTemplateUrl);
@@ -170,18 +164,44 @@ export function mountReflecting(ctx: ObsCtx): ObsView {
       const obs = ctx.obs();
       const { bytes, overflow } = await fillNesaTemplate(await res.arrayBuffer(), obs);
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
-      const a = h(doc, 'a', { href: url, download: nesaFileName(obs) });
-      doc.body.append(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      pdfNote.textContent = overflow.length
-        ? `Downloaded. Too long to show in full on the page (the whole text is in the box; shorten it here to fit): ${overflow.map((f) => nesaFieldLabel(obs, f)).join(', ')}.`
-        : 'Downloaded.';
+      setTimeout(() => URL.revokeObjectURL(url), 10 * 60_000);
+      const overflowNote = overflow.length
+        ? ` Too long to show in full on the page (the whole text is in the box; shorten it here to fit): ${overflow.map((f) => nesaFieldLabel(obs, f)).join(', ')}.`
+        : '';
+      return { url, name: nesaFileName(obs), overflowNote };
     } catch {
-      pdfNote.textContent = 'That didn’t download. Try again; Print layout still works.';
-    } finally {
-      btn.disabled = false;
+      return null;
+    }
+  }
+
+  async function downloadNesaPdf(btn: HTMLButtonElement): Promise<void> {
+    btn.disabled = true;
+    pdfNote.textContent = 'Filling the NESA template…';
+    const report = await fillReport();
+    btn.disabled = false;
+    if (!report) { pdfNote.textContent = 'That didn’t download. Try again.'; return; }
+    const a = h(doc, 'a', { href: report.url, download: report.name });
+    doc.body.append(a);
+    a.click();
+    a.remove();
+    pdfNote.textContent = `Downloaded.${report.overflowNote}`;
+  }
+
+  /** Open the filled official PDF in a new tab, where the browser's own viewer prints it page for page. */
+  async function printNesaPdf(btn: HTMLButtonElement): Promise<void> {
+    // Open the tab inside the click so pop-up blockers (Safari) let it through; point it at the PDF once filled.
+    const tab = doc.defaultView?.open('', '_blank') ?? null;
+    tab?.document.write('<title>NESA observation report</title><p style="font:14px system-ui;margin:24px">Filling the NESA template…</p>');
+    btn.disabled = true;
+    pdfNote.textContent = 'Filling the NESA template…';
+    const report = await fillReport();
+    btn.disabled = false;
+    if (!report) { tab?.close(); pdfNote.textContent = 'That didn’t open. Try again, or use Download NESA PDF.'; return; }
+    if (tab && !tab.closed) {
+      tab.location.href = report.url;
+      pdfNote.textContent = `Opened in a new tab. Print or save it from there (⌘P).${report.overflowNote}`;
+    } else {
+      pdfNote.textContent = `Your browser blocked the new tab. Use Download NESA PDF and print it from Preview.${report.overflowNote}`;
     }
   }
 
@@ -201,5 +221,5 @@ export function mountReflecting(ctx: ObsCtx): ObsView {
   // Keep untouched drafts current if the record changed elsewhere before mount finished.
   for (const [code, box] of feedbackBoxes) syncValue(box.ta, ctx.obs().reflection[code]?.feedback ?? '');
 
-  return { el, destroy() { report?.close(); report = null; } };
+  return { el, destroy() {} };
 }

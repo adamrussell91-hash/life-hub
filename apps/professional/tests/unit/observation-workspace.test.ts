@@ -12,7 +12,6 @@ const meetings = vi.hoisted(() => ({ getMeeting: vi.fn() }));
 vi.mock('@/observation/api', () => api);
 vi.mock('@/api/meetings', () => meetings);
 
-import { openObservationReport } from '@/observation/export';
 import { addDescriptor, addLookFor, endClock, logEntry, newObservation, startClock } from '@/observation/model';
 import { NESA } from '@/observation/ui';
 import { mountObservationWorkspace } from '@/observation/workspace';
@@ -412,31 +411,11 @@ describe('reflecting', () => {
   });
 });
 
-describe('export', () => {
-  it('lays out four pages with every template heading and question once', () => {
-    const report = openObservationReport(document, planned());
-    const overlay = document.querySelector('[data-part="obs-report"]') as HTMLElement;
-    expect(overlay.querySelectorAll('.obs-page')).toHaveLength(4);
-    const text = overlay.textContent ?? '';
-    const once = (s: string) => text.split(s).length - 1;
-    const questions = [
-      NESA.intro, NESA.phases.planning.about, NESA.phases.observing.about, NESA.phases.reflecting.about,
-      NESA.p1.descriptors.which, NESA.p1.descriptors.why, NESA.p1.descriptors.practice,
-      NESA.p1.strategies.demonstrate, NESA.p1.strategies.allStudents, NESA.p1.strategies.lesson, NESA.p1.strategies.syllabus,
-      NESA.p1.impact.planned, NESA.p1.impact.howKnow, NESA.p1.impact.measure,
-      ...NESA.p2.practiceQs, NESA.p2.strengthsQ, NESA.p2.decisionQ,
-      ...NESA.p3.teacherQs, NESA.p3.feedbackShown, NESA.p3.feedbackAdvice,
-      NESA.p3.teacherSig, NESA.p3.supervisorSig, NESA.teacherDetails, NESA.supervisorDetails
-    ];
-    for (const q of questions) expect(once(q), q).toBe(1);
-    const heads = [...overlay.querySelectorAll('.obs-r-head')].map((n) => n.textContent);
-    expect(heads).toEqual([
-      'Standard Descriptors', 'Teaching and learning strategies', 'Impact of practice',
-      'Standard Descriptor', 'Teaching practice', 'Observation Strengths', 'Record of decision against the Standard Descriptor',
-      'Standard Descriptor', 'Teacher’s reflection', 'Accreditation Supervisor’s feedback'
-    ]);
-    expect(overlay.querySelectorAll('.obs-page--landscape')).toHaveLength(3);
-    report.close();
-    expect(document.querySelector('[data-part="obs-report"]')).toBeNull();
+describe('NESA report buttons', () => {
+  it('offers Print and Download of the official PDF, no home-made print layout', async () => {
+    const root = await mount(planned(), 'reflecting');
+    expect(root.querySelector('[data-part="obs-nesa-print"]')!.textContent).toBe('Print / Save as PDF');
+    expect(root.querySelector('[data-part="obs-nesa-pdf"]')!.textContent).toBe('Download NESA PDF');
+    expect(root.querySelector('[data-part="obs-export"]')).toBeNull();
   });
 });

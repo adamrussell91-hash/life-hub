@@ -2,7 +2,7 @@
    Each agreed descriptor has a slot colour (d1–d4) that follows it from the planning card through the
    quick keys, the log, the tally and the write-up to the reflection.
    Approved mockup: docs/mockups/classroom-observation/set.html */
-.obs, .obs-report {
+.obs {
   --obs-paper: #f7f4ec; --obs-card: #fffdf8; --obs-ink: var(--ink, #1b2230); --obs-muted: var(--muted, #6b7380);
   --obs-line: rgba(27, 34, 48, 0.12);
   --obs-navy: #1f3a5f; --obs-navy-tint: #e3e9f2;
@@ -21,7 +21,7 @@
   color: var(--obs-ink);
 }
 .obs { display: flex; flex-direction: column; gap: var(--space-4, 16px); font-size: 15px; min-width: 0; }
-.obs *, .obs-report * { box-sizing: border-box; }
+.obs * { box-sizing: border-box; }
 .obs-c1 { --c: var(--obs-d1); --ct: var(--obs-d1-t); }
 .obs-c2 { --c: var(--obs-d2); --ct: var(--obs-d2-t); }
 .obs-c3 { --c: var(--obs-d3); --ct: var(--obs-d3-t); }
@@ -264,57 +264,6 @@ button.obs-series__step:hover { background: var(--obs-paper); }
   .obs-entry { grid-template-columns: 44px minmax(0, 1fr); }
   .obs-entry__tools { grid-column: 2; justify-content: flex-end; }
   .obs-clock { font-size: 18px; }
-}
-
-/* ── Export: the NESA report as four pages ── */
-.obs-report { position: fixed; inset: 0; z-index: 1000; background: #fff; overflow: auto; color: #1b2230; font-size: 13px; }
-.obs-report__bar { position: sticky; top: 0; z-index: 1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 16px; background: var(--obs-paper);
-  border-bottom: 1px solid var(--obs-line); }
-.obs-report__pages { display: flex; flex-direction: column; gap: 24px; padding: 24px 16px 48px; align-items: center; }
-.obs-page { width: 100%; max-width: 210mm; background: #fff; padding: 14mm; box-shadow: 0 1px 0 rgba(0, 0, 0, .04), 0 8px 24px rgba(27, 34, 48, .10); }
-.obs-page--landscape { max-width: 297mm; }
-.obs-page h1 { color: var(--obs-navy); font-size: 26px; margin: 0 0 12px; }
-.obs-page h2 { color: var(--obs-navy); font-size: 18px; margin: 18px 0 8px; }
-.obs-page h2:first-child { margin-top: 0; }
-.obs-page p { line-height: 1.5; margin: 0 0 8px; }
-.obs-r-phase b { color: var(--obs-navy); }
-.obs-r-source { color: var(--obs-muted); font-size: 11px; margin-top: 18px !important; }
-.obs-r-details { width: 100%; border-collapse: collapse; }
-.obs-r-details th, .obs-r-details td { border: 1px solid #9aa6b8; padding: 6px 8px; text-align: left; vertical-align: top; }
-.obs-r-details th { width: 34%; background: var(--obs-navy-tint); color: var(--obs-navy); font-weight: 600; }
-.obs-r-details td { height: 2.2em; }
-.obs-r-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.obs-r-table th, .obs-r-table td { border: 1px solid #9aa6b8; padding: 6px 8px; text-align: left; vertical-align: top; }
-.obs-r-table th { background: var(--obs-navy); color: #fff; font-weight: 400; }
-.obs-r-head { display: block; font-weight: 700; font-size: 13px; }
-.obs-r-qs { margin: 4px 0 0; padding-left: 16px; font-size: 11px; line-height: 1.35; }
-.obs-r-table--4 th:first-child, .obs-r-table--3r th:first-child { width: 18%; }
-.obs-r-desc b { color: var(--obs-navy); }
-.obs-r-desc__text { font-size: 11px; color: #3c4553; margin: 2px 0 6px; }
-.obs-r-part + .obs-r-part { margin-top: 6px; }
-.obs-r-label { display: block; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--obs-muted); }
-.obs-r-answer { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 1.4em; }
-.obs-r-choices { list-style: none; margin: 0 0 6px; padding: 0; }
-.obs-r-choices li.is-on { font-weight: 700; }
-.obs-r-whole td { background: #f7f8fa; }
-.obs-r-sig { display: grid; grid-template-columns: auto minmax(0, 1fr) auto 10em; gap: 8px; align-items: end; margin-top: 18px; }
-.obs-r-sig__label { font-weight: 600; color: var(--obs-navy); }
-.obs-r-sig__line { border-bottom: 1px solid #1b2230; min-height: 1.6em; padding: 0 4px; }
-
-@page obs-portrait { size: A4 portrait; margin: 12mm; }
-@page obs-landscape { size: A4 landscape; margin: 10mm; }
-@media print {
-  body.obs-report-open > *:not(.obs-report) { display: none !important; }
-  body.obs-report-open { background: #fff !important; }
-  .obs-report { position: static; overflow: visible; inset: auto; }
-  .obs-report__bar { display: none; }
-  .obs-report__pages { display: block; padding: 0; }
-  .obs-page { max-width: none; box-shadow: none; padding: 0; break-after: page; page-break-after: always; }
-  .obs-page:last-child { break-after: auto; page-break-after: auto; }
-  .obs-page--portrait { page: obs-portrait; }
-  .obs-page--landscape { page: obs-landscape; }
-  .obs-r-table tr { break-inside: avoid; }
-  .obs-r-table th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
 /* Extras and partial toggle */
