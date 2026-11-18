@@ -1,6 +1,6 @@
 import { el } from '@/quiz/dom';
 import type { InsightContext } from '@/evidence/context';
-import { classEvidence } from '@/evidence/class-evidence';
+import { classEvidence, taughtAreas } from '@/evidence/class-evidence';
 import { pct } from '@/evidence/views/parts';
 import { RUNG_IDS } from '@/skills/schema';
 import { RUNG_LETTER, RUNG_NAME, sortPoints, syllabusGrid, type GridCell, type GridLine, type PointRow, type PointSort } from '@/evidence/syllabus-grid';
@@ -234,7 +234,8 @@ export function renderSyllabusGrid(
     return root;
   }
   const { evidence } = classEvidence(view, ctx);
-  const rows = syllabusGrid(evidence, ctx.alignment ?? null, ctx.outcomes, ctx, listed.map((s) => s.id));
+  // Only the modules this class has been taught: the rest would be rows of grey, or worse, marks spread through shared outcomes.
+  const rows = syllabusGrid(evidence, ctx.alignment ?? null, ctx.outcomes, ctx, listed.map((s) => s.id), taughtAreas(view, ctx));
   if (!rows.length) {
     root.append(el('p', 'mb__empty', 'No syllabus is loaded for this subject, so dot points can’t be drawn. Marks has the table of quizzes and tasks.'));
     return root;
