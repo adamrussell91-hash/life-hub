@@ -278,7 +278,7 @@ export const PRESET_INFO: Record<RotationPreset, { label: string; blurb: string;
 
 /** The control dial: what each setting changes. */
 export const DIAL_TABLE: Array<{ row: string; guided: string; standard: string; open: string }> = [
-  { row: 'Route', guided: 'Next station recommended for you', standard: 'Recommended, you can pick another', open: 'You choose' },
+  { row: 'Route', guided: 'You choose any open station', standard: 'You choose any open station', open: 'You choose any open station' },
   { row: 'Level', guided: 'Set by the pretest', standard: 'Pretest level, you can change it', open: 'Pretest level, you can change it' },
   { row: 'Hints', guided: 'Offered after a minute', standard: 'Open when you ask', open: 'Open when you ask' },
   { row: 'Finale format', guided: 'One format', standard: 'Pick one of three', open: 'Any format' }

@@ -103,8 +103,12 @@ export function questionGiveaways(question: Record<string, unknown>): string[] {
     if (key && wrong.length) {
       const longestWrong = Math.max(...wrong.map((option) => option.text.trim().length));
       const keyLength = key.text.trim().length;
+      // Sentence options only: a fixed list of names (poems, techniques) has no length cue to remove.
+      const sentences = wrong.some((option) => option.text.trim().split(/\s+/).length >= 6);
       if (keyLength > longestWrong * 1.5 && keyLength - longestWrong >= 15) {
         issues.push('the right answer is much longer than every wrong one, so students can pick it by length. Make the options match in length and detail.');
+      } else if (sentences && keyLength > longestWrong) {
+        issues.push('the right answer is the longest option, so students can pick it by length. Make a wrong option the longest, or trim the right one.');
       }
       const extreme = wrong.filter((option) => ABSOLUTE.test(option.text)).length;
       if (extreme >= 2 && !ABSOLUTE.test(key.text)) {

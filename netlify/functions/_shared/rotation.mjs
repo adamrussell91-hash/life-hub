@@ -36,7 +36,7 @@ import { QuizError, deviceHash, read, reject, validToken } from './question-drop
 import { identify } from './quiz.mjs';
 import { checkQuestion, cleanResponse, hasAnswer, markResponse, splitQuestion } from './quiz-core.mjs';
 import { RotationSettingsSchema, PublicWrittenGateSchema, WrittenGateSchema, RUSH_ITEM_KINDS } from './rotation-schema.mjs';
-import { levelAt, levelsFromPretest, lockReason, piecesLeft, recommend, routeChoiceOpen, unlockProblems } from './rotation-rules.mjs';
+import { levelAt, levelsFromPretest, lockReason, piecesLeft, unlockProblems } from './rotation-rules.mjs';
 
 export { QuizError as RotationError };
 
@@ -452,8 +452,9 @@ async function buildStatus(store, lessonId, lesson, config, state, work, identit
     kit: vivaKit(config, work),
     gates,
     seats: taken,
-    recommend: recommend(settings, work, taken),
-    route_open: routeChoiceOpen(settings, work),
+    // No suggested route: stations seat a handful, so one route jams the room.
+    recommend: null,
+    route_open: true,
     pieces_left: piecesLeft(settings, work, fallbackOn(state)),
     fallback_on: fallbackOn(state),
     called: call && !call.done ? { at: call.at, group: call.group, title: call.title ?? 'Teacher station' } : null,
@@ -521,16 +522,36 @@ export async function rotationAction(store, lessonId, body, deps = {}) {
   work.student_id = who.student.id;
   const view = (extra) => buildStatus(store, lessonId, lesson, config, state, work, identity, owner, extra);
   const clock = typeof deps.now === 'function' ? deps.now : Date.now;
-  if (action === 'status' || action === 'claim') return view();
-
   const stations = list(config.stations);
   const settings = settingsOf(config);
+  // A station ticks off the moment its last lock and exit check are done, so a
+  // student who finishes never has to find a separate Collect button.
+  const finishedAt = (s) => {
+    if (!s || s.kind === 'teacher' || work.collected.includes(s.id) || s.offline_code) return false;
+    const exits = exitIds(config, s.id);
+    if (!locksAt(config, s.id).length && !exits.length) return false;
+    if (!gateOpen(config, work, s.id)) return false;
+    if (!exits.every((id) => list(work.exits[s.id]?.answered).includes(id))) return false;
+    return allLocksPassed(config, work, s.id);
+  };
   const save = async (extra) => {
+    const acted = stations.find((x) => x.id === (body.station ?? work.current));
+    if (finishedAt(acted)) {
+      work.done = work.done.includes(acted.id) ? work.done : [...work.done, acted.id];
+      work.collected = [...work.collected, acted.id];
+      if (work.current === acted.id) {
+        work.current = undefined;
+        await setSeat(store, lessonId, owner, null);
+      }
+    }
     work.at = now();
     await store.setJSON(k.work(owner), work);
     if (!state.started_at) await store.setJSON(k.state, { ...state, started_at: work.at });
     return view(extra);
   };
+  // A teacher can open a student's last lock, so a status poll finishes the station too.
+  if (action === 'status' || action === 'claim') return finishedAt(stations.find((x) => x.id === work.current)) ? save() : view();
+
   const station = (id = body.station) => {
     const s = stations.find((x) => x.id === id);
     if (!s) reject(400, 'bad_station', 'That station isn’t in this rotation.');

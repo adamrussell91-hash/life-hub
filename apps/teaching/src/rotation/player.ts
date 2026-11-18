@@ -215,10 +215,12 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
 
   // ------------------------------------------------------------ map, board, passport
 
-  function stateOf(s: RotationStatus, st: PublicStation): 'done' | 'rec' | 'full' | 'locked' | 'open' {
+  // No "go here next": a station holds a handful of students, so one suggested
+  // route sends the whole class the same way and jams station 1. Students pick
+  // any open station; the seat dots show where there's room.
+  function stateOf(s: RotationStatus, st: PublicStation): 'done' | 'full' | 'locked' | 'open' {
     if (s.work?.collected.includes(st.id)) return 'done';
     if (s.locks[st.id]) return 'locked';
-    if (s.recommend === st.id) return 'rec';
     if ((s.seats[st.id] ?? 0) >= st.seats) return 'full';
     return 'open';
   }
@@ -247,7 +249,7 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
       return b;
     }
     if (!teacher) top.append(levelChip(s.levels[st.id]?.level));
-    const words = { rec: 'Go here next', full: 'Full', locked: s.locks[st.id] ?? 'Locked', open: st.id === s.work?.current ? 'You’re here' : '' }[state];
+    const words = { full: 'Full', locked: s.locks[st.id] ?? 'Locked', open: st.id === s.work?.current ? 'You’re here' : '' }[state];
     b.append(top, el('span', 'rot-node__title', st.title), el('span', 'rot-node__sub', teacher ? (s.called ? 'Your teacher is calling you' : 'When your teacher calls you') : `${ROTATION_KIND_INFO[st.kind].label} · ${st.minutes} min`));
     const foot = el('span', 'rot-node__foot');
     const seats = el('span', 'rot-seats');
@@ -255,11 +257,9 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
     for (let i = 0; i < st.seats; i++) seats.append(el('i', i < (s.seats[st.id] ?? 0) ? 'on' : ''));
     foot.append(seats, el('span', '', words));
     b.append(foot);
-    const guidedLock = !s.route_open && !teacher && state !== 'rec' && st.id !== s.work?.current;
-    if (state === 'locked' || guidedLock) b.setAttribute('aria-disabled', 'true');
+    if (state === 'locked') b.setAttribute('aria-disabled', 'true');
     b.addEventListener('click', () => {
       if (state === 'locked') { mapMsg = s.locks[st.id]!; sigs.map = ''; paint(); return; }
-      if (guidedLock) { mapMsg = 'Your teacher has set your route for now: go to the station marked “Go here next”.'; sigs.map = ''; paint(); return; }
       void openStation(st.id);
     });
     return b;
@@ -345,7 +345,7 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
       if (!board) { board = mountEvidenceBoard({ rotation: r, client: client!, run, storageKey: `rot-board-seen:${lesson.lesson_id}` }); boardHost.append(board.root); }
       board.update(s);
     }
-    const sig = JSON.stringify([s.locks, s.recommend, s.seats, s.levels, s.work?.collected, s.work?.current, s.called, s.pieces_left, s.route_open, mapMsg, pretestLeft(s).length, skippedPretest]);
+    const sig = JSON.stringify([s.locks, s.seats, s.levels, s.work?.collected, s.work?.current, s.called, s.pieces_left, mapMsg, pretestLeft(s).length, skippedPretest]);
     if (sigs.map !== sig) {
       sigs.map = sig;
       const parts: HTMLElement[] = [];
@@ -359,8 +359,7 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
         p.append(go);
         parts.push(p);
       }
-      const rec = r.stations.find((x) => x.id === s.recommend);
-      parts.push(el('p', 'rot-small rot-muted', `${ROTATION_PATH_LABELS[r.path]} · ${ROTATION_DIAL_LABELS[r.dial]} control. ${rec ? `Go to ${rec.title} next${s.route_open ? ', or pick another' : ''}.` : s.pieces_left === 0 ? 'You have every piece you need: open the finale.' : ''}`));
+      parts.push(el('p', 'rot-small rot-muted', `${ROTATION_PATH_LABELS[r.path]} · ${ROTATION_DIAL_LABELS[r.dial]} control. ${s.pieces_left === 0 ? 'You have every piece you need: open the finale.' : 'Pick any open station with a free seat.'}`));
       if (mapMsg) parts.push(el('p', 'rot-feedback', mapMsg));
       const map = el('div', 'rot-map');
       map.setAttribute('aria-label', 'Station map');
@@ -370,7 +369,8 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
       svg.setAttribute('viewBox', '0 0 100 100');
       svg.setAttribute('preserveAspectRatio', 'none');
       svg.setAttribute('aria-hidden', 'true');
-      const order = [...learning.map((x) => x.id), '__finale'];
+      // Lines only when the teacher set a fixed order: otherwise they read as a route to follow.
+      const order = r.path === 'fixed' ? [...learning.map((x) => x.id), '__finale'] : [];
       for (let i = 0; i + 1 < order.length; i++) {
         const a = at[order[i]!]!;
         const b = at[order[i + 1]!]!;
@@ -391,7 +391,7 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
       fin.addEventListener('click', () => { if (ready) { view = 'finale'; paint(); toBody(); } else { mapMsg = `Collect ${s.pieces_left} more piece${s.pieces_left === 1 ? '' : 's'} to open the finale.`; sigs.map = ''; paint(); } });
       map.append(fin);
       const legend = el('div', 'rot-legend');
-      for (const [label, kind] of [['Collected', 'done'], ['Go here next', 'rec'], ['Teacher station', 'teacher'], ['Can’t open yet', 'locked']] as const) {
+      for (const [label, kind] of [['Collected', 'done'], ['Teacher station', 'teacher'], ['Can’t open yet', 'locked']] as const) {
         const span = el('span');
         const sw = el('b', `rot-legend__sw rot-legend__sw--${kind}`);
         if (kind === 'done') sw.textContent = '✓';
