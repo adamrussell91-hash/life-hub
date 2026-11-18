@@ -33,6 +33,13 @@
 .rot-btn--small { min-height: 34px; padding: 5px 12px; font-size: var(--text-sm); }
 .rot-btn--danger { color: var(--danger); border-color: var(--danger-line, var(--danger)); }
 .rot-btn:disabled { opacity: 0.45; cursor: default; }
+/* Back to the map: a big, plain-to-see button at the top and bottom of a station and the finale. */
+.rot-btn--map { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 50px; padding: 12px 24px; background: var(--navy); border: 2px solid var(--navy); color: #fff; font-size: var(--text-md); font-weight: 700; box-shadow: var(--elev-1); }
+.rot-btn--map:hover { background: var(--wave); border-color: var(--wave); }
+.rot-btn--map:focus-visible { outline: 3px solid var(--wave); outline-offset: 2px; }
+.rot-btn--map svg { flex: none; }
+.rot-mapbar { grid-column: 1 / -1; display: flex; justify-content: center; padding: 8px 0 4px; border-top: 1px solid var(--line); min-width: 0; }
+.rot-mapbar[hidden] { display: none; }
 .rot-link { border: 0; background: none; padding: 0; font: inherit; color: var(--wave); text-decoration: underline; cursor: pointer; }
 .rot-field { display: grid; gap: 4px; min-width: 0; }
 .rot-field > span { font-size: var(--text-sm); font-weight: 600; }
@@ -96,6 +103,8 @@
 
 /* ---------- student shell ---------- */
 .rot-hero-host { min-width: 0; }
+/* Slots with nothing in them (no story, no intro, no call) take no room: each one's grid gap left a blank band under the picture. */
+.rot-player > div:empty, .rot-steps > div:empty { display: none; }
 .rot-gate-msg { padding: 14px 16px; border-radius: var(--radius-sm); background: var(--pastel-blue); color: var(--pastel-blue-ink); }
 .rot-status { font-size: var(--text-xs); color: var(--muted); min-height: 1.2em; }
 .rot-saved { font-size: var(--text-xs); color: var(--success); font-weight: 600; }
@@ -449,5 +458,6 @@
   .rot-lk[data-state='open'] { padding: 12px; }
   .rot-rush { padding: 10px; }
   .rot-complete { padding: 14px; }
+  .rot-mapbar .rot-btn--map { width: 100%; }
   .rot-complete__tok { width: 44px; height: 44px; font-size: var(--text-lg); }
 }

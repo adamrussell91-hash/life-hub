@@ -8,7 +8,7 @@ import { studentUnitAnthology } from '@/blocks/anthology-load';
 import { ROTATION_DIAL_LABELS, ROTATION_KIND_INFO, ROTATION_LEVEL_LABELS, ROTATION_PATH_LABELS, type PublicRotation, type PublicStation } from './schema';
 import { isRotationFinale, rotationStationOf, sectionBlocks } from './model';
 import type { RotationClient, RotationStatus } from './api';
-import { mountStationCard, type StationCard } from './station-card';
+import { mapButton, mountStationCard, type StationCard } from './station-card';
 import { mountEvidenceBoard } from './board';
 import { kitCard } from './lock-chain';
 import './rotation.css';
@@ -441,9 +441,7 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
     const left = el('div', 'rot-grid');
     const right = el('div', 'rot-grid');
     grid.append(left, right);
-    const back = el('button', 'rot-btn rot-btn--small', '← Map');
-    back.type = 'button';
-    back.addEventListener('click', () => { view = 'map'; sigs.map = ''; paint(); });
+    const toMap = () => { view = 'map'; sigs.map = ''; paint(); toBody(); };
     const lockNeeded = !!r.finale.lock;
     const open = !lockNeeded || f.lock_passed;
     if (finaleBlocks.length) { const p = el('div', 'rot-blocks'); for (const b of finaleBlocks) p.append(render(b)); left.append(p); }
@@ -587,8 +585,10 @@ export function mountRotationPlayer(host: HTMLElement, options: RotationPlayerOp
     right.append(debrief);
     const wrap = el('div', 'rot-grid');
     const top = el('div', 'rot-row');
-    top.append(back);
-    wrap.append(top, grid);
+    top.append(mapButton(toMap));
+    const foot = el('div', 'rot-mapbar');
+    foot.append(mapButton(toMap));
+    wrap.append(top, grid, foot);
     body.replaceChildren(wrap);
   }
 
