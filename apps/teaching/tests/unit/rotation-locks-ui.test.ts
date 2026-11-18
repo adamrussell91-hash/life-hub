@@ -131,7 +131,27 @@ describe('station lock chain', () => {
     const c = card(status([k1Passed(), { ...k2Open, flagged: true, ai: { checks_left: 0, last: { text: 'x', at: '2026-11-14T00:00:00.000Z', outcome: 'not_yet', fix: 'Add the fish.' } } }, k3Locked]));
     const k2 = c.root.querySelector<HTMLElement>('.rot-lk[data-lock="k2"]')!;
     expect(k2.textContent).toContain('Your teacher will check this one with you');
+    expect(k2.textContent).toContain('You’ve used your checks.');
     expect(k2.querySelector<HTMLButtonElement>('.rot-lk__ai button')!.disabled).toBe(true);
+    // One teacher line, never the same thing stacked.
+    expect((k2.textContent!.match(/Your teacher will/g) ?? []).length).toBe(1);
+  });
+
+  it('asks for another check when the checker gave no verdict', () => {
+    const c = card(status([k1Passed(), { ...k2Open, ai: { checks_left: 6, last: { text: 'x', at: '2026-11-14T00:00:00.000Z', outcome: 'teacher', fix: null, retry: true } } }, k3Locked]));
+    const k2 = c.root.querySelector<HTMLElement>('.rot-lk[data-lock="k2"]')!;
+    expect(k2.textContent).toContain('Check again');
+    expect(k2.textContent).not.toContain('Your teacher will');
+    expect(k2.querySelector<HTMLButtonElement>('.rot-lk__ai button')!.disabled).toBe(false);
+  });
+
+  it('says the answer was strong the moment a written check opens the next lock', () => {
+    const passedAi = { ...k2Open, state: 'passed' as const, ai: { checks_left: 5, last: { text: 'x', at: '2026-11-14T00:00:00.000Z', outcome: 'passed' as const, fix: null } } };
+    const c = card(status([k1Passed(), k2Open, k3Locked]));
+    c.update(status([k1Passed(), passedAi, { ...k3Locked }]));
+    expect(c.root.querySelector('.rot-lk[data-lock="k2"]')!.textContent).toContain('Strong answer. Lock 3 is open.');
+    const reload = card(status([k1Passed(), passedAi, k3Locked]));
+    expect(reload.root.querySelector('.rot-lk[data-lock="k2"]')!.textContent).not.toContain('Strong answer');
   });
 
   it('keeps the question and the student’s place on a poll with nothing new', () => {

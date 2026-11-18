@@ -339,7 +339,7 @@ function publicLocks(config, work, stationId) {
       out.check = { kind: 'ai', prompt: lock.check.prompt };
       const checks = list(w.ai);
       const last = checks[checks.length - 1];
-      out.ai = { checks_left: Math.max(0, MAX_LOCK_CHECKS - checks.filter((a) => a.counted !== false).length), last: last ? { text: last.text, at: last.at, outcome: last.outcome, fix: last.fix ?? null } : null };
+      out.ai = { checks_left: Math.max(0, MAX_LOCK_CHECKS - checks.filter((a) => a.counted !== false).length), last: last ? { text: last.text, at: last.at, outcome: last.outcome, fix: last.fix ?? null, ...(last.unavailable ? { retry: true } : {}) } : null };
     }
     if (w.flagged) out.flagged = true;
     if (state === 'passed') out.reward = { title: lock.reward.title, text: lock.reward.text };
@@ -703,7 +703,9 @@ export async function rotationAction(store, lessonId, body, deps = {}) {
     }
     if (['passed', 'unlocked'].includes(g.state)) reject(409, 'open', 'This gate is already open.');
     const level = levelInfo(config, work, s.id).level;
-    const outcome = await (deps.checkWriting ?? teacherOnly)({ store, lessonId, classId: who.classId, gate, level, gateState: g, text: body.text });
+    const outcome = isTestPhrase(deps.testPhrase, body.text)
+      ? { attempt: { text: clean(body.text, 3000), outcome: 'passed', passed: gate.marks, need: gate.marks, rules: [], verdicts: [], feedback: [], points: [], counted: false, test: true }, message: null }
+      : await (deps.checkWriting ?? teacherOnly)({ store, lessonId, classId: who.classId, gate, level, gateState: g, text: body.text });
     const attempt = { at: now(), ...outcome.attempt };
     const written = [...list(g.written), attempt];
     const counted = written.filter((a) => a.counted !== false).length;
@@ -761,15 +763,18 @@ export async function rotationAction(store, lessonId, body, deps = {}) {
     if (lockState === 'passed') reject(409, 'open', 'This lock is already open.');
     if (w.flagged) reject(409, 'flagged', 'Your teacher will check this one with you.');
     const cap = Number(s.written_gate?.daily_cap_aud ?? LOCK_DAILY_CAP_AUD);
-    const outcome = await (deps.checkLock ?? lockTeacherOnly)({ store, lessonId, classId: who.classId, lock, checks: list(w.ai), text: body.text, capAud: cap });
+    const outcome = isTestPhrase(deps.testPhrase, body.text)
+      ? { attempt: { text: clean(body.text, 600), outcome: 'passed', counted: false, test: true }, message: null }
+      : await (deps.checkLock ?? lockTeacherOnly)({ store, lessonId, classId: who.classId, lock, checks: list(w.ai), text: body.text, capAud: cap });
     const attempt = { at: now(), ...outcome.attempt };
     const checks = [...list(w.ai), attempt];
     const counted = checks.filter((a) => a.counted !== false).length;
     const passed = attempt.outcome === 'passed';
-    const flagged = !passed && (attempt.outcome === 'teacher' || counted >= MAX_LOCK_CHECKS);
+    // A checker that didn't answer is a retry, never a teacher check.
+    const flagged = !passed && ((attempt.outcome === 'teacher' && !attempt.unavailable) || counted >= MAX_LOCK_CHECKS);
     setLockWork(work, s.id, lock.id, { ai: checks, ...(passed ? { passed_at: attempt.at } : {}), ...(flagged ? { flagged: true } : {}) });
     const message = outcome.message ?? (flagged && attempt.outcome !== 'teacher' ? 'You’ve used your checks. Your teacher will look at this one.' : null);
-    return save({ lock_check: { outcome: attempt.outcome, pass: passed, fix: attempt.fix ?? null, message, checks_left: Math.max(0, MAX_LOCK_CHECKS - counted) } });
+    return save({ lock_check: { outcome: attempt.outcome, pass: passed, fix: attempt.fix ?? null, message, ...(attempt.unavailable && !flagged ? { retry: true } : {}), checks_left: Math.max(0, MAX_LOCK_CHECKS - counted) } });
   }
 
   if (action === 'finale_lock' || action === 'finale_save') {
@@ -803,6 +808,18 @@ export async function rotationAction(store, lessonId, body, deps = {}) {
   }
 
   reject(400, 'bad_action', 'Unknown action.');
+}
+
+/**
+ * The teacher's test phrase (Netlify env ROTATION_TEST_PHRASE, never in code):
+ * typed as the whole answer, it passes a written gate or a lock's AI check with
+ * no AI call, so the teacher can walk a rotation end to end. Case, spacing and
+ * punctuation don't matter. Unset, or under six letters, it is off.
+ */
+const phraseWords = (t) => String(t ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+export function isTestPhrase(phrase, text) {
+  const p = phraseWords(phrase);
+  return p.replace(/ /g, '').length >= 6 && phraseWords(text) === p;
 }
 
 /** No checker wired (no key): a lock's written check goes to the teacher and doesn't count. */

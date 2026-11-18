@@ -138,15 +138,16 @@ export function mountLockChain(o: LockChainOptions): LockChain {
     spin.hidden = !busy;
     const out = el('div', 'rot-lk__reply');
     out.setAttribute('aria-live', 'polite');
+    // One line, whatever happened: the server's own message is never stacked on top.
     if (flagged) {
       out.dataset.kind = 'teacher';
-      out.append(el('p', '', 'Your teacher will check this one with you. You can do another station and come back.'));
+      out.append(el('p', '', `${left <= 0 ? 'You’ve used your checks. ' : ''}Your teacher will check this one with you. You can do another station and come back.`));
+    } else if (last?.retry) {
+      out.dataset.kind = 'fix';
+      out.append(el('p', '', 'The checker didn’t give a verdict that time. Check again: it doesn’t use up a check.'));
     } else if (last?.outcome === 'not_yet') {
       out.dataset.kind = 'fix';
       out.append(el('b', '', 'Not yet. Next step: '), document.createTextNode(last.fix || 'Read the question again and add the missing link.'));
-    } else if (last?.outcome === 'teacher') {
-      out.dataset.kind = 'teacher';
-      out.append(el('p', '', 'Your teacher will look at this one.'));
     }
     go.addEventListener('click', () => {
       const text = (aiDrafts[lock.id] ?? '').trim();
@@ -157,7 +158,6 @@ export function mountLockChain(o: LockChainOptions): LockChain {
         checking.delete(lock.id);
         const now = next ? chainOf(s, next).find((l) => l.id === lock.id) : lock;
         if (now && now.state === 'open') { paintAi(now, box); aiBoxes.set(lock.id, { box, sig: aiSig(now) }); }
-        if (next?.lock_check?.message && now?.state === 'open') box.querySelector('.rot-lk__reply')?.append(el('p', 'rot-small', next.lock_check.message));
       });
     });
     box.append(q, ta, r, spin);
@@ -205,6 +205,14 @@ export function mountLockChain(o: LockChainOptions): LockChain {
         fold.append(list);
       } else fold.append(el('p', 'rot-note', 'Nothing more to read in this lock.'));
       box.append(fold);
+      // The moment a written check passes, say so: the tick alone was easy to miss.
+      if (fresh && lock.kind === 'ai' && lock.ai?.last?.outcome === 'passed') {
+        const done = el('p', 'rot-lk__reply');
+        done.dataset.kind = 'pass';
+        done.setAttribute('role', 'status');
+        done.textContent = index + 1 < total ? `Strong answer. Lock ${index + 2} is open.` : 'Strong answer. Every lock here is open.';
+        box.append(done);
+      }
       if (lock.reward) {
         const card = kitCard(lock.reward, 'Viva Kit card');
         if (fresh) card.classList.add('rot-kit-card--new');

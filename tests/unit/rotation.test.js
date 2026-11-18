@@ -489,7 +489,8 @@ test('locks: the AI check passes or gives one fix, through the injected checker'
   assert.ok(s.lock_check.fix.length <= 160);
   assert.equal(requests[0].model, 'claude-haiku-5-5');
   assert.equal(requests[0].effort, 'low');
-  assert.ok(requests[0].max_tokens <= 300);
+  // Room for Haiku's thinking and the verdict: at 200 a strong answer ran out before the verdict.
+  assert.ok(requests[0].max_tokens >= 1000 && requests[0].max_tokens <= 2000);
   assert.ok(requests[0].messages[0].content.includes('<model_answer>'), 'judged against the model answer');
   assert.ok(!requests[0].messages[0].content.includes('Ann') && !requests[0].messages[0].content.includes('AB'), 'no names');
   await rejects(act(store, 1, 'lock_ai', { station: 's4', lock: 'k2', text: 'Warm water causes  bleaching.' }, { checkLock, now: clock.now }), 'unchanged');
@@ -534,6 +535,48 @@ test('locks: out of AI checks goes to the teacher, who sees it and opens the loc
   assert.equal(lockOfStatus(s, 'k2').state, 'passed');
   assert.equal(lockOfStatus(s, 'k3').state, 'open');
   assert.deepEqual(lockOfStatus(s, 'k3').blocks.map((b) => b.id), ['s4k3a', 's4k3q', 's4exit']);
+});
+
+test('locks: a checker with no readable verdict is a retry, not a teacher check', async () => {
+  const { createLockChecker } = await import('../../netlify/functions/_shared/rotation-writing.mjs');
+  const { store } = await lockSetup();
+  const clock = clockAt();
+  let replies = [{ content: [], stop_reason: 'max_tokens', usage: { input_tokens: 10, output_tokens: 200 } }];
+  const checkLock = createLockChecker({ complete: async (r) => replies.shift() ?? lockModel(r), now: clock.now });
+  await claim(store, 1);
+  await passRush(store, clock, 'k1', 3);
+  const text = 'Warm water causes bleaching, so the fish lose shelter.';
+  let s = await act(store, 1, 'lock_ai', { station: 's4', lock: 'k2', text }, { checkLock, now: clock.now });
+  assert.equal(s.lock_check.retry, true);
+  assert.equal(s.lock_check.checks_left, 6);
+  assert.equal(lockOfStatus(s, 'k2').flagged, undefined);
+  assert.equal(lockOfStatus(s, 'k2').ai.last.retry, true);
+  clock.tick(21_000);
+  // The same words may go again.
+  s = await act(store, 1, 'lock_ai', { station: 's4', lock: 'k2', text }, { checkLock, now: clock.now });
+  assert.equal(s.lock_check.pass, true);
+  assert.equal(lockOfStatus(s, 'k2').state, 'passed');
+  replies = [];
+});
+
+test('locks and written gates: the teacher test phrase passes with no AI call; off when unset', async () => {
+  const { isTestPhrase } = await import('../../netlify/functions/_shared/rotation.mjs');
+  assert.equal(isTestPhrase('pass pass pass', 'Pass, pass, PASS!'), true);
+  assert.equal(isTestPhrase('pass pass pass', 'pass pass'), false);
+  assert.equal(isTestPhrase('pass pass pass', 'I pass pass pass the test'), false);
+  assert.equal(isTestPhrase(undefined, 'pass pass pass'), false);
+  assert.equal(isTestPhrase('pass', 'pass'), false, 'too short to be safe');
+  const { store } = await lockSetup();
+  const clock = clockAt();
+  let calls = 0;
+  const checkLock = async () => { calls += 1; throw new Error('should not be called'); };
+  await claim(store, 1);
+  await passRush(store, clock, 'k1', 3);
+  const s = await act(store, 1, 'lock_ai', { station: 's4', lock: 'k2', text: 'pass pass pass' }, { checkLock, now: clock.now, testPhrase: 'pass pass pass' });
+  assert.equal(s.lock_check.pass, true);
+  assert.equal(s.lock_check.checks_left, 6);
+  assert.equal(lockOfStatus(s, 'k2').state, 'passed');
+  assert.equal(calls, 0);
 });
 
 test('locks: with no checker (no key) the AI check goes to the teacher and doesn’t count', async () => {
