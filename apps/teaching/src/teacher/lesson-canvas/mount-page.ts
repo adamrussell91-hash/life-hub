@@ -1833,7 +1833,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   }) : null;
   if (organiserCard) syllabus.element.after(organiserHost);
 
-  // Every dot's counts in one panel above the canvas, opened from the meta row.
+  // Every dot's counts in one panel under the meta row, opened from its chip.
   // The questions after the finish tick sit at the foot of the same panel: settings, then answers.
   const endQuestions = mountEndQuestions({
     lessonId: lesson.id,
@@ -1847,7 +1847,9 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     extra: { element: endQuestions.element, onOpen: endQuestions.refresh }
   });
   metaRow.append(pulseSummary.chip);
-  canvasHost.before(pulseSummary.panel);
+  // Straight under the meta row that holds the chip: case, quiz and sprint lessons
+  // hide the canvas and stack tall views above it, so a panel there opened off screen.
+  metaRow.after(pulseSummary.panel);
 
   // Learning conditions: what the lesson does for attention, memory and readiness. Teacher-only.
   const conditionsPanel = mountConditionsPanel({
@@ -1856,7 +1858,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     onOff: (ids) => emitLesson({ ...lesson, conditions_off: ids })
   });
   metaRow.append(conditionsPanel.chip);
-  canvasHost.before(conditionsPanel.panel);
+  pulseSummary.panel.after(conditionsPanel.panel);
   conditionsPanel.refresh();
   const syncBeforeConditions = afterEmit;
   afterEmit = () => {

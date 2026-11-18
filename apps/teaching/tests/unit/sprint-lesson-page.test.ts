@@ -35,6 +35,14 @@ beforeEach(() => {
 afterEach(() => host.remove());
 
 describe('sprint on the lesson page', () => {
+  it('opens the Pulse and Conditions panels straight under the meta row, not above the hidden canvas', () => {
+    const handle = mountLessonPage(host, { lesson: sprintLesson(), media: [], onChange: vi.fn(), onPrint: vi.fn(), onSelect: vi.fn(), idFactory: () => 'new_1' });
+    const meta = host.querySelector('.lesson-page__meta')!;
+    expect(meta.nextElementSibling?.classList.contains('pulse-summary')).toBe(true);
+    expect(meta.nextElementSibling?.nextElementSibling?.classList.contains('lc')).toBe(true);
+    handle.dispose();
+  });
+
   it('shows the progress map once the lesson is first published', async () => {
     const handle = mountLessonPage(host, { lesson: sprintLesson(), media: [], onChange: vi.fn(), onPrint: vi.fn(), onSelect: vi.fn(), idFactory: () => 'new_1' });
     expect(host.querySelector('.kit')).not.toBeNull();
