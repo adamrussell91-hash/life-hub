@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson End Card</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Mockup for docs/superpowers/specs/2026-11-18-lesson-end-card-design.md.
+   The end of a student lesson as one card: parts, Finish lesson, then what is next. Palette is the Teaching Hub student page.
+   The lesson and the student are invented. */
+:root {
+  --paper: #fbf8f2;
+  --card: #ffffff;
+  --ink: #13233a;
+  --muted: #6b7788;
+  --orca: #424860;
+  --line: rgba(23, 55, 94, 0.1);
+  --navy: #17375e;
+  --navy-2: #244f7c;
+  --wave: #376fb7;
+  --success: #2f7a4f;
+  --success-surface: rgba(47, 122, 79, 0.1);
+  --sage-ink: #3c5949;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 28px; font-family: Inter, ui-sans-serif, sans-serif; font-size: 17px; line-height: 1.45; color: var(--ink); background: #ece7dc; }
+h1 { margin: 0 0 4px; font-size: 26px; color: var(--navy); }
+.lede { margin: 0 0 24px; max-width: 46rem; color: var(--orca); }
+.group { margin: 0 0 36px; }
+.group > h2 { margin: 0 0 14px; font-size: 19px; color: var(--navy); }
+.frames { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+.cap { margin: 0 0 10px; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--orca); }
+.cap b { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 8px; border-radius: 999px; background: var(--navy); color: #fff; font-size: 12px; letter-spacing: 0; }
+.screen { width: var(--w, 700px); max-width: 100%; border-radius: 18px; overflow: hidden; background: linear-gradient(180deg, #fbf8f2, #f6f1e8); box-shadow: 0 2px 10px rgba(20, 35, 70, 0.12); }
+.screen__body { padding: 0 28px 30px; }
+.is-phone .screen__body { padding: 0 16px 24px; }
+/* The tail of the lesson's last section, for context. */
+.tail { padding: 14px 22px 20px; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 22px 22px; background: var(--card); box-shadow: 0 1px 2px rgba(20, 35, 70, 0.05), 0 2px 6px rgba(20, 35, 70, 0.06); }
+.tail__box { height: 46px; border: 1.5px solid var(--wave); border-top: 0; border-radius: 0 0 8px 8px; }
+.tail__done { display: flex; justify-content: flex-end; margin-top: 12px; }
+.tail__done span { padding: 9px 20px; border-radius: 14px; background: #8493ab; color: #fff; font-weight: 600; font-size: 15px; }
+
+button { font: inherit; color: inherit; cursor: pointer; }
+.kicker { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.btn-main { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 0 28px; border: 0; border-radius: 999px; background: var(--navy); color: #fff; font-size: 17px; font-weight: 700; white-space: nowrap; }
+.btn-main svg { width: 20px; height: 20px; }
+.btn-ghost { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; padding: 0 22px; border: 1px solid rgba(23, 55, 94, 0.22); border-radius: 999px; background: var(--card); color: var(--navy); font-size: 16px; font-weight: 600; white-space: nowrap; }
+.link { color: var(--wave); font-weight: 600; text-decoration: none; }
+.quiet { color: var(--muted); font-size: 14px; }
+
+/* A part row. */
+.parts { list-style: none; margin: 0; padding: 0; display: grid; }
+.part { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 48px; padding: 8px 0; }
+.part + .part { border-top: 1px solid var(--line); }
+.box { width: 28px; height: 28px; display: grid; place-items: center; border: 1.5px solid var(--navy-2); border-radius: 8px; background: var(--card); color: transparent; padding: 0; }
+.box svg { width: 15px; height: 15px; }
+.part.is-done .box { background: var(--success); border-color: var(--success); color: #fff; }
+.part__name { font-size: 17px; overflow-wrap: anywhere; }
+.part.is-done .part__name { color: var(--muted); }
+.part__go { font-size: 14px; white-space: nowrap; }
+
+/* Previous and next lesson. */
+.lnav { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 44rem; margin: 14px auto 0; }
+.lnav a { display: grid; gap: 2px; padding: 10px 14px; border-radius: 14px; color: var(--ink); text-decoration: none; min-width: 0; }
+.lnav a:last-child { text-align: right; }
+.lnav small { font-size: 12px; color: var(--muted); }
+.lnav span { font-size: 15px; font-weight: 600; }
+
+/* The end card. */
+.end { max-width: 44rem; margin: 26px auto 0; border: 1px solid var(--line); border-radius: 24px; background: var(--card); box-shadow: 0 10px 30px rgba(20, 35, 70, 0.1); overflow: hidden; }
+.end__head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px 16px; padding: 20px 24px 6px; }
+.end__head--bare { padding-bottom: 16px; }
+.end__title { margin: 2px 0 0; font-size: 21px; font-weight: 700; color: var(--navy); }
+.end__count { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 999px; background: var(--success); }
+.end__parts { padding: 6px 24px 0; }
+.end__help { margin: 0; padding: 10px 24px 18px; }
+.end__foot { display: grid; gap: 12px; padding: 18px 24px 20px; border-top: 1px solid var(--line); background: var(--paper); }
+.end__foot--plain { background: var(--card); border-top: 0; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+.end__then { margin: 0; font-size: 14px; color: var(--muted); }
+.end__then b { color: var(--ink); font-weight: 600; }
+.end__q { margin: 0; font-size: 19px; font-weight: 700; color: var(--navy); }
+.end__ok { margin: 0; font-size: 16px; }
+.end__ok::before { content: '✓  '; color: var(--success); font-weight: 700; }
+.end__band { display: flex; align-items: center; gap: 14px; padding: 18px 24px; background: var(--success-surface); }
+.dot { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 999px; background: var(--success); color: #fff; }
+.dot svg { width: 22px; height: 22px; }
+.end__band h3 { margin: 0; font-size: 21px; font-weight: 700; color: var(--success); }
+.end__band p { margin: 0; font-size: 14px; color: var(--sage-ink); }
+.end__next { display: grid; gap: 6px; padding: 20px 24px 8px; }
+.end__what { margin: 0 0 8px; font-size: 22px; font-weight: 700; color: var(--navy); line-height: 1.25; }
+.end__undo { margin: 0; padding: 10px 24px 18px; }
+.dots { display: flex; gap: 6px; }
+.dots i { width: 8px; height: 8px; border-radius: 999px; background: rgba(23, 55, 94, 0.14); }
+.dots i.on { background: var(--wave); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 14px; border: 1px solid rgba(23, 55, 94, 0.2); border-radius: 999px; background: var(--card); font-size: 16px; }
+.end__p { margin: 0; font-size: 17px; font-weight: 600; }
+.field { display: grid; gap: 6px; font-size: 15px; font-weight: 600; }
+.field span { display: block; width: 14rem; min-height: 44px; padding: 10px 12px; border: 1.5px solid var(--navy-2); border-radius: 10px; background: var(--card); color: var(--muted); font-weight: 400; }
+
+.is-phone .end__head, .is-phone .end__parts, .is-phone .end__help, .is-phone .end__foot, .is-phone .end__band, .is-phone .end__next, .is-phone .end__undo { padding-left: 18px; padding-right: 18px; }
+.is-phone .btn-main, .is-phone .btn-ghost { width: 100%; }
+.is-phone .part__go { display: none; }
+.is-phone .end__what { font-size: 20px; }
+</style>
+</head>
+<body>
+<h1>Lesson end card</h1>
+<p class="lede">The end of a student lesson as one card. Parts first, then one Finish lesson button, then the next thing on the student’s list. One main button on screen at a time.</p>
+<div id="root"></div>
+<script>
+const TICK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const PARTS = [
+  ['Do now: what do you remember?', true],
+  ['Read: the final stanza', false],
+  ['Annotate in your book', true],
+  ['Write: your paragraph', false]
+];
+const NEXT = 'Read your feedback on Viva practice';
+const HELP = '<p class="end__help quiet">Parts you answer on screen tick themselves. Did one in your book? Tick it here.</p>';
+const parts = () => `<ul class="parts">${PARTS.map(([name, done]) => `<li class="part${done ? ' is-done' : ''}"><button class="box" aria-pressed="${done}">${TICK}</button><span class="part__name">${name}</span>${done ? '' : '<a class="link part__go" href="#">Go to part ↑</a>'}</li>`).join('')}</ul>`;
+const lnav = () => `<nav class="lnav"><a href="#"><small>← Previous lesson</small><span>Weekly check 9</span></a><a href="#"><small>Next lesson →</small><span>Comparing two endings</span></a></nav>`;
+const head = `<header class="end__head"><div><p class="kicker">End of lesson</p><h2 class="end__title">Before you finish</h2></div><span class="end__count">2 of 4 parts done</span><div class="bar"><i style="width:50%"></i></div></header>`;
+const band = (label) => `<div class="end__band"><span class="dot">${TICK}</span><div><h3>Lesson completed</h3><p>2 of 4 parts ticked · <a class="link" href="#">${label}</a></p></div></div>`;
+const nextFull = `<div class="end__next"><p class="kicker">Next on your list</p><p class="end__what">${NEXT}</p><div class="row"><button class="btn-main">Take me there →</button><button class="btn-ghost">My to do list</button></div></div>`;
+const undo = '<p class="end__undo quiet">Finished by mistake? <a class="link" href="#">Untick this lesson</a></p>';
+const withParts = (foot) => `<section class="end">${head}<div class="end__parts">${parts()}</div>${HELP}<div class="end__foot">${foot}</div></section>${lnav()}`;
+
+const S = {
+  open: () => withParts(`<div class="row"><button class="btn-main">${TICK}Finish lesson</button><span class="quiet">2 parts aren’t ticked. You can still finish.</span></div><p class="end__then">Next on your list: <b>${NEXT}</b></p>`),
+  confirm: () => withParts(`<p class="end__q">Hand in and finish?</p><p class="end__ok">Written work: 2 answers</p><div class="row"><button class="btn-main">Hand in and finish</button><button class="btn-ghost">Keep working</button></div>`),
+  done: () => `<section class="end">${band('Show parts')}${nextFull}${undo}</section>${lnav()}`,
+  questions: () => withParts(`<p class="end__q">Quick questions about this lesson</p><div class="dots"><i class="on"></i><i></i><i></i></div><p class="end__p">Did you know what you were meant to be doing?</p><div class="chips"><span class="chip">All the way through</span><span class="chip">Mostly</span><span class="chip">Some of the time</span><span class="chip">Hardly at all</span></div><div class="row"><button class="btn-ghost">Skip</button><span class="quiet">Anonymous. Your teacher sees everyone’s answers together, not yours.</span></div>`),
+  initials: () => withParts(`<p class="end__q">Hand in and finish?</p><p class="end__ok">Written work: 2 answers</p><label class="field">Type your initials first<span>Your initials</span></label><div class="row"><button class="btn-main">Hand in and finish</button><button class="btn-ghost">Keep working</button></div>`),
+  short: () => `<section class="end"><header class="end__head end__head--bare"><h2 class="end__title">End of lesson</h2></header><div class="end__foot"><div class="row"><button class="btn-main">${TICK}Finish lesson</button></div><p class="end__then">Next on your list: <b>${NEXT}</b></p></div></section>${lnav()}`,
+  quiz: () => `<section class="end">${nextFull}<p class="end__undo"></p></section>${lnav()}`,
+  shown: () => `<section class="end">${band('Hide parts')}<div class="end__parts">${parts()}</div>${nextFull}${undo}</section>${lnav()}`,
+  untick: () => `<section class="end">${band('Show parts')}<div class="end__foot end__foot--plain"><p class="end__q">Mark this lesson as not finished?</p><span class="quiet">Your quiz and written work stay handed in.</span><div class="row"><button class="btn-main">Untick</button><button class="btn-ghost">Cancel</button></div></div></section>${lnav()}`
+};
+const screen = (n, cap, html, phone) => `<div><p class="cap"><b>${n}</b>${cap}</p><div class="screen${phone ? ' is-phone' : ''}" style="--w:${phone ? 390 : 700}px"><div class="screen__body"><div class="tail"><div class="tail__box"></div><div class="tail__done"><span>Done</span></div></div>${html}</div></div></div>`;
+const group = (title, frames) => `<section class="group"><h2>${title}</h2><div class="frames">${frames.join('')}</div></section>`;
+document.getElementById('root').innerHTML =
+  group('The flow', [screen(1, 'Arriving at the end', S.open()), screen(2, 'After pressing Finish lesson', S.confirm()), screen(3, 'Finished', S.done())]) +
+  group('Phone, 390px', [screen(1, 'Arriving', S.open(), true), screen(2, 'Finished', S.done(), true)]) +
+  group('Other cases', [
+    screen(1, 'Quick questions, after handing in', S.questions()),
+    screen(2, 'First time on this device', S.initials()),
+    screen(3, 'Short lesson with no parts list', S.short()),
+    screen(4, 'Quiz lesson: handing in already finishes it', S.quiz()),
+    screen(5, 'Finished, with parts shown again', S.shown()),
+    screen(6, 'Unticking a finished lesson', S.untick())
+  ]);
+</script>
+</body>
+</html>
