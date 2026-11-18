@@ -83,4 +83,6 @@ test('an <img> must name its origin: a bare same-site image load is refused, a c
   assert.equal(cors.status, 200);
   assert.equal(cors.headers.get('access-control-allow-origin'), 'https://life-hub.adam-russell.com');
   assert.equal(cors.headers.get('access-control-allow-credentials'), 'true');
+  // The route's own `cookie` (per-viewer cache) must survive the CORS `origin`.
+  assert.deepEqual(cors.headers.get('vary').toLowerCase().split(/\s*,\s*/).sort(), ['cookie', 'origin']);
 });
