@@ -14,7 +14,7 @@ import './work-sync.css';
  *
  * The class's initials claim says whose work it is, the same claim the quiz
  * uses. A device without one is asked once, at the top of the lesson, unless
- * the lesson's player (sprint, case study, tutorial, lecture) asks itself.
+ * the lesson's player (sprint, case study, tutorial, lecture, lab) asks itself.
  */
 
 /** A marked block that is back with the student: the piece its feedback opens by, when, and whether it's unopened. */
@@ -43,7 +43,7 @@ export type WorkSyncHandle = {
 };
 
 /** Players that ask for the same class initials themselves; one box on the page is enough. */
-const OWN_CLAIM = '.sprint, .cs, .tut, .lecture';
+const OWN_CLAIM = '.sprint, .cs, .tut, .lecture, .lab';
 
 /** The parts of a block's saved state that hold writing. Must match lesson-work.mjs. */
 const PART = /^(answers|step\.\d{1,3}|(format|lens|kaplan)\.[A-Za-z0-9_-]{1,60})$/;

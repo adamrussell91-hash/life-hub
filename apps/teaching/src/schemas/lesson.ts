@@ -15,6 +15,7 @@ import { RotationSettingsSchema } from '../rotation/schema';
 import { rotationIssues } from '../rotation/model';
 import { GameLessonSchema } from '../games/core/schema';
 import { gameIssues } from '../games/core/model';
+import { LabSettingsSchema, labIssues } from '../lab/schema';
 import { CoverSchema } from './cover';
 import { SourceSchema } from './source';
 import {
@@ -93,6 +94,8 @@ export const LessonSchema = z.object({
   rotation: RotationSettingsSchema.optional(),
   /** Game lessons only: the games, in play order, and when homework closes. */
   game: GameLessonSchema.optional(),
+  /** Lab lessons only: the Plan card's lines (question, level, how readers judge, pairs). */
+  lab: LabSettingsSchema.optional(),
   source: SourceSchema.optional()
 });
 
@@ -105,7 +108,7 @@ export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) =>
     });
   }
   // Lectures, design sprints, case studies and games play through their own player, which can't show quiz questions.
-  if (lesson.pedagogical_mode === 'lecture' || lesson.pedagogical_mode === 'design_sprint' || lesson.pedagogical_mode === 'case_study' || lesson.pedagogical_mode === 'game') {
+  if (lesson.pedagogical_mode === 'lecture' || lesson.pedagogical_mode === 'design_sprint' || lesson.pedagogical_mode === 'case_study' || lesson.pedagogical_mode === 'game' || lesson.pedagogical_mode === 'lab') {
     let stray = false;
     visitBlocks(lesson.blocks, (block) => {
       if (block.block_type === 'quiz_question') stray = true;
@@ -115,7 +118,9 @@ export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) =>
         code: z.ZodIssueCode.custom,
         message: lesson.pedagogical_mode === 'game'
           ? 'Quiz questions don’t run in a Game lesson’s blocks. Put them in a game, or remove them.'
-          : 'Quiz questions don’t run in a Lecture, Design Sprint or Case Study. Change the lesson type or remove them.',
+          : lesson.pedagogical_mode === 'lab'
+            ? 'Quiz questions don’t run in a Lab. Change the lesson type or remove them.'
+            : 'Quiz questions don’t run in a Lecture, Design Sprint or Case Study. Change the lesson type or remove them.',
         path: ['blocks']
       });
     }
@@ -138,6 +143,11 @@ export const PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) =>
   if (lesson.pedagogical_mode === 'station_rotation') {
     for (const message of rotationIssues(lesson)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ['rotation'] });
+    }
+  }
+  if (lesson.pedagogical_mode === 'lab') {
+    for (const message of lesson.lab ? labIssues(lesson.lab) : ['Fill in the Lab card before you publish.']) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ['lab'] });
     }
   }
   if (lesson.pedagogical_mode === 'game') {

@@ -88,6 +88,8 @@ import { mountTutorialBoard, type TutorialBoardHandle } from '@/tutorial/board';
 import { tutorialTeacherApi } from '@/tutorial/api';
 import { createTutorialTabs, inTab, movedGroups, type TutorialTab } from '@/tutorial/editor-tabs';
 import { groupSection, isGroupTab } from '@/tutorial/model';
+import { mountLabPlanCard, type LabPlanCardHandle } from '@/lab/plan-card';
+import { seedLab, withExplainBlock } from '@/lab/schema';
 import { mountKitEditor } from '@/sprint/kit-editor';
 import { createSprintTabs, inSprintTab, type SprintTab } from '@/sprint/editor-tabs';
 import { mountSprintMap, type SprintMapHandle } from '@/sprint/map';
@@ -1257,6 +1259,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     syncCasePanel();
     syncRotationPanel();
     syncGamePanel();
+    syncLabPanel();
     syncFooterNote();
     // Lecture controls on the canvas come and go with the lesson type.
     canvas.update(lesson.blocks, media);
@@ -1706,6 +1709,38 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     gameHost.hidden = !isGame;
   }
 
+  // A lesson set to Lab gets the Lab card in place of the block canvas: its lines are the whole lab.
+  const labHost = document.createElement('div');
+  labHost.className = 'lesson-page__lab';
+  let labCard: LabPlanCardHandle | null = null;
+  function syncLabPanel(): void {
+    const isLab = resolvePedagogicalMode(lesson.pedagogical_mode) === 'lab';
+    // A new lab starts with its defaults and the Explain block, the one written answer students hand in.
+    if (isLab && !lesson.lab) {
+      const lab = seedLab(options.flowClasses?.[0]?.id ?? '');
+      emitLesson({ ...lesson, lab, blocks: withExplainBlock(lesson.blocks, lab) as Lesson['blocks'] });
+    }
+    if (isLab && !labCard) {
+      labCard = mountLabPlanCard({
+        getLesson: () => lesson,
+        emitLesson,
+        classes: options.flowClasses ?? [],
+        loadRoster: (classId) => httpMarkbookApi.load(classId).then((v) => v.students.filter((st) => !st.removed))
+      });
+      labHost.append(labCard.root);
+    } else if (!isLab && labCard) {
+      labCard.dispose();
+      labCard = null;
+      labHost.replaceChildren();
+      canvasHost.hidden = false;
+    } else {
+      labCard?.sync();
+    }
+    // Runs after the other panels, which each reset the canvas for their own type.
+    if (isLab) canvasHost.hidden = true;
+    labHost.hidden = !isLab;
+  }
+
   if (showPageMenu) root.append(chrome);
   // Students end every lesson on the footer (lesson-footer.ts), so no block is needed for it.
   const footerNote = document.createElement('p');
@@ -1717,7 +1752,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         : 'Students see Previous, a tick to finish, and Next under every lesson.';
   }
   syncFooterNote();
-  root.append(coverHost, metaRow, quizHost, lectureHost, tutorialHost, sprintHost, caseHost, rotationHost, gameHost, canvasHost, footerNote);
+  root.append(coverHost, metaRow, quizHost, lectureHost, tutorialHost, sprintHost, caseHost, rotationHost, gameHost, labHost, canvasHost, footerNote);
 
   const classExamples = createTeacherClassExamples({ lessonId: lesson.id });
   const pulse = createTeacherBlockPulse({
@@ -1818,6 +1853,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   syncCasePanel();
   syncRotationPanel();
   syncGamePanel();
+  syncLabPanel();
   if (tutorialTabs || sprintTabs || caseEditor || rotationEditor) canvas.update(lesson.blocks, media);
 
   // Dot points, lines, tagged outcomes and what they ask for, in one card under the meta row.
@@ -1963,6 +1999,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       syncCasePanel();
       syncRotationPanel();
       syncGamePanel();
+      syncLabPanel();
       lecturePanel?.repaint();
       quizPanel?.update(lesson);
       banner.update({
@@ -2005,6 +2042,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       caseBoard?.dispose();
       caseBoard = null;
       caseEditor?.dispose();
+      labCard?.dispose();
+      labCard = null;
       classExamples.dispose();
       pulseSummary.dispose();
       pulse.dispose();

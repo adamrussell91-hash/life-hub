@@ -102,7 +102,7 @@ export function renderPublishedLessonHero(
   coverHost.className = 'lesson-page__cover';
   renderEntityBanner(coverHost, {
     title: lesson.title,
-    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : lesson.pedagogical_mode === 'lecture' ? 'Lecture' : lesson.pedagogical_mode === 'tutorial' ? 'Tutorial' : lesson.pedagogical_mode === 'design_sprint' ? 'Design Sprint' : lesson.pedagogical_mode === 'case_study' ? 'Case Study' : lesson.pedagogical_mode === 'station_rotation' ? 'Station Rotation' : lesson.pedagogical_mode === 'game' ? 'Game' : 'Lesson',
+    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : lesson.pedagogical_mode === 'lecture' ? 'Lecture' : lesson.pedagogical_mode === 'tutorial' ? 'Tutorial' : lesson.pedagogical_mode === 'design_sprint' ? 'Design Sprint' : lesson.pedagogical_mode === 'case_study' ? 'Case Study' : lesson.pedagogical_mode === 'station_rotation' ? 'Station Rotation' : lesson.pedagogical_mode === 'game' ? 'Game' : lesson.pedagogical_mode === 'lab' ? 'Lab' : 'Lesson',
     entityId: lesson.lesson_id,
     cover: lesson.cover,
     media: [],
