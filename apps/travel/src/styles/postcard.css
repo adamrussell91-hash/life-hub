@@ -119,8 +119,9 @@
 }
 
 /* ---------- The opened view ---------- */
+/* A solid ground: even a little of the page showing through reads as a see-through sheet. */
 .sheet-back.postcard-viewer {
-  background: rgba(10, 21, 54, .97); place-items: stretch; padding: 0;
+  background: var(--depth); place-items: stretch; padding: 0;
 }
 .postcard-viewer__panel {
   width: min(44rem, 100%); height: 100%; margin-inline: auto; color: #fff; overflow: auto;
@@ -243,9 +244,13 @@ button.safe-mark__postcard::before { content: ""; position: absolute; inset: -.4
 .postcard-composer__draft { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem; }
 .postcard-composer__draft[hidden], .postcard-composer__draft .hint[hidden] { display: none; }
 .postcard-composer__draft .mini { margin-left: auto; }
-.postcard-composer__error { margin: 0; color: #9b2c2c; font-weight: 600; }
+.postcard-composer__error, .postcard-composer__blocker { flex: 1 1 100%; margin: 0; }
+.postcard-composer__error { color: #9b2c2c; font-weight: 600; }
 .postcard-composer__error[hidden], .postcard-composer__blocker[hidden] { display: none; }
-.postcard-composer__blocker { margin: 0; }
+@media (max-width: 480px) {
+  /* Three buttons in one row wrap their labels on a phone: Post takes its own row. */
+  .postcard-composer .addform__actions .btn[type="submit"] { flex: 1 1 100%; }
+}
 .postcard-composer .addform__actions .btn:disabled { opacity: .5; cursor: default; }
 
 @media (prefers-reduced-motion: reduce) {

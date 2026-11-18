@@ -233,7 +233,7 @@ export function openPostcardComposer(options: ComposerOptions): ComposerHandle {
   errorNote.setAttribute('role', 'alert');
   const blockerNote = el('p', 'hint postcard-composer__blocker');
 
-  scroll.append(photoPart, voicePart, wordsPart, addressPart, draftRow, errorNote, blockerNote);
+  scroll.append(photoPart, voicePart, wordsPart, addressPart, draftRow);
 
   const actions = el('div', 'addform__actions');
   actions.setAttribute('data-part', 'form-actions');
@@ -241,7 +241,8 @@ export function openPostcardComposer(options: ComposerOptions): ComposerHandle {
   postBtn.type = 'submit';
   const previewBtn = button('btn ghost', 'Preview');
   const cancelBtn = button('btn ghost', 'Cancel');
-  actions.append(postBtn, previewBtn, cancelBtn);
+  // Why Post is off, or why it failed, stays in view with the buttons.
+  actions.append(errorNote, blockerNote, postBtn, previewBtn, cancelBtn);
 
   form.append(scroll, actions);
   sheet.append(form);

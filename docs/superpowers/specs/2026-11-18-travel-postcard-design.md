@@ -2,8 +2,9 @@
 
 Date: 18 November 2026
 Hub: Travel
-Status: approved, not built
+Status: built, except the journal keepsake (the second build)
 Mockup: `docs/mockups/travel-postcard.html`
+Plan: `docs/superpowers/plans/2026-11-18-travel-postcard-1-server.md` for the server. The card, the view and the sheet were built straight from this spec.
 
 ## Purpose
 
@@ -75,7 +76,7 @@ The voice plays only from the play button. It stops when the card turns back, wh
 
 The whole block is one button.
 
-**The opened view.** One card at a time on a dark ground, with Close and "2 of 4", and under the card its place and time in plain text ("Central Market, Kuala Lumpur" and "Wed 18 Nov, 17:22"). Opened from the stack it starts at the oldest postcard this device has not opened, or the newest if all have been opened. **Older** and **Newer** move through every postcard on the trip, as do a swipe and the arrow keys. A row of small cards along the bottom, oldest first, jumps to any card; the current one is outlined and unopened ones carry a dot. Back, Escape and Close leave the view and stay on the page.
+**The opened view.** One card at a time on a solid dark ground, with Close and "2 of 4", and under the card its place and time in plain text ("Central Market, Kuala Lumpur" and "Wed 18 Nov, 17:22"). Opened from the stack it starts at the oldest postcard this device has not opened, or the newest if all have been opened. **Older** and **Newer** move through every postcard on the trip, as do a swipe and the arrow keys. A row of small cards along the bottom, oldest first, jumps to any card; the current one is outlined and unopened ones carry a dot. Back, Escape and Close leave the view and stay on the page.
 
 A postcard counts as opened once its back has been shown. That is remembered in the browser, per trip. A new device or cleared browser data shows everything as new again. If the browser refuses storage, nothing is marked new and everything else works.
 
@@ -129,7 +130,7 @@ New folder `apps/travel/src/postcard/`:
 | `voice-clip.ts` | The 30 second recorder. |
 | `photo-place.ts` | The photo's location and the address lines. The EXIF reader loads only when a photo is chosen. |
 
-Changes elsewhere: `api/travel.ts` gains the calls above; `views/day-list.ts` swaps the Photo button and thumbnail for Postcard and the small card; `views/trip-page.ts` opens the composer and handles Remove; `views/public-trip.ts` mounts the stack; `components/safe-photo-sheet.ts` is deleted, while `lib/safe-photo.ts` keeps the photo shrink and the failure wording; `scripts/mock-api.ts` gains the new routes; a new `styles/postcard.css`. Images and audio from the API set `crossOrigin` before `src`.
+Changes elsewhere: `api/travel.ts` gains the calls above; `views/day-list.ts` swaps the Photo button and thumbnail for Postcard and the small card; `views/trip-page.ts` opens the composer and handles Remove; `views/public-trip.ts` mounts the stack; `components/safe-photo-sheet.ts` is deleted, and `lib/safe-photo.ts` keeps the failure wording and the photo width (the shrink itself moves to `photo-place.ts`, which refuses a photo it cannot decode); `scripts/mock-api.ts` gains the new routes; a new `styles/postcard.css`. Images and audio from the API set `crossOrigin` before `src`.
 
 ## Other cases
 
@@ -187,7 +188,8 @@ Changes elsewhere: `api/travel.ts` gains the calls above; `views/day-list.ts` sw
 - Server tests: the audio route (types, size, trip, link token, a journal token refused, ranges, origin guard, delete), the transcribe route (text returned, a call that never answers, the service not connected, another trip's clip, the rate limit), the postcard route (each limit, attaches without moving the check-in's time, both refusals, remove, a stale version), the redaction (fields present, no coordinates, private stop, older photo), the address parts.
 - Travel unit tests: the model, the card (words and address escaped), the view (order, opened state, reduced motion, ends of the list), the stack's wording, the composer, the draft, the day list.
 - In the running app against the mock API at 1280 and 390, with Chromium's stand-in microphone: tick a stop, compose with a portrait photo and a clip, preview, post, open it, remove it; then a landscape photo with typed words and no clip. Open the public link, read the stack, open it, go older and newer, reload and see the count drop.
-- Not testable here: a real phone microphone and the real transcription service. The owner's first clip from a phone is that test.
+- Walked on 18 November 2026 against the mock API at 390 and 1280 with Chromium's stand-in microphone: compose, record, preview, post, remove, the public stack and its count, Back, and a draft surviving a reload.
+- Not testable here: a real phone microphone, the real transcription service, and playback on an iPhone. The owner's first clip from a phone is that test.
 
 ## Second build: journal keepsake
 
