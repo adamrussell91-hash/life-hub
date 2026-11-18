@@ -53,6 +53,7 @@
     "media-chrome": "^4.19.2",
     "minisearch": "^7.2.0",
     "nspell": "^2.1.5",
+    "pdf-lib": "1.17.1",
     "pdfjs-dist": "^6.5.438",
     "photoswipe": "^5.4.4",
     "react": "18.3.1",
