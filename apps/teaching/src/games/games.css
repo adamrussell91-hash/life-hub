@@ -252,20 +252,21 @@ textarea.gm-input { resize: vertical; min-height: 2.4rem; }
 }
 
 /* ── Solo player shell ─────────────────────────────────────────────
- * A centred panel on a laptop; full screen on a phone with the action row
- * docked at the bottom (R4: 44px buttons sharing the row, safe-area padding). */
+ * Fills the screen on a laptop with a thin frame; edge to edge on a phone
+ * with the action row docked at the bottom (R4: 44px buttons sharing the
+ * row, safe-area padding). */
 html.gm-solo-open, html.gm-solo-open body { overflow: hidden; }
 .gm.gm-solo {
   position: fixed; inset: 0; z-index: 90;
-  display: grid; place-items: center;
-  padding: var(--space-5);
+  display: grid; place-items: stretch;
+  padding: var(--space-3);
   background: rgba(10, 21, 54, 0.5);
   max-width: none;
 }
 .gm-solo__panel {
   position: relative;
-  width: min(46rem, 100%);
-  height: min(52rem, calc(100dvh - 2 * var(--space-5)));
+  width: 100%;
+  height: calc(100dvh - 2 * var(--space-3));
   display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
   background: var(--warm-white, var(--paper)); color: var(--ink);
   border-radius: 24px; box-shadow: var(--elev-4, 0 24px 60px rgba(10, 21, 54, 0.35));
