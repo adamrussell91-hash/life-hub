@@ -413,7 +413,7 @@ const publicGate = (config, work, stationId) => {
     const counted = written.filter((a) => a.counted !== false).length;
     out.checks_left = Math.max(0, gate.max_checks - counted);
     const last = written[written.length - 1];
-    if (last) out.last = { text: last.text, at: last.at, outcome: last.outcome, feedback: list(last.feedback), passed: last.passed ?? 0, need: last.need ?? gate.pass_at, points: list(last.points) };
+    if (last) out.last = { text: last.text, at: last.at, outcome: last.outcome, feedback: list(last.feedback), passed: last.passed ?? 0, need: last.need ?? gate.pass_at, points: list(last.points), ...(last.unavailable ? { retry: true } : {}) };
     if (g.appeal_at) out.appeal_at = g.appeal_at;
     if (g.teacher) out.teacher = g.teacher;
   }
@@ -730,10 +730,11 @@ export async function rotationAction(store, lessonId, body, deps = {}) {
     const attempt = { at: now(), ...outcome.attempt };
     const written = [...list(g.written), attempt];
     const counted = written.filter((a) => a.counted !== false).length;
-    const nextState = attempt.outcome === 'passed' ? 'passed' : attempt.outcome === 'teacher' || counted >= gate.max_checks ? 'flagged' : 'open';
+    // A checker that didn't answer is a retry, never a teacher check.
+    const nextState = attempt.outcome === 'passed' ? 'passed' : (attempt.outcome === 'teacher' && !attempt.unavailable) || counted >= gate.max_checks ? 'flagged' : 'open';
     work.gates = { ...work.gates, [s.id]: { ...g, written, state: nextState } };
     if (nextState === 'flagged') work.teacher_group = `reteach:${s.id}`;
-    return save({ writing: { outcome: attempt.outcome, message: outcome.message ?? null } });
+    return save({ writing: { outcome: attempt.outcome, message: outcome.message ?? null, ...(attempt.unavailable && nextState !== 'flagged' ? { retry: true } : {}) } });
   }
 
   if (action === 'lock_rush' || action === 'lock_ai') {

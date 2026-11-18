@@ -15,12 +15,13 @@
  *     The prompt holds the passage, the question, the idea, the answer key and
  *     the student's points as quoted data under opaque ids. No names, no
  *     initials, no class. The model answer is never sent.
- *  5. The reply must parse against a strict shape; anything else is unsure,
- *     and any unsure sends the gate to the teacher. The AI never closes a
- *     gate on an unsure. A reason that writes the answer is stripped and logged.
+ *  5. The reply must parse against a strict shape; anything else is no
+ *     verdict, a retry that doesn't count. A real "unsure" sends the gate to
+ *     the teacher. The AI never closes a gate on an unsure. A reason that
+ *     writes the answer is stripped and logged.
  *
- * Model down or a 15 s timeout: the check doesn't count and the gate goes to
- * the teacher. Every call's real cost is logged like other Teaching AI jobs
+ * Model down or a 15 s timeout: the check doesn't count and the student checks
+ * again; the gate stays open. Every call's real cost is logged like other Teaching AI jobs
  * and added to the class's spend for the day.
  */
 import { randomBytes } from 'node:crypto';
@@ -35,7 +36,9 @@ export const TEXT_CAP = 3000;
 export const RATE_MS = 20_000;
 export const TIMEOUT_MS = 15_000;
 const LANE = 'standard';
-const MAX_TOKENS = 900;
+// Thinking counts against this cap, as with the lock check: leave room for it and the verdicts.
+const MAX_TOKENS = 2048;
+const WRITING_RETRY = 'The checker didn’t give a verdict that time. Check again: it doesn’t use up a check.';
 
 const list = (v) => (Array.isArray(v) ? v : []);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -96,7 +99,7 @@ export function createWritingChecker({ complete, models = {}, names = LITERARY_T
     const counted = written.filter((a) => a.counted !== false).length;
     if (counted >= gate.max_checks) reject(409, 'no_checks', 'You’ve used your checks. Your teacher will look at this one.');
     const last = written[written.length - 1];
-    if (last && sameText(last.text, text)) reject(409, 'unchanged', 'Change your answer before checking it again.');
+    if (last && !last.unavailable && sameText(last.text, text)) reject(409, 'unchanged', 'Change your answer before checking it again.');
     if (last && now() - Date.parse(last.at) < RATE_MS) reject(429, 'too_soon', 'Give it a moment, then check again.');
     const attemptNo = counted + 1;
     const base = { text: text.trim(), at: new Date(now()).toISOString(), rules: [], verdicts: [], feedback: [], points: [] };
@@ -128,7 +131,7 @@ export function createWritingChecker({ complete, models = {}, names = LITERARY_T
           new Promise((_, no) => { controller.signal.addEventListener('abort', () => no(new Error('timeout'))); })
         ]);
       } catch {
-        return { attempt: { ...base, outcome: 'teacher', counted: false, unavailable: true }, message: 'The checker didn’t answer in time. Your teacher will look at this one, and it doesn’t use up a check.' };
+        return { attempt: { ...base, outcome: 'teacher', counted: false, unavailable: true }, message: WRITING_RETRY };
       } finally {
         clearTimeout(timer);
       }
@@ -147,6 +150,11 @@ export function createWritingChecker({ complete, models = {}, names = LITERARY_T
       await logUsage(store, { job_id: null, lesson_id: lessonId, agent: null, action: WRITING_JOB_KIND, protocol_id: null, status: parsed.malformed ? 'error' : 'done', turns: 1, failed_checks: stripped + (parsed.malformed ? 1 : 0), cost_usd, usage: [{ model: reply?.model ?? model, ...usage, cost_usd }], at: new Date(now()).toISOString() });
       // A reply that tried to write the answer: the reason is dropped, and the log says so (never the student's text).
       if (stripped) console.warn(`[rotation] written gate: stripped ${stripped} reason(s) that gave the answer away (lesson ${lessonId})`);
+      // A reply that wasn't the strict shape gave no verdict: a retry, not a teacher check. A real "unsure" still goes to the teacher.
+      if (parsed.malformed) {
+        console.warn(`[rotation] written gate: no readable verdict (stop ${reply?.stop_reason ?? 'unknown'}, lesson ${lessonId})`);
+        return { attempt: { ...base, outcome: 'teacher', counted: false, unavailable: true, cost_usd }, message: WRITING_RETRY };
+      }
     }
     const combined = combineWriting(gate, level, check.results, verdicts, check.problems);
     const feedback = combined.outcome === 'teacher' ? [] : writingFeedback(attemptNo, gate, check.results, verdicts, check.problems, reasons);

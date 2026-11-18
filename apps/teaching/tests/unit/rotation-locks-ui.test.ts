@@ -254,3 +254,36 @@ describe('map', () => {
     player.dispose();
   });
 });
+
+describe('written gate messages', () => {
+  const s3: PublicStation = {
+    id: 's3', title: 'Close reading', kind: 'analysis', strand: 'reading', outcomes: [], minutes: 12, seats: 4, piece: 'Isolation.', x: 80, y: 30,
+    written_gate: { prompt: 'How is isolation shown?', passage: 'The sea, nothing, nothing, nothing.', marks: 2, idea: 'isolation', checks: ['technique_named', 'exact_quote', 'technique_fits', 'effect_linked'], different_techniques: true, pass_at: 2, max_checks: 3 }
+  } as PublicStation;
+  const gateCard = (gate: RotationStatus['gates'][string]) => {
+    const c = mountStationCard({ station: s3, number: 3, rotation: { ...rotation, stations: [...rotation.stations, s3] }, blocks: [], lessonId: 'rot1', unitId: 'unit1', pageBlocks: lesson.blocks as Block[], client: client(), run: async (go) => go(), onBack: () => {} });
+    document.body.append(c.root);
+    c.update(status([], { station_locks: {}, levels: { s3: { level: 'core', source: 'default' } }, gates: { s3: gate }, work: { ...status([]).work!, current: 's3', opened: ['s3'] } }));
+    return c.root;
+  };
+  const last = (over: Record<string, unknown>) => ({ text: 'x', at: '2026-11-14T00:00:00.000Z', outcome: 'not_yet', feedback: [], passed: 0, need: 2, points: [], ...over });
+
+  it('says the teacher has it once, with no appeal', () => {
+    const root = gateCard({ state: 'flagged', checks_left: 0, last: last({ outcome: 'not_yet', passed: 1 }) } as never);
+    expect((root.textContent!.match(/Your teacher will/g) ?? []).length).toBe(1);
+    expect(root.textContent).toContain('You’ve used your checks.');
+    expect(root.textContent).not.toContain('I think the checker got this wrong');
+  });
+
+  it('asks for another check when the checker gave no verdict', () => {
+    const root = gateCard({ state: 'open', checks_left: 3, last: last({ outcome: 'teacher', retry: true }) } as never);
+    expect(root.textContent).toContain('Check again: it doesn’t use up a check.');
+    expect(root.textContent).not.toContain('Your teacher will');
+    expect(root.querySelector<HTMLButtonElement>('button.rot-btn--primary')!.disabled).toBe(false);
+  });
+
+  it('calls a pass a strong answer', () => {
+    const root = gateCard({ state: 'passed', checks_left: 2, last: last({ outcome: 'passed', passed: 2 }) } as never);
+    expect(root.textContent).toContain('Strong answer: 2 of 2 points there. The rest of the station is open.');
+  });
+});

@@ -68,12 +68,19 @@ test('no AI call at all when every point fails by rule', async () => {
   assert.equal(out.attempt.outcome, 'not_yet');
 });
 
-test('any unsure goes to the teacher; a malformed reply counts as unsure', async () => {
-  for (const m of [model('unsure'), model('pass', '', { raw: 'Sure! It passes.' })]) {
-    const out = await createWritingChecker({ complete: m.complete, names: NAMES })(input(storeFor()));
-    assert.equal(out.attempt.outcome, 'teacher');
-    assert.match(out.message, /teacher/);
-  }
+test('a real unsure goes to the teacher; a malformed reply is a retry that doesn’t count', async () => {
+  const unsure = await createWritingChecker({ complete: model('unsure').complete, names: NAMES })(input(storeFor()));
+  assert.equal(unsure.attempt.outcome, 'teacher');
+  assert.ok(!unsure.attempt.unavailable);
+  assert.match(unsure.message, /teacher/);
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const garbled = await createWritingChecker({ complete: model('pass', '', { raw: 'Sure! It passes.' }).complete, names: NAMES })(input(storeFor()));
+    assert.equal(garbled.attempt.unavailable, true);
+    assert.equal(garbled.attempt.counted, false);
+    assert.match(garbled.message, /Check again/);
+  } finally { console.warn = warn; }
 });
 
 test('a reply that writes the answer is stripped and logged; feedback falls back to a pointer', async () => {
@@ -136,13 +143,15 @@ test('at the daily cap the gate becomes a teacher check', async () => {
   assert.match(out.message, /checks for today/);
 });
 
-test('model down or a timeout: the check doesn’t count and goes to the teacher', async () => {
+test('model down or a timeout: a retry that doesn’t count, and the same text may go again', async () => {
   const down = await createWritingChecker({ complete: async () => { throw new Error('529'); }, names: NAMES })(input(storeFor()));
-  assert.equal(down.attempt.outcome, 'teacher');
+  assert.equal(down.attempt.unavailable, true);
   assert.equal(down.attempt.counted, false);
   const slow = await createWritingChecker({ complete: () => new Promise(() => {}), names: NAMES, timeoutMs: 20 })(input(storeFor()));
-  assert.equal(slow.attempt.outcome, 'teacher');
-  assert.match(slow.message, /doesn’t use up a check/);
+  assert.equal(slow.attempt.unavailable, true);
+  assert.match(slow.message, /Check again: it doesn’t use up a check/);
+  const again = await createWritingChecker({ complete: model('pass').complete, names: NAMES })(input(storeFor(), { gateState: { written: [{ text: GOOD, at: '2000-01-01T00:00:00Z', unavailable: true, counted: false }] } }));
+  assert.equal(again.attempt.outcome, 'passed');
 });
 
 test('lock check: strict reply shape, and a fix that copies the model answer is replaced', async () => {

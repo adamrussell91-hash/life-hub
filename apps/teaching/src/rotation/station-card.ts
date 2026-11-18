@@ -293,7 +293,8 @@ export function mountStationCard(o: StationCardOptions): StationCard {
     check.type = 'button';
     const left = g?.checks_left ?? w.max_checks;
     check.disabled = done || checking || state === 'flagged' || left <= 0;
-    const tries = el('span', 'rot-small rot-muted', done ? '' : state === 'flagged' ? 'Your teacher will look at this one.' : `${left} check${left === 1 ? '' : 's'} before your teacher steps in`);
+    // Flagged: the result below says so once; this line stays quiet.
+    const tries = el('span', 'rot-small rot-muted', done || state === 'flagged' ? '' : `${left} check${left === 1 ? '' : 's'} before your teacher steps in`);
     const spin = el('span', 'rot-checking');
     spin.append(el('span', 'rot-spin'), document.createTextNode('Checking your writing…'));
     spin.hidden = !checking;
@@ -317,7 +318,16 @@ export function mountStationCard(o: StationCardOptions): StationCard {
       const result = el('div', 'rot-grid');
       result.setAttribute('aria-live', 'polite');
       result.style.gap = '8px';
-      result.append(el('p', 'rot-small', last.outcome === 'passed' ? `All there: ${last.passed} of ${last.need} needed. The rest is open.` : last.outcome === 'teacher' ? 'Your teacher will look at this one.' : `${last.passed} of ${last.need} points there so far.`));
+      const flagged = state === 'flagged';
+      const head = last.outcome === 'passed'
+        ? el('p', 'rot-feedback rot-feedback--pass', `Strong answer: ${last.passed} of ${last.need} points there. The rest of the station is open.`)
+        : flagged
+          ? el('p', 'rot-feedback', `${left <= 0 ? 'You’ve used your checks. ' : ''}Your teacher will look at this one with you. You can do another station and come back.`)
+          : last.retry
+            ? el('p', 'rot-small', 'The checker didn’t give a verdict that time. Check again: it doesn’t use up a check.')
+            : el('p', 'rot-small', `${last.passed} of ${last.need} points there so far.`);
+      if (last.outcome === 'passed') head.setAttribute('role', 'status');
+      result.append(head);
       last.points.forEach((p, i) => {
         const card = el('div', 'rot-wg-point');
         card.dataset.pass = String(p.passed);
@@ -335,7 +345,8 @@ export function mountStationCard(o: StationCardOptions): StationCard {
         for (const line of last.feedback) fb.append(el('li', '', line));
         result.append(fb);
       }
-      if (!done && last.outcome !== 'passed') {
+      // An appeal only makes sense against a verdict the checker gave, before the teacher has it.
+      if (!done && !flagged && !last.retry && last.outcome === 'not_yet') {
         if (g?.appeal_at) result.append(el('p', 'rot-note', 'Sent to your teacher. The checker’s verdict stands until they decide.'));
         else {
           const appeal = el('button', 'rot-link', 'I think the checker got this wrong');
