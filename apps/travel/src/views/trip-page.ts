@@ -621,7 +621,9 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
   });
 
   updateChips();
-  selectCity(selectedCityId);
+  // First paint keeps the deep link's day; showCity falls back to the city's
+  // first day when that date is missing or outside the stay.
+  showCity(selectedCityId);
   loadMealMoments();
 }
 
