@@ -212,7 +212,39 @@ describe('mountStudentLessonView', () => {
     );
   });
 
-  it('a station rotation has no finish tick, What\'s next or lesson links: Back to the map stands in', async () => {
+  it('a class lesson with parts ends in one card: the parts list and its count inside the end card', async () => {
+    const part = (id: string, title: string) => ({
+      id, type: 'block', variant: 'medium', visibility: 'student_teacher', layout: {}, print: {}, settings: {},
+      created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z', schema_version: 1,
+      block_type: 'section', content: { title, blocks: [] }
+    });
+    vi.mocked(apiGet).mockImplementation(async (path: string) => {
+      if (path.includes('/published/classes/')) return publishedClass();
+      if (path.includes('/published/lessons/')) return { ...publishedLesson(), blocks: [part('s1', 'Read the stanza'), part('s2', 'Annotate in your book')] };
+      throw new Error(path);
+    });
+
+    const root = document.createElement('div');
+    document.body.append(root);
+    mountStudentLessonView({ root, lessonId: 'lesson_lkeep_008', classId: CLASS_ID });
+
+    await vi.waitFor(() => {
+      expect(root.querySelector('.lf__card .lf__parts .lm-check')).not.toBeNull();
+    });
+    const card = root.querySelector('.lf__card')!;
+    expect(card.querySelectorAll('.lm-check__row')).toHaveLength(2);
+    expect(card.querySelector('.lf__count')?.textContent).toBe('0 of 2 parts done');
+    expect(card.querySelector('.lf__name')?.textContent).toBe('Before you finish');
+    expect(card.querySelector('.lf__finish')?.textContent).toBe('Finish lesson');
+    // What's next is in the same card, and nothing of the old three pieces is left outside it.
+    expect(card.querySelector('.wn-card')).not.toBeNull();
+    expect(root.querySelectorAll('.lm-check, .wn-card, .lf__finish')).toHaveLength(3);
+    card.querySelector<HTMLButtonElement>('.lm-check__tick')!.click();
+    expect(card.querySelector('.lf__count')?.textContent).toBe('1 of 2 parts done');
+    expect(card.querySelector('.lf__left')?.textContent).toBe('1 part isn’t ticked. You can still finish.');
+  });
+
+  it('a station rotation has no end card, next on your list or lesson links: Back to the map stands in', async () => {
     const rotation = { dial: 'standard', path: 'free_all', evidence: 'none', link_words: [], stations: [], finale: { build_prompt: 'Write it.', formats: [], debrief: [] }, behind_fallback: 'none', pretest_count: 0 };
     vi.mocked(apiGet).mockImplementation(async (path: string) => {
       if (path.includes('/published/classes/')) return publishedClass();
