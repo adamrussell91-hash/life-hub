@@ -73,7 +73,13 @@ describe('NESA template field values', () => {
     expect(v[F.reflection(1)]).toBe('I set the goal early.');
     expect(v[F.feedback(2)]).toBe('Model one tool.');
     expect(v[F.teacherDate]).toBe('20/11/26');
-    expect(v[F.supervisorDate]).toBe('');
+    expect(nesaFieldValues(record(), '2026-11-21')[F.supervisorDate]).toBe('21/11/26');
+  });
+
+  it('fills a signature date not picked in the app with the day the report is made', () => {
+    const v = nesaFieldValues({ ...record(), signatures: { teacher: { name: '', date: '' }, supervisor: { name: '', date: '2026-11-19' } } }, '2026-11-22');
+    expect(v[F.teacherDate]).toBe('22/11/26');
+    expect(v[F.supervisorDate]).toBe('19/11/26');
   });
 
   it('leaves extra descriptors off the report', () => {
@@ -102,9 +108,10 @@ describe('filling the shipped template', () => {
   });
 
   it('writes the values into the PDF, sized to fit, still editable', async () => {
-    const { bytes, overflow } = await fillNesaTemplate(TEMPLATE, record());
+    const { bytes, overflow } = await fillNesaTemplate(TEMPLATE, record(), '2026-11-21');
     const form = (await PDFDocument.load(bytes)).getForm();
     expect(form.getTextField(F.teacherName).getText()).toBe('Sam Okafor');
+    expect(form.getTextField(F.supervisorDate).getText()).toBe('21/11/26');
     expect(form.getTextField(F.decision(1)).getText()).toBe('Observed\n\nAsk about peer feedback.');
     expect(form.getTextField(F.teacherDate).getText()).toBe('20/11/26');
     expect(form.getTextField(F.practice(3)).getText() ?? '').toBe('');
