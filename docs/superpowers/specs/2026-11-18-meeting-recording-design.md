@@ -223,3 +223,36 @@ Transcription and voice matching have no per-hour fees. They cost the Mac's proc
 - Keeping audio for playback.
 - Recognising voices across meetings. Each meeting is named from its own taps.
 - A paid-API fallback.
+
+## Addendum, 19 November: write-up, picks, profiles and failsafes
+
+Approved from the mockup `docs/mockups/meeting-recording.html`. Where this conflicts with the sections above, this wins. The build contract is `docs/superpowers/plans/2026-11-19-meeting-recording-build.md`.
+
+### The transcript is not the main view
+
+The After card is **From the recording**. In order:
+
+1. **Overview.** Three to five sentences on the whole meeting or event. It feeds ✦ Summary and the Minutes draft.
+2. **How it went.** A thin bar for the whole meeting and topic cards (time, length, one line, who led) that scroll sideways. It never grows taller than one card row.
+3. **Your notes, built out.** Adam's own note lines stay as written. Under each, the recording adds short lines: what was decided, what was said for and against, who will do what, each with who said it and a time. ✓ moves a line into the notes; ✕ drops it. **Not in your notes** lists what he didn't write down.
+4. **Picked up.** *For you to do* (+ Task, with the due date heard), *Others said they'd do* (Track it, a they-owe promise on that person), and *Points of interest*: opportunities or things worth remembering, such as a program looking for people, a role or a strong idea (★ Keep, or + Task to follow up).
+5. **Who said what.** A few points per person, with ★ on what's most worth remembering. Each attendee's points are saved to their profile under a **Said in meetings** tab, so months later the meeting, the point and a time to check the words are on the person.
+
+The full transcript moves to a side drawer: voices and the *Who is this?* pickers, Find, and *Change who said this*. Any time shown on the card opens the drawer at that line.
+
+During recording, two extra buttons sit under the name chips: **That's a to-do** and **Remember this**. A tap marks the moment so the write-up looks hardest there.
+
+The write-up runs after the speaker check, on Claude Opus 5.5 at low effort, from the transcript, Adam's notes and the flags. It costs about A$0.30 per hour of meeting on top of the A$0.60 speaker check. Private meetings run both on the Mac's local model or skip the write-up if no local model is set up.
+
+### Failsafes
+
+- **Every minute is saved on the device first**, in the browser's own storage, then uploaded. The strip shows *Saved on this device* and *In Life Hub* separately. A failed upload keeps retrying and never loses a part.
+- **Recovery.** If the page closes mid-recording, opening the meeting again shows what is saved on the device and offers to upload the rest, save a copy, or keep recording.
+- **Save a copy** of the audio is available from the device at any time, and from Life Hub until the audio is deleted.
+- **Device copies** are cleared only once Life Hub has the transcript and has deleted its own audio.
+- **Mic check before recording.** The consent panel shows a live level meter and a mic picker.
+- **Silent mic alarm.** A live meter in the strip. After 15 seconds of near silence while recording, a red banner says so, the phone buzzes where it can, and a mic picker is offered.
+
+### Events
+
+Events with attendees get the same recorder and card. Speakers are the attendees; a **Someone in the room** chip covers questions from the audience.
