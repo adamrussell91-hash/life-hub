@@ -213,6 +213,41 @@ button.safe-mark__postcard::before { content: ""; position: absolute; inset: -.4
   object-fit: cover; border-radius: 1px; box-shadow: none; flex: none;
 }
 
+/* ---------- The sheet that makes one ---------- */
+.postcard-composer__parts { display: grid; gap: 1.1rem; align-content: start; }
+.postcard-composer__part { display: grid; gap: .4rem; justify-items: start; min-width: 0; }
+.postcard-composer__part > * { max-width: 100%; }
+.postcard-composer__choose { display: inline-flex; align-items: center; gap: 6px; min-height: 2.75rem; }
+.postcard-composer__choose svg { width: 16px; height: 16px; }
+.postcard-composer__picked { display: flex; align-items: center; gap: 10px; width: 100%; }
+.postcard-composer__picked[hidden] { display: none; }
+.postcard-composer__preview { flex: none; width: 4.5rem; height: 4.5rem; object-fit: cover; border-radius: var(--radius-sm); box-shadow: inset 0 0 0 1px var(--line); background: var(--shore); }
+.postcard-composer__name { flex: 1; min-width: 0; font-size: .875rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.postcard-composer__voice { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; width: 100%; }
+.postcard-composer__voice .btn { display: inline-flex; align-items: center; gap: 6px; min-height: 2.75rem; }
+.postcard-composer__voice .btn[hidden], .postcard-composer__voice .mini[hidden] { display: none; }
+.postcard-composer__clock { font-weight: 700; font-size: 1rem; color: var(--ink); }
+.postcard-composer__clock[hidden] { display: none; }
+.postcard-composer__player { flex: 1 1 14rem; min-width: 0; height: 2.75rem; }
+.postcard-composer__player[hidden] { display: none; }
+.postcard-composer .mini { min-height: 2.75rem; padding-inline: .75rem; }
+.postcard-composer__text, .postcard-composer__line {
+  width: 100%; border: 0; border-radius: var(--radius-sm); padding: .625rem .75rem; background: var(--cotton);
+  box-shadow: inset 0 0 0 1px var(--line); font: inherit; font-size: 1rem; color: var(--ink);
+}
+.postcard-composer__text { resize: vertical; min-height: 6.5rem; line-height: 1.4; }
+.postcard-composer__under { display: flex; justify-content: space-between; align-items: center; gap: .75rem; width: 100%; min-height: 1.25rem; }
+.postcard-composer__count { margin-left: auto; font-size: .75rem; color: var(--muted); }
+.postcard-composer__note { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .25rem; margin: 0; }
+.postcard-composer__note[hidden], .postcard-composer__note .mini[hidden] { display: none; }
+.postcard-composer__draft { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem; }
+.postcard-composer__draft[hidden], .postcard-composer__draft .hint[hidden] { display: none; }
+.postcard-composer__draft .mini { margin-left: auto; }
+.postcard-composer__error { margin: 0; color: #9b2c2c; font-weight: 600; }
+.postcard-composer__error[hidden], .postcard-composer__blocker[hidden] { display: none; }
+.postcard-composer__blocker { margin: 0; }
+.postcard-composer .addform__actions .btn:disabled { opacity: .5; cursor: default; }
+
 @media (prefers-reduced-motion: reduce) {
   .postcard__inner, .postcard__word { transition: none; }
 }

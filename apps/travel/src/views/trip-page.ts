@@ -1,5 +1,5 @@
 import type { City, Item, Trip } from '@/types';
-import { addCheckin, getTrip, removePostcard, uploadTravelPhoto, type TripEnvelope } from '@/api/travel';
+import { addCheckin, getTrip, removePostcard, type TripEnvelope } from '@/api/travel';
 import { ApiClientError } from '@/api/client';
 import {
   buildTodo,
@@ -21,8 +21,8 @@ import { renderCityDatesForm } from '@/components/city-dates-form';
 import { renderCityForm } from '@/components/city-form';
 import { renderDayLabelSheet } from '@/components/day-label-sheet';
 import { renderArrivalGuideSheet } from '@/components/arrival-guide-sheet';
-import { renderSafePhotoSheet } from '@/components/safe-photo-sheet';
-import { safeSaveErrorMessage, shrinkSafePhoto } from '@/lib/safe-photo';
+import { safeSaveErrorMessage } from '@/lib/safe-photo';
+import { openPostcardComposer } from '@/postcard/composer';
 import { getJournal } from '@/api/journal';
 import { openQuickMealSheet } from '@/journal/quick-meal-sheet';
 import { renderTakeMeHome } from '@/components/take-me-home';
@@ -572,12 +572,11 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     });
   }
 
-  async function markItemSafe(item: Item, photoId?: string): Promise<void> {
+  async function markItemSafe(item: Item): Promise<void> {
     const saved = await addCheckin(tripId, {
       city_id: item.city_id,
-      label: photoId ? `Photo · ${item.title}` : `Safe · ${item.title}`,
+      label: `Safe · ${item.title}`,
       item_id: item.id,
-      photo_id: photoId,
       if_version: version
     });
     trip = saved.trip;
@@ -621,22 +620,21 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
   }
 
   function openSafeMark(item: Item, mode: 'mark' | 'postcard'): void {
-    // One-tap mark safe; photo opens the sheet.
+    // One tap marks the stop safe and never waits on anything else. The postcard is its own sheet.
     if (mode === 'mark') {
       void markItemSafe(item).catch((err) => {
         window.alert(`Not marked safe. ${safeSaveErrorMessage(err)}`);
       });
       return;
     }
-    const formHost = document.createElement('div');
-    document.body.append(formHost);
-    renderSafePhotoSheet(formHost, {
+    openPostcardComposer({
+      trip,
+      version,
       item,
-      onClose: () => formHost.remove(),
-      onConfirm: async (file) => {
-        const uploaded = await uploadTravelPhoto(tripId, await shrinkSafePhoto(file));
-        await markItemSafe(item, uploaded.photo_id);
-        formHost.remove();
+      onPosted: (saved) => {
+        trip = saved.trip;
+        version = saved.version;
+        renderCityScene();
       }
     });
   }

@@ -314,10 +314,6 @@ details.tobook[open] summary::after { content: "Hide"; }
 .safe-mark__btn:active .safe-mark__tick { background: var(--success); color: #fff; box-shadow: none; }
 .safe-mark__photo-btn { display: inline-flex; align-items: center; gap: 4px; min-height: 2rem; }
 .safe-mark__photo-btn svg { width: 14px; height: 14px; }
-.safe-photo-preview {
-  display: block; width: 100%; max-height: 200px; object-fit: cover;
-  border-radius: var(--radius-sm); margin-top: 8px;
-}
 .price { font-weight: 600; }
 .price small { color: var(--muted); font-weight: 500; }
 .go { display: flex; align-items: center; gap: 8px; font-size: .75rem; color: var(--muted); padding: 6px 0 2px; }
@@ -671,8 +667,3 @@ body.map-open { overflow: hidden; }
 .meal-log:focus-visible { outline: 2px solid var(--wave); border-radius: 6px; }
 
 /* Safe-mark photo: a real button and the chosen file's name, not "Choose File". */
-.safe-photo-pick { display: grid; gap: 6px; justify-items: start; }
-.safe-photo-choose { display: inline-flex; align-items: center; gap: 6px; min-height: 2.75rem; }
-.safe-photo-choose svg { width: 16px; height: 16px; }
-.safe-photo-picked { display: flex; align-items: center; gap: 10px; max-width: 100%; }
-.safe-photo-picked__name { font-size: .875rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
