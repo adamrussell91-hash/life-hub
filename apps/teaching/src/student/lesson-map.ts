@@ -10,8 +10,9 @@ import './lesson-map.css';
  * per section that pops out into the section names, and a "This lesson"
  * checklist above the footer. Sections with a quiz question or a question set
  * tick themselves once that work is answered (as profile-todo.mjs activitiesOf
- * counts a question set done); the rest the student ticks, kept on this device
- * per class and lesson.
+ * counts a question set done). Any section can also be ticked by hand, since
+ * plenty of work is done in books; hand ticks are kept on this device per class
+ * and lesson. The checklist is a guide: the footer's tick finishes the lesson.
  */
 
 /** One section of the lesson and the answerable work inside it. */
@@ -79,12 +80,17 @@ export function lessonSections(blocks: Block[]): LessonMapSection[] {
 
 export const isAuto = (s: LessonMapSection): boolean => s.quizIds.length > 0 || s.sets.length > 0;
 
-/** A question set is done when every question has writing, or anything is written in its format or lens (activitiesOf). */
+const filled = (v: unknown): boolean => typeof v === 'string' && v.trim() !== '';
+
+/**
+ * A question set is done when every question has writing or its success criteria ticked,
+ * or anything is written in its format or lens (activitiesOf).
+ */
 export function setDone(set: { questionIds: string[] }, saved: Record<string, Record<string, string>> | undefined): boolean {
   if (!saved) return false;
   if (Object.keys(saved).some((part) => part !== 'answers')) return true;
   const answers = saved.answers ?? {};
-  return set.questionIds.length > 0 && set.questionIds.every((id) => typeof answers[id] === 'string' && answers[id]!.trim() !== '');
+  return set.questionIds.length > 0 && set.questionIds.every((id) => filled(answers[id]) || filled(answers[`${id}.checked`]));
 }
 
 const checkKey = (classId: string, lessonId: string) => `lesson-check:${classId}:${lessonId}`;
@@ -141,7 +147,8 @@ export function mountLessonMap(options: LessonMapOptions): LessonMapHandle {
   count.setAttribute('aria-live', 'polite');
   head.append(heading, count);
   const list = el('ul', 'lm-check__list');
-  card.append(head, list);
+  const foot = el('p', 'lm-check__note', 'Tick parts off as you go. The big tick below finishes the lesson, even with parts left.');
+  card.append(head, list, foot);
   const checkRows = new Map<string, { li: HTMLLIElement; tick: HTMLButtonElement; status: HTMLElement }>();
   for (const s of sections) {
     const li = el('li', 'lm-check__row');
@@ -150,12 +157,10 @@ export function mountLessonMap(options: LessonMapOptions): LessonMapHandle {
     tick.type = 'button';
     tick.innerHTML = TICK_SVG;
     tick.setAttribute('aria-label', s.title);
-    if (isAuto(s)) {
-      tick.setAttribute('aria-disabled', 'true');
-      tick.title = 'Ticks itself when you finish the work in it';
-    }
+    if (isAuto(s)) tick.title = 'Ticks itself when you answer here. Did it in your book? Tick it yourself.';
     tick.addEventListener('click', () => {
-      if (isAuto(s)) return;
+      // Work answered here keeps its tick; a hand tick comes off again.
+      if (isAuto(s) && autoDone(s)) return;
       if (checks.has(s.id)) checks.delete(s.id);
       else checks.add(s.id);
       writeChecks(key, checks);
@@ -166,7 +171,7 @@ export function mountLessonMap(options: LessonMapOptions): LessonMapHandle {
     name.type = 'button';
     name.addEventListener('click', () => goTo(s.id));
     label.append(name);
-    if (isAuto(s)) label.append(el('span', 'lm-check__auto', 'ticks itself'));
+    if (isAuto(s)) label.append(el('span', 'lm-check__auto', 'ticks itself when answered here'));
     label.append(el('span', 'lm-check__start', 'Start here'));
     const status = el('span', 'lm-check__status');
     li.append(tick, label, status);
@@ -261,6 +266,8 @@ export function mountLessonMap(options: LessonMapOptions): LessonMapHandle {
   }
 
   /* ── State ── */
+  const auto = new Map<string, boolean>();
+  const autoDone = (s: LessonMapSection): boolean => auto.get(s.id) === true;
   function compute(): void {
     const q = quiz()?.progress();
     const answered = new Set(q?.answeredIds ?? []);
@@ -272,13 +279,10 @@ export function mountLessonMap(options: LessonMapOptions): LessonMapHandle {
       // No storage to read: nothing written yet as far as the map knows.
     }
     for (const s of sections) {
-      if (!isAuto(s)) {
-        done.set(s.id, checks.has(s.id));
-        continue;
-      }
       const quizDone = s.quizIds.every((id) => handedIn || answered.has(id));
       const setsDone = s.sets.every((set) => setDone(set, saved.get(set.id)));
-      done.set(s.id, quizDone && setsDone);
+      auto.set(s.id, isAuto(s) && quizDone && setsDone);
+      done.set(s.id, autoDone(s) || checks.has(s.id));
     }
   }
 

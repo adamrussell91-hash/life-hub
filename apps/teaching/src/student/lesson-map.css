@@ -36,13 +36,13 @@
 .lm-check__tick { width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 1.5px solid var(--navy-2); border-radius: var(--radius-xs); background: transparent; color: transparent; cursor: pointer; }
 .lm-check__tick svg { width: 14px; height: 14px; }
 .lm-check__tick:focus-visible, .lm-check__name:focus-visible { outline: 3px solid var(--wave); outline-offset: 2px; }
-.lm-check__tick[aria-disabled='true'] { border-style: dashed; cursor: default; }
 .lm-check__row.is-done .lm-check__tick { background: var(--success); border-color: var(--success); border-style: solid; color: #fff; }
 .lm-check__label { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .lm-check__name { min-height: 28px; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
 .lm-check__name:hover { text-decoration: underline; }
 .lm-check__row.is-done .lm-check__name { color: var(--muted); text-decoration: line-through; }
-.lm-check__auto { padding: 0 4px; border: 1px solid var(--success); border-radius: 4px; color: var(--success); font-size: var(--text-2xs); white-space: nowrap; }
+.lm-check__auto { color: var(--muted); font-size: var(--text-xs); }
+.lm-check__note { margin: 0; padding-top: var(--space-2); border-top: 1px solid var(--line); color: var(--ink); font-size: var(--text-sm); }
 .lm-check__start { display: none; padding: 0 6px; border-radius: var(--radius-full); background: var(--high-sea-ink); color: #fff; font-size: var(--text-2xs); font-weight: 600; white-space: nowrap; }
 .lm-check__row.is-next .lm-check__start { display: inline-block; }
 .lm-check__row.is-next .lm-check__name { color: var(--high-sea-ink); font-weight: 600; }

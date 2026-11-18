@@ -131,7 +131,8 @@ const answered = (v) => typeof v === 'string' && v.trim() !== '';
 
 /**
  * The writing activities in a lesson (its question sets) and whether each is finished: every
- * question answered, or for a set worked in a format or lens, anything written there.
+ * question answered or its success criteria ticked, or for a set worked in a format or lens,
+ * anything written there.
  */
 export function activitiesOf(lesson, saved) {
   const out = [];
@@ -140,7 +141,7 @@ export function activitiesOf(lesson, saved) {
     const questions = (Array.isArray(b.content?.questions) ? b.content.questions : []).filter((q) => q && typeof q.id === 'string');
     const parts = saved?.[b.id] ?? {};
     const other = Object.keys(parts).some((p) => p !== 'answers');
-    const done = other || (questions.length > 0 && questions.every((q) => answered(parts.answers?.[q.id])));
+    const done = other || (questions.length > 0 && questions.every((q) => answered(parts.answers?.[q.id]) || answered(parts.answers?.[`${q.id}.checked`])));
     const title = typeof b.content?.title === 'string' && b.content.title.trim() ? b.content.title.trim() : `Questions (${questions.length})`;
     out.push({ id: b.id, title: clip(title, 100), done });
   }
