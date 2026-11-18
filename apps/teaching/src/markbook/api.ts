@@ -4,8 +4,11 @@ import type { MarkbookView } from './types';
 
 export type NewMember = { student: string; why: string };
 
-/** A side lesson's tick list for one class. Started students keep the lesson whether ticked or not. */
-export type LessonStudents = { students: Array<{ id: string; name: string }>; ticked: string[]; started: string[] };
+/**
+ * A lesson's student list for one class: who is ticked for it as a side lesson, who is left out of it
+ * as a core lesson, and who has started it, so keeps it either way.
+ */
+export type LessonStudents = { students: Array<{ id: string; name: string }>; ticked: string[]; excused?: string[]; started: string[] };
 
 export type MarkbookApi = {
   load: (classId: string) => Promise<MarkbookView>;
@@ -16,6 +19,7 @@ export type MarkbookApi = {
   setTook: (classId: string, studentId: string, lessonIds: string[]) => Promise<Markbook>;
   lessonStudents: (classId: string, lessonId: string) => Promise<LessonStudents>;
   setLessonStudents: (classId: string, lessonId: string, studentIds: string[]) => Promise<Markbook>;
+  setCoreStudents: (classId: string, lessonId: string, studentIds: string[]) => Promise<Markbook>;
   saveGroup: (classId: string, group: { id: string; name: string; tags: string[]; members: NewMember[] }, today: string) => Promise<Markbook>;
   addMembers: (classId: string, groupId: string, members: NewMember[], today: string) => Promise<Markbook>;
   removeMember: (classId: string, groupId: string, student: string, today: string) => Promise<Markbook>;
@@ -35,6 +39,7 @@ export const httpMarkbookApi: MarkbookApi = {
   setTook: (classId, studentId, lessonIds) => write(classId, { action: 'set_took', student_id: studentId, lesson_ids: lessonIds }),
   lessonStudents: (classId, lessonId) => apiPost<LessonStudents>(path(classId), { action: 'lesson_students', lesson_id: lessonId }),
   setLessonStudents: (classId, lessonId, studentIds) => write(classId, { action: 'set_lesson_students', lesson_id: lessonId, student_ids: studentIds }),
+  setCoreStudents: (classId, lessonId, studentIds) => write(classId, { action: 'set_core_students', lesson_id: lessonId, student_ids: studentIds }),
   saveGroup: (classId, group, today) => write(classId, { action: 'save_group', group, today }),
   addMembers: (classId, groupId, members, today) => write(classId, { action: 'add_members', group_id: groupId, members, today }),
   removeMember: (classId, groupId, student, today) => write(classId, { action: 'remove_member', group_id: groupId, student, today }),

@@ -2,7 +2,7 @@ import { el } from '@/quiz/dom';
 import type { AnyColumn, MarkbookActions, MarkbookView, RosterStudent } from './types';
 import { dateOf, formatDay, markOf, orderedColumns, overallFor } from './calc';
 import { KIND_LABEL, cellFor, overallText, studentHead } from './grid';
-import { lessonButton, lessonCell, shortDate, type ProgressLesson } from './progress';
+import { leftOut, lessonButton, lessonCell, shortDate, type ProgressLesson } from './progress';
 
 /**
  * Marks & progress: one table for every lesson, quiz, task, hand-in and check, in date order.
@@ -63,12 +63,17 @@ export function doneText(view: MarkbookView, studentId: string, lessons: readonl
 const lessonTag = (l: ProgressLesson): string =>
   l.students ? 'Tutorial' : l.assessment ? 'Assessment' : l.role === 'core' ? '' : l.role === 'optional' ? 'Option' : l.role === 'support' ? 'Support' : 'Extension';
 
-/** A tutorial's exit check is only for the students in its groups; a side lesson's quiz is for those ticked for it. */
+/**
+ * A tutorial's exit check is only for the students in its groups; a side lesson's quiz is for those
+ * ticked for it; a core lesson's quiz is for everyone not left out of it.
+ */
 function notForStudent(view: MarkbookView, lessons: readonly ProgressLesson[], c: AnyColumn, studentId: string): boolean {
   if (c.kind !== 'quiz' || c.scores[studentId]) return false;
   if (c.groups) return !c.groups[studentId];
   const lesson = lessons.find((l) => l.id === c.lesson_id);
-  return Boolean(lesson) && lesson!.role !== 'core' && !(view.markbook.took?.[studentId] ?? []).includes(c.lesson_id);
+  if (!lesson) return false;
+  if (lesson.role === 'core') return leftOut(view, studentId, c.lesson_id);
+  return !(view.markbook.took?.[studentId] ?? []).includes(c.lesson_id);
 }
 
 /** The grey box for a student a column isn't set for, matching the lesson boxes. */

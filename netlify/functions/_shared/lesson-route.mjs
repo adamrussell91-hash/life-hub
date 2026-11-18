@@ -40,7 +40,7 @@ async function classUnit(store, cls) {
 
 /** The student's own quiz and work facts for the unit, in the shape lessonsForStudent and mapRows read. */
 async function studentView(store, roster, student, lessonIds) {
-  if (!student) return { markbook: { took: {} }, quizzes: [], work: [] };
+  if (!student) return { markbook: { took: {}, excused: {} }, quizzes: [], work: [] };
   const self = { ...roster, students: roster.students.filter((s) => s.id === student.id) };
   const [{ book }, facts, work] = await Promise.all([
     readBook(store, roster.cls.id),

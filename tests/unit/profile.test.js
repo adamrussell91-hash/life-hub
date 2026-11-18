@@ -88,6 +88,20 @@ test('a side lesson reaches only ticked students, and the tick list reads back',
   assert.deepEqual((await markbookAction(s, 'class1', { action: 'lesson_students', lesson_id: 'l3' })).ticked, [tom.id]);
 });
 
+test('a core lesson leaves the map of a student left out of it, and the list reads back', async () => {
+  const s = await fixture();
+  const roster = await loadRoster(s, 'class1');
+  const [bob, tom] = roster.students;
+  await claimInitials(s, roster, token(2), 'TT');
+  const titles = async (n) => (await profileAction(s, 'class1', { class_token: token(n) })).map.unit.lessons.map((l) => l.title);
+  await markbookAction(s, 'class1', { action: 'set_core_students', lesson_id: 'l1', student_ids: [tom.id] });
+  assert.deepEqual(await titles(1), []);
+  assert.deepEqual(await titles(2), ['Ghost poem']);
+  assert.deepEqual((await markbookAction(s, 'class1', { action: 'lesson_students', lesson_id: 'l1' })).excused, [bob.id]);
+  await markbookAction(s, 'class1', { action: 'set_core_students', lesson_id: 'l1', student_ids: [bob.id, tom.id] });
+  assert.deepEqual(await titles(1), ['Ghost poem']);
+});
+
 test('next is the first core lesson not yet done', async () => {
   const s = storeFixture([
     ['classes/class1', cls([{ name: 'Bob Brown' }])],

@@ -232,7 +232,7 @@ export function mountLessonFlow(
     dateRow.append(dateList);
 
     if (isSide(self)) {
-      root.append(route, ...(whoFor ? [whoFor.open()] : []), dateRow, ...branchRows());
+      root.append(route, ...(whoFor ? [whoFor.open('side')] : []), dateRow, ...branchRows());
       return;
     }
 
@@ -301,7 +301,7 @@ export function mountLessonFlow(
     }
     sideRow.append(sideList);
 
-    root.append(route, dateRow, beforeRow, afterRow, sideRow);
+    root.append(route, ...(whoFor ? [whoFor.open('core')] : []), dateRow, beforeRow, afterRow, sideRow);
     if (next.length > 1) root.append(el('p', 'lesson-flow__note', `Students choose: ${next.map(title).join(', ')}. The unit map splits here.`));
 
     // This lesson's own problems, with a fix where there is one.

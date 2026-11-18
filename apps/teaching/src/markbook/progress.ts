@@ -10,7 +10,7 @@ export type { DoneRecord };
  * Lesson progress for the markbook's Marks & progress view: which lessons of the class's active units
  * each student has done. A tick is complete, a half circle is partial, a grey box is not for that
  * student, and a red dot means it is still not complete a week after its set date. A core lesson is
- * for every student. A side lesson is for the students ticked for it, a tutorial for those in its groups.
+ * for every student the teacher hasn't left out of it. A side lesson is for the students ticked for it, a tutorial for those in its groups.
  */
 
 /** A lesson is late this many days after its set date. */
@@ -163,7 +163,7 @@ export function lessonCell(view: MarkbookView, studentId: string, lesson: Progre
     // Written work saved in the lesson counts as under way, like a quiz go not handed in.
     quizStarted: Boolean(quiz?.started?.includes(studentId)) || Boolean(view.work?.find((w) => w.lesson_id === lesson.id)?.students[studentId]),
     took: (view.markbook.took?.[studentId] ?? []).includes(lesson.id),
-    forStudent: lesson.students ? lesson.students.includes(studentId) : lesson.role === 'core',
+    forStudent: lesson.students ? lesson.students.includes(studentId) : lesson.role === 'core' && !leftOut(view, studentId, lesson.id),
     today
   });
 }
@@ -202,4 +202,9 @@ export function lessonButton(
   b.setAttribute('aria-label', words);
   b.title = words;
   return b;
+}
+
+/** The teacher left this student out of this core lesson. */
+export function leftOut(view: MarkbookView, studentId: string, lessonId: string): boolean {
+  return (view.markbook.excused?.[studentId] ?? []).includes(lessonId);
 }

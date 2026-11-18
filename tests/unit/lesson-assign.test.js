@@ -43,3 +43,11 @@ test('an older side lesson takes its role from the unit map stop; its own role w
 test('hasStarted is false with no evidence', () => {
   assert.equal(hasStarted('st1', 'x', { quizzes: [], work: [], done: undefined }), false);
 });
+
+test('a student left out of a core lesson loses it from their map unless they have started it', () => {
+  const out = { markbook: { took: {}, excused: { st1: ['core1'], st2: ['core1'] } }, quizzes: [{ lesson_id: 'core1', started: ['st2'], scores: {} }], work: [] };
+  const seen = (student) => lessonsForStudent(lessons, out, {}, student, 'c1').map((l) => l.id);
+  assert.ok(!seen('st1').includes('core1'));
+  assert.ok(seen('st2').includes('core1'), 'started keeps it');
+  assert.ok(seen('st9').includes('core1'), 'everyone else still has it');
+});
