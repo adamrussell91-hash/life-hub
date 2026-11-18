@@ -80,6 +80,8 @@ import { renderRolesEditor } from '@/components/person-roles-editor';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { renderProfessionalProfileSummary, renderProfessionalProfileTab } from '@/components/professional-profile';
 import { headStart } from '@/app/head-start';
+import { listPeopleSaid } from '@/api/meeting-recordings';
+import { renderPeopleSaid } from '@/components/person-said-tab';
 
 export interface PeoplePageOptions {
   selectedId?: string | null;
@@ -835,6 +837,16 @@ export async function renderPeoplePage(
     if (nextHost) setSectionState(nextHost, 'loading');
     if (ledgerHost) setSectionState(ledgerHost, 'loading');
     if (rememberHost) setSectionState(rememberHost, 'loading');
+    const saidRoot = pane.querySelector('[data-section="said"]') as HTMLElement | null;
+    if (saidRoot) {
+      saidRoot.hidden = true;
+      const saidBody = saidRoot.querySelector('.people-pane__section-body') as HTMLElement;
+      void listPeopleSaid(personRef(id)).then(({ entries }) => {
+        if (!current() || !entries.length) return;
+        renderPeopleSaid(saidBody, entries, { heading: false });
+        saidRoot.hidden = false;
+      }).catch(() => { /* optional section: stays hidden */ });
+    }
     if (timelineHost) setSectionState(timelineHost, 'loading');
     if (linkedHost) setSectionState(linkedHost, 'loading');
     if (rolesHost) setSectionState(rolesHost, 'loading');
@@ -1435,6 +1447,12 @@ export async function renderPeoplePage(
     remember.root.querySelector('.people-pane__h2')?.append(el('span', 'people-pane__h2-sub', 'pulled from your notes'));
     setSectionState(remember.body, 'loading');
     pane.append(remember.root);
+    // What they said in recorded meetings; hidden until there is something.
+    const said = sectionHost('', 'Said in meetings');
+    said.root.setAttribute('data-section', 'said');
+    said.root.querySelector('.people-pane__h2')?.append(el('span', 'people-pane__h2-sub', 'from recordings'));
+    said.root.hidden = true;
+    pane.append(said.root);
     const motivation = sectionHost('people-pane__motivation', 'Motivation');
     motivation.root.setAttribute('data-section', 'motivation');
     motivation.root.hidden = true;

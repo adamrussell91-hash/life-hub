@@ -13,16 +13,20 @@ export function extractJsonText(raw) {
 }
 
 /**
- * @param {{ system: string, content: unknown[], apiKey: string, fetchImpl?: typeof fetch, maxTokens?: number }} input
+ * `model` and `effort` are optional: left out, the call is exactly the Clare comms default.
+ * `effort` goes in `output_config` (Opus 5.5 at low effort for the meeting write-up).
+ * @param {{ system: string, content: unknown[], apiKey: string, fetchImpl?: typeof fetch, maxTokens?: number, model?: string, effort?: string }} input
  * @returns {Promise<any>} the parsed JSON object
  */
-export async function completeJson({ system, content, apiKey, fetchImpl = fetch, maxTokens = 1200 }) {
+export async function completeJson({ system, content, apiKey, fetchImpl = fetch, maxTokens = 1200, model, effort }) {
+  const body = { model: model || CLARE_COMMS_MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content }] };
+  if (effort) body.output_config = { effort };
   let response;
   try {
     response = await fetchImpl('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: CLARE_COMMS_MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content }] })
+      body: JSON.stringify(body)
     });
   } catch {
     throw clareFailed('network');

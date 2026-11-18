@@ -9,6 +9,11 @@ const meeting = {
   occurrence_history: [], created_at: '', updated_at: '', purpose: 'Get a yes on the TeachMeet date', blocks: [], decisions: []
 };
 
+vi.mock('@/api/meeting-recordings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/meeting-recordings')>()),
+  getRecordingBundle: vi.fn(async () => null),
+  listPeopleSaid: vi.fn(async () => ({ entries: [] }))
+}));
 vi.mock('@/api/meetings', () => ({
   getMeeting: vi.fn(async () => ({ meeting })),
   updateMeeting: vi.fn(async (_id: string, patch: object) => ({ meeting: { ...meeting, ...patch } })),
@@ -16,7 +21,8 @@ vi.mock('@/api/meetings', () => ({
   meetingStateAction: vi.fn(async () => ({ meeting: { ...meeting, state: 'completed' } })),
   listMeetings: vi.fn(async () => ({ meetings: [] })),
   createMeeting: vi.fn(async () => ({ meeting: { ...meeting, id: 'meeting_new' }, links: [], created: true })),
-  isMeetingIncompleteLinksError: () => false
+  isMeetingIncompleteLinksError: () => false,
+  linkMeetingTask: vi.fn(async () => ({}))
 }));
 const workspaceDestroy = vi.fn();
 vi.mock('@/observation/workspace', () => ({
@@ -185,8 +191,8 @@ describe('meeting page', () => {
     canvas.querySelector<HTMLButtonElement>('[data-set-phase="after"]')!.click();
     await vi.advanceTimersByTimeAsync(0);
     const main = canvas.querySelector('.meeting-page__main')!;
-    expect(main.firstElementChild?.getAttribute('data-part')).toBe('minutes');
-    const parts = [...main.children].map((node) => node.getAttribute('data-part'));
+    const parts = [...main.children].filter((node) => !(node as HTMLElement).hidden).map((node) => node.getAttribute('data-part'));
+    expect(parts[0]).toBe('minutes');
     expect(parts.indexOf('minutes')).toBeLessThan(parts.indexOf('actions'));
     expect(parts).not.toContain('notes');
     expect(canvas.querySelector('.meeting-page__full > [data-part="notes"]')).not.toBeNull();
@@ -306,7 +312,7 @@ describe('meeting page', () => {
 
   it('the three phases show different work: brief + open promises / live strip / wrap-up', async () => {
     const canvas = await render();
-    const parts = () => [...canvas.querySelectorAll('.meeting-page__main > [data-part]')].map((node) => node.getAttribute('data-part'));
+    const parts = () => [...canvas.querySelectorAll<HTMLElement>('.meeting-page__main > [data-part]')].filter((node) => !node.hidden).map((node) => node.getAttribute('data-part'));
     const fullParts = () => [...canvas.querySelectorAll('.meeting-page__full > [data-part]')].map((node) => node.getAttribute('data-part'));
     const notesHeading = () => canvas.querySelector('[data-part="notes"] h3')!.textContent;
 
