@@ -246,6 +246,13 @@ describe('Coverage map: one student', () => {
     expect(not.nodes.get('e|read')).toBe('ahead');
   });
 
+  it('shows a core lesson the student was left out of as skipped', () => {
+    const map = build();
+    const route = studentRoute(map, { evidence: [ev('quiz:b', 0.3)], took: [], excused: ['a'], scores: new Map(), today: '2026-12-01' });
+    expect(route.took.has('a')).toBe(false);
+    expect(route.nodes.get('a|human:U1')).toBe('skipped');
+  });
+
   it('matches skill tags to the strand’s line and stars the second secure checkpoint', () => {
     const lessons: MapLesson[] = [
       { id: 'q1', title: 'Quiz one', quiz: true, line_stops: [{ line_id: 'read' }] },

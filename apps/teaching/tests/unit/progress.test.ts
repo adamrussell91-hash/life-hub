@@ -29,6 +29,12 @@ describe('cellFor', () => {
     expect(lessonCell(view({ s2: [side.id] }), 's1', side, '2027-01-01').state).toBe('na');
     expect(lessonCell({ ...view({}), done: { s1: { [side.id]: { at: 'x', via: 'tick' } } } } as MarkbookView, 's1', side, '2027-01-01').state).toBe('complete');
   });
+  it('a core lesson is a grey box for a student left out of it, until they do it anyway', () => {
+    const view = (excused: Record<string, string[]>, done = {}) => ({ markbook: { took: {}, excused }, quizzes: [], done }) as unknown as MarkbookView;
+    expect(lessonCell(view({ s1: [core.id] }), 's1', core, '2027-01-01')).toEqual({ state: 'na', late: false });
+    expect(lessonCell(view({ s2: [core.id] }), 's1', core, '2027-01-01')).toEqual({ state: 'open', late: true });
+    expect(lessonCell(view({ s1: [core.id] }, { s1: { [core.id]: { at: 'x', via: 'tick' } } }), 's1', core, '2027-01-01').state).toBe('complete');
+  });
   it('a lesson not set for the student (a tutorial outside their group) is a grey box, and never late', () => {
     expect(cellFor({ ...base, forStudent: false, today: '2027-01-01' })).toEqual({ state: 'na', late: false });
     expect(cellFor({ ...base, forStudent: false, took: true, today: '2027-01-01' })).toEqual({ state: 'open', late: true });

@@ -97,6 +97,8 @@ export const MarkbookSchema = z.object({
     .default({}),
   /** Per student: support, extension and option lessons the teacher marked as taken (the unit map's route). */
   took: z.record(z.string(), z.array(z.string().min(1).max(64)).max(200)).default({}),
+  /** Per student: core lessons the teacher left them out of. Those lessons leave the student's map. */
+  excused: z.record(z.string(), z.array(z.string().min(1).max(64)).max(200)).default({}),
   /** Saved groups (Next steps, quiz group sets). */
   groups: z.array(SavedGroupSchema).max(MARKBOOK_LIMITS.groups).default([]),
   /** Group history, appended and never recomputed. */

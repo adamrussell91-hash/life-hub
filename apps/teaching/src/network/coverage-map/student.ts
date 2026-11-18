@@ -12,7 +12,7 @@ export type ItemState = 'struggling' | 'working' | 'secure';
 export type NodeState = ItemState | 'none' | 'skipped' | 'ahead';
 
 export type StudentRoute = {
-  /** Rows the student did (core rows up to now; side rows they took). */
+  /** Rows the student did (core rows up to now, less any they were left out of; side rows they took). */
   took: Set<string>;
   /** Index of the last row the student has reached. */
   now: number;
@@ -30,6 +30,8 @@ export type StudentInput = {
   evidence: readonly Evidence[];
   /** Side lessons the teacher marked as taken. */
   took: readonly string[];
+  /** Core lessons the teacher left this student out of. */
+  excused?: readonly string[];
   scores: ReadonlyMap<string, { score: number; max: number }>;
   /** "2026-10-27"; rows dated after it are ahead. */
   today: string;
@@ -53,6 +55,7 @@ export function studentRoute(map: CoverageMap, input: StudentInput): StudentRout
   const bySource = new Map<string, Evidence[]>();
   for (const x of input.evidence) bySource.set(x.source, [...(bySource.get(x.source) ?? []), x]);
   const manual = new Set(input.took);
+  const leftOut = new Set(input.excused ?? []);
 
   // Where the student is: the last dated row on or before today, else the last row with their evidence or a tick.
   let now = -1;
@@ -65,7 +68,7 @@ export function studentRoute(map: CoverageMap, input: StudentInput): StudentRout
   map.rows.forEach((row, i) => {
     if (i > now) return;
     const side = row.lane !== 'core';
-    if (!side || manual.has(row.id) || input.scores.has(row.id) || bySource.has(`quiz:${row.id}`)) took.add(row.id);
+    if ((!side && !leftOut.has(row.id)) || manual.has(row.id) || input.scores.has(row.id) || bySource.has(`quiz:${row.id}`)) took.add(row.id);
   });
 
   const current = new Map<string, ItemState>();

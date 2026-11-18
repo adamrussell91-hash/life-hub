@@ -45,7 +45,8 @@ export async function loadClassEvidence(classId: string): Promise<ClassEvidence>
     students: view.students.filter((s) => !s.removed).map((s) => ({ id: s.id, name: s.name })),
     evidence: markbookEvidence(view).evidence,
     scores,
-    took: { ...(view.markbook.took ?? {}) }
+    took: { ...(view.markbook.took ?? {}) },
+    excused: { ...(view.markbook.excused ?? {}) }
   };
 }
 
