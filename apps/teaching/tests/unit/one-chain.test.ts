@@ -113,6 +113,15 @@ describe('the chain', () => {
     expect(bare.lessonAreas.get('L2')).toEqual(['storms']);
   });
 
+  it('takes a game answer through its lesson like a quiz item, in the app and the server’s copy', () => {
+    const want = ['kp:kp_linked', 'dp:harbours:U1', 'out:o1'];
+    const [app] = withPointTags([ev(['kp:kp_linked', 'out:o4'], 'game:L1:g1')], byLesson, new Map([['out:o4', ['dp:storms:R1']]]), chain());
+    const [server] = mirror.withPointTags([ev(['kp:kp_linked', 'out:o4'], 'game:L1:g1')], byLesson, new Map([['out:o4', ['dp:storms:R1']]]), serverChain());
+    expect(app!.tags).toEqual(want);
+    expect(server.tags).toEqual(want);
+    expect(withPointTags([ev(['tech:x'], 'game:L1:g1')], byLesson, new Map(), chain())[0]!.tags).toEqual(['tech:x', 'dp:harbours:R2', 'out:o3']);
+  });
+
   it('leaves assessment criteria their outcomes', () => {
     const [out] = withPointTags([ev(['out:o4'], 'assess:t1')], byLesson, new Map([['out:o4', ['dp:storms:R1']]]), chain());
     expect(out!.tags).toEqual(['out:o4', 'dp:storms:R1']);
