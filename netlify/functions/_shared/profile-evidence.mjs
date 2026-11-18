@@ -237,7 +237,11 @@ function dotPointOutcomes(dotPoints, alignment, labels) {
   }
   return [...tags];
 }
-var lessonOf = (source) => source.startsWith("quiz:") ? source.slice(5) : source.startsWith("work:") ? source.slice(5) : null;
+var lessonOf = (source) => {
+  if (source.startsWith("quiz:") || source.startsWith("work:")) return source.slice(5);
+  if (source.startsWith("game:")) return source.slice(5).split(":")[0] || null;
+  return null;
+};
 var pointTag = (area, id) => `dp:${area}:${id}`;
 function lessonPointMap(lessons, alignment) {
   const map = /* @__PURE__ */ new Map();

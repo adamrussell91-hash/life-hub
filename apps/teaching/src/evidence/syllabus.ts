@@ -55,8 +55,15 @@ export function lessonOutcomeMap(
   return map;
 }
 
-/** The lesson a piece of evidence came from: quiz items, and work with a rubric. Assessment criteria have none. */
-const lessonOf = (source: string): string | null => (source.startsWith('quiz:') ? source.slice(5) : source.startsWith('work:') ? source.slice(5) : null);
+/**
+ * The lesson a piece of evidence came from: quiz items, work with a rubric, and
+ * game answers (`game:{lesson}:{game}`). Assessment criteria have none.
+ */
+const lessonOf = (source: string): string | null => {
+  if (source.startsWith('quiz:') || source.startsWith('work:')) return source.slice(5);
+  if (source.startsWith('game:')) return source.slice(5).split(':')[0] || null;
+  return null;
+};
 
 /** Adds the lesson's outcomes to quiz items that carry none. */
 export function withLessonOutcomes(evidence: Evidence[], byLesson: ReadonlyMap<string, string[]>): Evidence[] {
