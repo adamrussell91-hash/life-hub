@@ -175,15 +175,19 @@ export function createWritingChecker({ complete, models = {}, names = LITERARY_T
  * teacher's model answer and criteria by the fast lane. Same fences as the
  * written gate: refused before the model when empty, too long, unchanged or
  * inside 20 s of the last check; at the class's daily cap, or when the text
- * talks to the marker, it goes to the teacher. A reply that isn't the strict
- * shape goes to the teacher too. A fix that copies the model answer is
- * replaced with a plain pointer and logged.
+ * talks to the marker, it goes to the teacher. A checker that times out or
+ * gives no readable verdict is a retry, not a teacher check: the attempt is
+ * marked `unavailable`, doesn't count, and the same text may be checked again.
+ * A fix that copies the model answer is replaced with a plain pointer and logged.
  */
 export const LOCK_JOB_KIND = 'rotation_lock_check';
 export const LOCK_TEXT_CAP = 600;
 export const LOCK_FIX_CAP = 160;
 const LOCK_LANE = 'fast';
-const LOCK_MAX_TOKENS = 200;
+// Haiku thinks before it answers and the thinking counts against this cap. At
+// 200 a careful look at a strong answer ran out before the verdict was written.
+const LOCK_MAX_TOKENS = 1024;
+const LOCK_RETRY = 'The checker didn’t give a verdict that time. Check again: it doesn’t use up a check.';
 const PLAIN_FIX = 'Read the question again and add one more specific detail.';
 
 const LOCK_SYSTEM = [
@@ -208,7 +212,12 @@ export function lockPrompt(check, text) {
 export function parseLockReply(raw) {
   const s = String(raw ?? '').trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
   let v;
-  try { v = JSON.parse(s); } catch { return null; }
+  try { v = JSON.parse(s); } catch {
+    // A verdict with a sentence around it: take the one JSON object.
+    const m = s.match(/\{[^{}]*\}/g);
+    if (m?.length !== 1) return null;
+    try { v = JSON.parse(m[0]); } catch { return null; }
+  }
   if (!v || typeof v !== 'object' || typeof v.pass !== 'boolean') return null;
   if (v.fix !== undefined && typeof v.fix !== 'string') return null;
   return { pass: v.pass, fix: String(v.fix ?? '').trim() };
@@ -234,7 +243,7 @@ export function createLockChecker({ complete, models = {}, logUsage = async () =
     if (text.length > LOCK_TEXT_CAP) reject(400, 'too_long', `Keep it to one or two sentences (under ${LOCK_TEXT_CAP} characters).`);
     const past = list(checks);
     const last = past[past.length - 1];
-    if (last && sameText(last.text, text)) reject(409, 'unchanged', 'Change your answer before checking it again.');
+    if (last && !last.unavailable && sameText(last.text, text)) reject(409, 'unchanged', 'Change your answer before checking it again.');
     if (last && now() - Date.parse(last.at) < RATE_MS) reject(429, 'too_soon', 'Give it a moment, then check again.');
     const base = { text: text.trim(), at: new Date(now()).toISOString() };
     if (await spentToday(store, lessonId, classId).then((aud) => capReached(aud, capAud))) {
@@ -250,7 +259,7 @@ export function createLockChecker({ complete, models = {}, logUsage = async () =
         new Promise((_, no) => { controller.signal.addEventListener('abort', () => no(new Error('timeout'))); })
       ]);
     } catch {
-      return { attempt: { ...base, outcome: 'teacher', counted: false, unavailable: true }, message: 'The checker didn’t answer in time. Your teacher will look at this one, and it doesn’t use up a check.' };
+      return { attempt: { ...base, outcome: 'teacher', counted: false, unavailable: true }, message: LOCK_RETRY };
     } finally {
       clearTimeout(timer);
     }
@@ -266,7 +275,10 @@ export function createLockChecker({ complete, models = {}, logUsage = async () =
     await addSpend(store, lessonId, classId, usdToAud(cost_usd));
     await logUsage(store, { job_id: null, lesson_id: lessonId, agent: null, action: LOCK_JOB_KIND, protocol_id: null, status: parsed ? 'done' : 'error', turns: 1, failed_checks: (stripped ? 1 : 0) + (parsed ? 0 : 1), cost_usd, usage: [{ model: reply?.model ?? model, ...usage, cost_usd }], at: new Date(now()).toISOString() });
     if (stripped) console.warn(`[rotation] lock check: replaced a fix that gave the answer away (lesson ${lessonId})`);
-    if (!parsed) return { attempt: { ...base, outcome: 'teacher', counted: false, cost_usd }, message: 'Your teacher will look at this one.' };
+    if (!parsed) {
+      console.warn(`[rotation] lock check: no readable verdict (stop ${reply?.stop_reason ?? 'unknown'}, lesson ${lessonId})`);
+      return { attempt: { ...base, outcome: 'teacher', counted: false, unavailable: true, cost_usd }, message: LOCK_RETRY };
+    }
     return { attempt: { ...base, outcome: parsed.pass ? 'passed' : 'not_yet', ...(parsed.pass ? {} : { fix }), cost_usd, ...(stripped ? { stripped: true } : {}) }, message: null };
   };
 }

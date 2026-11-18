@@ -29,7 +29,7 @@ export function createPublishedRotationHandler(deps = {}) {
     try {
       const text = await request.text();
       if (text.length > MAX_BODY) throw new RotationError(413, 'too_large', 'That’s too long to send. Shorten it and try again.');
-      const result = await rotationAction(store, match?.[1], JSON.parse(text), { checkWriting: deps.checkWriting ?? liveChecker(env), checkLock: deps.checkLock ?? liveLockChecker(env) });
+      const result = await rotationAction(store, match?.[1], JSON.parse(text), { checkWriting: deps.checkWriting ?? liveChecker(env), checkLock: deps.checkLock ?? liveLockChecker(env), testPhrase: deps.testPhrase ?? env?.ROTATION_TEST_PHRASE });
       return withCors(okResponse(200, result, { 'cache-control': 'no-store' }), request, env);
     } catch (e) {
       if (e instanceof RotationError || e instanceof SyntaxError) return withCors(errorResponse(e.status ?? 400, e.code ?? 'bad_request', e instanceof SyntaxError ? 'Invalid request.' : e.message, false), request, env);

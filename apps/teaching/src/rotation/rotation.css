@@ -371,6 +371,7 @@
 .rot-lk__reply p { margin: 0; }
 .rot-lk__reply[data-kind='fix'] { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
 .rot-lk__reply[data-kind='teacher'] { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.rot-lk__reply[data-kind='pass'] { margin: 8px 0 0; background: var(--success-surface); color: var(--success); font-weight: 600; }
 
 /* rush round */
 .rot-rush { display: grid; gap: 10px; min-width: 0; padding: 12px; border-radius: var(--radius-sm); background: var(--pastel-blue); transition: background-color 0.2s var(--rot-ease); }

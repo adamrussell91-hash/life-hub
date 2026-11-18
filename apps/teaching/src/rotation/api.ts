@@ -44,7 +44,7 @@ export type PublicStationLock = {
   /** Rush, open or passed: the round so far. Ask `next_item_id` next. */
   rush?: { streak: number; best: number; answered: number; started_at: string | null; ends_at: string | null; next_item_id: string | null };
   /** AI check, open or passed. */
-  ai?: { checks_left: number; last: { text: string; at: string; outcome: 'passed' | 'not_yet' | 'teacher'; fix: string | null } | null };
+  ai?: { checks_left: number; last: { text: string; at: string; outcome: 'passed' | 'not_yet' | 'teacher'; fix: string | null; /** The checker didn't answer: check again, no check used. */ retry?: boolean } | null };
   /** Sent to the teacher (out of checks, daily cap, or text that talked to the marker). */
   flagged?: true;
   /** Passed only: the Viva Kit card. */
