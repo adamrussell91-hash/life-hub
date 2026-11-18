@@ -208,3 +208,39 @@ test('the owner can delete a draft clip, but not one a postcard uses', async () 
   assert.equal((await del('tau_gone9')).status, 200, 'deleting twice is fine');
   assert.equal((await del('nope')).status, 404);
 });
+
+test('a delete never removes a clip while its trip or its own record cannot be read', async () => {
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    const store = seeded();
+    const down = createTravelAudioHandler({
+      env,
+      getTravelStore: async () => store,
+      createTravelRepository: () => ({
+        async getTrip() {
+          throw Object.assign(new Error('Storage is unavailable.'), { code: 'upstream_unavailable', status: 503 });
+        }
+      }),
+      verifySessionToken: async () => ({ valid: true, payload: {} })
+    });
+    const del = (h, id) =>
+      h(
+        new Request(`https://api.example/api/travel-audio?id=${id}`, {
+          method: 'DELETE',
+          headers: { origin: ORIGIN, cookie: 'life_hub_session=x' }
+        })
+      );
+    assert.equal((await del(down, 'tau_a1')).status, 503);
+    assert.equal(store.blobs.has('audio/tau_a1.bin'), true, 'the trip could not be read, so the clip stays');
+
+    const broken = seeded();
+    broken.get = async () => {
+      throw new Error('blob store down');
+    };
+    assert.equal((await del(handler({ store: broken }), 'tau_a1')).status, 500);
+    assert.equal(broken.blobs.has('audio/tau_a1.bin'), true, 'the record could not be read, so the clip stays');
+  } finally {
+    console.error = quiet;
+  }
+});

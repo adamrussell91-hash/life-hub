@@ -96,13 +96,16 @@ export function createTravelAudioWriteHandler(deps = {}) {
         return errorResponse(404, 'not_found', 'Clip not found.', false, PRIVATE_CACHE);
       }
       const store = await getStore(ctx.env);
-      const meta = await readAudioMeta(store, audioId);
-      if (meta?.trip_id) {
+      // Fail closed: if the clip's record or its trip cannot be read, the clip stays.
+      // Only a record that is really absent, or a trip that is really gone, lets it go.
+      const raw = await store.get(audioMetaKey(audioId), { type: 'text' });
+      const tripId = raw ? JSON.parse(raw).trip_id : null;
+      if (tripId) {
         let trip = null;
         try {
-          ({ trip } = await ctx.repo.getTrip(meta.trip_id));
-        } catch {
-          trip = null;
+          ({ trip } = await ctx.repo.getTrip(tripId));
+        } catch (error) {
+          if (error?.code !== 'not_found' && error?.status !== 404) throw error;
         }
         if ((trip?.checkins || []).some((c) => c?.postcard?.audio_id === audioId)) {
           return errorResponse(
