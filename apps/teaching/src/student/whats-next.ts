@@ -1,9 +1,11 @@
 /**
- * "What's next" on a student's lesson page: a card under the finish tick that names the one thing
- * on their To do list (the lesson they're on passed over), with "Take me there" and "My to do list".
- * Quiet (dashed) while the lesson is open; once the lesson is ticked done it turns navy, since
- * that's the moment they ask "what now?". It reads the progress page's own payload, and only when
- * it comes near the screen or the lesson is ticked, so a lesson page costs nothing extra up top.
+ * "Next on your list" in the lesson end card (lesson-footer.ts): the one thing on the student's
+ * To do list, the lesson they're on passed over. While the lesson is open it is one quiet line with
+ * no button, so Finish lesson is the only main button. Once the lesson is finished it becomes the
+ * body of the card, with "Take me there" and "My to do list", since that's the moment they ask
+ * "what now?". A quiz has nothing left to finish, so there it is the full block from the start
+ * (`open`). It reads the progress page's own payload, and only when it comes near the screen or the
+ * lesson is finished, so a lesson page costs nothing extra up top.
  *
  * Also the small "Not sure what to do? My to do list →" line under the lesson title.
  */
@@ -19,6 +21,8 @@ export type WhatsNextOptions = {
   lessonId: string;
   /** This lesson's own path, so the progress page can offer "Back to lesson". */
   from: string;
+  /** The full block from the start: a quiz, where there is no Finish lesson button to wait for. */
+  open?: boolean;
   /** Test seam: the progress page's payload. */
   load?: () => Promise<{ need?: string | null; todo?: TodoPayload }>;
 };
@@ -59,9 +63,10 @@ export function mountWhatsNext(options: WhatsNextOptions): WhatsNextHandle {
   let found: NowThing | null | undefined;
 
   const card = el('section', 'wn-card');
-  card.setAttribute('aria-label', 'What’s next');
+  card.setAttribute('aria-label', 'Next on your list');
   card.setAttribute('aria-live', 'polite');
-  const kicker = el('p', 'wn-card__kicker', 'What’s next');
+  if (options.open) card.classList.add('is-open');
+  const kicker = el('p', 'wn-card__kicker', 'Next on your list');
   const what = el('p', 'wn-card__what', 'Your to do list has what to do after this lesson.');
   const acts = el('div', 'wn-card__acts');
   const all = studentAnchor(todoListHref(classId, from), 'wn-card__all', 'My to do list');
@@ -69,6 +74,8 @@ export function mountWhatsNext(options: WhatsNextOptions): WhatsNextHandle {
   card.append(kicker, what, acts);
 
   const paint = (thing: NowThing | null): void => {
+    // The quiet line shows only with something to name.
+    card.classList.toggle('has-thing', !!thing);
     if (thing) {
       what.textContent = thing.what;
       acts.replaceChildren(studentAnchor(thereHref(classId, thing, from), 'wn-card__go', 'Take me there →'), all);
