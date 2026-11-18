@@ -454,6 +454,29 @@ async function loadAll(): Promise<FlowLoad> {
   return { tasks, quizzes };
 }
 
+/**
+ * A press that redraws part of a card (a tick, a rung, Again) throws away the button it was on, and the browser
+ * lays the page out while that part is still empty. Scrolled down, the work area is briefly too short for where
+ * it sits, so it snaps up, and each press further down snaps again. What's in the work area keeps its height
+ * through the press.
+ */
+export function holdHeightOnPress(work: HTMLElement): void {
+  let letGo: (() => void) | null = null;
+  work.addEventListener('click', () => {
+    // A click before the last one let go measures afresh, from the heights as they really are.
+    letGo?.();
+    const held = ([...work.children] as HTMLElement[]).map((child) => [child, child.style.minHeight, child.offsetHeight] as const);
+    for (const [child, , height] of held) child.style.minHeight = `${height}px`;
+    const mine = (): void => {
+      for (const [child, was] of held) child.style.minHeight = was;
+      if (letGo === mine) letGo = null;
+    };
+    letGo = mine;
+    // Let go once every handler for this press has run, so the redraw has filled the space back in.
+    window.setTimeout(() => { if (letGo === mine) mine(); });
+  }, true);
+}
+
 export function mountToMarkPage(canvas: HTMLElement, load: () => Promise<FlowLoad> = loadAll): { dispose: () => void } {
   canvas.replaceChildren(el('p', 'tm-sub', 'Loading what is waiting…'));
   let disposed = false;
@@ -501,6 +524,7 @@ export function mountToMarkPage(canvas: HTMLElement, load: () => Promise<FlowLoa
   bar.append(prev, skip, go);
   root.append(head, body, bar);
   queueToggle.addEventListener('click', () => body.classList.toggle('show-queue'));
+  holdHeightOnPress(work);
 
   const shown = () => items.filter((i) => filter === 'all' || i.kind === filter);
   const current = () => items[at] ?? null;
