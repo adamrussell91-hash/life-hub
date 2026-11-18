@@ -50,3 +50,9 @@ export function setApiImageSrc(img: HTMLImageElement, url: string): void {
   img.crossOrigin = 'use-credentials';
   img.src = url;
 }
+
+/** The same for an <audio>: the clip route refuses a media load that does not name its origin. */
+export function setApiAudioSrc(audio: HTMLAudioElement, url: string): void {
+  audio.crossOrigin = 'use-credentials';
+  audio.src = url;
+}

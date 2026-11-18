@@ -70,3 +70,84 @@ test('redactTrip attaches safe_at and photo id onto the matching public stop', (
   assert.equal(publicTrip.last_checkin?.photo_id, 'tph_testphoto01');
   assert.equal(publicTrip.last_checkin?.item_id, stopId);
 });
+
+const postcardCheckin = (extra = {}) => ({
+  id: 'chk_card1',
+  at: '2027-03-04T11:00:00.000Z',
+  city_id: 'lis',
+  label: 'Safe',
+  item_id: 'itm_testtodo01',
+  photo_id: 'tph_p1',
+  postcard: {
+    photo_id: 'tph_p1',
+    orientation: 'portrait',
+    address: ['Rua do Exemplo', 'Lisboa', 'Portugal'],
+    posted_at: '2027-03-04T11:30:00.000Z',
+    audio_id: 'tau_a1',
+    audio_s: 21,
+    text: 'All good here.',
+    coordinates: { lat: 12.345678, lon: 98.765432 }
+  },
+  ...extra
+});
+
+test('redactTrip gives followers a stop\'s postcard, and never where exactly it was taken', () => {
+  const trip = structuredClone(fixture);
+  trip.checkins = [
+    postcardCheckin(),
+    { id: 'chk_later', at: '2027-03-04T13:00:00.000Z', city_id: 'lis', label: 'Safe', item_id: 'itm_testtodo01' }
+  ];
+  const publicTrip = redactTrip(trip);
+  const stop = publicTrip.items.find((i) => i.id === 'itm_testtodo01');
+
+  assert.equal(stop.safe_at, '2027-03-04T13:00:00.000Z', 'the safe time is still the latest tick');
+  assert.deepEqual(stop.postcard, {
+    id: 'chk_card1',
+    at: '2027-03-04T11:30:00.000Z',
+    photo_id: 'tph_p1',
+    orientation: 'portrait',
+    address: ['Rua do Exemplo', 'Lisboa', 'Portugal'],
+    audio_id: 'tau_a1',
+    audio_s: 21,
+    text: 'All good here.'
+  });
+  const json = JSON.stringify(publicTrip);
+  assert.equal(json.includes('12.345678'), false);
+  assert.equal(json.includes('"coordinates"'), false);
+  assert.equal(publicTrip.items.find((i) => i.id === 'itm_testfood01').postcard, undefined);
+});
+
+test('redactTrip reads a photo from before postcards as a photo-only postcard', () => {
+  const trip = structuredClone(fixture);
+  trip.checkins = [
+    { id: 'chk_old', at: '2027-03-04T10:00:00.000Z', city_id: 'lis', label: 'Photo', item_id: 'itm_testtodo01', photo_id: 'tph_old1' }
+  ];
+  const stop = redactTrip(trip).items.find((i) => i.id === 'itm_testtodo01');
+  assert.deepEqual(stop.postcard, { id: 'chk_old', at: '2027-03-04T10:00:00.000Z', photo_id: 'tph_old1' });
+  assert.equal(stop.safe_photo_id, 'tph_old1');
+});
+
+test('redactTrip drops a private stop with its postcard, and the last check-in does not name it', () => {
+  const trip = structuredClone(fixture);
+  trip.checkins = [
+    postcardCheckin({ item_id: 'itm_testmed01', city_id: 'opo', label: 'Safe · Private test medication stop' })
+  ];
+  const publicTrip = redactTrip(trip);
+  const json = JSON.stringify(publicTrip);
+  for (const secret of ['itm_testmed01', 'Private test medication stop', 'Rua do Exemplo', 'All good here.', 'tau_a1', 'tph_p1']) {
+    assert.equal(json.includes(secret), false, `leaked: ${secret}`);
+  }
+  assert.deepEqual(publicTrip.last_checkin, { at: '2027-03-04T11:00:00.000Z', city_name: 'Porto', label: 'Safe' });
+});
+
+test('redactTrip still names a public stop in the last check-in', () => {
+  const trip = structuredClone(fixture);
+  trip.checkins = [postcardCheckin({ label: 'Safe · Book Belém tram tickets' })];
+  assert.deepEqual(redactTrip(trip).last_checkin, {
+    at: '2027-03-04T11:00:00.000Z',
+    city_name: 'Lisbon',
+    label: 'Safe · Book Belém tram tickets',
+    item_id: 'itm_testtodo01',
+    photo_id: 'tph_p1'
+  });
+});

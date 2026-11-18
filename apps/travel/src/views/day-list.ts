@@ -15,6 +15,7 @@ import {
   showArrivalGuide
 } from '@/model/day';
 import { canMarkSafe, formatSafeTime, safeByItemId } from '@/lib/safe-mark';
+import { listPostcards, type PostcardView } from '@/postcard/model';
 import { I } from '@/lib/icons';
 import { escapeHtml, pick } from '@/lib/html';
 import { splitGuideText } from '@/lib/guide-text';
@@ -32,8 +33,10 @@ export interface DayListOptions {
   onTellPenelope?: (prompt: string) => void;
   /** Owner: edit Soft Landing tips for this city. */
   onEditArrivalGuide?: () => void;
-  /** Owner: open mark-safe / add-photo sheet for this stop. */
-  onMarkSafe?: (item: Item, mode: 'mark' | 'photo') => void;
+  /** Owner: mark this stop safe, or open the postcard sheet for it. */
+  onMarkSafe?: (item: Item, mode: 'mark' | 'postcard') => void;
+  /** Open the stop's postcard. Without it the small card is a picture, not a button. */
+  onOpenPostcard?: (itemId: string) => void;
   /** Owner: log what was eaten at a food stop, or reopen the logged meal. */
   onLogMeal?: (item: Item, momentId?: string) => void;
   /** Food stops with a logged meal → that journal moment's id. */
@@ -76,23 +79,19 @@ function appendMealLog(meta: HTMLElement, item: Item, options: DayListOptions): 
   meta.append(btn);
 }
 
-function resolveSafe(
-  item: Item,
-  byItem: Map<string, Checkin>
-): { at: string; photoId?: string } | null {
+function resolveSafe(item: Item, byItem: Map<string, Checkin>): { at: string } | null {
   const publicItem = item as Item & PublicSafeFields;
-  if (publicItem.safe_at) {
-    return { at: publicItem.safe_at, photoId: publicItem.safe_photo_id };
-  }
+  if (publicItem.safe_at) return { at: publicItem.safe_at };
   const live = byItem.get(item.id);
-  return live ? { at: live.at, photoId: live.photo_id } : null;
+  return live ? { at: live.at } : null;
 }
 
 function appendSafeMark(
   meta: HTMLElement,
   item: Item,
   options: DayListOptions,
-  byItem: Map<string, Checkin>
+  byItem: Map<string, Checkin>,
+  postcards: Map<string, PostcardView>
 ): void {
   if (!canMarkSafe(item)) return;
   const safe = resolveSafe(item, byItem);
@@ -108,23 +107,38 @@ function appendSafeMark(
     badge.setAttribute('aria-label', `Safe at ${time}`);
     meta.append(badge);
 
-    if (safe.photoId) {
+    const card = postcards.get(item.id);
+    if (card) {
+      // The stop's postcard, small: the photo in a white border. It opens the card itself.
+      const open = options.onOpenPostcard;
+      const small = document.createElement(open ? 'button' : 'span');
+      small.className = 'safe-mark__postcard';
+      small.dataset.orient = card.orientation ?? 'landscape';
       const img = document.createElement('img');
       img.className = 'safe-mark__photo';
-      img.alt = `Photo from ${item.title}`;
-      setApiImageSrc(img, travelPhotoUrl(safe.photoId, options.shareToken));
+      img.alt = open ? '' : `Photo from ${item.title}`;
+      setApiImageSrc(img, travelPhotoUrl(card.photoId, options.shareToken));
       img.loading = 'lazy';
-      meta.append(img);
+      small.append(img);
+      if (open) {
+        (small as HTMLButtonElement).type = 'button';
+        small.setAttribute('aria-label', `Open the postcard from ${item.title}`);
+        small.addEventListener('click', (e) => {
+          e.stopPropagation();
+          open(item.id);
+        });
+      }
+      meta.append(small);
     } else if (!options.isPublic && options.onMarkSafe) {
-      const addPhoto = document.createElement('button');
-      addPhoto.type = 'button';
-      addPhoto.className = 'mini safe-mark__photo-btn';
-      addPhoto.innerHTML = `${I.camera}Photo`;
-      addPhoto.addEventListener('click', (e) => {
+      const addCard = document.createElement('button');
+      addCard.type = 'button';
+      addCard.className = 'mini safe-mark__photo-btn';
+      addCard.innerHTML = `${I.post}Postcard`;
+      addCard.addEventListener('click', (e) => {
         e.stopPropagation();
-        options.onMarkSafe?.(item, 'photo');
+        options.onMarkSafe?.(item, 'postcard');
       });
-      meta.append(addPhoto);
+      meta.append(addCard);
     }
     return;
   }
@@ -150,6 +164,7 @@ function renderCard(
   options: DayListOptions,
   hop: Hop | undefined,
   byItem: Map<string, Checkin>,
+  postcards: Map<string, PostcardView>,
   viewDate: string
 ): HTMLElement {
   const stop = document.createElement('div');
@@ -324,7 +339,7 @@ function renderCard(
       meta.append(mapsLink);
     }
     // Mark safe belongs to arriving; a later night would echo night 1's check-in.
-    if (!continuing) appendSafeMark(meta, item, options, byItem);
+    if (!continuing) appendSafeMark(meta, item, options, byItem, postcards);
     appendMealLog(meta, item, options);
   }
 
@@ -452,6 +467,7 @@ export function renderDayList(
   }
 
   const safeByItem = safeByItemId(trip.checkins);
+  const postcards = new Map(listPostcards(trip).map((card) => [card.itemId, card]));
   for (const item of ordered) {
     if (item.kind === 'checkin_slot') {
       const row = document.createElement('div');
@@ -501,7 +517,7 @@ export function renderDayList(
       const fallback = hopFallback(item, next);
       if (fallback) hop = { mode: 'walk', minutes: fallback.minutes };
     }
-    list.append(renderCard(item, numbers.get(item.id), listOptions, hop, safeByItem, date));
+    list.append(renderCard(item, numbers.get(item.id), listOptions, hop, safeByItem, postcards, date));
   }
 
   if (!options.isPublic) {

@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Travel Postcard Mockup</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&amp;family=Caveat:wght@400..700&amp;family=Inter:wght@400..700&amp;display=swap">
+<style>
+/* Mockup for docs/superpowers/specs/2026-11-18-travel-postcard-design.md.
+   A check-in postcard that turns itself over, and where people on the public link find it.
+   Sample places, words and the drawn photos are invented. Palette is the Travel hub. */
+/* Layout: one column of two parts. First the postcard as an object you can turn over,
+   with its controls beside it; then three phone frames showing where followers meet it. */
+:root {
+  /* page chrome (follows the viewer's theme) */
+  --bg: #f5f1e9; --surface: #fbf8f2; --fg: #13233a; --muted: #5d6979;
+  --line: rgba(23, 55, 94, .16); --accent: #17375e; --accent-fg: #ffffff; --focus: #376fb7;
+  /* the app and the card are light objects in both themes, as in the travel app itself */
+  --app-cotton: #f5f1e9; --app-paper: #fbf8f2; --app-ink: #13233a; --app-muted: #6b7788;
+  --app-line: rgba(23, 55, 94, .13); --app-navy: #17375e; --app-success: #2f7a4f; --app-map: #a9d3e6; --app-depth: #0a1536;
+  --card-paper: #fbf7ee; --card-edge: #ffffff; --card-rule: rgba(19, 35, 58, .17); --pen: #1d2a52;
+  --card-shadow: 0 1px 2px rgba(10, 21, 54, .18), 0 14px 34px rgba(10, 21, 54, .22);
+  /* current leg accent, set per sample */
+  --city: #e8743b; --city-soft: #fde3d3; --city-ink: #8a3a12;
+  --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-fun: Archivo, "Helvetica Neue", Arial, sans-serif;
+  --font-hand: Caveat, "Bradley Hand", "Segoe Print", cursive;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c1529; --surface: #15233f; --fg: #e9eef7; --muted: #a3b2c9;
+    --line: rgba(233, 238, 247, .18); --accent: #f0cfac; --accent-fg: #0c1529; --focus: #9cc2f2;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c1529; --surface: #15233f; --fg: #e9eef7; --muted: #a3b2c9;
+  --line: rgba(233, 238, 247, .18); --accent: #f0cfac; --accent-fg: #0c1529; --focus: #9cc2f2;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-ui); font-size: .9375rem; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 72px;
+}
+h1, h2, p, dl, dd, figure { margin: 0; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.page { max-width: 66rem; margin-inline: auto; display: grid; gap: 3.5rem; }
+.eyebrow { font-size: .6875rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; color: var(--muted); }
+.head { display: grid; gap: .5rem; }
+h1 { font-family: var(--font-fun); font-weight: 800; font-stretch: 125%; font-size: clamp(1.7rem, 5vw, 2.5rem); line-height: 1.05; letter-spacing: -.02em; text-wrap: balance; }
+h2 { font-family: var(--font-fun); font-weight: 800; font-stretch: 125%; font-size: 1.35rem; line-height: 1.1; letter-spacing: -.01em; text-wrap: balance; }
+.lede { max-width: 38rem; color: var(--muted); font-size: 1rem; }
+
+/* ---------- Part 1: the postcard ---------- */
+.stage {
+  display: grid; gap: 1.75rem 3rem; align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  grid-template-areas: "text card" "facts card";
+}
+.stage__text { grid-area: text; display: grid; gap: 1rem; min-width: 0; }
+.stage__card { grid-area: card; display: grid; gap: 1rem; justify-items: center; min-width: 0; }
+.facts { grid-area: facts; display: grid; gap: .75rem; min-width: 0; }
+@media (max-width: 56rem) {
+  .stage { grid-template-columns: minmax(0, 1fr); grid-template-areas: "text" "card" "facts"; }
+}
+.stage__text p { max-width: 34rem; }
+.facts div { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: .75rem; padding-top: .75rem; border-top: 1px solid var(--line); }
+.facts dt { font-weight: 600; font-size: .8125rem; }
+.facts dd { color: var(--muted); font-size: .875rem; }
+
+.controls { display: grid; gap: .75rem; }
+.control { display: grid; gap: .3rem; }
+.control > span { font-size: .75rem; font-weight: 600; color: var(--muted); }
+.seg { display: flex; flex-wrap: wrap; gap: .375rem; }
+.seg__b {
+  min-height: 2.75rem; padding: .5rem .875rem; border-radius: .875rem; border: 0;
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); font-size: .8125rem; font-weight: 600;
+}
+.seg__b[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); box-shadow: none; }
+
+.pc-actions { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; }
+.btn { min-height: 2.75rem; padding: .5rem 1rem; border-radius: .875rem; border: 0; font-size: .8125rem; font-weight: 600; background: var(--accent); color: var(--accent-fg); }
+.btn--ghost { background: var(--surface); color: var(--fg); box-shadow: inset 0 0 0 1px var(--line); }
+.note { color: var(--muted); font-size: .8125rem; text-align: center; max-width: 30rem; }
+
+/* The card. Everything inside is sized in em off one container-relative font size,
+   so the whole object scales together. */
+.pc { container-type: inline-size; width: min(100%, 22.5rem); aspect-ratio: 2 / 3; perspective: 1600px; cursor: pointer; }
+.pc[data-orient="landscape"] { width: min(100%, 37.5rem); aspect-ratio: 3 / 2; }
+.pc__inner { position: relative; width: 100%; height: 100%; font-size: 2.8cqw; transform-style: preserve-3d; transition: transform .9s cubic-bezier(.3, .1, .2, 1); }
+.pc.is-flipped .pc__inner { transform: rotateY(180deg); }
+.pc__face { position: absolute; inset: 0; border-radius: .5em; overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; box-shadow: var(--card-shadow); }
+.pc__front { background: var(--card-edge); padding: 1.1em; }
+.pc__front svg { display: block; width: 100%; height: 100%; border-radius: .2em; }
+.pc__back {
+  transform: rotateY(180deg); background: var(--card-paper); color: var(--app-ink);
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 1.3em; padding: 2em 2.2em;
+}
+.back-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.2em; align-items: start; }
+.pc-label { font-family: var(--font-fun); font-stretch: 125%; font-weight: 700; font-size: .95em; letter-spacing: .12em; text-transform: uppercase; color: var(--app-muted); }
+.addr { display: grid; gap: .5em; min-width: 0; }
+.addr__lines { display: grid; font-family: var(--font-hand); font-size: 1.75em; line-height: 1.3; color: var(--pen); }
+.addr__lines span { border-bottom: 1px solid var(--card-rule); overflow-wrap: anywhere; }
+.addr__lines--short { display: none; }
+
+.post { position: relative; width: 13em; height: 10.4em; flex: none; font-size: 1.2em; }
+.stamp {
+  position: absolute; right: 0; top: 0; width: 6.4em; height: 8em; padding: .5em;
+  background: radial-gradient(circle at center, transparent .24em, var(--card-edge) .27em) -.4em -.4em / .8em .8em;
+  filter: drop-shadow(0 .08em .12em rgba(10, 21, 54, .35));
+}
+.stamp__in { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--city-soft); }
+.stamp__in svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.stamp__day, .stamp__country { position: absolute; left: 0; right: 0; text-align: center; font-family: var(--font-fun); font-stretch: 125%; font-weight: 800; text-transform: uppercase; }
+.stamp__day { top: .35em; font-size: .62em; letter-spacing: .08em; color: var(--city-ink); }
+.stamp__country { bottom: .3em; font-size: .56em; letter-spacing: .1em; color: var(--city-soft); }
+.pm { position: absolute; left: -1em; top: 2.2em; width: 14em; height: 8em; color: var(--city-ink); opacity: .8; mix-blend-mode: multiply; transform: rotate(-7deg); filter: url(#ink); }
+.pm text { font-family: var(--font-fun); font-stretch: 125%; font-weight: 800; fill: currentColor; }
+
+.msg { position: relative; min-height: 0; overflow: auto; }
+.msg__text {
+  font-family: var(--font-hand); font-size: 2em; line-height: 1.25; color: var(--pen);
+  background: repeating-linear-gradient(to bottom, transparent 0, transparent calc(1.25em - 1px), var(--card-rule) calc(1.25em - 1px), var(--card-rule) 1.25em);
+}
+.w { opacity: 0; transition: opacity .28s ease-out; }
+.w.is-on { opacity: 1; }
+.msg__hint { position: absolute; left: 0; top: .2em; font-size: 1.2em; color: var(--app-muted); }
+
+.play { display: flex; align-items: center; gap: 1em; }
+.play__btn { flex: none; width: 4.4em; height: 4.4em; min-width: 44px; min-height: 44px; border-radius: 50%; border: 0; background: var(--city-ink); color: var(--card-edge); display: grid; place-items: center; }
+.play__btn svg { width: 1.7em; height: 1.7em; min-width: 16px; min-height: 16px; }
+.play__track { flex: 1; height: .45em; min-height: 4px; border-radius: 1em; background: var(--card-rule); overflow: hidden; }
+.play__fill { display: block; height: 100%; width: 0; background: var(--city); }
+.play__time { font-size: 1.2em; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--app-muted); }
+
+/* A landscape card on a wide screen gets the classic divided back. */
+@container (min-width: 480px) {
+  .pc[data-orient="landscape"] .pc__inner { font-size: 1.68cqw; }
+  .pc[data-orient="landscape"] .pc__back {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "msg top" "play top"; column-gap: 2.2em;
+  }
+  .pc[data-orient="landscape"] .back-top { grid-area: top; height: 100%; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; border-left: 1px solid var(--card-rule); padding-left: 2.2em; justify-items: end; }
+  .pc[data-orient="landscape"] .post { order: -1; }
+  .pc[data-orient="landscape"] .addr { align-self: end; justify-self: stretch; }
+  .pc[data-orient="landscape"] .msg { grid-area: msg; }
+  .pc[data-orient="landscape"] .play { grid-area: play; }
+}
+/* A landscape card on a phone is small, so the back stacks and tightens. */
+@container (max-width: 479.98px) {
+  .pc[data-orient="landscape"] .pc__back { padding: 1.3em 1.5em; gap: .7em; }
+  .pc[data-orient="landscape"] .post { font-size: .68em; }
+  .pc[data-orient="landscape"] .addr__lines--full { display: none; }
+  .pc[data-orient="landscape"] .addr__lines--short { display: grid; font-size: 1.55em; }
+  .pc[data-orient="landscape"] .msg__text { font-size: 1.5em; line-height: 1.2; background: none; }
+  .pc[data-orient="landscape"] .play__btn { width: 4.4em; height: 4.4em; }
+}
+
+/* ---------- Part 2: where followers find it ---------- */
+.places { display: grid; gap: 1.25rem; }
+.places > p { max-width: 38rem; color: var(--muted); }
+.frames { display: grid; grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr)); gap: 2rem 1.5rem; align-items: start; }
+.opt { display: grid; gap: .875rem; min-width: 0; }
+.opt figcaption { display: grid; gap: .25rem; }
+.opt__k { font-family: var(--font-fun); font-stretch: 125%; font-weight: 800; font-size: 1rem; }
+.opt__k small { font-family: var(--font-ui); font-stretch: 100%; font-size: .6875rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-left: .5rem; }
+.opt__d { font-size: .875rem; color: var(--muted); }
+.phone { width: min(100%, 17rem); border-radius: 1.6rem; padding: .5rem; background: var(--app-navy); box-shadow: var(--card-shadow); }
+.app { border-radius: 1.2rem; background: var(--app-cotton); color: var(--app-ink); padding: .875rem .75rem 1.1rem; display: grid; gap: .625rem; font-size: .75rem; line-height: 1.35; }
+.app__crumb { font-size: .625rem; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; color: var(--app-muted); }
+.app__map { height: 4.25rem; border-radius: .75rem; background: var(--app-map); display: grid; place-items: center; font-size: .625rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--app-navy); }
+.app__chips, .app__days { display: flex; gap: .3rem; }
+.app__chips span, .app__days span { padding: .25rem .55rem; border-radius: 1rem; background: var(--app-paper); box-shadow: inset 0 0 0 1px var(--app-line); font-weight: 600; font-size: .6875rem; }
+.app__chips .is-on { background: var(--city); color: var(--card-edge); box-shadow: none; }
+.app__days .is-on { background: var(--app-navy); color: var(--card-edge); box-shadow: none; }
+.row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .5rem; align-items: center; background: var(--app-paper); border-radius: .7rem; padding: .5rem .6rem; box-shadow: inset 0 0 0 1px var(--app-line); }
+.row__t { font-weight: 700; font-variant-numeric: tabular-nums; }
+.row__n { min-width: 0; }
+.row__r { display: flex; align-items: center; gap: .4rem; }
+.safe { color: var(--app-success); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mini { display: block; flex: none; background: var(--card-edge); padding: 2px; border-radius: 2px; box-shadow: 0 1px 2px rgba(10, 21, 54, .3), 0 3px 8px rgba(10, 21, 54, .18); }
+.mini svg { display: block; width: 100%; height: 100%; }
+.mini--p { width: 1.75rem; height: 2.6rem; transform: rotate(4deg); }
+.mini--l { width: 2.6rem; height: 1.75rem; transform: rotate(-3deg); }
+.mini--b svg { filter: hue-rotate(38deg) saturate(.9); }
+.mini--c svg { filter: hue-rotate(-28deg); }
+.newest { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .75rem; align-items: center; background: var(--app-paper); border-radius: .9rem; padding: .7rem; box-shadow: inset 0 0 0 1px var(--app-line); }
+.newest .mini { width: 5rem; height: 7.5rem; padding: 4px; transform: rotate(-3deg); }
+.newest b { display: block; font-family: var(--font-fun); font-stretch: 125%; font-weight: 800; font-size: .875rem; line-height: 1.15; }
+.newest span { display: block; color: var(--app-muted); }
+.newest em { display: inline-block; margin-top: .4rem; font-style: normal; font-weight: 700; color: var(--city-ink); }
+.stack { position: relative; display: block; width: 5.7rem; height: 7.9rem; flex: none; }
+.newest .stack .mini { position: absolute; left: 0; top: .2rem; }
+.newest .stack .mini:nth-child(1) { transform: rotate(8deg) translate(.5rem, .05rem); }
+.newest .stack .mini:nth-child(2) { transform: rotate(3deg) translate(.28rem, 0); }
+.newest .stack .mini:nth-child(3) { transform: rotate(-3deg); }
+.app--viewer { background: var(--app-depth); color: var(--card-edge); justify-items: center; gap: .8rem; padding-bottom: 1.3rem; }
+.viewer__bar { width: 100%; display: flex; justify-content: space-between; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mini.viewer__card { width: 9.5rem; height: 14.25rem; padding: 6px; transform: rotate(-1.5deg); }
+.viewer__where { text-align: center; opacity: .85; }
+.viewer__where b { display: block; font-family: var(--font-fun); font-stretch: 125%; font-weight: 800; font-size: .8125rem; }
+.viewer__nav { display: flex; gap: .4rem; }
+.vbtn { padding: .4rem .8rem; border-radius: 1rem; background: var(--card-edge); color: var(--app-navy); font-weight: 700; font-size: .6875rem; }
+.viewer__strip { display: flex; gap: .55rem; align-items: center; }
+.viewer__strip .mini { position: relative; transform: none; }
+.viewer__strip .mini.is-current { outline: 2px solid var(--city); outline-offset: 2px; }
+.viewer__strip .mini.is-new::after { content: ""; position: absolute; top: -.25rem; right: -.25rem; width: .55rem; height: .55rem; border-radius: 50%; background: var(--city); box-shadow: 0 0 0 2px var(--app-depth); }
+.rack { display: grid; gap: .4rem; background: var(--app-paper); border-radius: .9rem; padding: .6rem .7rem .8rem; box-shadow: inset 0 0 0 1px var(--app-line); }
+.rack__row { display: flex; align-items: center; padding-left: .3rem; }
+.rack__row .mini { margin-left: -.3rem; }
+.rack__row .mini--p { width: 2.6rem; height: 3.9rem; }
+.rack__row .mini--l { width: 3.9rem; height: 2.6rem; }
+.rack b { font-size: .6875rem; letter-spacing: .06em; text-transform: uppercase; color: var(--app-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .pc__inner, .w { transition: none; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="g-kul-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b1440"/><stop offset=".55" stop-color="#5a2a6b"/><stop offset="1" stop-color="#d9603f"/></linearGradient>
+    <linearGradient id="g-kul-street" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2340"/><stop offset="1" stop-color="#120d26"/></linearGradient>
+    <linearGradient id="g-ist-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d5a80"/><stop offset=".55" stop-color="#e99a78"/><stop offset="1" stop-color="#fbd9a5"/></linearGradient>
+    <filter id="ink" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="1.6"/></filter>
+  </defs>
+  <!-- Stand-in "photos": drawn scenes, so no real picture is needed for the mockup. -->
+  <symbol id="p-kul" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice">
+    <rect width="300" height="300" fill="url(#g-kul-sky)"/>
+    <g fill="#2a1f4d"><rect x="131" y="44" width="11" height="130"/><rect x="158" y="44" width="11" height="130"/><path d="M136.500 16l6 28h-12z"/><path d="M163.500 16l6 28h-12z"/><rect x="142" y="96" width="16" height="4"/></g>
+    <path d="M0 300V112h30v-16h34v24h28v180z" fill="#1c1538"/>
+    <path d="M300 300V98h-30v18h-32v-10h-26v194z" fill="#1c1538"/>
+    <g fill="#ffcf7a" opacity=".85"><rect x="10" y="126" width="8" height="10"/><rect x="38" y="112" width="8" height="10"/><rect x="38" y="134" width="8" height="10"/><rect x="70" y="136" width="8" height="10"/><rect x="222" y="122" width="8" height="10"/><rect x="250" y="130" width="8" height="10"/><rect x="278" y="112" width="8" height="10"/><rect x="278" y="136" width="8" height="10"/></g>
+    <path d="M18 132Q150 184 282 126" fill="none" stroke="#3b2a5c" stroke-width="1.5"/>
+    <g><circle cx="48" cy="143" r="6" fill="#ff5a3c"/><circle cx="84" cy="153" r="6" fill="#ffb347"/><circle cx="118" cy="159" r="6" fill="#ff5a3c"/><circle cx="151" cy="161" r="6" fill="#ffb347"/><circle cx="184" cy="158" r="6" fill="#ff5a3c"/><circle cx="218" cy="150" r="6" fill="#ffb347"/><circle cx="252" cy="139" r="6" fill="#ff5a3c"/></g>
+    <rect x="16" y="198" width="84" height="46" fill="#ffd27a"/>
+    <path d="M8 198h100l-10-24H18z" fill="#d7263d"/>
+    <g fill="#fbe9d0" opacity=".85"><path d="M30 174h12l3 24H27z"/><path d="M56 174h12l3 24H53z"/><path d="M82 174h10l4 24H80z"/></g>
+    <rect x="204" y="202" width="86" height="42" fill="#ffe2a0"/>
+    <path d="M196 202h102l-8-26H206z" fill="#f2a71b"/>
+    <g fill="#efe6f5" opacity=".28"><ellipse cx="62" cy="160" rx="26" ry="12"/><ellipse cx="78" cy="138" rx="18" ry="9"/><ellipse cx="244" cy="166" rx="24" ry="10"/></g>
+    <rect y="240" width="300" height="60" fill="url(#g-kul-street)"/>
+    <g fill="#ffb347" opacity=".28"><rect x="30" y="242" width="50" height="58"/><rect x="216" y="242" width="56" height="58"/></g>
+    <g fill="#120d26"><circle cx="128" cy="212" r="7"/><rect x="120" y="220" width="16" height="44" rx="6"/><circle cx="166" cy="206" r="8"/><rect x="157" y="215" width="18" height="52" rx="7"/><circle cx="190" cy="222" r="6"/><rect x="184" y="229" width="13" height="34" rx="5"/></g>
+    <g fill="#d7263d"><rect x="96" y="252" width="14" height="12" rx="2"/><rect x="204" y="256" width="14" height="12" rx="2"/><rect x="232" y="252" width="14" height="12" rx="2"/></g>
+  </symbol>
+  <symbol id="p-ist" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice">
+    <rect width="300" height="300" fill="url(#g-ist-sky)"/>
+    <circle cx="92" cy="150" r="26" fill="#ffe9b8" opacity=".9"/>
+    <g fill="none" stroke="#2c3e57" stroke-width="2" stroke-linecap="round" opacity=".7"><path d="M40 84q7-7 14 0q7-7 14 0"/><path d="M118 62q6-6 12 0q6-6 12 0"/><path d="M252 96q6-6 12 0q6-6 12 0"/></g>
+    <g fill="#7d6b8f" opacity=".75"><path d="M0 184h150v-8H0z"/><path d="M40 176a22 22 0 0 1 44 0z"/><rect x="26" y="134" width="4" height="44"/><rect x="94" y="134" width="4" height="44"/><path d="M24.500 134l3.500-10 3.500 10z"/><path d="M92.500 134l3.500-10 3.500 10z"/><path d="M104 176a12 12 0 0 1 24 0z"/></g>
+    <rect y="184" width="300" height="26" fill="#5f8fa8"/>
+    <g stroke="#fbd9a5" stroke-width="2" stroke-linecap="round" opacity=".6"><path d="M70 192h44"/><path d="M84 200h26"/><path d="M150 195h22"/></g>
+    <path d="M0 300v-88l26-12 30 12 28-14 34 14 30-10 26 10v88z" fill="#8c4f3a"/>
+    <g fill="#c9b8a3"><rect x="188" y="100" width="40" height="150"/></g>
+    <rect x="183" y="120" width="50" height="9" fill="#a8957f"/>
+    <path d="M182 100l26-56 26 56z" fill="#4a5a6a"/>
+    <rect x="207" y="28" width="2" height="18" fill="#4a5a6a"/>
+    <g fill="#5b4a3f"><rect x="196" y="140" width="6" height="14" rx="3"/><rect x="214" y="140" width="6" height="14" rx="3"/><rect x="196" y="170" width="6" height="14" rx="3"/><rect x="214" y="170" width="6" height="14" rx="3"/></g>
+    <path d="M0 300V226h34v-14h30v20h28v68zM300 300V214h-28v16h-30v-10h-22v80z" fill="#3a2c3a"/>
+    <g fill="#ffcf7a" opacity=".85"><rect x="10" y="238" width="8" height="10"/><rect x="42" y="226" width="8" height="10"/><rect x="42" y="250" width="8" height="10"/><rect x="70" y="244" width="8" height="10"/><rect x="232" y="234" width="8" height="10"/><rect x="258" y="244" width="8" height="10"/><rect x="282" y="228" width="8" height="10"/></g>
+  </symbol>
+</svg>
+
+<main class="page">
+  <header class="head">
+    <p class="eyebrow">Travel · design mockup</p>
+    <h1>Postcards on check-ins</h1>
+    <p class="lede">You tick a stop safe, add a photo and up to 30 seconds of voice. The people on your travel link get a postcard that turns itself over.</p>
+  </header>
+
+  <section class="stage" aria-labelledby="h-card">
+    <div class="stage__text">
+      <h2 id="h-card">The postcard</h2>
+      <p>The photo shows for a moment, then the card turns over. Tap the card to turn it back.</p>
+      <div class="controls">
+        <div class="control">
+          <span id="l-sample">Sample postcard</span>
+          <div class="seg" role="group" aria-labelledby="l-sample">
+            <button type="button" class="seg__b" data-sample="kul" aria-pressed="true">Kuala Lumpur, portrait photo</button>
+            <button type="button" class="seg__b" data-sample="ist" aria-pressed="false">Istanbul, landscape photo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage__card">
+      <div class="pc" id="pc" data-orient="portrait">
+        <div class="pc__inner">
+          <div class="pc__face pc__front" id="pc-front"></div>
+          <div class="pc__face pc__back" id="pc-back" inert></div>
+        </div>
+      </div>
+      <div class="pc-actions">
+        <button type="button" class="btn" id="turn">Turn over</button>
+        <button type="button" class="btn btn--ghost" id="again">Start again from the front</button>
+      </div>
+      <p class="note">Sample card with a drawn stand-in for the photo. There is no sound here: the play button runs 12 seconds in place of a 28-second clip.</p>
+    </div>
+
+    <dl class="facts">
+      <div><dt>Address</dt><dd>Where the photo was taken, read from the photo's own location. Street and neighbourhood, never a house number. You can change it before posting.</dd></div>
+      <div><dt>Stamp</dt><dd>The city scene for the leg you are on, with the day of the trip.</dd></div>
+      <div><dt>Postmark</dt><dd>The leg's ink colour, the city, and the local date and time of the check-in.</dd></div>
+      <div><dt>Words</dt><dd>Your voice, transcribed. You read and fix them before anyone else sees them.</dd></div>
+      <div><dt>Voice</dt><dd>Up to 30 seconds, played from the button on the card.</dd></div>
+    </dl>
+  </section>
+
+  <section class="places" aria-labelledby="h-places">
+    <h2 id="h-places">Where followers find it</h2>
+    <p>The newest postcard sits at the top of the public link with the others stacked behind it. The stop you ticked also carries its postcard, where today's photo thumbnail sits.</p>
+    <div class="frames" id="frames"></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var SAMPLES = {
+    kul: {
+      orient: 'portrait', photo: 'p-kul', photoLabel: 'Sample photo: a night food street in Kuala Lumpur',
+      city: 'Kuala Lumpur', country: 'Malaysia', day: 'Day 3', date: '18 NOV', year: '2026', time: '21:40',
+      accent: { color: '#e8743b', soft: '#fde3d3', ink: '#8a3a12' },
+      address: ['Jalan Alor', 'City Centre', '50200 Kuala Lumpur', 'Malaysia'],
+      short: ['Jalan Alor, City Centre', 'Kuala Lumpur, Malaysia'],
+      clip: 28,
+      text: 'Made it to Jalan Alor and it is chaos in the best way. Smoke everywhere, plastic stools, someone just walked past with a tray of grilled stingray. I have had satay, I have had the chicken wings everyone talks about, and I am about to make a bad decision about durian. Thirty degrees at nine at night. Safe, full and very happy. Talk soon.',
+      stamp: '<svg viewBox="0 0 54 70" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><circle cx="38" cy="27" r="11" fill="var(--city)" opacity=".55"/><g fill="var(--city-ink)"><path d="M14 58V32h1.500v-4H17v-4h1.500l1.500-6 1.500 6H23v4h1.500v4H26v26z"/><path d="M29 58V32h1.500v-4H32v-4h1.500l1.500-6 1.500 6H38v4h1.500v4H41v26z"/><rect x="25" y="40" width="5" height="2"/><rect y="58" width="54" height="12"/></g></svg>'
+    },
+    ist: {
+      orient: 'landscape', photo: 'p-ist', photoLabel: 'Sample photo: a stone tower over rooftops in Istanbul at dusk',
+      city: 'Istanbul', country: 'Türkiye', day: 'Day 9', date: '24 NOV', year: '2026', time: '16:55',
+      accent: { color: '#1e7fa0', soft: '#d6eef5', ink: '#12506a' },
+      address: ['Karaköy waterfront', 'Karaköy', '34425 İstanbul', 'Türkiye'],
+      short: ['Karaköy waterfront', 'İstanbul, Türkiye'],
+      clip: 21,
+      text: 'Down on the Karaköy waterfront with the tower up on the hill behind me. I walked the whole way along the water, and a man selling tea from a tray would not let me pay for the second glass. The call to prayer has just started. Cold hands, warm simit. All good here.',
+      stamp: '<svg viewBox="0 0 54 70" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><circle cx="16" cy="25" r="9" fill="var(--city)" opacity=".5"/><g fill="var(--city-ink)"><rect x="8.800" y="28" width="2.400" height="30"/><path d="M8 28l2-8 2 8z"/><rect x="42.800" y="28" width="2.400" height="30"/><path d="M42 28l2-8 2 8z"/><path d="M15 58V47a12 12 0 0 1 24 0v11z"/><rect x="26.300" y="29" width="1.400" height="7"/><rect y="58" width="54" height="12"/></g></svg>'
+    }
+  };
+  var ICON_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.500v13l11-6.500z" fill="currentColor"/></svg>';
+  var ICON_STOP = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.500" fill="currentColor"/></svg>';
+  var DEMO_MS = 12000, FLIP_AFTER_MS = 2400, FLIP_MS = 900, WRITE_MS = 2600;
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var pc = document.getElementById('pc');
+  var front = document.getElementById('pc-front');
+  var back = document.getElementById('pc-back');
+  var turnBtn = document.getElementById('turn');
+  var sampleKey = 'kul', mode = 'flip', timers = [], rafPlay = 0, rafWrite = 0, playing = false;
+
+  function fmt(sec) { var s = Math.max(0, Math.floor(sec)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+
+  function postmark(s) {
+    var waves = [34, 47, 60, 73, 86].map(function (y) {
+      return '<path d="M112 ' + y + 'q11.500-9 23 0t23 0t23 0t23 0"/>';
+    }).join('');
+    return '<svg class="pm" viewBox="0 0 210 120" aria-hidden="true">' +
+      '<defs><path id="pm-top" d="M24 60A36 36 0 0 1 96 60"/><path id="pm-bot" d="M16 60A44 44 0 0 0 104 60"/></defs>' +
+      '<g fill="none" stroke="currentColor" stroke-linecap="round"><circle cx="60" cy="60" r="50" stroke-width="2.600"/><circle cx="60" cy="60" r="30" stroke-width="1.500"/><g stroke-width="2.200">' + waves + '</g></g>' +
+      '<text font-size="9.500" letter-spacing="1.400"><textPath href="#pm-top" startOffset="50%" text-anchor="middle">' + s.city.toUpperCase() + '</textPath></text>' +
+      '<text font-size="8" letter-spacing="1.800"><textPath href="#pm-bot" startOffset="50%" text-anchor="middle">' + s.country.toUpperCase() + '</textPath></text>' +
+      '<text x="60" y="55" text-anchor="middle" font-size="11.500">' + s.date + '</text>' +
+      '<text x="60" y="67" text-anchor="middle" font-size="9">' + s.year + '</text>' +
+      '<text x="60" y="79" text-anchor="middle" font-size="8.500">' + s.time + '</text></svg>';
+  }
+
+  function lines(list) { return list.map(function (l) { return '<span>' + l + '</span>'; }).join(''); }
+
+  function render() {
+    var s = SAMPLES[sampleKey];
+    pc.dataset.orient = s.orient;
+    pc.style.setProperty('--city', s.accent.color);
+    pc.style.setProperty('--city-soft', s.accent.soft);
+    pc.style.setProperty('--city-ink', s.accent.ink);
+    front.innerHTML = '<svg role="img" aria-label="' + s.photoLabel + '"><use href="#' + s.photo + '" width="100%" height="100%"/></svg>';
+    var words = s.text.split(' ').map(function (w) { return '<span class="w">' + w + '</span>'; }).join(' ');
+    back.innerHTML =
+      '<div class="back-top">' +
+        '<div class="addr"><p class="pc-label">Sent from</p>' +
+          '<p class="addr__lines addr__lines--full">' + lines(s.address) + '</p>' +
+          '<p class="addr__lines addr__lines--short">' + lines(s.short) + '</p></div>' +
+        '<div class="post"><div class="stamp"><div class="stamp__in">' + s.stamp +
+          '<span class="stamp__day">' + s.day + '</span><span class="stamp__country">' + s.country + '</span></div></div>' + postmark(s) + '</div>' +
+      '</div>' +
+      '<div class="msg"><p class="msg__text">' + words + '</p><p class="msg__hint" hidden>Press play. The words write themselves as you listen.</p></div>' +
+      '<div class="play"><button type="button" class="play__btn" data-play aria-label="Play the voice message">' + ICON_PLAY + '</button>' +
+        '<div class="play__track"><span class="play__fill"></span></div><span class="play__time">' + fmt(s.clip) + '</span></div>';
+  }
+
+  function setWords(p) {
+    var ws = back.querySelectorAll('.w');
+    var k = Math.round(p * ws.length);
+    for (var i = 0; i < ws.length; i++) ws[i].classList.toggle('is-on', i < k);
+    var hint = back.querySelector('.msg__hint');
+    if (hint) hint.hidden = !(mode === 'voice' && k === 0);
+  }
+
+  function writeOn() {
+    if (reduced) { setWords(1); return; }
+    var t0 = performance.now();
+    (function step() {
+      var p = Math.min(1, (performance.now() - t0) / WRITE_MS);
+      setWords(p);
+      if (p < 1) rafWrite = requestAnimationFrame(step);
+    })();
+  }
+
+  function stopPlay() {
+    playing = false;
+    cancelAnimationFrame(rafPlay);
+    var btn = back.querySelector('[data-play]');
+    if (!btn) return;
+    btn.innerHTML = ICON_PLAY;
+    btn.setAttribute('aria-label', 'Play the voice message');
+    back.querySelector('.play__fill').style.width = '0';
+    back.querySelector('.play__time').textContent = fmt(SAMPLES[sampleKey].clip);
+  }
+
+  function startPlay() {
+    var s = SAMPLES[sampleKey];
+    var btn = back.querySelector('[data-play]');
+    var fill = back.querySelector('.play__fill');
+    var time = back.querySelector('.play__time');
+    playing = true;
+    btn.innerHTML = ICON_STOP;
+    btn.setAttribute('aria-label', 'Stop');
+    var t0 = performance.now();
+    (function step() {
+      var p = Math.min(1, (performance.now() - t0) / DEMO_MS);
+      fill.style.width = (p * 100) + '%';
+      time.textContent = fmt(p * s.clip) + ' / ' + fmt(s.clip);
+      if (mode === 'voice') setWords(p);
+      if (p < 1) rafPlay = requestAnimationFrame(step);
+      else stopPlay();
+    })();
+  }
+
+  function setFlipped(on) {
+    pc.classList.toggle('is-flipped', on);
+    back.inert = !on;
+    turnBtn.textContent = on ? 'Turn back to the photo' : 'Turn over';
+    if (!on) stopPlay();
+  }
+
+  function clearTimers() {
+    timers.forEach(clearTimeout); timers = [];
+    cancelAnimationFrame(rafWrite);
+  }
+
+  function flipToBack() {
+    setFlipped(true);
+    if (mode === 'flip') timers.push(setTimeout(writeOn, reduced ? 0 : FLIP_MS));
+    else setWords(0);
+  }
+
+  function restart() {
+    clearTimers();
+    stopPlay();
+    render();
+    setFlipped(false);
+    setWords(mode === 'flip' && reduced ? 1 : 0);
+    if (!reduced) timers.push(setTimeout(flipToBack, FLIP_AFTER_MS));
+  }
+
+  pc.addEventListener('click', function (e) {
+    if (e.target.closest('[data-play]')) {
+      if (playing) stopPlay(); else startPlay();
+      return;
+    }
+    clearTimers();
+    if (pc.classList.contains('is-flipped')) setFlipped(false);
+    else { setFlipped(true); if (mode === 'flip') setWords(1); }
+  });
+  turnBtn.addEventListener('click', function () {
+    clearTimers();
+    if (pc.classList.contains('is-flipped')) setFlipped(false);
+    else { setFlipped(true); if (mode === 'flip') setWords(1); }
+  });
+  document.getElementById('again').addEventListener('click', restart);
+
+  document.querySelectorAll('[data-sample]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      sampleKey = b.dataset.sample;
+      document.querySelectorAll('[data-sample]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      restart();
+    });
+  });
+  document.querySelectorAll('[data-mode]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      mode = b.dataset.mode;
+      document.querySelectorAll('[data-mode]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      restart();
+    });
+  });
+
+  /* ---------- Part 2: phone frames ---------- */
+  function mini(cls, photo) { return '<span class="mini ' + cls + '"><svg aria-hidden="true"><use href="#' + photo + '" width="100%" height="100%"/></svg></span>'; }
+  function row(t, name, safe, thumb) {
+    return '<div class="row"><span class="row__t">' + t + '</span><span class="row__n">' + name + '</span>' +
+      '<span class="row__r">' + (safe ? '<span class="safe">✓ ' + safe + '</span>' : '') + (thumb || '') + '</span></div>';
+  }
+  var ROWS = row('17:10', 'Central Market', '17:22', mini('mini--l mini--b', 'p-kul')) +
+    row('19:30', 'Jalan Alor night market', '21:40', mini('mini--p', 'p-kul')) +
+    row('22:30', 'Petronas Towers', '', '');
+  var OPTIONS = [
+    { k: 'On the public link', title: 'Newest on top', desc: 'The newest postcard sits at the top of the page with the others stacked behind it, and it says how many this phone has not opened yet.',
+      top: '<div class="newest"><span class="stack">' + mini('mini--p mini--c', 'p-kul') + mini('mini--p mini--b', 'p-kul') + mini('mini--p', 'p-kul') + '</span><div><b>3 new postcards</b><span>Latest: Jalan Alor, Kuala Lumpur</span><span>21:40 · 28 seconds of voice</span><em>Open them</em></div></div>' },
+    { k: 'Opened', title: 'Going back through them', desc: 'Tapping the stack opens the postcards one at a time, starting with the oldest one this phone has not opened. Swipe or tap to go older or newer. The row along the bottom jumps to any card, and a dot marks the unopened ones.',
+      body: '<div class="phone"><div class="app app--viewer"><p class="viewer__bar"><span>Close</span><span>2 of 4</span></p>' + mini('mini--p mini--b viewer__card', 'p-kul') + '<p class="viewer__where"><b>Central Market, Kuala Lumpur</b>Wed 18 Nov, 17:22</p><div class="viewer__nav"><span class="vbtn">Older</span><span class="vbtn">Newer</span></div><div class="viewer__strip">' + mini('mini--p mini--c', 'p-kul') + mini('mini--p mini--b is-current', 'p-kul') + mini('mini--l mini--c is-new', 'p-kul') + mini('mini--p is-new', 'p-kul') + '</div></div></div>' },
+  ];
+  document.getElementById('frames').innerHTML = OPTIONS.map(function (o) {
+    if (o.body) return '<figure class="opt"><figcaption><span class="opt__k">' + o.k + ' · ' + o.title + '</span><span class="opt__d">' + o.desc + '</span></figcaption>' + o.body + '</figure>';
+    return '<figure class="opt"><figcaption><span class="opt__k">' + o.k + ' · ' + o.title + (o.tag ? '<small>' + o.tag + '</small>' : '') + '</span><span class="opt__d">' + o.desc + '</span></figcaption>' +
+      '<div class="phone"><div class="app"><p class="app__crumb">Trip · Last check-in 21:40 Kuala Lumpur</p>' + (o.top || '') +
+      '<div class="app__map">World map</div>' + (o.mid || '') +
+      '<div class="app__chips"><span class="is-on">Kuala Lumpur</span><span>Istanbul</span></div>' +
+      '<div class="app__days"><span>16</span><span>17</span><span class="is-on">18</span><span>19</span></div>' + ROWS + '</div></div></figure>';
+  }).join('');
+
+  restart();
+})();
+</script>
+</body>
+</html>
