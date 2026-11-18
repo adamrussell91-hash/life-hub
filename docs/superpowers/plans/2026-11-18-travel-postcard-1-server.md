@@ -992,7 +992,12 @@ test('the clip goes to the transcription service and its words come back tidy', 
 test('a service that never answers is a retryable 502, inside the time limit', async () => {
   const fetchImpl = (_url, { signal }) =>
     new Promise((_resolve, reject) => {
-      signal.addEventListener('abort', () => reject(signal.reason ?? new Error('aborted')));
+      // AbortSignal.timeout does not hold the event loop open; this timer does until it fires.
+      const keepAlive = setTimeout(() => {}, 5_000);
+      signal.addEventListener('abort', () => {
+        clearTimeout(keepAlive);
+        reject(signal.reason ?? new Error('aborted'));
+      });
     });
   const response = await ask(handler({ fetchImpl, timeoutMs: 20 }), 'tau_a1');
   assert.equal(response.status, 502);
@@ -1962,7 +1967,7 @@ const postcardCheckin = (extra = {}) => ({
     audio_id: 'tau_a1',
     audio_s: 21,
     text: 'All good here.',
-    coordinates: { lat: 38.6916, lon: -9.216 }
+    coordinates: { lat: 12.345678, lon: 98.765432 }
   },
   ...extra
 });
@@ -1988,7 +1993,7 @@ test('redactTrip gives followers a stop\'s postcard, and never where exactly it 
     text: 'All good here.'
   });
   const json = JSON.stringify(publicTrip);
-  assert.equal(json.includes('38.6916'), false);
+  assert.equal(json.includes('12.345678'), false);
   assert.equal(json.includes('"coordinates"'), false);
   assert.equal(publicTrip.items.find((i) => i.id === 'itm_testfood01').postcard, undefined);
 });

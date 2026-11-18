@@ -1,3 +1,5 @@
+import { carryingCheckin, publicPostcard } from './travel-postcard.mjs';
+
 /**
  * Pure redaction for public follow-along links.
  * Never include booking refs, costs, private/med items, notes, or penelope prompts.
@@ -82,6 +84,9 @@ export function redactTrip(trip) {
         base.safe_at = safe.at;
         if (safe.photo_id) base.safe_photo_id = safe.photo_id;
       }
+      // The postcard may sit on an earlier check-in than the latest tick.
+      const carrier = carryingCheckin(checkins, item.id);
+      if (carrier) base.postcard = publicPostcard(carrier);
       return base;
     });
 
@@ -91,14 +96,17 @@ export function redactTrip(trip) {
     subtitle: d.subtitle
   }));
 
+  // A check-in on a stop followers cannot see still says "safe in <city>", and nothing about the stop.
+  const shownItemIds = new Set(items.map((item) => item.id));
   const latest = [...checkins].sort((a, b) => b.at.localeCompare(a.at))[0];
+  const latestShown = !latest?.item_id || shownItemIds.has(latest.item_id);
   const checkin = latest
     ? {
         at: latest.at,
         city_name: cityName[latest.city_id] || latest.city_id,
-        label: latest.label,
-        ...(latest.item_id ? { item_id: latest.item_id } : {}),
-        ...(latest.photo_id ? { photo_id: latest.photo_id } : {})
+        label: latestShown ? latest.label : 'Safe',
+        ...(latest.item_id && latestShown ? { item_id: latest.item_id } : {}),
+        ...(latest.photo_id && latestShown ? { photo_id: latest.photo_id } : {})
       }
     : null;
 
