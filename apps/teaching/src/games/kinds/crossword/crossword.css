@@ -44,3 +44,19 @@
 .cw-dots i.on { background: var(--high-sea); }
 .gm-calm .gm-cw .cw-grid { transition: none; }
 @media (prefers-reduced-motion: reduce) { .gm-cw .cw-grid { transition: none; } }
+
+/* Wide screen: the grid fills the left, the clue list scrolls on the right. */
+@container (min-width: 960px) {
+  .gm-cw {
+    grid-template-columns: minmax(0, 1.4fr) minmax(20rem, 1fr);
+    grid-template-areas: "row list" "view list" "bar list" "foot list";
+    grid-template-rows: auto auto auto 1fr;
+    column-gap: var(--space-5);
+    align-items: start;
+  }
+  .gm-cw .cw-row { grid-area: row; }
+  .gm-cw .cw-view { grid-area: view; height: clamp(360px, calc(100dvh - 22rem), 900px); }
+  .gm-cw .cw-bar { grid-area: bar; }
+  .gm-cw .cw-foot { grid-area: foot; }
+  .gm-cw .cw-list { grid-area: list; max-height: calc(100dvh - 14rem); overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+}

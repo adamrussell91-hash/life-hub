@@ -17,6 +17,8 @@ import type { MountedPlayer, PlayerContext } from '../../solo/registry';
 
 const P = 44;
 const CELL = 42;
+/** How far the whole-grid view may scale up on a wide screen. */
+const MAX_FIT = 1.5;
 type Dir = 'across' | 'down';
 type Entry = { i: number; item: string; number: number; dir: Dir; x: number; y: number; length: number; cells: string[]; clue: string; kind: string; lengths: number[] };
 type Cell = { x: number; y: number; n?: number; across?: number; down?: number };
@@ -218,7 +220,8 @@ export function mountCrossword(host: HTMLElement, ctx: PlayerContext): MountedPl
     const { vw, vh } = viewSize();
     const GW = grid!.width * P;
     const GH = grid!.height * P;
-    const fit = Math.min(1, fitScale());
+    // The whole grid may grow past its natural size to fill a big screen.
+    const fit = Math.min(MAX_FIT, fitScale());
     if (!zoom || fitScale() >= 1) {
       gridEl.style.transform = `translate(${(vw - GW * fit) / 2}px, ${(vh - GH * fit) / 2}px) scale(${fit})`;
       return;
