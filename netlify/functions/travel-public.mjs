@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
   errorResponse,
   okResponse,
@@ -7,7 +6,7 @@ import {
 } from './_shared/http.mjs';
 import { createTravelRepository } from './_shared/travel-repository.mjs';
 import { redactTrip } from './_shared/travel-redact.mjs';
-import { isDeletedRecord } from './_shared/record-liveness.mjs';
+import { liveTripForShareToken } from './_shared/travel-share-token.mjs';
 
 export const config = { path: '/api/travel-public' };
 
@@ -36,19 +35,13 @@ export function createTravelPublicHandler(deps = {}) {
     } catch {
       return errorResponse(503, 'misconfigured', 'Travel storage is unavailable.', true, NO_STORE);
     }
-    const { map } = await repo.getShareTokens();
-    const hash = createHash('sha256').update(token).digest('hex');
-    const row = map[hash];
     // Journal tokens open the journal page only; the whole trip needs a trip link.
-    if (!row?.trip_id || (row.kind && row.kind !== 'trip')) {
+    const shared = await liveTripForShareToken(repo, token);
+    if (!shared) {
       return errorResponse(404, 'not_found', 'This link has been turned off.', false, NO_STORE);
     }
     try {
-      const { trip } = await repo.getTrip(row.trip_id);
-      if (isDeletedRecord(trip)) {
-        return errorResponse(404, 'not_found', 'This link has been turned off.', false, NO_STORE);
-      }
-      return okResponse(200, { trip: redactTrip(trip) }, NO_STORE);
+      return okResponse(200, { trip: redactTrip(shared.trip) }, NO_STORE);
     } catch {
       return errorResponse(404, 'not_found', 'This link has been turned off.', false, NO_STORE);
     }

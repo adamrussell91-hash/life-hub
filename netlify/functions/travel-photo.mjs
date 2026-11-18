@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { serializeExpiredSessionCookie, verifySessionToken } from './_shared/auth-security.mjs';
 import {
   createTravelOperatorHandler,
@@ -15,7 +14,7 @@ import {
   photoMetaKey
 } from './_shared/travel-blobs.mjs';
 import { createTravelRepository } from './_shared/travel-repository.mjs';
-import { isDeletedRecord } from './_shared/record-liveness.mjs';
+import { liveTripForShareToken } from './_shared/travel-share-token.mjs';
 import { MAX_PHOTO_BYTES } from './_shared/knowledge-r2.mjs';
 import {
   errorResponse as httpError,
@@ -161,24 +160,13 @@ export function createTravelPhotoGetHandler(deps = {}) {
     const store = await getStore(env);
 
     if (token) {
-      const { map } = await repo.getShareTokens();
-      const hash = createHash('sha256').update(token).digest('hex');
-      const row = map[hash];
       // Only a trip link opens trip photos (journal links have their own scoped media
-      // route), and only while the trip is live. Old trip rows have no `kind`.
-      if (!row?.trip_id || (row.kind && row.kind !== 'trip')) {
+      // route), and only while the trip is live.
+      const shared = await liveTripForShareToken(repo, token);
+      if (!shared) {
         return httpError(404, 'not_found', 'This link has been turned off.', false, { 'cache-control': 'no-store' });
       }
-      let trip = null;
-      try {
-        ({ trip } = await repo.getTrip(row.trip_id));
-      } catch {
-        trip = null;
-      }
-      if (!trip || isDeletedRecord(trip)) {
-        return httpError(404, 'not_found', 'This link has been turned off.', false, { 'cache-control': 'no-store' });
-      }
-      const response = await loadPhotoResponse(store, photoId, row.trip_id);
+      const response = await loadPhotoResponse(store, photoId, shared.tripId);
       return response || httpError(404, 'not_found', 'Photo not found.', false, { 'cache-control': 'no-store' });
     }
 
