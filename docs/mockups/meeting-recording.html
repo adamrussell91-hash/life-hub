@@ -1,0 +1,982 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meeting recording — mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #fbf8f2; --cotton: #f5f1e9; --navy: #17375e; --navy-2: #244f7c;
+  --depth: #0a1536; --ink: #13233a; --muted: #6b7788;
+  --line: rgba(23, 55, 94, 0.10); --line-2: rgba(23, 55, 94, 0.18);
+  --glass: rgba(255, 255, 255, 0.86); --elev-1: 0 1px 2px rgba(20,35,70,.06);
+  --elev-2: 0 8px 28px rgba(20,35,70,.12);
+  --sage: #5e8a6e; --sage-bg: #e7f0e8; --amber: #b7791f; --amber-bg: #fbf0dc;
+  --sky-bg: #e6eef8; --red: #c0392b; --red-bg: #fbe9e7; --plum: #6b4c8a; --plum-bg: #f0eaf6;
+  --gold: #a67c00; --gold-bg: #fff6d6;
+  --r-sm: 12px; --r-md: 18px; --r-lg: 22px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, ui-sans-serif, sans-serif; color: var(--ink);
+  background: linear-gradient(135deg, #f6f1e8, #fbf8f2 50%, #f3eee6); min-height: 100vh; }
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select { font: inherit; }
+
+/* mockup control bar — not part of the product */
+.mock { position: sticky; top: 0; z-index: 50; background: #2b2f36; color: #e9ecf1; font-size: 13px;
+  display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 8px 16px; }
+.mock b { color: #fff; letter-spacing: .06em; font-size: 11px; text-transform: uppercase; }
+.mock .grp { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.mock button { background: #3b414b; border: 0; color: #e9ecf1; border-radius: 6px; padding: 5px 9px; font-size: 12px; }
+.mock button.on { background: #f2c94c; color: #222; font-weight: 700; }
+.mock .lbl { color: #9aa3b2; }
+
+.app { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 40px); }
+.side { background: var(--depth); color: #dfe6f1; padding: 26px 14px; }
+.side h1 { font-size: 13px; letter-spacing: .12em; margin: 0 14px 26px; color: #fff; }
+.side .sec { font-size: 11px; letter-spacing: .12em; color: #8d9ab3; margin: 20px 14px 8px; font-weight: 700; }
+.side a { display: block; padding: 10px 14px; border-radius: 12px; color: #dfe6f1; text-decoration: none; font-weight: 500; font-size: 15px; }
+.side a.on { background: rgba(255,255,255,.1); color: #fff; font-weight: 700; }
+
+main { padding: 30px 36px 140px; max-width: 1040px; min-width: 0; }
+.eyebrow { font-size: 12px; letter-spacing: .14em; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+h2.page { font-size: 30px; font-weight: 800; color: var(--depth); margin: 6px 0 6px; letter-spacing: -.02em; }
+.meta { color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 18px; }
+.people { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #fff; border: 1px solid var(--line-2); font-size: 13px; font-weight: 600; color: var(--navy); }
+.pill small { font-weight: 500; color: var(--muted); }
+
+.phases { display: inline-flex; background: var(--cotton); border: 1px solid var(--line); border-radius: 999px; padding: 4px; margin-bottom: 18px; }
+.phases button { border: 0; background: transparent; padding: 7px 16px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--muted); }
+.phases button.on { background: #fff; color: var(--navy); box-shadow: var(--elev-1); }
+
+.card { background: var(--glass); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--elev-1); padding: 20px 22px; margin-bottom: 16px; min-width: 0; }
+.card h3 { margin: 0 0 4px; font-size: 17px; font-weight: 700; color: var(--depth); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.card .sub { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+.card.dim { opacity: .55; }
+.stub { height: 60px; border-radius: 12px; background: repeating-linear-gradient(90deg, var(--cotton) 0 40%, transparent 40% 45%); }
+.cardhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+
+.btn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line-2); background: #fff; font-weight: 600; font-size: 14px; color: var(--navy); white-space: nowrap; }
+.btn.primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn.primary:disabled { background: #a9b4c3; border-color: #a9b4c3; cursor: not-allowed; }
+.btn.red { background: var(--red); border-color: var(--red); color: #fff; }
+.btn.ghost { background: transparent; }
+.btn.small { min-height: 32px; padding: 0 12px; font-size: 13px; }
+.btn.tiny { min-height: 28px; padding: 0 10px; font-size: 12px; }
+.link { background: none; border: 0; padding: 0; color: var(--navy-2); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; font-size: 13px; }
+.ts { font-size: 12px; color: var(--navy-2); font-weight: 600; background: var(--sky-bg); border: 0; border-radius: 6px; padding: 1px 6px; font-variant-numeric: tabular-nums; }
+
+/* live strip */
+.strip { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: var(--depth); color: #fff; border-radius: var(--r-md); padding: 12px 14px; margin-bottom: 14px; }
+.strip .timer { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 18px; margin-right: auto; display: flex; align-items: center; gap: 10px; }
+.strip .timer small { font-weight: 500; font-size: 12px; color: #9fb0cc; }
+.strip .btn { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.2); color: #fff; }
+.strip .btn.rec { background: #fff; color: var(--red); border-color: #fff; }
+.strip .btn.end { background: #fff; color: var(--depth); }
+.recbadge { display: inline-flex; align-items: center; gap: 8px; background: rgba(192,57,43,.22); border: 1px solid rgba(255,140,120,.5); padding: 4px 12px; border-radius: 999px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: #ff5a47; animation: pulse 1.6s infinite; }
+.paused .dot { animation: none; background: #f2c94c; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,90,71,.6);} 70% { box-shadow: 0 0 0 8px rgba(255,90,71,0);} 100% { box-shadow: 0 0 0 0 rgba(255,90,71,0);} }
+.health { width: 100%; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 12px; color: #9fb0cc; }
+.health .ok::before { content: "✓ "; color: #7fd1a0; }
+.health .bad { color: #ffb4a8; font-weight: 600; }
+.health .bad::before { content: "! "; }
+.meter { display: inline-flex; align-items: flex-end; gap: 2px; height: 18px; }
+.meter i { width: 4px; border-radius: 2px; background: #7fd1a0; transition: height .2s; }
+.meter.dead i { background: #ff7a66; }
+
+/* mic check */
+.miccheck { display: flex; align-items: center; gap: 12px; background: var(--cotton); border-radius: 12px; padding: 10px 12px; margin: 0 0 14px; font-size: 14px; flex-wrap: wrap; }
+.miccheck .meter i { background: var(--sage); }
+.miccheck select { border: 1px solid var(--line-2); border-radius: 999px; padding: 4px 10px; background: #fff; font-size: 13px; }
+.miccheck .heard { color: var(--sage); font-weight: 700; }
+
+/* alarm banners */
+.alarm { border-radius: var(--r-md); padding: 14px 16px; margin-bottom: 14px; display: flex; gap: 12px; align-items: flex-start; }
+.alarm .big { font-size: 22px; line-height: 1; }
+.alarm p { margin: 0 0 6px; }
+.alarm .acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+.alarm.red { background: var(--red); color: #fff; animation: throb 1.2s ease-in-out infinite; }
+.alarm.red .btn { background: #fff; color: var(--red); border-color: #fff; }
+.alarm.red select { border-radius: 999px; border: 0; padding: 6px 10px; font-size: 13px; }
+.alarm.amber { background: var(--amber-bg); color: #6b4509; }
+.alarm.sky { background: var(--sky-bg); color: var(--navy); }
+@keyframes throb { 50% { box-shadow: 0 0 0 6px rgba(192,57,43,.25); } }
+
+/* consent */
+.consent { background: #fff; border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 18px; margin-bottom: 14px; box-shadow: var(--elev-2); }
+.consent label.tick { display: flex; gap: 12px; align-items: flex-start; font-size: 16px; font-weight: 600; color: var(--depth); cursor: pointer; }
+.consent input[type=checkbox] { width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--navy); flex: none; }
+.consent .law { color: var(--muted); font-size: 13px; margin: 8px 0 14px 34px; }
+.consent .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.private { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink); cursor: pointer; }
+.switch { width: 40px; height: 24px; border-radius: 999px; background: #c9d1dc; position: relative; transition: background .15s; flex: none; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.private.on .switch { background: var(--plum); }
+.private.on .switch::after { left: 19px; }
+.private small { color: var(--muted); display: block; font-size: 12px; }
+
+/* tap chips */
+.taps { background: #fff; border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 14px 16px; margin-bottom: 14px; }
+.taps .hint { font-size: 13px; color: var(--muted); margin: 0 0 10px; display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.tchip { display: inline-flex; align-items: center; gap: 8px; min-height: 52px; padding: 0 18px; border-radius: 999px; border: 2px solid var(--line-2); background: var(--paper); font-size: 16px; font-weight: 700; color: var(--navy); transition: transform .08s; user-select: none; }
+.tchip:active { transform: scale(.96); }
+.tchip .av { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; color: #fff; background: var(--navy-2); }
+.tchip .cnt { font-size: 12px; font-weight: 700; background: var(--sky-bg); color: var(--navy); border-radius: 999px; padding: 2px 7px; }
+.tchip.flash { background: var(--navy); color: #fff; border-color: var(--navy); }
+.tchip.room { border-style: dashed; background: transparent; color: var(--muted); }
+.tchip.room .av { background: #9aa3b2; }
+.tchip.speaking { border-color: var(--sage); box-shadow: 0 0 0 3px var(--sage-bg); }
+.undo { margin-top: 10px; font-size: 13px; color: var(--muted); min-height: 20px; }
+.flagrow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line-2); }
+.flagrow .btn { border-style: dashed; }
+
+.notes { background: #fff; border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 14px 16px; font-size: 15px; line-height: 1.6; min-height: 110px; }
+.notes ul { margin: 0; padding-left: 18px; }
+
+/* modal */
+.scrim { position: fixed; inset: 0; background: rgba(10,21,54,.35); display: none; place-items: center; z-index: 70; padding: 16px; }
+.scrim.show { display: grid; }
+.modal { background: #fff; border-radius: var(--r-lg); padding: 22px; max-width: 440px; width: 100%; box-shadow: var(--elev-2); }
+.modal h4 { margin: 0 0 8px; font-size: 18px; color: var(--depth); }
+.modal p { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+.modal .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* transcript card waiting states */
+.state { display: flex; gap: 14px; align-items: flex-start; padding: 6px 0; }
+.state .ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: 18px; flex: none; }
+.state .ic.wait { background: var(--sky-bg); }
+.state .ic.work { background: var(--amber-bg); }
+.state .ic.fail { background: var(--red-bg); }
+.state p { margin: 0 0 4px; font-size: 15px; }
+.state .muted, .muted { color: var(--muted); font-size: 13px; }
+.bar { height: 8px; background: var(--cotton); border-radius: 999px; overflow: hidden; margin: 8px 0 4px; max-width: 360px; }
+.bar i { display: block; height: 100%; background: var(--navy-2); border-radius: 999px; }
+.bar.work i { background: var(--amber); width: 40%; animation: slide 2.4s ease-in-out infinite; }
+@keyframes slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+.safety { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-top: 12px; }
+.safety div { background: var(--cotton); border-radius: 10px; padding: 8px 10px; font-size: 12px; color: var(--muted); }
+.safety b { display: block; color: var(--ink); font-size: 13px; }
+
+.tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; letter-spacing: .02em; white-space: nowrap; }
+.tag.priv { background: var(--plum-bg); color: var(--plum); }
+.tag.ok { background: var(--sage-bg); color: var(--sage); }
+.tag.amber { background: var(--amber-bg); color: #7a4f0d; }
+.tag.gone { background: var(--cotton); color: var(--muted); }
+.tag.gold { background: var(--gold-bg); color: var(--gold); }
+
+/* DONE: overview */
+.sect-h { font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--muted); text-transform: uppercase; margin: 22px 0 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sect-h:first-child { margin-top: 0; }
+.overview { font-size: 16px; line-height: 1.6; color: var(--ink); margin: 0; }
+.feeds { font-size: 12px; color: var(--muted); margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* flow timeline */
+.flowbar { display: flex; height: 10px; border-radius: 99px; overflow: hidden; gap: 2px; margin-bottom: 10px; }
+.flowbar i { display: block; height: 100%; cursor: pointer; }
+.flow { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 10px; scroll-snap-type: x mandatory; }
+.seg { flex: 0 0 210px; scroll-snap-align: start; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; border-top: 4px solid var(--c); }
+.seg .when { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; }
+.seg b { display: block; font-size: 14px; color: var(--depth); margin: 3px 0 4px; }
+.seg p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.seg .who { display: flex; margin-top: 8px; }
+.mini { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 9px; font-weight: 700; border: 2px solid #fff; margin-left: -5px; }
+.mini:first-child { margin-left: 0; }
+
+/* notes built out */
+.bnotes { background: #fff; border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 14px 16px; }
+.bnotes .mine { font-size: 15px; font-weight: 600; color: var(--depth); margin: 10px 0 4px; display: flex; gap: 8px; }
+.bnotes .mine:first-child { margin-top: 0; }
+.bnotes .mine::before { content: "•"; color: var(--navy-2); }
+.add { display: flex; gap: 8px; align-items: flex-start; margin: 4px 0 4px 18px; font-size: 14px; line-height: 1.5; padding: 6px 8px; border-radius: 10px; background: var(--plum-bg); border-left: 3px solid var(--plum); }
+.add .txt { flex: 1; min-width: 0; color: #3f2c55; }
+.add .txt .src { color: var(--plum); font-size: 12px; }
+.add .acts { display: flex; gap: 4px; flex: none; }
+.add .acts button { border: 0; background: #fff; border-radius: 8px; width: 28px; height: 28px; font-size: 14px; }
+.add.kept { background: transparent; border-left-color: var(--line-2); }
+.add.kept .txt { color: var(--ink); }
+.add.kept .acts { display: none; }
+.add.gone { display: none; }
+.newhead { margin-top: 14px !important; color: var(--plum) !important; }
+.newhead::before { content: "+" !important; color: var(--plum) !important; }
+.legend { font-size: 12px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--plum-bg); border-left: 3px solid var(--plum); margin-right: 4px; vertical-align: -1px; }
+
+/* pickups */
+.picks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pcol h4 { margin: 0 0 8px; font-size: 13px; display: flex; align-items: center; gap: 6px; color: var(--depth); }
+.pcol h4 .n { background: var(--cotton); color: var(--muted); border-radius: 99px; font-size: 11px; padding: 1px 7px; }
+.pk { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-bottom: 8px; font-size: 14px; line-height: 1.45; }
+.pk .q { color: var(--muted); font-size: 12px; margin-top: 4px; font-style: italic; }
+.pk .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+.pk.done { background: var(--sage-bg); border-color: transparent; }
+.pk.done .acts { display: none; }
+.pk .res { display: none; font-size: 12px; font-weight: 700; color: var(--sage); margin-top: 6px; }
+.pk.done .res { display: block; }
+.pk.dismissed { display: none; }
+.pcol.poi .pk { border-left: 3px solid var(--gold); }
+.pcol.poi h4 { color: var(--gold); }
+
+/* by person */
+.persons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.prs { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
+.prs .top { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; }
+.prs .av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 700; flex: none; }
+.prs .nm { font-weight: 700; color: var(--depth); }
+.prs .nm small { display: block; font-weight: 500; color: var(--muted); font-size: 12px; }
+.prs ul { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.5; }
+.prs li { margin-bottom: 3px; }
+.prs .star { color: var(--gold); font-weight: 700; }
+.prs .foot2 { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 8px; flex-wrap: wrap; }
+.nameprompt { background: var(--amber-bg); border-radius: 12px; padding: 10px 12px; font-size: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between; margin-top: 12px; }
+
+.wordsbar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); margin-top: 18px; padding-top: 14px; font-size: 13px; color: var(--muted); }
+
+/* drawer (full transcript) */
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(520px, 100%); background: #fff; z-index: 65; box-shadow: -10px 0 40px rgba(10,21,54,.18); transform: translateX(105%); transition: transform .22s ease; display: flex; flex-direction: column; }
+.drawer:not(.open) { visibility: hidden; }
+.drawer.open { transform: none; }
+.drawer .dh { padding: 16px 18px 10px; border-bottom: 1px solid var(--line); }
+.drawer .dh .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.drawer .dh h3 { margin: 0; font-size: 17px; color: var(--depth); }
+.drawer .db { overflow: auto; padding: 8px 18px 40px; flex: 1; }
+.dscrim { position: fixed; inset: 0; background: rgba(10,21,54,.2); z-index: 64; display: none; }
+.dscrim.show { display: block; }
+.spk { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.spk:first-of-type { border-top: 0; }
+.spk .av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 700; }
+.spk .nm { font-weight: 700; color: var(--depth); font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.spk .nm small { font-weight: 500; color: var(--muted); font-size: 12px; }
+.spk .share { font-size: 12px; color: var(--muted); }
+.spk.unnamed { background: linear-gradient(90deg, var(--amber-bg), transparent 70%); border-radius: 12px; padding-left: 6px; }
+.picker select { border: 1px solid var(--line-2); border-radius: 999px; padding: 4px 10px; background: #fff; font-size: 13px; font-weight: 600; color: var(--navy); margin-top: 4px; }
+.find input { width: 100%; height: 38px; border-radius: 999px; border: 1px solid var(--line-2); padding: 0 16px; background: #fff; font-size: 14px; margin-top: 10px; }
+.ln { display: grid; grid-template-columns: 42px 1fr; gap: 8px; padding: 8px 4px; border-radius: 10px; }
+.ln.hit { background: var(--gold-bg); }
+.ln:hover { background: var(--cotton); }
+.ln .t { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 3px; }
+.ln .who { font-weight: 700; font-size: 13px; }
+.ln .tx { font-size: 14px; line-height: 1.55; }
+.ln mark { background: #fde68a; border-radius: 3px; }
+.ln .moved { font-size: 11px; font-weight: 600; color: var(--plum); background: var(--plum-bg); border-radius: 999px; padding: 1px 7px; }
+.ln .fix { font-size: 12px; margin-left: 4px; }
+.fixmenu { display: none; margin-top: 6px; gap: 6px; flex-wrap: wrap; }
+.fixmenu.show { display: flex; }
+.fixmenu button { border: 1px solid var(--line-2); background: #fff; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--navy); }
+
+/* profile sheet */
+.profile { max-width: 560px; padding: 0; overflow: hidden; }
+.profile .ph { background: var(--depth); color: #fff; padding: 18px 22px; display: flex; gap: 14px; align-items: center; }
+.profile .ph .av { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 17px; }
+.profile .ph small { color: #9fb0cc; display: block; }
+.profile .pb { padding: 16px 22px 20px; max-height: 70vh; overflow: auto; }
+.profile .tabs { display: flex; gap: 14px; border-bottom: 1px solid var(--line); margin-bottom: 14px; font-size: 14px; }
+.profile .tabs span { padding: 6px 0; color: var(--muted); }
+.profile .tabs span.on { color: var(--navy); font-weight: 700; border-bottom: 2px solid var(--navy); }
+.said { border-left: 2px solid var(--line-2); padding: 0 0 14px 14px; position: relative; }
+.said::before { content: ""; position: absolute; left: -6px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--navy-2); }
+.said .mt { font-size: 12px; color: var(--muted); }
+.said .mt b { color: var(--depth); }
+.said ul { margin: 6px 0 0; padding-left: 18px; font-size: 14px; line-height: 1.5; }
+.said .q { font-size: 13px; color: var(--muted); font-style: italic; margin-top: 4px; }
+.said.new::before { background: var(--plum); }
+
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; }
+  .side { display: none; }
+  main { padding: 18px 16px 120px; }
+  h2.page { font-size: 24px; }
+  .card { padding: 16px; }
+  .tchip { min-height: 56px; flex: 1 1 calc(50% - 8px); justify-content: flex-start; padding: 0 12px; }
+  .strip .timer { width: 100%; }
+  .picks, .persons, .safety { grid-template-columns: 1fr; }
+  .seg { flex-basis: 78%; }
+  .add { margin-left: 6px; }
+}
+</style>
+</head>
+<body>
+
+<div class="mock" role="region" aria-label="Mockup controls">
+  <b>Mockup</b>
+  <div class="grp"><span class="lbl">Kind</span>
+    <button data-ctx="meeting" class="on">Meeting</button>
+    <button data-ctx="event">Event</button>
+  </div>
+  <div class="grp"><span class="lbl">During</span>
+    <button data-jump="before">Before</button>
+    <button data-jump="record">Recording</button>
+    <button data-jump="silent">Mic silent</button>
+    <button data-jump="offline">Upload stalls</button>
+    <button data-jump="late">2 h 50 m</button>
+    <button data-jump="crash">Tab crashed</button>
+  </div>
+  <div class="grp"><span class="lbl">After</span>
+    <button data-jump="uploading">Uploading</button>
+    <button data-jump="device">Parts on device</button>
+    <button data-jump="waiting">Waiting for Mac</button>
+    <button data-jump="transcribing">Transcribing</button>
+    <button data-jump="done">Done</button>
+    <button data-jump="failed">Failed ×3</button>
+  </div>
+</div>
+
+<div class="app">
+  <nav class="side">
+    <h1>PROFESSIONAL</h1>
+    <a href="#">Today</a>
+    <a href="#" class="on" id="navMeet">Meetings</a>
+    <a href="#">People</a>
+    <a href="#">Projects</a>
+    <div class="sec">THIS WEEK</div>
+    <a href="#">Calendar</a>
+  </nav>
+
+  <main>
+    <div class="eyebrow" id="eyebrow"></div>
+    <h2 class="page" id="title"></h2>
+    <div class="meta" id="meta"></div>
+    <div class="people" id="people"></div>
+    <div class="phases" role="tablist">
+      <button data-phase="before">Before</button>
+      <button data-phase="during">During</button>
+      <button data-phase="after">After</button>
+    </div>
+    <div id="view"></div>
+  </main>
+</div>
+
+<div class="dscrim" id="dscrim" data-act="close-drawer"></div>
+<aside class="drawer" id="drawer" aria-label="Full transcript"></aside>
+<div class="scrim" id="scrim"><div class="modal" id="modal"></div></div>
+
+<script>
+/* ---------- invented data (no real people) ---------- */
+const CTX = {
+  meeting: {
+    eyebrow: 'Meetings › Thursday 19 November',
+    title: 'Year 11 English planning',
+    meta: ['3:30 – 4:30 pm', 'Staffroom B', 'Purpose: agree the Term 1 assessment order'],
+    people: [
+      { id: 'p1', name: 'Priya Nandakumar', short: 'Priya', role: 'chair', c: '#2f6f8f' },
+      { id: 'p2', name: 'Tom Castellano', short: 'Tom', role: null, c: '#8a5a2b' },
+      { id: 'p3', name: 'Grace Whitfield', short: 'Grace', role: 'minute taker', c: '#5e8a6e' },
+    ],
+    room: false,
+    notes: ['Essay first or viva first?', 'Moderation date clash with Week 6 camp', 'Who writes the marking guide'],
+  },
+  event: {
+    eyebrow: 'Events › Thursday 19 November',
+    title: 'Year 12 information evening',
+    meta: ['6:00 – 7:30 pm', 'School hall', 'Event · 3 speakers, families in the room'],
+    people: [
+      { id: 'p1', name: 'Helen Marsh', short: 'Helen', role: 'host', c: '#2f6f8f' },
+      { id: 'p2', name: 'Dev Okafor', short: 'Dev', role: 'careers', c: '#8a5a2b' },
+      { id: 'p3', name: 'Ruth Lindqvist', short: 'Ruth', role: 'wellbeing', c: '#5e8a6e' },
+    ],
+    room: true,
+    notes: ['My slot: English assessment timeline', 'Questions from families', 'Exam leave dates'],
+  },
+};
+const ME = { id: 'me', name: 'Me', short: 'Me', c: '#17375e' };
+
+/* What the transcript job hands back (synthetic). */
+const RESULT = {
+  meeting: {
+    duration: '58 min',
+    overview: 'The team agreed the Term 1 order: <b>viva first</b>, spread across Weeks 4 and 5 to ease marking, then the <b>essay in Week 8</b>, which also clears the Week 6 camp clash and suits moderation. Marking guides were split between you and Tom, with drafts due by the end of Week 2. Near the end, Tom raised an outside opportunity: a state reading panel looking for Year 11 teachers.',
+    flow: [
+      { at: '0:00', mins: 3, title: 'Purpose', text: 'Priya sets the one decision needed today.', who: ['p1'], c: '#9aa3b2', jump: 0 },
+      { at: '0:03', mins: 14, title: 'Viva or essay first', text: 'Tom argues viva first while oral skills are fresh. You raise marking load.', who: ['p2', 'me'], c: '#2f6f8f', jump: 2 },
+      { at: '0:17', mins: 9, title: 'Splitting the vivas', text: 'Grace suggests two weeks. Agreed.', who: ['p3', 'p1'], c: '#5e8a6e', jump: 5 },
+      { at: '0:26', mins: 11, title: 'Dates and camp', text: 'Essay moves to Week 8. Priya to confirm moderation.', who: ['p1', 'me'], c: '#b7791f', jump: 7 },
+      { at: '0:37', mins: 8, title: 'Marking guides', text: 'Tom: viva guide. You: essay guide by end of Week 2.', who: ['p2', 'me'], c: '#6b4c8a', jump: 10 },
+      { at: '0:45', mins: 5, title: 'Reading panel', text: 'Tom mentions the state panel wanting Year 11 teachers.', who: ['p2'], c: '#a67c00', jump: 13 },
+      { at: '0:50', mins: 8, title: 'Wrap-up', text: 'Priya reads back the decisions.', who: ['p1', 'me'], c: '#9aa3b2', jump: 15 },
+    ],
+    built: [
+      { mine: 0, text: 'Decided: <b>viva first</b>, across Weeks 4 and 5', who: 'p1', at: '0:52', line: 15 },
+      { mine: 0, text: 'For: students still warm from the Term 4 oral work', who: 'p2', at: '0:29', line: 2 },
+      { mine: 0, text: 'Against: 28 vivas in one week lands on top of reports', who: 'me', at: '0:39', line: 4 },
+      { mine: 1, text: 'Essay moves to <b>Week 8</b>, after camp, which is also cleaner for moderation', who: 'me', at: '1:01', line: 8 },
+      { mine: 1, text: 'Priya will confirm the moderation date with the head of department', who: 'p1', at: '1:05', line: 9 },
+      { mine: 2, text: 'Tom writes the viva guide. You write the essay guide, draft by end of Week 2', who: 'p2', at: '1:09', line: 10 },
+      { mine: null, text: 'Grace will book the library seminar room (free on Tuesdays) for the vivas', who: 'p3', at: '1:21', line: 12 },
+      { mine: null, text: 'State reading panel wants Year 11 teachers. Applications close 4 December', who: 'p2', at: '1:44', line: 13 },
+    ],
+    picks: {
+      mine: [
+        { text: 'Draft the essay marking guide', due: 'End of Week 2', q: '“I’ll take the essay guide. Draft by the end of Week 2.”', at: '1:15', line: 11 },
+        { text: 'Write up the decisions in the minutes', due: 'Today', q: '“Agreed. I’ll put that in the minutes.”', at: '1:52', line: 16 },
+      ],
+      others: [
+        { who: 'p2', text: 'Write the viva marking guide', q: '“I can write the marking guide for the viva…”', at: '1:09', line: 10 },
+        { who: 'p3', text: 'Book the library seminar room for vivas', q: '“I’ll book the rooms for the vivas.”', at: '1:21', line: 12 },
+        { who: 'p1', text: 'Confirm moderation date with head of department', q: '“Leave moderation with me, I’ll check.”', at: '1:05', line: 9 },
+      ],
+      poi: [
+        { who: 'p2', text: 'State literacy network wants Year 11 teachers for its reading panel. Closes 4 December.', q: '“They’re after classroom teachers, not consultants.”', at: '1:44', line: 13 },
+      ],
+    },
+    persons: [
+      { who: 'p1', role: 'chair', pts: ['Kept the meeting on the one decision', 'Read back the final order', 'Took on checking the moderation date'] },
+      { who: 'p2', role: '', pts: ['Made the case for viva first: oral skills are fresh after Term 4', 'Offered to write the viva marking guide', '<span class="star">★</span> Flagged the state reading panel opportunity'] },
+      { who: 'p3', role: 'minute taker', pts: ['<span class="star">★</span> Suggested splitting vivas over two weeks, which settled the marking-load problem', 'Will book the library seminar room'] },
+      { who: 'me', role: 'you', pts: ['Raised marking load against a one-week viva', 'Spotted that Week 8 clears camp', 'Took the essay guide and the minutes'] },
+    ],
+  },
+  event: {
+    duration: '1 h 24 min',
+    overview: 'Helen opened with the shape of Year 12. You set out the English timeline (viva in Weeks 4 and 5, essay in Week 8), and families asked how the viva is marked. Dev covered early-offer university applications, and Ruth closed on wellbeing in the busy Weeks 4–8. A full calendar goes home on Friday.',
+    flow: [
+      { at: '0:00', mins: 10, title: 'Welcome', text: 'Helen sets out the evening.', who: ['p1'], c: '#9aa3b2', jump: 0 },
+      { at: '0:10', mins: 18, title: 'English timeline', text: 'Your slot. Families ask how the viva is marked.', who: ['me', 'room'], c: '#2f6f8f', jump: 1 },
+      { at: '0:28', mins: 26, title: 'Early offers', text: 'Dev on applications and personal statements.', who: ['p2', 'room'], c: '#8a5a2b', jump: 4 },
+      { at: '0:54', mins: 16, title: 'Wellbeing', text: 'Ruth on sleep and the busy weeks.', who: ['p3'], c: '#5e8a6e', jump: 7 },
+      { at: '1:10', mins: 14, title: 'Questions + close', text: 'Calendar home Friday.', who: ['p1', 'room'], c: '#9aa3b2', jump: 8 },
+    ],
+    built: [
+      { mine: 0, text: 'Families wanted to know if the viva is recorded. Answered: marked on the spot against a checklist', who: 'room', at: '0:23', line: 2 },
+      { mine: 1, text: 'Asked twice: does early offer depend on the trial results?', who: 'room', at: '0:46', line: 5 },
+      { mine: 2, text: 'Not mentioned tonight. Calendar goes home Friday', who: 'p1', at: '1:07', line: 8 },
+      { mine: null, text: 'A university runs a free HSC English masterclass for teachers in January. They want schools to nominate someone', who: 'p2', at: '0:52', line: 6 },
+    ],
+    picks: {
+      mine: [
+        { text: 'Send families the viva checklist', due: 'This week', q: '“I’ll get the checklist out to families.”', at: '0:31', line: 3 },
+      ],
+      others: [
+        { who: 'p1', text: 'Send the full calendar home', q: '“We’ll send the full calendar home on Friday.”', at: '1:07', line: 8 },
+        { who: 'p3', text: 'Share the sleep resource with families', q: '“I’ll put the sleep guide on the portal.”', at: '1:01', line: 7 },
+      ],
+      poi: [
+        { who: 'p2', text: 'Free HSC English masterclass for teachers in January. Schools nominate one person.', q: '“They asked us to put a name forward.”', at: '0:52', line: 6 },
+        { who: 'room', text: 'Families keep asking whether the viva is recorded. Worth an FAQ line.', q: '“Is the viva recorded, or marked on the spot?”', at: '0:23', line: 2 },
+      ],
+    },
+    persons: [
+      { who: 'p1', role: 'host', pts: ['Opened and closed the evening', 'Calendar goes home Friday'] },
+      { who: 'p2', role: 'careers', pts: ['Explained early offers: most use Year 11 results', '<span class="star">★</span> Mentioned the January masterclass nomination'] },
+      { who: 'p3', role: 'wellbeing', pts: ['Weeks 4–8 are the pressure point', 'Will share the sleep guide'] },
+      { who: 'me', role: 'you', pts: ['Set out the English timeline', 'Answered the viva question'] },
+    ],
+  },
+};
+
+function transcript() {
+  if (ctx === 'meeting') return {
+    voices: [
+      { key: 'S1', who: 'me', src: 'taps', share: 31 },
+      { key: 'S2', who: 'p1', src: 'taps', share: 34 },
+      { key: 'S3', who: 'p2', src: 'taps', share: 27 },
+      { key: 'S4', who: 'p3', src: 'taps', share: 6 },
+      { key: 'S5', who: null, src: null, share: 2 },
+    ],
+    lines: [
+      ['0:12', 'S2', 'Okay, let’s start. The one thing we need out of today is the order of the Term 1 tasks.'],
+      ['0:21', 'S1', 'I’ve put the two options in the notes. Essay first, or the viva first.'],
+      ['0:29', 'S3', 'Viva first, for me. They’re still warm from the oral work in Term 4.', 'moved'],
+      ['0:36', 'S2', 'What’s the case against?'],
+      ['0:39', 'S1', 'Marking load. Twenty-eight vivas in Week 4 lands on top of reports.'],
+      ['0:47', 'S4', 'Could we split it across two weeks?'],
+      ['0:50', 'S5', 'Yeah, that would help.'],
+      ['0:52', 'S2', 'Two weeks works if the essay moves to Week 8. Does that clash with anything?'],
+      ['1:01', 'S1', 'Week 6 is camp, so Week 8 is actually cleaner for moderation.', 'moved'],
+      ['1:05', 'S2', 'Leave moderation with me, I’ll check with the head of department.'],
+      ['1:09', 'S3', 'I can write the marking guide for the viva if someone takes the essay one.'],
+      ['1:15', 'S1', 'I’ll take the essay guide. Draft by the end of Week 2.'],
+      ['1:21', 'S4', 'And I’ll book the rooms for the vivas — the library seminar room is free Tuesdays.'],
+      ['1:44', 'S3', 'Before we go — the state literacy network wants Year 11 teachers for a reading panel. They’re after classroom teachers, not consultants. Closes 4 December.'],
+      ['1:50', 'S2', 'Good. So: viva across Weeks 4 and 5, essay Week 8, guides drafted by Week 2.'],
+      ['1:52', 'S2', 'Anything else?'],
+      ['1:52', 'S1', 'Agreed. I’ll put that in the minutes.'],
+    ],
+  };
+  return {
+    voices: [
+      { key: 'S1', who: 'p1', src: 'taps', share: 29 },
+      { key: 'S2', who: 'me', src: 'taps', share: 22 },
+      { key: 'S3', who: 'p2', src: 'taps', share: 24 },
+      { key: 'S4', who: 'p3', src: 'taps', share: 15 },
+      { key: 'S5', who: 'room', src: 'taps', share: 10 },
+    ],
+    lines: [
+      ['0:04', 'S1', 'Welcome, everyone. Tonight is about the shape of the year, and where to go with questions.'],
+      ['0:14', 'S2', 'From English: the first task is a viva in Weeks 4 and 5, then an essay in Week 8.'],
+      ['0:23', 'S5', 'Is the viva recorded, or marked on the spot?', 'moved'],
+      ['0:27', 'S2', 'Marked on the spot against a checklist the students see in advance. I’ll get the checklist out to families.'],
+      ['0:35', 'S3', 'On careers: early-offer applications open in Term 1, so start the personal statement over summer.'],
+      ['0:46', 'S5', 'Does early offer depend on the trial results?'],
+      ['0:52', 'S3', 'Most use Year 11 results. Also — a university runs a free HSC English masterclass for teachers in January. They asked us to put a name forward.'],
+      ['1:01', 'S4', 'The busiest weeks are 4 to 8. Please watch sleep. I’ll put the sleep guide on the portal.'],
+      ['1:07', 'S1', 'We’ll send the full calendar home on Friday.'],
+    ],
+  };
+}
+
+/* ---------- state ---------- */
+let ctx = 'meeting', phase = 'before', rec = 'idle';
+let consentTicked = false, isPrivate = false, secs = 0;
+let taps = [], lastTapAt = null, flags = [];
+let card = 'none', failCount = 0;
+let silentFor = 0, forceSilent = false, offline = false, pendingParts = 0, crashed = false;
+let speakerNames = {}, lineOverrides = {}, findQ = '', hitLine = null;
+let addState = {}, pickState = {};
+let timer = null, drawerOpen = false;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const people = () => CTX[ctx].people;
+const everyone = () => [ME, ...people()];
+const ROOM = { id: 'room', name: 'Someone in the room', short: 'Room', c: '#9aa3b2' };
+const byId = id => id === 'room' ? ROOM : everyone().find(p => p.id === id) || null;
+const fmt = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
+const initials = n => n === 'Me' ? 'Me' : n === 'Someone in the room' ? '?' : n.split(' ').map(w => w[0]).join('').slice(0, 2);
+const R = () => RESULT[ctx];
+const tsBtn = (at, line) => `<button class="ts" data-line-jump="${line}" title="Check the exact words">${at}</button>`;
+
+/* ---------- render ---------- */
+function render() {
+  const C = CTX[ctx];
+  $('#eyebrow').textContent = C.eyebrow;
+  $('#title').textContent = C.title;
+  $('#meta').innerHTML = C.meta.map(m => `<span>${esc(m)}</span>`).join('');
+  $('#people').innerHTML = C.people.map(p => `<span class="pill">${esc(p.name)}${p.role ? ` <small>${esc(p.role)}</small>` : ''}</span>`).join('');
+  $('#navMeet').textContent = ctx === 'event' ? 'Events' : 'Meetings';
+  document.querySelectorAll('[data-phase]').forEach(b => b.classList.toggle('on', b.dataset.phase === phase));
+  document.querySelectorAll('[data-ctx]').forEach(b => b.classList.toggle('on', b.dataset.ctx === ctx));
+  $('#view').innerHTML = (crashed ? crashBanner() : '') + (phase === 'before' ? viewBefore() : phase === 'during' ? viewDuring() : viewAfter());
+  renderDrawer();
+}
+
+function crashBanner() {
+  return `<div class="alarm sky"><div class="big">↺</div><div>
+    <p><b>A recording from 3:31 pm didn’t finish uploading.</b></p>
+    <div>The page closed while it was recording. <b>42 min</b> is saved on this device and 40 min is already in Life Hub. Nothing is lost.</div>
+    <div class="acts"><button class="btn primary small" data-act="recover">Upload the last 2 min</button><button class="btn small">⇣ Save a copy to this device</button><button class="btn small" data-act="resume-rec">Keep recording (adds to it)</button></div></div></div>`;
+}
+
+function viewBefore() {
+  return `
+  ${ctx === 'event' ? `<div class="alarm sky" style="font-size:13px">Events reuse the meeting recorder. Families in the room tap as <b>&nbsp;Someone in the room</b>.</div>` : ''}
+  <div class="card">
+    <h3>Recording</h3>
+    <p class="sub">Choose now or after. Private keeps the speaker check and the write-up on your Mac, so no text leaves Life Hub.</p>
+    ${privateSwitch()}
+  </div>
+  <div class="card dim"><h3>Agenda</h3><div class="stub"></div></div>
+  <div class="card" style="text-align:right"><button class="btn primary" data-act="start-meeting">Start ${ctx} ›</button></div>`;
+}
+
+function privateSwitch() {
+  return `<span class="private ${isPrivate ? 'on' : ''}" role="switch" aria-checked="${isPrivate}" tabindex="0" data-act="private">
+    <span class="switch"></span>
+    <span><b>Private</b><small>${isPrivate ? 'Speaker check and write-up run on your Mac. Nothing leaves Life Hub.' : 'Speaker check and write-up send text, never audio, to Claude.'}</small></span>
+  </span>`;
+}
+
+function meter(dead) {
+  const hs = dead ? [2, 2, 2, 2, 2, 2] : Array.from({ length: 6 }, () => 3 + Math.round(Math.random() * 15));
+  return `<span class="meter ${dead ? 'dead' : ''}">${hs.map(h => `<i style="height:${h}px"></i>`).join('')}</span>`;
+}
+
+function viewDuring() {
+  const recording = rec === 'recording' || rec === 'paused';
+  const silent = recording && rec !== 'paused' && forceSilent;
+  const saved = Math.floor(secs / 60);
+  const uploaded = Math.max(0, saved - pendingParts);
+  const strip = `
+  <div class="strip ${rec === 'paused' ? 'paused' : ''}">
+    <div class="timer">⏱ 0:${String(12 + Math.floor(secs / 60) % 48).padStart(2, '0')} <small>${ctx} time</small></div>
+    ${recording ? `
+      <span class="recbadge"><span class="dot"></span>${rec === 'paused' ? 'Paused' : 'Rec'} ${fmt(secs)}</span>
+      ${meter(silent || rec === 'paused')}
+      <button class="btn small" data-act="pause">${rec === 'paused' ? '▶ Resume' : '❚❚ Pause'}</button>
+      <button class="btn small" data-act="stop">■ Stop</button>`
+    : rec === 'stopped' ? `<span class="recbadge" style="background:rgba(94,138,110,.25);border-color:rgba(127,209,160,.5)">✓ Recorded ${fmt(secs)}</span>`
+    : `<button class="btn small rec" data-act="record">● Record</button>`}
+    <button class="btn small">📷 Read a photo</button>
+    <button class="btn small end" data-act="end">End ›</button>
+    ${recording ? `<div class="health">
+      <span class="${silent ? 'bad' : 'ok'}">${silent ? `No sound for ${silentFor}s` : 'Hearing voices'}</span>
+      <span class="ok">Saved on this device: ${fmt(secs)}</span>
+      <span class="${offline ? 'bad' : 'ok'}">${offline ? `Upload paused, ${pendingParts} min waiting` : `In Life Hub: ${uploaded} min`}</span>
+      <span class="ok">Screen kept on</span>${isPrivate ? '<span>🔒 Private</span>' : ''}</div>` : ''}
+  </div>`;
+
+  const silentAlarm = silent && silentFor >= 15 ? `
+  <div class="alarm red" role="alert"><div class="big">🔇</div><div>
+    <p><b>Not hearing anything for ${silentFor} seconds.</b></p>
+    <div>The recording is running, but the mic is picking up silence. The phone buzzes and this stays until sound comes back.</div>
+    <div class="acts">
+      <select aria-label="Microphone"><option>AirPods Pro (connected, silent)</option><option>MacBook Pro microphone</option><option>iPhone microphone</option></select>
+      <button class="btn small" data-act="fix-mic">Switch mic</button>
+      <button class="btn small" data-act="fix-mic" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.5)">It’s just quiet</button>
+    </div></div></div>` : '';
+
+  const offlineAlarm = recording && offline ? `
+  <div class="alarm amber"><div class="big">⇡</div><div>
+    <p><b>Upload paused — no connection.</b> Recording carries on.</p>
+    <div>Every minute is saved on this device first, so nothing is lost. ${pendingParts} min will upload when the connection is back.</div>
+    <div class="acts"><button class="btn small" data-act="online">Try now</button><button class="btn small">⇣ Save a copy to this device</button></div></div></div>` : '';
+
+  const consent = rec === 'consent' ? `
+  <div class="consent">
+    <div class="miccheck">${meter(false)} <span class="heard">✓ Hearing you</span>
+      <select aria-label="Microphone"><option>MacBook Pro microphone</option><option>AirPods Pro</option><option>iPhone microphone</option></select>
+      <span class="muted">Say something. The bars must move before you start.</span></div>
+    <label class="tick"><input type="checkbox" id="ctick" ${consentTicked ? 'checked' : ''}> Everyone in this ${ctx} has agreed to it being recorded.</label>
+    <p class="law">Recording people without their agreement is unlawful in NSW.</p>
+    <div class="row">
+      ${privateSwitch()}
+      <span style="display:flex;gap:8px">
+        <button class="btn ghost small" data-act="cancel-consent">Cancel</button>
+        <button class="btn primary" data-act="begin" ${consentTicked ? '' : 'disabled'}>● Start recording</button>
+      </span>
+    </div>
+  </div>` : '';
+
+  const warn = recording && secs >= 2 * 3600 + 50 * 60 ? `<div class="alarm amber">⚠ <span>Recording stops by itself at 3 hours (${fmt(3 * 3600 - secs)} left). Stop and start again to keep going.</span></div>` : '';
+
+  const counts = {};
+  taps.forEach(t => counts[t.who] = (counts[t.who] || 0) + 1);
+  const chipList = [...everyone(), ...(CTX[ctx].room ? [ROOM] : [])];
+  const allTapped = everyone().every(p => counts[p.id]);
+  const lastWho = taps.length ? taps[taps.length - 1].who : null;
+  const canUndo = lastTapAt !== null && (secs - lastTapAt) <= 10 && taps.length;
+  const tapsBox = recording ? `
+  <div class="taps">
+    <p class="hint"><span>${allTapped ? 'Who’s talking? Tap when someone new starts.' : 'Tap when someone starts talking. Two or three taps each is enough.'}</span><span>${taps.length} taps</span></p>
+    <div class="chips">
+      ${chipList.map(p => `<button class="tchip ${p.id === 'room' ? 'room' : ''} ${p.id === lastWho ? 'speaking' : ''}" data-tap="${p.id}">
+        <span class="av" style="background:${p.c}">${esc(initials(p.name))}</span>${esc(p.id === 'room' ? 'Someone in the room' : p.short)}
+        ${counts[p.id] ? `<span class="cnt">×${counts[p.id]}</span>` : ''}</button>`).join('')}
+    </div>
+    <div class="flagrow">
+      <button class="btn small" data-flag="task">☐ That’s a to-do</button>
+      <button class="btn small" data-flag="poi">★ Remember this</button>
+      ${flags.length ? `<span class="muted" style="align-self:center">${flags.length} marked — the write-up looks hardest here</span>` : ''}
+    </div>
+    <div class="undo">${canUndo ? `Tapped ${esc(byId(lastWho).short)}. <button class="link" data-act="undo">Undo last tap</button>` : ''}</div>
+  </div>` : '';
+
+  return `${strip}${silentAlarm}${offlineAlarm}${consent}${warn}${tapsBox}
+  <div class="card"><h3>Minutes</h3><p class="sub">Agenda items fold here with a notes box each.</p><div class="stub"></div></div>
+  <div class="card"><h3>Notes</h3><div class="notes"><ul>${CTX[ctx].notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div></div>`;
+}
+
+function viewAfter() {
+  return `${transcriptCard()}
+  <div class="card dim"><h3>Minutes</h3><div class="stub"></div></div>
+  <div class="card dim"><h3>Purpose check</h3><div class="stub"></div></div>`;
+}
+
+function safetyRow(local, life, mac) {
+  return `<div class="safety"><div><b>${local}</b>on this device</div><div><b>${life}</b>in Life Hub</div><div><b>${mac}</b>on your Mac</div></div>`;
+}
+
+function transcriptCard() {
+  const head = t => `<h3>${t} ${isPrivate ? '<span class="tag priv">🔒 Private</span>' : ''}</h3>`;
+  if (card === 'none') return `<div class="card">${head('From the recording')}<p class="sub">No recording for this ${ctx}.</p></div>`;
+  if (card === 'uploading') return `<div class="card">${head('From the recording')}
+      <div class="state"><div class="ic wait">⇡</div><div>
+        <p>Uploading the last parts — <b>56 of 58</b></p><div class="bar"><i style="width:96%"></i></div>
+        <div class="muted">Safe to close: every part is already saved on this device.</div></div></div>
+      ${safetyRow('58 min ✓', '56 min', '—')}</div>`;
+  if (card === 'device') return `<div class="card">${head('From the recording')}
+      <div class="state"><div class="ic fail">⇡</div><div>
+        <p><b>4 minutes are only on this device.</b> The upload stopped at minute 54.</p>
+        <div class="muted">They stay here until Life Hub has them. Don’t clear this browser’s data. This device last tried 2 min ago.</div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn primary small" data-act="upload-now">Upload now</button>
+          <button class="btn small">⇣ Save the whole recording to this device</button></div></div></div>
+      ${safetyRow('58 min ✓', '54 min', '—')}</div>`;
+  if (card === 'waiting') return `<div class="card">${head('From the recording')}
+      <div class="state"><div class="ic wait">💻</div><div>
+        <p>Your Mac will write this up next time it’s on.</p>
+        <div class="muted">Mac last checked in 2 hours ago · 58 min recorded, all uploaded</div>
+        <div style="margin-top:8px"><button class="link">⇣ Save a copy of the audio</button> <span class="muted">· available until the write-up is done</span></div></div></div>
+      ${safetyRow('58 min ✓', '58 min ✓', '—')}</div>`;
+  if (card === 'transcribing') return `<div class="card">${head('From the recording')}
+      <div class="state"><div class="ic work">⚙</div><div>
+        <p>Your Mac is writing this up <span class="muted">(about 20 minutes for an hour)</span></p>
+        <div class="bar work"><i></i></div>
+        <div class="muted">Words → voices → ${isPrivate ? 'speaker check and write-up on your Mac' : 'speaker check and write-up by Claude'}. Audio is deleted only once the write-up is saved.</div></div></div>
+      ${safetyRow('58 min ✓', '58 min ✓', 'working')}</div>`;
+  if (card === 'failed') return `<div class="card">${head('From the recording')}
+      <div class="state"><div class="ic fail">!</div><div>
+        <p><b>Transcription keeps failing.</b> Part 14 of 58 wouldn’t download on the Mac.</p>
+        <div class="muted">Tried ${failCount} times. The audio is safe in Life Hub and on this device until a run works.</div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn primary small" data-act="retry">Try again</button>
+          <button class="btn small">⇣ Save a copy of the audio</button>
+          <button class="btn small" data-act="del-rec">Delete recording</button></div></div></div>
+      ${safetyRow('58 min ✓', '58 min ✓', 'failed')}</div>`;
+  return doneCard();
+}
+
+function nameOfVoice(key) {
+  const v = transcript().voices.find(v => v.key === key);
+  const who = speakerNames[key] !== undefined ? speakerNames[key] : v.who;
+  return who ? byId(who) : null;
+}
+
+function doneCard() {
+  const r = R();
+  const mini = id => { const p = byId(id); return `<span class="mini" style="background:${p.c}" title="${esc(p.name)}">${esc(initials(p.name))}</span>`; };
+  const total = r.flow.reduce((a, s) => a + s.mins, 0);
+
+  // notes built out
+  const notes = CTX[ctx].notes;
+  const addRow = (a, i) => {
+    const st = addState[i] || '';
+    const p = byId(a.who);
+    return `<div class="add ${st}"><div class="txt">${a.text} <span class="src">— ${esc(p.short)} ${tsBtn(a.at, a.line)}</span></div>
+      <div class="acts"><button data-add="${i}" data-v="kept" title="Keep in my notes">✓</button><button data-add="${i}" data-v="gone" title="Drop">✕</button></div></div>`;
+  };
+  const pending = r.built.filter((_, i) => !addState[i]).length;
+  const notesHtml = notes.map((n, ni) => `<div class="mine">${esc(n)}</div>` + r.built.map((a, i) => a.mine === ni ? addRow(a, i) : '').join('')).join('')
+    + (r.built.some(a => a.mine === null) ? `<div class="mine newhead">Not in your notes</div>` + r.built.map((a, i) => a.mine === null ? addRow(a, i) : '').join('') : '');
+
+  // pickups
+  const pk = (kind, item, i) => {
+    const key = kind + i; const st = pickState[key];
+    const who = item.who ? byId(item.who) : null;
+    const acts = kind === 'mine'
+      ? `<button class="btn tiny primary" data-pick="${key}" data-res="✓ Task added to Tasks · due ${esc(item.due)}">+ Task</button>`
+      : kind === 'others'
+        ? `<button class="btn tiny primary" data-pick="${key}" data-res="✓ Waiting on ${esc(who.short)} — on their profile and your Waiting list">Track it</button>`
+        : `<button class="btn tiny primary" data-pick="${key}" data-res="★ Saved${who && who.id !== 'room' ? ' to ' + esc(who.short) + '’s profile and' : ''} to Opportunities">★ Keep</button><button class="btn tiny" data-pick="${key}" data-res="✓ Task added: follow up">+ Task</button>`;
+    return `<div class="pk ${st === 'x' ? 'dismissed' : st ? 'done' : ''}">
+      ${who ? `<b style="color:${who.c}">${esc(who.short)}</b> · ` : ''}${esc(item.text)}${item.due ? ` <span class="tag amber">${esc(item.due)}</span>` : ''}
+      <div class="q">${esc(item.q)} ${tsBtn(item.at, item.line)}</div>
+      <div class="acts">${acts}<button class="btn tiny ghost" data-pick="${key}" data-x="1">Not this</button></div>
+      <div class="res">${st && st !== 'x' ? st : ''}</div></div>`;
+  };
+
+  // people
+  const T = transcript();
+  const unnamed = T.voices.filter(v => !nameOfVoice(v.key));
+  const persons = r.persons.map(ps => {
+    const p = byId(ps.who);
+    const isMe = ps.who === 'me';
+    return `<div class="prs"><div class="top"><span class="av" style="background:${p.c}">${esc(initials(p.name))}</span>
+      <span class="nm">${esc(isMe ? 'You' : p.name)}<small>${esc(ps.role || 'attendee')}</small></span></div>
+      <ul>${ps.pts.map(x => `<li>${x}</li>`).join('')}</ul>
+      <div class="foot2">${isMe ? '<span class="muted">Not saved anywhere else</span>' : `<span class="tag ok">✓ On ${esc(p.short)}’s profile</span><button class="link" data-profile="${ps.who}">Open profile</button>`}</div></div>`;
+  }).join('');
+
+  const checking = card === 'unchecked';
+
+  return `<div class="card">
+    <div class="cardhead">
+      <div><h3>From the recording ${isPrivate ? '<span class="tag priv">🔒 Private</span>' : ''}</h3>
+      <p class="sub">${r.duration} · ${isPrivate ? 'written up on your Mac' : 'written up by Claude'} · audio deleted 5:02 pm</p></div>
+      <button class="btn small" data-act="open-drawer">≡ Full transcript</button>
+    </div>
+
+    <div class="sect-h"><span>Overview</span></div>
+    <p class="overview">${r.overview}</p>
+    <div class="feeds"><span class="tag ok">✓ In ✦ Summary</span><span class="tag ok">✓ In Minutes draft</span><button class="link">Edit</button></div>
+
+    <div class="sect-h"><span>How it went</span><span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">scroll →</span></div>
+    <div class="flowbar">${r.flow.map(s => `<i style="flex:${s.mins};background:${s.c}" title="${esc(s.title)}"></i>`).join('')}</div>
+    <div class="flow">${r.flow.map(s => `<div class="seg" style="--c:${s.c}"><div class="when"><span>${s.at}</span><span>${s.mins} min</span></div>
+      <b>${esc(s.title)}</b><p>${esc(s.text)}</p>
+      <div class="who" style="justify-content:space-between;align-items:center"><span style="display:flex">${s.who.map(mini).join('')}</span><button class="link" data-line-jump="${s.jump}">words</button></div></div>`).join('')}</div>
+
+    <div class="sect-h"><span>Your notes, built out</span>
+      <span style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0">
+        ${pending ? `<span class="muted" style="font-weight:500">${pending} to look at</span><button class="btn tiny" data-act="keep-all">✓ Keep all</button>` : `<span class="tag ok">All looked at</span>`}</span></div>
+    <div class="bnotes">${notesHtml}</div>
+    <div class="legend" style="margin-top:8px"><span><span class="sw"></span>added from the recording</span><span>✓ moves it into your notes · ✕ drops it · the time opens the exact words</span></div>
+
+    <div class="sect-h"><span>Picked up</span></div>
+    <div class="picks">
+      <div class="pcol"><h4>☐ For you to do <span class="n">${r.picks.mine.length}</span></h4>${r.picks.mine.map((x, i) => pk('mine', x, i)).join('')}</div>
+      <div class="pcol"><h4>⏳ Others said they’d do <span class="n">${r.picks.others.length}</span></h4>${r.picks.others.map((x, i) => pk('others', x, i)).join('')}</div>
+      <div class="pcol poi"><h4>★ Points of interest <span class="n">${r.picks.poi.length}</span></h4>${r.picks.poi.map((x, i) => pk('poi', x, i)).join('')}</div>
+    </div>
+
+    <div class="sect-h"><span>Who said what</span></div>
+    <div class="persons">${persons}</div>
+    ${unnamed.length ? `<div class="nameprompt"><span>⚠ <b>${unnamed.length} voice${unnamed.length > 1 ? 's' : ''} not named</b> — what they said isn’t on anyone’s profile yet.</span><button class="btn small" data-act="open-drawer">Name it</button></div>` : ''}
+
+    <div class="wordsbar"><span>Lines the check moved are marked in the transcript. Check wording there before quoting anyone.</span>
+      <button class="btn small" data-act="open-drawer">≡ Full transcript</button></div>
+  </div>`;
+}
+
+/* ---------- drawer: full transcript (the backend view) ---------- */
+function renderDrawer() {
+  const d = $('#drawer');
+  d.classList.toggle('open', drawerOpen);
+  $('#dscrim').classList.toggle('show', drawerOpen);
+  if (!drawerOpen) { d.innerHTML = ''; return; }
+  const T = transcript();
+  const opts = sel => `<option value="">Who is this?</option>` + everyone().map(p => `<option value="${p.id}" ${sel === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('') + (CTX[ctx].room ? `<option value="room" ${sel === 'room' ? 'selected' : ''}>Someone in the room</option>` : '');
+  const vIdx = k => T.voices.findIndex(v => v.key === k) + 1;
+  const speakers = T.voices.map(v => {
+    const p = nameOfVoice(v.key);
+    const src = speakerNames[v.key] !== undefined ? 'you picked' : v.src === 'taps' ? 'from your taps' : '';
+    return `<div class="spk ${p ? '' : 'unnamed'}"><div class="av" style="background:${p ? p.c : '#9aa3b2'}">${p ? esc(initials(p.name)) : '?'}</div>
+      <div><div class="nm">${p ? esc(p.name) : 'Unnamed voice ' + vIdx(v.key)} ${src ? `<small>${src}</small>` : ''}</div>
+      <div class="picker"><select data-voice="${v.key}">${opts(p ? p.id : '')}</select></div></div>
+      <div class="share">${v.share}%</div></div>`;
+  }).join('');
+  const q = findQ.trim().toLowerCase();
+  const hl = s => q ? esc(s).replace(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), m => `<mark>${m}</mark>`) : esc(s);
+  const fixOpts = id => everyone().map(p => `<button data-fixto="${p.id}" data-line="${id}">${esc(p.short)}</button>`).join('') + (CTX[ctx].room ? `<button data-fixto="room" data-line="${id}">Room</button>` : '');
+  const lines = T.lines.map((l, i) => {
+    if (q && !l[2].toLowerCase().includes(q)) return '';
+    const id = 'L' + i;
+    const p = lineOverrides[id] !== undefined ? byId(lineOverrides[id]) : nameOfVoice(l[1]);
+    return `<div class="ln ${hitLine === i ? 'hit' : ''}" id="line-${i}"><div class="t">${l[0]}</div><div>
+      <div class="who" style="color:${p ? p.c : '#7b8494'}">${p ? esc(p.name) : 'Unnamed voice ' + vIdx(l[1])}</div>
+      <div class="tx">${hl(l[2])} ${l[3] === 'moved' ? '<span class="moved">moved</span>' : ''}${lineOverrides[id] !== undefined ? ' <span class="tag ok">you fixed</span>' : ''}
+      <button class="link fix" data-fix="${id}">Change who</button></div>
+      <div class="fixmenu" id="fm-${id}">${fixOpts(id)}</div></div></div>`;
+  }).join('') || `<div class="muted" style="padding:12px 4px">No lines contain “${esc(findQ)}”.</div>`;
+  d.innerHTML = `<div class="dh"><div class="row"><h3>Full transcript</h3><button class="btn small" data-act="close-drawer">Close</button></div>
+    <div class="muted" style="margin-top:4px">For checking exact words. Names fixed here flow back into the summary and profiles.</div>
+    <div class="find"><input id="find" type="search" placeholder="Find what was said…" value="${esc(findQ)}"></div></div>
+    <div class="db"><div class="sect-h" style="margin-top:12px"><span>Voices</span></div>${speakers}
+    <div class="sect-h"><span>Lines</span></div>${lines}</div>`;
+}
+
+/* ---------- profile sheet ---------- */
+function openProfile(id) {
+  const p = byId(id);
+  const ps = R().persons.find(x => x.who === id);
+  const older = ctx === 'meeting'
+    ? { when: '14 May 2026', what: 'Stage 6 moderation day', pts: ['Suggested students mark one exemplar before seeing the criteria', 'Offered to share their rubric template'], q: '“If they mark it cold first, the criteria actually land.”' }
+    : { when: '2 April 2026', what: 'Careers network meeting', pts: ['Explained how school recommendations are weighted'], q: '“The recommendation matters more than the trial mark for most.”' };
+  $('#modal').className = 'modal profile';
+  $('#modal').innerHTML = `<div class="ph"><span class="av" style="background:${p.c}">${esc(initials(p.name))}</span><div><b style="font-size:18px">${esc(p.name)}</b><small>Colleague · People</small></div></div>
+    <div class="pb"><div class="tabs"><span>About</span><span>Roles</span><span class="on">Said in meetings</span><span>Timeline</span></div>
+      <div class="said new"><div class="mt"><b>${esc(CTX[ctx].title)}</b> · 19 Nov 2026 <span class="tag priv">new</span></div>
+        <ul>${ps.pts.map(x => `<li>${x}</li>`).join('')}</ul>
+        <div class="q">${esc((R().built.find(b => b.who === id) || { text: '' }).text.replace(/<[^>]+>/g, ''))}</div>
+        <div style="margin-top:6px"><button class="link">Open the meeting</button> · <button class="link">Check the words</button></div></div>
+      <div class="said"><div class="mt"><b>${older.what}</b> · ${older.when}</div>
+        <ul>${older.pts.map(x => `<li>${esc(x)}</li>`).join('')}</ul><div class="q">${esc(older.q)}</div></div>
+      <p class="muted" style="margin:8px 0 0">★ marks what the write-up thought was worth remembering. Kept in private storage, never in the public app.</p>
+      <div class="row" style="margin-top:14px"><button class="btn" data-act="close">Close</button></div></div>`;
+  $('#scrim').classList.add('show');
+}
+
+/* ---------- actions ---------- */
+function tick() {
+  if (rec !== 'recording') return;
+  secs++;
+  if (forceSilent) silentFor++;
+  if (offline && secs % 60 === 0) pendingParts++;
+  if (secs >= 3 * 3600) { stopRec(true); return; }
+  if (!document.querySelector('#scrim.show')) render();
+}
+function startTimer() { clearInterval(timer); timer = setInterval(tick, 1000); }
+function stopRec(auto) {
+  rec = 'stopped'; clearInterval(timer);
+  if (auto) showModal('Recording stopped at 3 hours', 'It has uploaded. Press Record again to start a second recording.', [['OK', 'close']]);
+  render();
+}
+function showModal(h, p, buttons) {
+  $('#modal').className = 'modal';
+  $('#modal').innerHTML = `<h4>${esc(h)}</h4><p>${esc(p)}</p><div class="row">${buttons.map(([l, a, cls]) => `<button class="btn ${cls || ''}" data-act="${a}">${esc(l)}</button>`).join('')}</div>`;
+  $('#scrim').classList.add('show');
+}
+function closeModal() { $('#scrim').classList.remove('show'); }
+function seedTaps() {
+  taps = []; everyone().forEach((p, i) => { taps.push({ who: p.id, at: 20 + i * 30 }); if (i < 2) taps.push({ who: p.id, at: 200 + i * 40 }); });
+  lastTapAt = null;
+}
+function resetDone() { speakerNames = {}; lineOverrides = {}; findQ = ''; addState = {}; pickState = {}; hitLine = null; drawerOpen = false; }
+
+function jump(to) {
+  resetDone(); clearInterval(timer);
+  forceSilent = false; silentFor = 0; offline = false; pendingParts = 0; crashed = false;
+  if (to === 'before') { phase = 'before'; rec = 'idle'; card = 'none'; secs = 0; taps = []; flags = []; }
+  if (['record', 'silent', 'offline', 'late'].includes(to)) {
+    phase = 'during'; rec = 'recording'; consentTicked = true; card = 'none'; seedTaps();
+    secs = to === 'late' ? 2 * 3600 + 50 * 60 + 4 : 754;
+    if (to === 'silent') { forceSilent = true; silentFor = 18; }
+    if (to === 'offline') { offline = true; pendingParts = 3; }
+    startTimer();
+  }
+  if (to === 'crash') { phase = 'during'; rec = 'idle'; card = 'none'; crashed = true; secs = 2520; }
+  if (['uploading', 'device', 'waiting', 'transcribing', 'done', 'failed'].includes(to)) {
+    phase = 'after'; rec = 'stopped'; if (secs < 300) secs = 3482; card = to; failCount = to === 'failed' ? 3 : 0;
+  }
+  render();
+}
+
+function openDrawerAt(line) {
+  drawerOpen = true; findQ = ''; hitLine = line; render();
+  const el = document.getElementById('line-' + line); if (el) el.scrollIntoView({ block: 'center' });
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('button, [data-act]');
+  if (!t) return;
+  if (t.dataset.ctx) { ctx = t.dataset.ctx; resetDone(); render(); return; }
+  if (t.dataset.jump) { jump(t.dataset.jump); return; }
+  if (t.dataset.phase) { phase = t.dataset.phase; render(); return; }
+  if (t.dataset.lineJump !== undefined) { openDrawerAt(+t.dataset.lineJump); return; }
+  if (t.dataset.tap) {
+    taps.push({ who: t.dataset.tap, at: secs }); lastTapAt = secs; render();
+    const el = document.querySelector(`[data-tap="${t.dataset.tap}"]`); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 350);
+    return;
+  }
+  if (t.dataset.flag) { flags.push({ kind: t.dataset.flag, at: secs }); render(); return; }
+  if (t.dataset.add !== undefined) { addState[t.dataset.add] = t.dataset.v; render(); return; }
+  if (t.dataset.pick) { pickState[t.dataset.pick] = t.dataset.x ? 'x' : t.dataset.res; render(); return; }
+  if (t.dataset.profile) { openProfile(t.dataset.profile); return; }
+  if (t.dataset.fix) { document.getElementById('fm-' + t.dataset.fix).classList.toggle('show'); return; }
+  if (t.dataset.fixto) { lineOverrides[t.dataset.line] = t.dataset.fixto; render(); return; }
+  const a = t.dataset.act;
+  if (a === 'private') { isPrivate = !isPrivate; render(); }
+  if (a === 'start-meeting') { phase = 'during'; render(); }
+  if (a === 'record') { rec = 'consent'; consentTicked = false; render(); }
+  if (a === 'cancel-consent') { rec = 'idle'; render(); }
+  if (a === 'begin' && consentTicked) { rec = 'recording'; secs = 0; taps = []; flags = []; lastTapAt = null; startTimer(); render(); }
+  if (a === 'pause') { rec = rec === 'paused' ? 'recording' : 'paused'; render(); }
+  if (a === 'undo') { taps.pop(); lastTapAt = null; render(); }
+  if (a === 'stop') stopRec(false);
+  if (a === 'fix-mic') { forceSilent = false; silentFor = 0; render(); }
+  if (a === 'online') { offline = false; pendingParts = 0; render(); }
+  if (a === 'recover') { crashed = false; phase = 'after'; rec = 'stopped'; card = 'waiting'; render(); }
+  if (a === 'resume-rec') { crashed = false; rec = 'recording'; seedTaps(); startTimer(); render(); }
+  if (a === 'upload-now') { card = 'waiting'; render(); }
+  if (a === 'end') {
+    if (rec === 'recording' || rec === 'paused') showModal(`End the ${ctx}?`, `This stops the recording first, uploads the last minute, then completes the ${ctx}.`, [['Keep going', 'close', 'ghost'], ['Stop and end', 'end-confirm', 'primary']]);
+    else { phase = 'after'; if (rec === 'stopped' && card === 'none') card = 'uploading'; render(); }
+  }
+  if (a === 'end-confirm') { closeModal(); stopRec(false); phase = 'after'; card = 'uploading'; render(); setTimeout(() => { if (card === 'uploading') { card = 'waiting'; render(); } }, 2500); }
+  if (a === 'close') closeModal();
+  if (a === 'retry') { card = 'transcribing'; render(); }
+  if (a === 'keep-all') { R().built.forEach((_, i) => { if (!addState[i]) addState[i] = 'kept'; }); render(); }
+  if (a === 'open-drawer') { drawerOpen = true; hitLine = null; render(); }
+  if (a === 'close-drawer') { drawerOpen = false; render(); }
+  if (a === 'del-rec') showModal('Delete this recording?', 'The audio is deleted permanently and there will be no write-up. This can’t be undone.', [['Cancel', 'close', 'ghost'], ['Delete', 'del-confirm', 'red']]);
+  if (a === 'del-confirm') { closeModal(); card = 'none'; render(); }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'ctick') { consentTicked = e.target.checked; render(); }
+  if (e.target.dataset.voice) { speakerNames[e.target.dataset.voice] = e.target.value || null; render(); }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'find') { findQ = e.target.value; hitLine = null; const pos = e.target.selectionStart; renderDrawer(); const f = $('#find'); f.focus(); f.setSelectionRange(pos, pos); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.dataset.act === 'private') e.target.click();
+  if (e.key === 'Escape') { drawerOpen = false; closeModal(); render(); }
+});
+
+render();
+</script>
+</body>
+</html>

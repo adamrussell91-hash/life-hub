@@ -9,6 +9,12 @@ import { buildEventTaskPanel, buildEventConnections, buildPdFields, renderEventN
 import { groupTotals, talkHoursNote } from '@/lib/pd-totals';
 import { formatTalkLength, parseTalkLength, talkLengthInputValue } from '@/lib/talk-length';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
+import { createTask } from '@/api/universal-links';
+import { createLedgerItem } from '@/api/ledger';
+import { createRecordingModel, mountRecordingStrip, type RecordingAttendeeInput } from '@/views/meeting-recording-strip';
+import { mountRecordingCard } from '@/views/meeting-recording-card';
+import { recordingNotesBlockId, withRecordingLines } from '@/views/meeting-page';
+import { activeRecordingMeeting } from '@/lib/meeting-recorder';
 import type { EventRecord, EventTalk, PdGroupRecord } from '@/domain/types';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -208,8 +214,10 @@ export async function renderEventPage(
   notes.append(el('h3', undefined, isPd ? 'Reflection and notes' : 'Notes'));
   const body = el('div');
   notes.append(body);
-  root.append(relatedStatus, notes);
-  mountBlockPage(body, {
+  const recHost = el('div', 'event-page__recording');
+  recHost.dataset.part = 'event-recording';
+  root.append(recHost, relatedStatus, notes);
+  const notesPage = mountBlockPage(body, {
     blocks: (data.record.blocks ?? []) as never[],
     editable: true,
     onSave: async (blocks) => {
@@ -223,7 +231,83 @@ export async function renderEventPage(
     removal.disconnect();
   });
   removal.observe(canvas, {childList:true});
+  void mountRecording();
   await enrich();
+
+  /** Events with people get the meeting recorder: speakers are the people, plus someone in the room. */
+  async function mountRecording(): Promise<void> {
+    let speakers: RecordingAttendeeInput[] = [];
+    try {
+      const links = await listUniversalLinksForEntity(eventRef);
+      const seen = new Set<string>();
+      for (const entry of links.outgoing) {
+        const type = entry.link.relationship_type;
+        if (entry.link.status !== 'current' || !entry.endpoint || entry.endpoint.kind !== 'person') continue;
+        if (type !== 'attendee' && type !== 'presenter') continue;
+        if (seen.has(entry.endpoint.ref)) continue;
+        seen.add(entry.endpoint.ref);
+        speakers.push({ ref: entry.endpoint.ref, name: entry.endpoint.display_label, role: entry.link.role ?? (type === 'presenter' ? 'presenter' : null) });
+      }
+    } catch {
+      speakers = [];
+    }
+    if (!speakers.length || !options.isCurrent() || !canvas.contains(root)) return;
+    const blockText = () => (notesPage.current() as Array<{ content?: { html?: string; text?: string } }>)
+      .flatMap((block) => String(block.content?.html ?? block.content?.text ?? '').replace(/<\/(p|li|h\d)>/g, '\n').replace(/<[^>]*>/g, '').split('\n'))
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const model = createRecordingModel(id);
+    const strip = mountRecordingStrip({ meetingId: id, kind: 'event', people: () => speakers, room: true, notes: blockText, model });
+    const card = mountRecordingCard({
+      meetingId: id,
+      kind: 'event',
+      people: () => speakers,
+      room: true,
+      model,
+      initialLine: (() => {
+        const value = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('line');
+        return value !== null && /^\d+$/.test(value) ? Number(value) : null;
+      })(),
+      deps: {
+        appendToNotes: (lines) => {
+          if (!lines.length) return;
+          const blockId = recordingNotesBlockId(id);
+          const current = notesPage.current();
+          const next = withRecordingLines(current, blockId, lines);
+          if (next.added) {
+            notesPage.append([next.added as never]);
+            return;
+          }
+          // The handle only appends: swap the block in the live list, then append nothing so it redraws and saves.
+          const index = current.findIndex((block) => block.id === blockId);
+          if (index >= 0) current[index] = next.blocks[index] as never;
+          notesPage.append([]);
+        },
+        createTask: async ({ title, due_date }) => {
+          const task = await createTask({ title, ...(due_date ? { due_date } : {}) });
+          await createUniversalLink({ source_ref: `tasks:task:${task.id}`, target_ref: eventRef, relationship_type: 'tagged_with' });
+        },
+        trackIt: async ({ person_ref, text, due }) => {
+          await createLedgerItem({ direction: 'they_owe', person_ref, text, comm_ref: eventRef, due });
+        }
+      }
+    });
+    const open = data.record.occurrence_state !== 'cancelled' && (data.record.occurrence_state !== 'completed' || activeRecordingMeeting() === id);
+    if (open) {
+      const bar = el('div', 'live-strip rec-event-strip');
+      bar.dataset.part = 'live-strip';
+      bar.append(el('span', 'live-strip__rec', 'Recording'), strip.controls, strip.health);
+      recHost.append(bar, strip.below);
+    }
+    recHost.append(card.el);
+    const gone = new MutationObserver(() => {
+      if (canvas.contains(root)) return;
+      gone.disconnect();
+      strip.destroy();
+      card.destroy();
+    });
+    gone.observe(canvas, { childList: true });
+  }
 
   async function enrich(): Promise<void> {
     try {

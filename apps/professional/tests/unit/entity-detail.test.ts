@@ -309,7 +309,7 @@ describe('renderPersonPage', () => {
     expect(applicationLink?.getAttribute('href')).toMatch(/#\/application\//);
   });
 
-  it('exposes a back link to People, an 8-tab bar, identity edit, and no archive/delete/create-link controls', async () => {
+  it('exposes a back link to People, a 9-tab bar, identity edit, and no archive/delete/create-link controls', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { ok: true, data: personOverview() }));
     const canvas = document.createElement('div');
     await renderPersonPage(canvas, PERSON_ID);
@@ -322,7 +322,7 @@ describe('renderPersonPage', () => {
     for (const forbidden of ['archive', 'delete', 'create-link', 'lifecycle']) {
       expect(canvas.innerHTML.toLowerCase()).not.toMatch(new RegExp(`data-${forbidden}|class="[^"]*${forbidden}`));
     }
-    expect(canvas.querySelectorAll('button[role="tab"]').length).toBe(8);
+    expect(canvas.querySelectorAll('button[role="tab"]').length).toBe(9);
   });
 
   it('shows a clear empty state when there are no relationships at all', async () => {
@@ -336,7 +336,7 @@ describe('renderPersonPage', () => {
     expect(canvas.textContent).toMatch(/No historical relationships/);
   });
 
-  it('renders an 8-tab tab bar including Profile, with Overview active initially', async () => {
+  it('renders a 9-tab tab bar including Profile, with Overview active initially', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { ok: true, data: personOverview() }));
     const canvas = document.createElement('div');
     await renderPersonPage(canvas, PERSON_ID);
@@ -351,7 +351,8 @@ describe('renderPersonPage', () => {
       'Network',
       'History',
       'Observations',
-      'Evidence'
+      'Evidence',
+      'Said in meetings'
     ]);
     expect(tabs[0].getAttribute('aria-selected')).toBe('true');
     expect(tabs.slice(1).every((t) => t.getAttribute('aria-selected') === 'false')).toBe(true);
