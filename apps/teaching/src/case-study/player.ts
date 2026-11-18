@@ -82,7 +82,7 @@ const clip = (text: string) => (text.length > QUOTE_MAX ? `${text.slice(0, QUOTE
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
 const dayOf = (day: string) => new Date(`${day}T12:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
 
-export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): { dispose(): void } {
+export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): { dispose(): void; refresh(): Promise<void> } {
   const { lesson, client } = options;
   const cs = lesson.case as PublicCase;
   const pageBlocks = lesson.blocks as Block[];
@@ -893,6 +893,7 @@ export function mountCasePlayer(host: HTMLElement, options: CasePlayerOptions): 
   }
 
   return {
+    refresh,
     dispose() {
       disposed = true;
       window.clearInterval(poll);

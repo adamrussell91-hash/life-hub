@@ -116,6 +116,7 @@ import { createPublishedTutorialHandler } from '../../../netlify/functions/publi
 import { createTutorialHandler } from '../../../netlify/functions/tutorial.mjs';
 import { createPublishedCaseHandler } from '../../../netlify/functions/published-case.mjs';
 import { createCaseHandler } from '../../../netlify/functions/case.mjs';
+import { createCasePracticeHandler } from '../../../netlify/functions/case-practice.mjs';
 import { createPublishedRotationHandler } from '../../../netlify/functions/published-rotation.mjs';
 import { createRotationHandler } from '../../../netlify/functions/rotation.mjs';
 import { createGamesHandler } from '../../../netlify/functions/games.mjs';
@@ -4339,6 +4340,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? createPublishedGamesHandler(deps)
       : /^\/api\/lessons\/[^/]+\/case$/.test(path)
         ? createCaseHandler(deps)
+      : /^\/api\/lessons\/[^/]+\/case-practice$/.test(path)
+        ? createCasePracticeHandler(deps)
       : /^\/api\/units\/[^/]+\/organiser$/.test(path)
         ? createOrganiserHandler(deps)
       : path.startsWith('/api/published/organiser/')
@@ -4508,6 +4511,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/tutorial\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/case$/.test(path) ||
       /^\/api\/published\/case\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/case-practice$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/rotation$/.test(path) ||
       /^\/api\/published\/rotation\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/game$/.test(path) ||

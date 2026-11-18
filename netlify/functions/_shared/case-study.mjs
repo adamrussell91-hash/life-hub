@@ -220,8 +220,6 @@ export async function caseAction(store, lessonId, body) {
   }
   if (who.need === 'class') reject(403, 'need_class', 'Open this case from your class page.');
   const identity = { need: who.need, initials: who.student?.initials ?? null };
-  const k = keys(lessonId);
-  const state = { ...emptyState(), ...((await read(store, k.state)) ?? {}) };
   const blank = (extra = {}) => ({ identity, open_to: 0, done: [], parts: [], parts_total: list(config.parts).length, work: {}, objections: null, outcome: null, held_until: null, spread: null, not_used: [], transfer: null, ...extra });
   if (who.need === 'initials') {
     if (action !== 'status' && action !== 'claim') reject(403, 'need_initials', 'Type your initials first.');
@@ -237,6 +235,20 @@ export async function caseAction(store, lessonId, body) {
   }
   if (!validToken(body.class_token)) reject(400, 'no_device', 'This browser can’t remember you. Use your usual browser.');
   const owner = deviceHash(`student:${who.classId}:${who.student.id}`);
+  return caseStudentCore(store, { caseId: lessonId, config, identity, classId: who.classId, student: who.student, owner }, body);
+}
+
+/**
+ * One student's action on one case, once they are known. `caseId` names the storage
+ * (case/{caseId}/…): the lesson id, or `{lesson}~practice` for the teacher's practice run.
+ */
+export async function caseStudentCore(store, { caseId, config, identity, classId, student, owner }, body) {
+  const action = body.action ?? 'status';
+  if (!ACTIONS.includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  const lessonId = caseId;
+  const k = keys(caseId);
+  const state = { ...emptyState(), ...((await read(store, k.state)) ?? {}) };
+  const who = { classId, student };
   const key = k.work(owner);
   const work = (await read(store, key)) ?? {};
   const view = () => buildStatus(store, lessonId, config, state, work, identity);
@@ -387,15 +399,13 @@ async function board(store, lessonId, draft, config, state) {
   };
 }
 
-export async function caseTeacherAction(store, lessonId, body) {
-  if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
-  if (!isSafeId(lessonId)) reject(404, 'not_found', 'Case not found.');
-  const action = body.action ?? 'board';
-  if (!TEACHER_ACTIONS.includes(action)) reject(400, 'bad_action', 'Unknown action.');
-  const draft = await read(store, draftLessonKey(lessonId));
-  if (!draft || draft.pedagogical_mode !== 'case_study') reject(404, 'not_found', 'Case not found.');
-  const k = keys(lessonId);
-  const config = (await read(store, k.config)) ?? draft.case ?? { parts: [] };
+/**
+ * The class moves (open, release_part, reveal) on case/{caseId}/state; any other action
+ * leaves the state as it is. Returns the state after the move.
+ */
+export async function caseClassMove(store, caseId, config, body) {
+  const k = keys(caseId);
+  const action = body.action;
   let state = { ...emptyState(), ...((await read(store, k.state)) ?? {}) };
   const write = async (change) => {
     state = { ...state, ...change };
@@ -414,6 +424,19 @@ export async function caseTeacherAction(store, lessonId, body) {
     if (state.open_to < 3) reject(409, 'not_open', 'Open the Outcome station first.');
     await write({ outcome_revealed: true });
   }
+  return state;
+}
+
+export async function caseTeacherAction(store, lessonId, body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
+  if (!isSafeId(lessonId)) reject(404, 'not_found', 'Case not found.');
+  const action = body.action ?? 'board';
+  if (!TEACHER_ACTIONS.includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  const draft = await read(store, draftLessonKey(lessonId));
+  if (!draft || draft.pedagogical_mode !== 'case_study') reject(404, 'not_found', 'Case not found.');
+  const k = keys(lessonId);
+  const config = (await read(store, k.config)) ?? draft.case ?? { parts: [] };
+  const state = await caseClassMove(store, lessonId, config, body);
   // One student's work, gone for good: they start the case again from the Brief.
   if (action === 'clear_student') {
     const studentId = String(body.student_id ?? '');

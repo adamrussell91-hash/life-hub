@@ -98,6 +98,7 @@ import { isGuidesSection, phaseOfSection } from '@/sprint/model';
 import { mountCaseEditor, type CaseEditorHandle } from '@/case-study/editor';
 import { mountCaseBoard, type CaseBoardHandle } from '@/case-study/board';
 import { caseTeacherApi } from '@/case-study/api';
+import { openCasePractice } from '@/case-study/practice';
 import { casePartOf, findCasePartSection, isCaseBriefSection, isCaseOutcomeSection, seedCase } from '@/case-study/model';
 import { inCaseTab, withCaseBriefSection, withCaseOutcomeSection, withCasePartSection } from '@/case-study/editor-tabs';
 import { mountRotationEditor, type RotationEditorHandle } from '@/rotation/editor';
@@ -1598,7 +1599,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
           ensureCasePartSection(partId, title);
           const section = findCasePartSection(lesson.blocks, partId);
           if (section) canvasHost.querySelector(`[data-block-id="${section.id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+        },
+        onTryIt: () => openCasePractice({ getLesson: () => lesson })
       });
       caseHost.append(caseEditor.root);
     } else if (!isCase && caseEditor) {
