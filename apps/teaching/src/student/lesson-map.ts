@@ -7,12 +7,13 @@ import './lesson-map.css';
 
 /**
  * A student's map of a plain lesson: a slim strip on the right edge with a dot
- * per section that pops out into the section names, and a "This lesson"
- * checklist above the footer. Sections with a quiz question or a question set
- * tick themselves once that work is answered (as profile-todo.mjs activitiesOf
- * counts a question set done). Any section can also be ticked by hand, since
- * plenty of work is done in books; hand ticks are kept on this device per class
- * and lesson. The checklist is a guide: the footer's tick finishes the lesson.
+ * per section that pops out into the section names, and the list of parts in
+ * the lesson end card (lesson-footer.ts gives it the slot and shows the count).
+ * Sections with a quiz question or a question set tick themselves once that
+ * work is answered (as profile-todo.mjs activitiesOf counts a question set
+ * done). Any section can also be ticked by hand, since plenty of work is done
+ * in books; hand ticks are kept on this device per class and lesson. The list
+ * is a guide: the card's Finish lesson button finishes the lesson.
  */
 
 /** One section of the lesson and the answerable work inside it. */
@@ -32,8 +33,12 @@ export type LessonMapOptions = {
   blocks: Block[];
   /** Where the page's blocks are rendered; sections are found here by data-block-id. */
   content: HTMLElement;
-  /** The checklist goes just before this (the lesson footer). */
-  before: Node;
+  /** Where the list of parts goes: the slot in the lesson end card. */
+  slot: HTMLElement;
+  /** What the strip's last row scrolls to: the lesson end card. The list itself when not given. */
+  end?: HTMLElement;
+  /** Told the count on every repaint. A part a hinge gate still holds back is in neither number. */
+  onProgress?: (done: number, total: number) => void;
   /** Test seams. */
   quiz?: () => LessonQuizHandle | null;
   written?: () => Map<string, Record<string, Record<string, string>>>;
@@ -136,20 +141,15 @@ export function mountLessonMap(options: LessonMapOptions): LessonMapHandle {
   const sectionEl = (id: string): HTMLElement | null =>
     [...content.querySelectorAll<HTMLElement>('[data-block-id]')].find((b) => b.dataset.blockId === id) ?? null;
 
-  /* ── Checklist card ── */
-  const card = el('section', 'lm-check');
-  const headingId = uid('lm-check');
-  card.setAttribute('aria-labelledby', headingId);
-  const head = el('div', 'lm-check__head');
-  const heading = el('h2', 'lm-check__title', 'This lesson');
-  heading.id = headingId;
-  const count = el('span', 'lm-check__count');
-  count.setAttribute('aria-live', 'polite');
-  head.append(heading, count);
+  /* ── The list of parts ── */
+  const card = el('div', 'lm-check');
   const list = el('ul', 'lm-check__list');
-  const foot = el('p', 'lm-check__note', 'Tick parts off as you go. The big tick below finishes the lesson, even with parts left.');
-  card.append(head, list, foot);
-  const checkRows = new Map<string, { li: HTMLLIElement; tick: HTMLButtonElement; status: HTMLElement }>();
+  list.setAttribute('aria-label', 'Parts of this lesson');
+  // Said once here, not on every row.
+  const note = el('p', 'lm-check__note', sections.some(isAuto) ? 'Parts you answer on screen tick themselves. Did one in your book? Tick it here.' : 'Tick each part off as you go.');
+  card.append(list, note);
+  const end = options.end ?? card;
+  const checkRows = new Map<string, { li: HTMLLIElement; tick: HTMLButtonElement; status: HTMLElement; go: HTMLButtonElement }>();
   for (const s of sections) {
     const li = el('li', 'lm-check__row');
     li.dataset.section = s.id;
@@ -166,17 +166,17 @@ export function mountLessonMap(options: LessonMapOptions): LessonMapHandle {
       writeChecks(key, checks);
       paint();
     });
-    const label = el('span', 'lm-check__label');
     const name = el('button', 'lm-check__name', s.title);
     name.type = 'button';
     name.addEventListener('click', () => goTo(s.id));
-    label.append(name);
-    if (isAuto(s)) label.append(el('span', 'lm-check__auto', 'ticks itself when answered here'));
-    label.append(el('span', 'lm-check__start', 'Start here'));
     const status = el('span', 'lm-check__status');
-    li.append(tick, label, status);
+    // The same trip as the name, said out loud for a part still to do.
+    const go = el('button', 'lm-check__go', 'Go to part ↑');
+    go.type = 'button';
+    go.addEventListener('click', () => goTo(s.id));
+    li.append(tick, name, status, go);
     list.append(li);
-    checkRows.set(s.id, { li, tick, status });
+    checkRows.set(s.id, { li, tick, status, go });
   }
 
   /* ── Rail ── */
@@ -251,17 +251,16 @@ export function mountLessonMap(options: LessonMapOptions): LessonMapHandle {
 
   /* ── Going to a section ── */
   function goTo(id: string): void {
-    const target = id === 'end' ? card : sectionEl(id);
+    const target = id === 'end' ? end : sectionEl(id);
     if (!target) return;
     const top = target.getBoundingClientRect().top + window.scrollY - headerOffset() - 12;
     window.scrollTo({ top: Math.max(0, top), behavior: reducedMotion() ? 'auto' : 'smooth' });
     target.classList.add('lm-flash');
     window.setTimeout(() => target.classList.remove('lm-flash'), 1200);
     // Keyboard users land where they went.
-    const focusTo = id === 'end' ? heading : target.querySelector<HTMLElement>('.block-section__title') ?? target;
+    const focusTo = target.querySelector<HTMLElement>(id === 'end' ? 'h2' : '.block-section__title') ?? target;
     if (!focusTo.hasAttribute('tabindex')) focusTo.setAttribute('tabindex', '-1');
     focusTo.focus({ preventScroll: true });
-    if (id === 'end') card.classList.add('is-in');
     window.setTimeout(() => setOpen(false), 350);
   }
 
@@ -289,27 +288,29 @@ export function mountLessonMap(options: LessonMapOptions): LessonMapHandle {
   function paint(): void {
     compute();
     let n = 0;
-    let nextMarked = false;
+    let total = 0;
     for (const s of sections) {
       const isDone = done.get(s.id) === true;
       const row = checkRows.get(s.id)!;
-      // A part a hinge gate still holds back stays off the map until it opens.
+      // A part a hinge gate still holds back stays off the map, and out of the count, until it opens.
       const gated = isGatedAway(sectionEl(s.id));
       row.li.hidden = gated;
       railRows.get(s.id)!.li.hidden = gated;
       row.li.classList.toggle('is-done', isDone);
       row.tick.setAttribute('aria-pressed', String(isDone));
-      row.status.textContent = isDone ? 'Done' : s.minutes ? `${s.minutes} min` : '';
-      const isNext = !isDone && !gated && !nextMarked;
-      row.li.classList.toggle('is-next', isNext);
-      if (isNext) nextMarked = true;
+      // The green box says done; the row adds only how long a part still to do takes.
+      row.status.textContent = !isDone && s.minutes ? `${s.minutes} min` : '';
+      row.status.hidden = row.status.textContent === '';
+      row.go.hidden = isDone;
       const r = railRows.get(s.id)!;
       r.li.classList.toggle('is-done', isDone);
       r.status.textContent = isDone ? 'Done' : s.minutes ? `${s.minutes} min` : '';
+      if (gated) continue;
+      total += 1;
       if (isDone) n += 1;
     }
-    count.textContent = `${n} of ${sections.length} done`;
-    endRow.li.classList.toggle('is-done', n === sections.length);
+    endRow.li.classList.toggle('is-done', total > 0 && n === total);
+    options.onProgress?.(n, total);
   }
 
   let pending: number | undefined;
@@ -336,8 +337,8 @@ export function mountLessonMap(options: LessonMapOptions): LessonMapHandle {
       if (node && node.getBoundingClientRect().top <= line) current = s.id;
     }
     const doc = document.documentElement;
-    const cardTop = card.getBoundingClientRect().top;
-    if (window.innerHeight + window.scrollY >= doc.scrollHeight - 4 || (card.isConnected && cardTop <= line)) current = 'end';
+    const endTop = end.getBoundingClientRect().top;
+    if (window.innerHeight + window.scrollY >= doc.scrollHeight - 4 || (end.isConnected && endTop <= line)) current = 'end';
     for (const li of railList.children) (li as HTMLElement).classList.toggle('is-here', (li as HTMLElement).dataset.section === current);
   }
   const onScroll = (): void => {
@@ -350,25 +351,7 @@ export function mountLessonMap(options: LessonMapOptions): LessonMapHandle {
   };
   listen(window, 'resize', placeRail, { passive: true });
 
-  /* ── The checklist pops in near the end ── */
-  let observer: IntersectionObserver | null = null;
-  if (typeof IntersectionObserver === 'function') {
-    // Only hidden once something will show it again.
-    card.classList.add('is-armed');
-    observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) card.classList.add('is-in');
-          // Scrolled back up past it: ready to pop in again.
-          else if (entry.boundingClientRect.top > 0) card.classList.remove('is-in');
-        }
-      },
-      { rootMargin: '0px 0px -40px 0px', threshold: 0.05 }
-    );
-    observer.observe(card);
-  } else card.classList.add('is-in');
-
-  options.before.parentNode?.insertBefore(card, options.before);
+  options.slot.append(card);
   content.append(rail);
   content.classList.add('has-lesson-map');
   placeRail();
@@ -383,7 +366,6 @@ export function mountLessonMap(options: LessonMapOptions): LessonMapHandle {
       window.clearTimeout(pending);
       window.clearTimeout(closeTimer);
       if (frame) window.cancelAnimationFrame(frame);
-      observer?.disconnect();
       for (const c of cleanups) c();
       content.classList.remove('has-lesson-map');
       rail.remove();

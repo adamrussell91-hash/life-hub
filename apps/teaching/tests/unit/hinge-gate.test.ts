@@ -213,17 +213,21 @@ describe('Hinge gate on a plain lesson', () => {
     const content = document.createElement('div');
     root.replaceWith(content);
     content.append(root);
-    const footer = document.createElement('nav');
-    content.append(footer);
+    const slot = document.createElement('div');
+    content.append(slot);
     applyHingeGates(root, blocks);
-    const map = mountLessonMap({ lessonId: 'L1', classId: 'c1', blocks, content, before: footer, quiz: () => null, written: () => new Map(), headerOffset: () => 56 });
+    const progress: Array<[number, number]> = [];
+    const map = mountLessonMap({ lessonId: 'L1', classId: 'c1', blocks, content, slot, onProgress: (d, t) => progress.push([d, t]), quiz: () => null, written: () => new Map(), headerOffset: () => 56 });
     const row = (id: string) => map.card!.querySelector<HTMLLIElement>(`.lm-check__row[data-section="${id}"]`)!;
     expect(row('s1').hidden).toBe(false);
     expect(row('s2').hidden).toBe(true);
     expect(row('s3').hidden).toBe(true);
+    // The count matches the rows a student can see.
+    expect(progress.at(-1)).toEqual([0, 1]);
     done(root, 'h1');
     expect(row('s2').hidden).toBe(false);
     expect(row('s3').hidden).toBe(false);
+    expect(progress.at(-1)?.[1]).toBe(3);
     map.dispose();
   });
 });

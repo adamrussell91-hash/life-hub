@@ -1,4 +1,4 @@
-/* "What's next" under the lesson footer, and the to do line under the lesson title. See whats-next.ts. */
+/* "Next on your list" in the lesson end card, and the to do line under the lesson title. See whats-next.ts. */
 
 .wn-hint {
   margin: calc(-1 * var(--space-2)) 0 var(--space-4);
@@ -17,38 +17,67 @@
   text-decoration: underline;
 }
 
+/* While the lesson is open: one quiet line, "Next on your list: …", with no button. */
 .wn-card {
-  display: grid;
-  gap: var(--space-1);
-  max-width: 34rem;
-  width: 100%;
-  justify-self: center;
-  margin: var(--space-4) auto 0;
-  padding: var(--space-3) var(--space-4) var(--space-4);
-  border: 2px dashed color-mix(in srgb, var(--navy) 20%, transparent);
-  border-radius: var(--radius-md);
-  background: var(--paper);
-  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
 }
 
-.wn-card__kicker {
+.wn-card__kicker,
+.wn-card__what {
+  display: inline;
   margin: 0;
-  font-size: var(--text-xs);
+}
+
+.wn-card__kicker::after {
+  content: ': ';
+}
+
+.wn-card__what {
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.wn-card__acts {
+  display: none;
+}
+
+/* Nothing to name yet: the line stays empty (the element stays, so it can tell when it nears the screen). */
+.wn-card:not(.is-ready):not(.is-open):not(.has-thing) > * {
+  display: none;
+}
+
+/* Finished (or a quiz, which has nothing to finish): the body of the card. */
+.wn-card:is(.is-ready, .is-open) {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.wn-card:is(.is-ready, .is-open) .wn-card__kicker {
+  display: block;
+  font-size: var(--text-2xs);
   font-weight: var(--weight-bold);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
-.wn-card__what {
+.wn-card:is(.is-ready, .is-open) .wn-card__kicker::after {
+  content: none;
+}
+
+.wn-card:is(.is-ready, .is-open) .wn-card__what {
+  display: block;
   margin: 0 0 var(--space-2);
   font-size: var(--text-lg);
   font-weight: var(--weight-bold);
+  line-height: 1.25;
   color: var(--navy);
-  overflow-wrap: anywhere;
 }
 
-.wn-card__acts {
+.wn-card:is(.is-ready, .is-open) .wn-card__acts {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
@@ -58,9 +87,11 @@
 .wn-card__all {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
-  padding: var(--space-2) var(--space-4);
+  justify-content: center;
+  min-height: 48px;
+  padding: var(--space-2) var(--space-6);
   border-radius: var(--radius-full);
+  font-size: var(--text-md);
   font-weight: var(--weight-bold);
   text-decoration: none;
 }
@@ -68,6 +99,10 @@
 .wn-card__go {
   background: var(--navy);
   color: var(--paper);
+}
+
+.wn-card__go:hover {
+  background: var(--navy-2);
 }
 
 .wn-card__all {
@@ -82,23 +117,7 @@
   outline-offset: 2px;
 }
 
-/* Ticked done: the moment they ask "what now?". */
-.wn-card.is-ready {
-  border: 2px solid var(--navy);
-  background: var(--navy);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--navy) 25%, transparent);
-}
-
-.wn-card.is-ready .wn-card__kicker { color: var(--pastel-gold); }
-.wn-card.is-ready .wn-card__what { color: var(--paper); }
-.wn-card.is-ready .wn-card__go { background: var(--pastel-gold); color: var(--navy); }
-.wn-card.is-ready .wn-card__all { background: transparent; color: var(--paper); border-color: color-mix(in srgb, var(--paper) 35%, transparent); }
-
-@media (prefers-reduced-motion: reduce) {
-  .wn-card { transition: none; }
-}
-
 @media (max-width: 480px) {
   .wn-card__go,
-  .wn-card__all { flex: 1 1 100%; justify-content: center; }
+  .wn-card__all { flex: 1 1 100%; }
 }

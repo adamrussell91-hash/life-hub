@@ -24,6 +24,10 @@ describe('What’s next on a lesson page', () => {
     document.body.append(card.element);
     await flush();
     expect(card.element.querySelector('.wn-card__what')?.textContent).toBe('Do the lesson: Ghost poem');
+    expect(card.element.querySelector('.wn-card__kicker')?.textContent).toBe('Next on your list');
+    expect(card.element.getAttribute('aria-label')).toBe('Next on your list');
+    // Something to name: the quiet line may show before the lesson is finished.
+    expect(card.element.classList.contains('has-thing')).toBe(true);
     expect(card.element.querySelector<HTMLAnchorElement>('.wn-card__go')?.getAttribute('href')).toMatch(/\/s\/classes\/c1\/lessons\/l2$/);
     expect(card.element.querySelector<HTMLAnchorElement>('.wn-card__all')?.getAttribute('href')).toMatch(/profile\?show=todo&from=/);
   });
@@ -41,9 +45,20 @@ describe('What’s next on a lesson page', () => {
     expect(card.element.querySelector('.wn-card__what')?.textContent).toMatch(/Nothing else/);
     expect(card.element.querySelector('.wn-card__go')).toBeNull();
     expect(card.element.querySelector('.wn-card__all')).not.toBeNull();
+    expect(card.element.classList.contains('has-thing')).toBe(false);
   });
 
-  it('turns navy once the lesson is ticked, and reads the list once', async () => {
+  it('starts as the full block on a quiz, where nothing is left to finish', async () => {
+    const quiet = mountWhatsNext({ classId: 'c1', lessonId: 'here', from: FROM, load: async () => ({ todo: base }) });
+    expect(quiet.element.classList.contains('is-open')).toBe(false);
+    const open = mountWhatsNext({ classId: 'c1', lessonId: 'here', from: FROM, open: true, load: async () => ({ todo: base }) });
+    expect(open.element.classList.contains('is-open')).toBe(true);
+    // Told the quiz isn't "done" here: it stays open all the same.
+    open.setDone(false);
+    expect(open.element.classList.contains('is-open')).toBe(true);
+  });
+
+  it('becomes the full block once the lesson is finished, and reads the list once', async () => {
     const load = vi.fn(async () => ({ todo: base }));
     const card = mountWhatsNext({ classId: 'c1', lessonId: 'here', from: FROM, load });
     expect(card.element.classList.contains('is-ready')).toBe(false);

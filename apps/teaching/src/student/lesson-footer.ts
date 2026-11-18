@@ -6,12 +6,19 @@ import type { WorkSyncHandle } from '@/student/work-sync';
 import './lesson-footer.css';
 
 /**
- * The rail at the foot of a lesson: previous lesson, a tick to finish, next
- * lesson. The tick shows what's still unanswered, hands in the quiz go and the
+ * The end of a lesson, as one card that reads in order: what you did, finish,
+ * where next. The head says "Before you finish" with the count of parts, the
+ * lesson map puts its list of parts in the slot (lesson-map.ts), then one
+ * Finish lesson button, then the quiet "Next on your list" line it is handed
+ * (whats-next.ts). Previous and next lesson sit under the card.
+ *
+ * Finish lesson shows what's still unanswered, hands in the quiz go and the
  * written work the Markbook marks, records the lesson done, then asks two quick
- * questions about the lesson and an optional "still unclear" box. The answers
- * are anonymous (end-questions.mjs). A student can untick: the done mark goes,
- * what was handed in stays.
+ * questions about the lesson and an optional "still unclear" box, all in the
+ * place the button was. The answers are anonymous (end-questions.mjs). Then the
+ * card turns into "Lesson completed" with what's next as its body. A student
+ * can untick from the foot of the card: the done mark goes, what was handed in
+ * stays. One main button is on screen at a time.
  */
 
 type ProfileReply = { need: 'initials' | null; initials?: string; ticked?: boolean };
@@ -26,21 +33,30 @@ export type LessonFooterOptions = {
   classId: string;
   prev?: FooterLink | null;
   next?: FooterLink | null;
-  /** False on a quiz: handing it in marks it done, so there's no tick, just previous and next. */
+  /** False on a quiz: handing it in marks it done, so there's no Finish lesson button, just what's next and the lesson links. */
   finish?: boolean;
   /** The written-work sync on this page, if any. */
   work?: () => WorkSyncHandle | null;
   /** Told when the student gives their initials here, so the top bar can show them. */
   onClaimed?: () => void;
-  /** Told each time the done state is drawn; `fresh` when the student ticked it just now. */
+  /** Told each time the done state changes; `fresh` when the student finished it just now. */
   onDone?: (done: boolean, fresh: boolean) => void;
-  /** Shown beside the tick and its status, e.g. the What's next card. */
+  /** Shown in the card after the Finish lesson row: the "Next on your list" block. */
   beside?: HTMLElement;
   /** Test seams. */
   calls?: FooterCalls;
   quiz?: () => LessonQuizHandle | null;
 };
-export type LessonFooterHandle = { element: HTMLElement; dispose(): void };
+export type LessonFooterHandle = {
+  /** The card, then the lesson links. */
+  element: HTMLElement;
+  card: HTMLElement;
+  /** Where the lesson map puts its list of parts. */
+  partsSlot: HTMLElement;
+  /** How many parts are ticked, for the head, the bar and the line beside the button. */
+  setParts(done: number, total: number): void;
+  dispose(): void;
+};
 
 const TICK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
@@ -58,61 +74,157 @@ export function mountLessonFooter(options: LessonFooterOptions): LessonFooterHan
   const { lessonId } = options;
   const calls = options.calls ?? networkCalls(lessonId, options.classId);
   const quiz = options.quiz ?? (() => lessonQuiz(lessonId));
+  const finish = options.finish !== false;
   let disposed = false;
   let done = false;
+  /** Handed in, with the quick questions still open: not "completed" on screen until they close. */
+  let asking = false;
   let need: 'initials' | null = null;
   let busy = false;
+  let parts = { done: 0, total: 0 };
+  let showParts = false;
 
-  const root = el('nav', 'lf');
-  root.setAttribute('aria-label', 'Lesson');
+  const root = el('div', 'lf');
+  const card = el('section', 'lf__card');
+
+  /* ── Head ── */
+  const head = el('header', 'lf__head');
+  const mark = el('span', 'lf__mark');
+  mark.innerHTML = TICK_SVG;
+  const kicker = el('p', 'lf__kicker', 'End of lesson');
+  const name = el('h2', 'lf__name');
+  name.id = uid('lf-name');
+  name.tabIndex = -1;
+  card.setAttribute('aria-labelledby', name.id);
+  const partsSlot = el('div', 'lf__parts');
+  partsSlot.id = uid('lf-parts');
+  const sub = el('p', 'lf__sub');
+  const subText = el('span');
+  const show = el('button', 'lf__show');
+  show.type = 'button';
+  show.setAttribute('aria-controls', partsSlot.id);
+  sub.append(subText, show);
+  const words = el('div', 'lf__words');
+  words.append(kicker, name, sub);
+  const count = el('span', 'lf__count');
+  count.setAttribute('aria-live', 'polite');
+  const bar = el('div', 'lf__bar');
+  bar.setAttribute('aria-hidden', 'true');
+  const fill = el('i');
+  bar.append(fill);
+  head.append(mark, words, count, bar);
+
+  /* ── Foot: the Finish lesson row, the check and questions in its place, what's next, undo ── */
+  const foot = el('div', 'lf__foot');
   const panel = el('section', 'lf__panel');
   panel.hidden = true;
   panel.id = uid('lf-panel');
-  const row = el('div', 'lf__row');
+  const go = el('div', 'lf__go');
+  const finishBtn = button('', 'primary', () => {
+    if (!busy) openFinish();
+  });
+  finishBtn.classList.add('lf__finish');
+  finishBtn.innerHTML = TICK_SVG;
+  finishBtn.append(el('span', undefined, 'Finish lesson'));
+  finishBtn.setAttribute('aria-controls', panel.id);
+  finishBtn.setAttribute('aria-expanded', 'false');
+  const left = el('span', 'lf__left');
+  if (finish) go.append(finishBtn, left);
+  const undo = el('p', 'lf__undo', 'Finished by mistake? ');
+  const untickBtn = el('button', 'lf__untick', 'Untick this lesson');
+  untickBtn.type = 'button';
+  untickBtn.setAttribute('aria-controls', panel.id);
+  undo.append(untickBtn);
+  const status = el('p', 'lf__status');
+  status.setAttribute('role', 'status');
+  foot.append(go, panel);
+  if (options.beside) foot.append(options.beside);
+  foot.append(undo);
+  card.append(head, partsSlot, foot, status);
 
+  /* ── Previous and next lesson, under the card ── */
+  const row = el('nav', 'lf__row');
+  row.setAttribute('aria-label', 'Lessons');
   const link = (to: FooterLink | null | undefined, dir: 'prev' | 'next'): HTMLElement => {
     if (!to) return el('span', `lf__link lf__link--${dir} lf__link--none`);
     const a = studentAnchor(to.href, `lf__link lf__link--${dir}`);
-    a.append(el('span', 'lf__dir', dir === 'prev' ? '← Previous' : 'Next →'), el('span', 'lf__title', to.title));
+    a.append(el('span', 'lf__dir', dir === 'prev' ? '← Previous lesson' : 'Next lesson →'), el('span', 'lf__title', to.title));
     return a;
   };
-  const tick = el('button', 'lf__tick');
-  tick.type = 'button';
-  tick.innerHTML = TICK_SVG;
-  tick.setAttribute('aria-controls', panel.id);
-  const status = el('p', 'lf__status');
-  status.setAttribute('role', 'status');
-  const finish = options.finish !== false;
-  // The tick with its status under it, and anything given to sit beside it, in the middle of the row.
-  const middle = el('div', 'lf__finish');
-  const done_ = el('div', 'lf__done');
-  done_.append(finish ? tick : el('span', 'lf__gap'), status);
-  middle.append(done_);
-  if (options.beside) middle.append(options.beside);
-  row.append(link(options.prev, 'prev'), middle, link(options.next, 'next'));
-  root.append(panel, row);
+  row.append(link(options.prev, 'prev'), link(options.next, 'next'));
+  row.hidden = !options.prev && !options.next;
 
-  function paintTick(fresh = false): void {
-    options.onDone?.(done, fresh);
-    tick.setAttribute('aria-pressed', String(done));
-    tick.setAttribute('aria-label', done ? 'Lesson completed. Press to untick' : 'Finish this lesson');
-    tick.title = done ? 'Lesson completed' : 'Finish this lesson';
+  // A quiz with nothing to show beside it has no card at all.
+  if (finish || options.beside) root.append(card);
+  root.append(row);
+  if (!finish) {
+    card.classList.add('is-bare');
+    head.hidden = true;
+    partsSlot.hidden = true;
+    go.hidden = true;
+    undo.hidden = true;
+  }
+
+  /** What the last press opened the panel from, to hand focus back to. */
+  let opener: HTMLElement = finishBtn;
+
+  const leftLine = (): string => {
+    if (!parts.total) return '';
+    const n = parts.total - parts.done;
+    if (n <= 0) return 'All parts ticked.';
+    return `${n} ${n === 1 ? 'part isn’t' : 'parts aren’t'} ticked. You can still finish.`;
+  };
+
+  const tell = (fresh = false): void => options.onDone?.(done, fresh);
+
+  function draw(): void {
+    if (!finish) return;
+    const open = !panel.hidden;
     // Said once the questions are out of the way, not while they're open.
-    status.textContent = done && panel.hidden ? 'Lesson completed ✓' : '';
+    const settled = done && !asking;
+    const hasParts = parts.total > 0;
+    card.classList.toggle('is-done', settled);
+    card.classList.toggle('has-panel', open);
+    card.classList.toggle('has-parts', hasParts);
+    mark.hidden = !settled;
+    kicker.hidden = settled || !hasParts;
+    name.textContent = settled ? 'Lesson completed' : hasParts ? 'Before you finish' : 'End of lesson';
+    count.hidden = settled || !hasParts;
+    bar.hidden = settled || !hasParts;
+    count.textContent = `${parts.done} of ${parts.total} parts done`;
+    fill.style.width = `${hasParts ? Math.round((parts.done / parts.total) * 100) : 0}%`;
+    sub.hidden = !settled || !hasParts;
+    subText.textContent = `${parts.done} of ${parts.total} parts ticked · `;
+    show.textContent = showParts ? 'Hide parts' : 'Show parts';
+    show.setAttribute('aria-expanded', String(showParts));
+    // Finished: the parts step back behind Show parts, so what's next leads.
+    partsSlot.hidden = !hasParts || (settled && !showParts);
+    go.hidden = done || open;
+    left.textContent = leftLine();
+    undo.hidden = !settled || open;
+    status.textContent = settled ? 'Lesson completed' : '';
   }
 
   function close(): void {
     panel.hidden = true;
     panel.replaceChildren();
-    tick.setAttribute('aria-expanded', 'false');
+    opener.setAttribute('aria-expanded', 'false');
+    draw();
   }
 
   function open(children: Node[], label: string): void {
     panel.replaceChildren(...children);
     panel.setAttribute('aria-label', label);
     panel.hidden = false;
-    tick.setAttribute('aria-expanded', 'true');
+    opener.setAttribute('aria-expanded', 'true');
+    draw();
     panel.querySelector<HTMLElement>('input, textarea, button.btn--primary')?.focus();
+  }
+
+  /** Close the panel and put focus back on what opened it. */
+  function backOut(): void {
+    close();
+    opener.focus();
   }
 
   const errorLine = (): HTMLElement => {
@@ -139,8 +251,9 @@ export function mountLessonFooter(options: LessonFooterOptions): LessonFooterHan
     if (w && w.written) list.append(el('li', 'lf__ok', `Written work: ${w.written} ${w.written === 1 ? 'answer' : 'answers'}${w.toHandIn ? `, ${w.toHandIn} to hand in` : ''}`));
     if (!list.childElementCount) list.append(el('li', 'lf__ok', 'Nothing left to hand in.'));
 
+    opener = finishBtn;
     const err = errorLine();
-    const children: Node[] = [el('h2', 'lf__heading', 'Finish this lesson?'), list];
+    const children: Node[] = [el('h3', 'lf__heading', 'Hand in and finish?'), list];
     let initials: HTMLInputElement | null = null;
     if (need === 'initials') {
       initials = el('input', 'lf__initials');
@@ -152,20 +265,17 @@ export function mountLessonFooter(options: LessonFooterOptions): LessonFooterHan
       children.push(labelled('Type your initials first', initials));
     }
     if (q?.open) children.push(el('p', 'lf__note', 'You can’t change your quiz answers after this.'));
-    const keep = button('Keep working', 'secondary', () => {
-      close();
-      tick.focus();
-    });
-    const finish = button('Hand in and finish', 'primary', () => void handIn());
+    const keep = button('Keep working', 'secondary', backOut);
+    const handInBtn = button('Hand in and finish', 'primary', () => void handIn());
     const actions = el('div', 'lf__actions');
-    actions.append(keep, finish);
+    actions.append(handInBtn, keep);
     children.push(actions, err);
-    open(children, 'Finish this lesson');
+    open(children, 'Hand in and finish');
 
     async function handIn(): Promise<void> {
       if (busy) return;
       busy = true;
-      finish.disabled = true;
+      handInBtn.disabled = true;
       err.hidden = true;
       try {
         if (initials) {
@@ -179,13 +289,15 @@ export function mountLessonFooter(options: LessonFooterOptions): LessonFooterHan
         if (work && !(await work.handInAll())) throw 'Some written work didn’t hand in. It’s kept on this device: try again.';
         await calls.profile('done', { lesson_id: lessonId, quick: true });
         done = true;
-        paintTick();
+        asking = true;
+        tell();
+        draw();
         await askQuestions();
       } catch (e) {
         showError(err, e);
       } finally {
         busy = false;
-        finish.disabled = false;
+        handInBtn.disabled = false;
       }
     }
   }
@@ -221,7 +333,7 @@ export function mountLessonFooter(options: LessonFooterOptions): LessonFooterHan
       const dots = el('div', 'lf__dots');
       dots.setAttribute('aria-hidden', 'true');
       for (let i = 0; i < steps; i += 1) dots.append(el('i', i <= step ? 'is-on' : ''));
-      const children: Node[] = [el('h2', 'lf__heading', 'Quick questions about this lesson'), dots];
+      const children: Node[] = [el('h3', 'lf__heading', 'Quick questions about this lesson'), dots];
       const skip = button('Skip', 'secondary', () => send());
       const actions = el('div', 'lf__actions');
       if (step < questions.length) {
@@ -256,7 +368,7 @@ export function mountLessonFooter(options: LessonFooterOptions): LessonFooterHan
         box.rows = 3;
         box.placeholder = 'Leave empty if nothing';
         children.push(labelled(`${reply.unclear ?? ''} (optional)`, box));
-        actions.append(skip, button('Done', 'primary', () => send(box.value)));
+        actions.append(button('Done', 'primary', () => send(box.value)), skip);
       }
       children.push(actions, el('p', 'lf__note', 'Anonymous. Your teacher sees everyone’s answers together, not yours.'));
       open(children, 'Quick questions about this lesson');
@@ -265,55 +377,52 @@ export function mountLessonFooter(options: LessonFooterOptions): LessonFooterHan
   }
 
   function complete(): void {
-    close();
     done = true;
-    paintTick(true);
-    tick.focus();
+    asking = false;
+    close();
+    tell(true);
+    // The Finish lesson button is gone: land on the words that say so.
+    name.focus({ preventScroll: true });
   }
 
   function openUntick(): void {
+    opener = untickBtn;
     const err = errorLine();
     const actions = el('div', 'lf__actions');
     actions.append(
-      button('Cancel', 'secondary', () => {
-        close();
-        tick.focus();
-      }),
       button('Untick', 'primary', () => {
         void calls.profile('undone', { lesson_id: lessonId, quick: true }).then(
           () => {
             done = false;
-            paintTick();
+            showParts = false;
+            tell();
             close();
-            tick.focus();
+            finishBtn.focus();
           },
           (e: unknown) => showError(err, e)
         );
-      })
+      }),
+      button('Cancel', 'secondary', backOut)
     );
-    open([el('h2', 'lf__heading', 'Mark this lesson as not finished?'), el('p', 'lf__note', 'Your quiz and written work stay handed in.'), actions, err], 'Untick this lesson');
+    open([el('h3', 'lf__heading', 'Mark this lesson as not finished?'), el('p', 'lf__note', 'Your quiz and written work stay handed in.'), actions, err], 'Untick this lesson');
   }
 
-  tick.addEventListener('click', () => {
-    if (busy) return;
-    if (!panel.hidden) {
-      close();
-      return;
-    }
-    if (done) openUntick();
-    else openFinish();
+  untickBtn.addEventListener('click', () => {
+    if (!busy) openUntick();
+  });
+  show.addEventListener('click', () => {
+    showParts = !showParts;
+    draw();
   });
   root.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape' || panel.hidden || busy) return;
     // Escaping the questions still finishes the lesson; it was already handed in.
-    if (done && panel.getAttribute('aria-label') === 'Quick questions about this lesson') complete();
-    else {
-      close();
-      tick.focus();
-    }
+    if (asking) complete();
+    else backOut();
   });
 
-  paintTick();
+  tell();
+  draw();
   if (finish) void Promise.resolve()
     .then(() => calls.profile('status', { lesson_id: lessonId, quick: true }))
     .then(
@@ -321,13 +430,20 @@ export function mountLessonFooter(options: LessonFooterOptions): LessonFooterHan
       if (disposed) return;
       need = reply.need;
       done = reply.ticked === true;
-      paintTick();
+      tell();
+      draw();
     },
     () => {}
   );
 
   return {
     element: root,
+    card,
+    partsSlot,
+    setParts(ticked, total) {
+      parts = { done: ticked, total };
+      draw();
+    },
     dispose() {
       disposed = true;
       root.remove();

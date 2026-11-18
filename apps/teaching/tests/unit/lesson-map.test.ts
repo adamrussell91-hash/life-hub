@@ -31,11 +31,17 @@ function page(blocks: Block[]) {
     wrap.append(title);
     content.append(wrap);
   }
-  const footer = document.createElement('nav');
-  footer.className = 'lf';
-  content.append(footer);
+  // The lesson end card, with the slot the list goes into.
+  const end = document.createElement('section');
+  end.className = 'lf__card';
+  const heading = document.createElement('h2');
+  heading.textContent = 'Before you finish';
+  const slot = document.createElement('div');
+  slot.className = 'lf__parts';
+  end.append(heading, slot);
+  content.append(end);
   document.body.append(content);
-  return { content, footer };
+  return { content, end, slot };
 }
 
 let quizState: { answeredIds: string[]; handedIn: boolean };
@@ -46,9 +52,10 @@ const fakeQuiz = (): LessonQuizHandle => ({
 });
 
 function mount(blocks: Block[] = LESSON) {
-  const { content, footer } = page(blocks);
-  const handle = mountLessonMap({ lessonId: 'lesson1', classId: 'class1', blocks, content, before: footer, quiz: fakeQuiz, written: () => written, headerOffset: () => 56 });
-  return { content, footer, handle };
+  const { content, end, slot } = page(blocks);
+  const progress: Array<[number, number]> = [];
+  const handle = mountLessonMap({ lessonId: 'lesson1', classId: 'class1', blocks, content, slot, end, onProgress: (d, t) => progress.push([d, t]), quiz: fakeQuiz, written: () => written, headerOffset: () => 56 });
+  return { content, end, slot, handle, progress };
 }
 const rows = (card: HTMLElement) => [...card.querySelectorAll<HTMLLIElement>('.lm-check__row')];
 const rowFor = (card: HTMLElement, id: string) => rows(card).find((r) => r.dataset.section === id)!;
@@ -90,16 +97,46 @@ describe('lesson map', () => {
     expect(content.querySelector('.lm, .lm-check')).toBeNull();
   });
 
-  it('puts a rail row per section plus the finish row, and the checklist just above the footer', () => {
-    const { content, footer, handle } = mount();
+  it('puts a rail row per section plus the finish row, and the list in the end card’s slot', () => {
+    const { content, slot, handle, progress } = mount();
     const rail = handle.rail!;
     expect(rail.getAttribute('aria-label')).toBe('Lesson map');
     expect([...rail.querySelectorAll('.lm__label')].map((n) => n.textContent)).toEqual(['Watch the reading', 'Quick quiz', 'Write one paragraph', 'Exit ticket', 'Checklist and finish']);
-    expect(handle.card!.nextSibling).toBe(footer);
+    expect(handle.card!.parentElement).toBe(slot);
     expect(rows(handle.card!)).toHaveLength(4);
     expect(content.classList.contains('has-lesson-map')).toBe(true);
-    expect(handle.card!.querySelector('.lm-check__count')!.textContent).toBe('0 of 4 done');
-    expect(rowFor(handle.card!, 's1').classList.contains('is-next')).toBe(true);
+    // The count belongs to the card's head: the list only reports it.
+    expect(progress.at(-1)).toEqual([0, 4]);
+  });
+
+  it('keeps each row to a tick and a name: no heading, count, row labels or Start here', () => {
+    const { handle } = mount();
+    const card = handle.card!;
+    expect(card.querySelector('.lm-check__title, .lm-check__count, .lm-check__auto, .lm-check__start')).toBeNull();
+    expect(rows(card).some((r) => r.classList.contains('is-next'))).toBe(false);
+    expect(rowFor(card, 's2').textContent).toBe('Quick quizGo to part ↑');
+  });
+
+  it('explains self-ticking once, under the list', () => {
+    const { handle } = mount();
+    expect(handle.card!.querySelector('.lm-check__note')!.textContent).toBe('Parts you answer on screen tick themselves. Did one in your book? Tick it here.');
+    handle.dispose();
+    document.body.replaceChildren();
+    const plain = mount([section('s1', 'Read', [text('t1')]), section('s2', 'Talk', [text('t2')])] as unknown as Block[]);
+    expect(plain.handle.card!.querySelector('.lm-check__note')!.textContent).toBe('Tick each part off as you go.');
+  });
+
+  it('offers Go to part on a row that is not ticked, and takes it away once it is', () => {
+    const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    const { handle } = mount();
+    const row = rowFor(handle.card!, 's1');
+    const go = row.querySelector<HTMLButtonElement>('.lm-check__go')!;
+    expect(go.textContent).toBe('Go to part ↑');
+    expect(go.hidden).toBe(false);
+    go.click();
+    expect(scroll).toHaveBeenCalledTimes(1);
+    row.querySelector<HTMLButtonElement>('.lm-check__tick')!.click();
+    expect(go.hidden).toBe(true);
   });
 
   it('opens and closes the strip from its button and Escape', () => {
@@ -119,9 +156,8 @@ describe('lesson map', () => {
     const tick = rowFor(first.handle.card!, 's1').querySelector<HTMLButtonElement>('.lm-check__tick')!;
     tick.click();
     expect(tick.getAttribute('aria-pressed')).toBe('true');
-    expect(first.handle.card!.querySelector('.lm-check__count')!.textContent).toBe('1 of 4 done');
+    expect(first.progress.at(-1)).toEqual([1, 4]);
     expect(JSON.parse(localStorage.getItem('lesson-check:class1:lesson1')!)).toEqual(['s1']);
-    expect(rowFor(first.handle.card!, 's2').classList.contains('is-next')).toBe(true);
     first.handle.dispose();
     document.body.replaceChildren();
 
@@ -132,11 +168,11 @@ describe('lesson map', () => {
 
   it('ticks a section with work in it itself when the work is done', () => {
     vi.useFakeTimers();
-    const { content, handle } = mount();
+    const { content, handle, progress } = mount();
     const quizRow = rowFor(handle.card!, 's2');
     const tick = quizRow.querySelector<HTMLButtonElement>('.lm-check__tick')!;
     expect(tick.hasAttribute('aria-disabled')).toBe(false);
-    expect(quizRow.querySelector('.lm-check__auto')!.textContent).toBe('ticks itself when answered here');
+    expect(tick.title).toContain('Ticks itself when you answer here');
 
     quizState = { answeredIds: ['q1'], handedIn: false };
     content.dispatchEvent(new CustomEvent('lesson-quiz-change', { bubbles: true }));
@@ -155,7 +191,7 @@ describe('lesson map', () => {
     content.dispatchEvent(new Event('input', { bubbles: true }));
     vi.advanceTimersByTime(300);
     expect(rowFor(handle.card!, 's3').classList.contains('is-done')).toBe(true);
-    expect(handle.card!.querySelector('.lm-check__count')!.textContent).toBe('2 of 4 done');
+    expect(progress.at(-1)).toEqual([2, 4]);
   });
 
   it('lets a student tick a work section by hand when they did it in their book, and untick it', () => {
@@ -167,11 +203,6 @@ describe('lesson map', () => {
     expect(JSON.parse(localStorage.getItem('lesson-check:class1:lesson1')!)).toEqual(['s3']);
     tick.click();
     expect(row.classList.contains('is-done')).toBe(false);
-  });
-
-  it('says the big tick finishes the lesson', () => {
-    const { handle } = mount();
-    expect(handle.card!.querySelector('.lm-check__note')!.textContent).toContain('The big tick below finishes the lesson');
   });
 
   it('counts a handed-in quiz as done', () => {
@@ -190,8 +221,13 @@ describe('lesson map', () => {
     expect(target.classList.contains('lm-flash')).toBe(true);
     expect(document.activeElement).toBe(target.querySelector('.block-section__title'));
 
+    // The strip's last row goes to the whole end card, and lands on its heading.
+    const { end } = { end: content.querySelector<HTMLElement>('.lf__card')! };
+    vi.spyOn(end, 'getBoundingClientRect').mockReturnValue({ top: 1400, bottom: 1700, left: 0, right: 0, width: 0, height: 300, x: 0, y: 1400, toJSON: () => ({}) });
     handle.rail!.querySelector<HTMLButtonElement>('[data-section="end"] .lm__go')!.click();
-    expect(scroll).toHaveBeenCalledTimes(2);
+    expect(scroll).toHaveBeenLastCalledWith(expect.objectContaining({ top: 1400 + window.scrollY - 56 - 12 }));
+    expect(end.classList.contains('lm-flash')).toBe(true);
+    expect(document.activeElement).toBe(end.querySelector('h2'));
   });
 
   it('removes everything on dispose', () => {

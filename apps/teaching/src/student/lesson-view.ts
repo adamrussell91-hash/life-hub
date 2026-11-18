@@ -376,7 +376,7 @@ export function mountStudentLessonView(
     const workClass = extras?.cls?.id ?? extras?.quizClassId;
     setVoiceClass(workClass ?? null);
     if (workClass) work = mountWorkSync(content, { lessonId: lesson.lesson_id, classId: workClass });
-    // Previous, the finish tick and next. Neighbours come from the class's schedule when the lesson was opened from it.
+    // The lesson end card, with previous and next under it. Neighbours come from the class's schedule when the lesson was opened from it.
     if (workClass) {
       const cls = extras?.cls;
       token = mountInitialsToken({
@@ -384,16 +384,18 @@ export function mountStudentLessonView(
         from: cls ? `/s/classes/${cls.id}/lessons/${lesson.lesson_id}` : `/s/lessons/${lesson.lesson_id}?class=${workClass}`
       });
       header.append(token.element);
-      // A station rotation keeps students inside it: no finish tick (it would mark the whole rotation done)
-      // and no What's next or next-lesson links (they lead out of it). The player's Back to the map buttons stand in.
+      // A station rotation keeps students inside it: no end card (finishing would mark the whole rotation done)
+      // and no next-on-your-list or next-lesson links (they lead out of it). The player's Back to the map buttons stand in.
       if (lesson.pedagogical_mode === 'station_rotation') return;
       const { prev, next } = cls ? scheduleNeighbors(cls.schedule, lesson.lesson_id) : { prev: null, next: null };
       const linkTo = (row: typeof prev) => (row && cls ? { href: `/s/classes/${cls.id}/lessons/${row.lesson_id}`, title: row.title } : null);
       const here = cls ? `/s/classes/${cls.id}/lessons/${lesson.lesson_id}` : `/s/lessons/${lesson.lesson_id}?class=${workClass}`;
-      // What's next: a card beside the tick naming the next thing on their To do list, and a line under the title.
-      const wn = (whatsNext = mountWhatsNext({ classId: workClass, lessonId: lesson.lesson_id, from: here }));
-      footer = mountLessonFooter({ lessonId: lesson.lesson_id, classId: workClass, prev: linkTo(prev), next: linkTo(next), finish: lesson.pedagogical_mode !== 'quiz', work: () => work, onClaimed: () => token?.refresh(), onDone: (done, fresh) => wn.setDone(done, fresh), beside: wn.element });
-      content.append(footer.element);
+      // Next on your list: the next thing on their To do list, in the end card, and a line under the title.
+      // A quiz is finished by handing it in, so there the block is in its full form from the start.
+      const isQuiz = lesson.pedagogical_mode === 'quiz';
+      const wn = (whatsNext = mountWhatsNext({ classId: workClass, lessonId: lesson.lesson_id, from: here, open: isQuiz }));
+      const end = (footer = mountLessonFooter({ lessonId: lesson.lesson_id, classId: workClass, prev: linkTo(prev), next: linkTo(next), finish: !isQuiz, work: () => work, onClaimed: () => token?.refresh(), onDone: (done, fresh) => wn.setDone(done, fresh), beside: wn.element }));
+      content.append(end.element);
       const hero = content.querySelector(':scope > .lesson-hero');
       if (hero) {
         hero.after(renderTodoHint(workClass, here));
@@ -401,9 +403,9 @@ export function mountStudentLessonView(
         edgeTab = mountEdgeTab({ classId: workClass, from: here, card: wn });
         if (edgeTab) document.body.append(edgeTab.element);
       }
-      // Plain lessons only: the section strip on the right and the checklist above the footer.
-      if (!lecture && lesson.pedagogical_mode !== 'quiz') lessonMap = mountLessonMap({ lessonId: lesson.lesson_id, classId: workClass, blocks: lesson.blocks, content, before: footer.element });
-      addEndCard(content, lesson, workClass, cls ? `/s/classes/${cls.id}/lessons/${lesson.lesson_id}` : `/s/lessons/${lesson.lesson_id}?class=${workClass}`, lessonMap?.card ?? footer.element);
+      // Plain lessons only: the section strip on the right, and the list of parts in the end card.
+      if (!lecture && !isQuiz) lessonMap = mountLessonMap({ lessonId: lesson.lesson_id, classId: workClass, blocks: lesson.blocks, content, slot: end.partsSlot, end: end.card, onProgress: (ticked, total) => end.setParts(ticked, total) });
+      addEndCard(content, lesson, workClass, here, end.element);
       // Why this matters: a compass by each section title, on plain lessons only (players draw their own pages).
       if (!lecture) whyRoute = mountWhyRoute({ root: content, lesson, classId: workClass });
     } else {
