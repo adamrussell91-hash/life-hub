@@ -120,12 +120,44 @@ export interface Checkin {
   item_id?: string;
   /** Optional place photo (Netlify Blobs id, served via /api/travel-photo). */
   photo_id?: string;
+  /** A postcard written onto this check-in. Its photo is repeated in `photo_id`. */
+  postcard?: Postcard;
+}
+
+export type PostcardOrientation = 'portrait' | 'landscape';
+
+/** A postcard on a check-in: the photo, where it was taken, and optionally a voice clip and its words. */
+export interface Postcard {
+  photo_id: string;
+  orientation: PostcardOrientation;
+  /** One to four lines, each at most 60 characters. Never coordinates. */
+  address: string[];
+  posted_at: string;
+  /** Voice clip (Netlify Blobs id, served via /api/travel-audio). */
+  audio_id?: string;
+  /** Clip length in whole seconds, 1 to 30. */
+  audio_s?: number;
+  /** At most 600 characters. */
+  text?: string;
+}
+
+/** What the public link carries for a stop's postcard. A photo from before postcards has only the first three. */
+export interface PublicPostcard {
+  id: string;
+  at: string;
+  photo_id: string;
+  orientation?: PostcardOrientation;
+  address?: string[];
+  audio_id?: string;
+  audio_s?: number;
+  text?: string;
 }
 
 /** Public/redacted item fields for follower-visible safe ticks. */
 export type PublicSafeFields = {
   safe_at?: string;
   safe_photo_id?: string;
+  postcard?: PublicPostcard;
 };
 
 export interface DayMeta {

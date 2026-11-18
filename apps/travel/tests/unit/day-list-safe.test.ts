@@ -97,6 +97,71 @@ describe('renderDayList marked safe', () => {
       cityTz: 'UTC'
     });
     expect(host.querySelector('.safe-mark.is-safe')?.getAttribute('aria-label')).toBe('Safe at 11:05');
-    expect(host.textContent).toContain('Photo');
+    expect(host.textContent).toContain('Postcard');
+  });
+
+  it('offers Postcard on a safe stop with none, and opens the sheet for it', () => {
+    const host = document.createElement('div');
+    const onMarkSafe = vi.fn();
+    const item = stopItem();
+    const ticked: Trip = {
+      ...trip,
+      checkins: [{ id: 'chk_1', at: '2027-03-04T11:05:00.000Z', city_id: item.city_id, label: 'Safe', item_id: item.id }]
+    };
+    renderDayList(host, ticked, item.city_id, item.date, { onMarkSafe, cityTz: 'UTC' });
+    const btn = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Postcard');
+    expect(btn).toBeTruthy();
+    btn!.click();
+    expect(onMarkSafe).toHaveBeenCalledWith(expect.objectContaining({ id: item.id }), 'postcard');
+  });
+
+  it('shows a stop\'s postcard as a small card that opens it, and no Postcard button', () => {
+    const host = document.createElement('div');
+    const onOpenPostcard = vi.fn();
+    const item = stopItem();
+    const posted: Trip = {
+      ...trip,
+      checkins: [
+        {
+          id: 'chk_1',
+          at: '2027-03-04T11:05:00.000Z',
+          city_id: item.city_id,
+          label: 'Safe',
+          item_id: item.id,
+          photo_id: 'tph_card1',
+          postcard: {
+            photo_id: 'tph_card1',
+            orientation: 'portrait',
+            address: ['Rua do Exemplo', 'Lisboa'],
+            posted_at: '2027-03-04T11:30:00.000Z'
+          }
+        },
+        // A later plain tick does not hide the postcard.
+        { id: 'chk_2', at: '2027-03-04T13:00:00.000Z', city_id: item.city_id, label: 'Safe', item_id: item.id }
+      ]
+    };
+    renderDayList(host, posted, item.city_id, item.date, { onMarkSafe: vi.fn(), onOpenPostcard, cityTz: 'UTC' });
+    const small = host.querySelector<HTMLButtonElement>('button.safe-mark__postcard');
+    expect(small).toBeTruthy();
+    expect(small!.dataset.orient).toBe('portrait');
+    expect(small!.getAttribute('aria-label')).toBe(`Open the postcard from ${item.title}`);
+    expect(small!.querySelector('img')!.src).toContain('id=tph_card1');
+    small!.click();
+    expect(onOpenPostcard).toHaveBeenCalledWith(item.id);
+    expect([...host.querySelectorAll('button')].some((b) => b.textContent === 'Postcard')).toBe(false);
+  });
+
+  it('draws the small card as a picture, not a dead button, when nothing can open it', () => {
+    const host = document.createElement('div');
+    const item = stopItem();
+    const posted: Trip = {
+      ...trip,
+      checkins: [
+        { id: 'chk_1', at: '2027-03-04T11:05:00.000Z', city_id: item.city_id, label: 'Safe', item_id: item.id, photo_id: 'tph_old1' }
+      ]
+    };
+    renderDayList(host, posted, item.city_id, item.date, { cityTz: 'UTC' });
+    expect(host.querySelector('button.safe-mark__postcard')).toBeNull();
+    expect(host.querySelector('span.safe-mark__postcard img')?.getAttribute('alt')).toBe(`Photo from ${item.title}`);
   });
 });

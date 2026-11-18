@@ -1,5 +1,6 @@
 import type { City, Item, Trip } from '@/types';
-import { addCheckin, getTrip, uploadTravelPhoto } from '@/api/travel';
+import { addCheckin, getTrip, removePostcard, uploadTravelPhoto, type TripEnvelope } from '@/api/travel';
+import { ApiClientError } from '@/api/client';
 import {
   buildTodo,
   dayBarCaption,
@@ -26,6 +27,8 @@ import { getJournal } from '@/api/journal';
 import { openQuickMealSheet } from '@/journal/quick-meal-sheet';
 import { renderTakeMeHome } from '@/components/take-me-home';
 import { renderShareSheet } from '@/components/share-sheet';
+import { listPostcards } from '@/postcard/model';
+import { openPostcardViewer } from '@/postcard/viewer';
 import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
 import { formatCountdown, formatLongRange, formatShortRange, formatWeekdayDate } from '@/lib/date-label';
 import { I } from '@/lib/icons';
@@ -430,6 +433,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
         onTellPenelope: (prompt) => writePenelopeHandoff(trip, city.id, selectedDate, prompt),
         onEditArrivalGuide: () => openArrivalGuide(city),
         onMarkSafe: (item, mode) => openSafeMark(item, mode),
+        onOpenPostcard: (itemId) => openPostcard(itemId),
         onLogMeal: (item, momentId) => openLogMeal(item, momentId),
         mealMomentByItem
       });
@@ -581,7 +585,42 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     renderCityScene();
   }
 
-  function openSafeMark(item: Item, mode: 'mark' | 'photo'): void {
+  /** Save against the version in hand; if someone else changed the trip, fetch it and try once more. */
+  async function saveWithRetry(save: (ifVersion: string) => Promise<TripEnvelope>): Promise<void> {
+    let saved: TripEnvelope;
+    try {
+      saved = await save(version);
+    } catch (err) {
+      if (!(err instanceof ApiClientError) || err.code !== 'conflict') throw err;
+      const fresh = await getTrip(tripId);
+      trip = fresh.trip;
+      version = fresh.version;
+      saved = await save(version);
+    }
+    trip = saved.trip;
+    version = saved.version;
+  }
+
+  function openPostcard(itemId: string): void {
+    const cards = listPostcards(trip);
+    const card = cards.find((c) => c.itemId === itemId);
+    if (!card) return;
+    openPostcardViewer({
+      trip,
+      cards,
+      startId: card.id,
+      onRemove: async (target) => {
+        try {
+          await saveWithRetry((ifVersion) => removePostcard(tripId, target.itemId, ifVersion));
+        } catch (err) {
+          throw new Error(safeSaveErrorMessage(err));
+        }
+        renderCityScene();
+      }
+    });
+  }
+
+  function openSafeMark(item: Item, mode: 'mark' | 'postcard'): void {
     // One-tap mark safe; photo opens the sheet.
     if (mode === 'mark') {
       void markItemSafe(item).catch((err) => {

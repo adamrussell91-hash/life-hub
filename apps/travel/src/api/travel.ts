@@ -1,6 +1,6 @@
-import { ApiClientError, apiDelete, apiGet, apiPatch, apiPost, parseApiResponse } from '@/api/client';
+import { ApiClientError, apiDelete, apiGet, apiPatch, apiPost, apiPut, parseApiResponse } from '@/api/client';
 import { getApiBaseUrl } from '@/api/config';
-import type { Checkin, Item, ItemDraft, Place, Trip, TripSummary } from '@/types';
+import type { Checkin, Item, ItemDraft, Place, Postcard, PublicPostcard, Trip, TripSummary } from '@/types';
 
 export interface TripEnvelope {
   trip: Trip;
@@ -70,12 +70,13 @@ export function addCheckin(
   return apiPost(`/api/travel-checkins?trip=${encodeURIComponent(tripId)}`, body);
 }
 
-export async function uploadTravelPhoto(tripId: string, file: File): Promise<{ photo_id: string }> {
+/** POST one file as multipart. Uploads on mobile data are slow, so they get a minute. */
+async function postFile<T>(path: string, file: Blob, filename: string): Promise<{ data: T | undefined; status: number }> {
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', file, filename);
   let response: Response;
   try {
-    response = await fetch(`${getApiBaseUrl()}/api/travel-photo?trip=${encodeURIComponent(tripId)}`, {
+    response = await fetch(`${getApiBaseUrl()}${path}`, {
       method: 'POST',
       body: form,
       credentials: 'include',
@@ -89,14 +90,77 @@ export async function uploadTravelPhoto(tripId: string, file: File): Promise<{ p
       message: cause instanceof Error ? cause.message : 'Network request failed'
     });
   }
-  const result = await parseApiResponse<{ photo_id: string }>(response);
+  const result = await parseApiResponse<T>(response);
   if (!result.ok) {
     throw new ApiClientError(result.error, response.status, result.data);
   }
-  if (!result.data?.photo_id) {
-    throw new ApiClientError({ code: 'invalid_response', message: 'Photo upload failed.' }, response.status);
+  return { data: result.data, status: response.status };
+}
+
+export async function uploadTravelPhoto(tripId: string, file: File): Promise<{ photo_id: string }> {
+  const { data, status } = await postFile<{ photo_id: string }>(
+    `/api/travel-photo?trip=${encodeURIComponent(tripId)}`,
+    file,
+    file.name
+  );
+  if (!data?.photo_id) {
+    throw new ApiClientError({ code: 'invalid_response', message: 'Photo upload failed.' }, status);
   }
-  return { photo_id: result.data.photo_id };
+  return { photo_id: data.photo_id };
+}
+
+/** Store a postcard's voice clip. The file name only carries the type for servers that want one. */
+export async function uploadTravelAudio(tripId: string, clip: Blob): Promise<{ audio_id: string }> {
+  const ext = clip.type.includes('mp4') ? 'm4a' : clip.type.includes('ogg') ? 'ogg' : 'webm';
+  const { data, status } = await postFile<{ audio_id: string }>(
+    `/api/travel-audio?trip=${encodeURIComponent(tripId)}`,
+    clip,
+    `clip.${ext}`
+  );
+  if (!data?.audio_id) {
+    throw new ApiClientError({ code: 'invalid_response', message: 'Recording upload failed.' }, status);
+  }
+  return { audio_id: data.audio_id };
+}
+
+export function travelAudioUrl(audioId: string, shareToken?: string | null): string {
+  const params = new URLSearchParams({ id: audioId });
+  if (shareToken) params.set('token', shareToken);
+  return `${getApiBaseUrl()}/api/travel-audio?${params.toString()}`;
+}
+
+/** Remove a clip no postcard uses (a discarded draft, or a take that was recorded again). */
+export function deleteTravelAudio(audioId: string): Promise<{ id: string; deleted: true }> {
+  return apiDelete(`/api/travel-audio?id=${encodeURIComponent(audioId)}`);
+}
+
+/** The words of a stored clip, tidied and cut to what a postcard holds. */
+export function transcribeTravelAudio(tripId: string, audioId: string): Promise<{ text: string }> {
+  return apiPost(`/api/travel-transcribe?trip=${encodeURIComponent(tripId)}`, { audio_id: audioId });
+}
+
+/** What the composer sends: everything on a postcard except the time the server stamps. */
+export type PostcardInput = Omit<Postcard, 'posted_at'>;
+
+/** Write a postcard onto the stop's latest check-in. The stop must already be ticked safe. */
+export function setPostcard(
+  tripId: string,
+  itemId: string,
+  ifVersion: string,
+  postcard: PostcardInput
+): Promise<TripEnvelope> {
+  return apiPut(
+    `/api/travel-postcard?trip=${encodeURIComponent(tripId)}&item=${encodeURIComponent(itemId)}`,
+    { if_version: ifVersion, postcard }
+  );
+}
+
+/** Take a stop's postcard back. Its photo and voice are deleted for everyone on the link. */
+export function removePostcard(tripId: string, itemId: string, ifVersion: string): Promise<TripEnvelope> {
+  return apiDelete(
+    `/api/travel-postcard?trip=${encodeURIComponent(tripId)}&item=${encodeURIComponent(itemId)}`,
+    { if_version: ifVersion }
+  );
 }
 
 export function travelPhotoUrl(photoId: string, shareToken?: string | null): string {
@@ -115,7 +179,7 @@ export function revokeShareLink(tripId: string): Promise<{ enabled: false }> {
 
 export interface PublicTrip {
   trip: Omit<Trip, 'items' | 'checkins' | 'share'> & {
-    items: Array<Item & { safe_at?: string; safe_photo_id?: string }>;
+    items: Array<Item & { safe_at?: string; safe_photo_id?: string; postcard?: PublicPostcard }>;
     last_checkin: (Pick<Checkin, 'at' | 'item_id' | 'photo_id'> & {
       city_name: string;
       label: string;
@@ -157,6 +221,22 @@ export function askNoticing(
 /** Mark a Someday item done in Tasks. Only ever called from the owner's own tap. */
 export function tickOffTask(taskId: string): Promise<unknown> {
   return apiPatch(`/api/tasks?id=${encodeURIComponent(taskId)}`, { status: 'done' });
+}
+
+/** The parts of a postal address for a spot. Never a house number or a business name. */
+export interface PlaceAddressParts {
+  street?: string;
+  district?: string;
+  postcode?: string;
+  city?: string;
+  country?: string;
+}
+
+/** The address parts for a spot, or null when the lookup has nothing sure to say. */
+export async function reversePlaceAddress(lat: number, lon: number): Promise<PlaceAddressParts | null> {
+  const params = new URLSearchParams({ reverse: '1', lat: String(lat), lon: String(lon) });
+  const result = await apiGet<{ address?: PlaceAddressParts | null }>(`/api/travel-places?${params.toString()}`);
+  return result.address ?? null;
 }
 
 /** A street or neighbourhood name for a spot, or null when the lookup has nothing sure to say. */

@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import nodePath from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fixtureTrip from '../fixtures/test-trip.json' with { type: 'json' };
-import type { Item, ItemDraft, Trip } from '@/types';
+import type { Item, ItemDraft, Postcard, Trip } from '@/types';
 import { lisbonPortoJournal } from '@/journal/fixtures/lisbon-porto';
 
 const PHOTO_DIR = nodePath.resolve(nodePath.dirname(fileURLToPath(import.meta.url)), '../fixtures/journal-photos');
@@ -30,7 +30,8 @@ function nowIso(): string {
 export function createMockApi() {
   const trips = new Map<string, Trip>([[fixtureTrip.id, clone(fixtureTrip) as Trip]]);
   const shareTokens = new Map<string, { tripId: string; createdAt: string }>();
-  const photoBytes = new Map<string, { tripId: string; mime: string }>();
+  const photoBytes = new Map<string, { tripId: string; mime: string; bytes?: Buffer }>();
+  const audioBytes = new Map<string, { tripId: string; mime: string; bytes: Buffer }>();
   let authenticated = false;
   // Journals and the Arches Atlas, in memory. Invented sample rows only.
   const journals = new Map<string, { journal: Record<string, unknown>; version: number }>();
@@ -142,7 +143,8 @@ export function createMockApi() {
     if (
       !authenticated &&
       path !== '/api/travel-public' &&
-      !(path === '/api/travel-photo' && method === 'GET')
+      !(path === '/api/travel-photo' && method === 'GET') &&
+      !(path === '/api/travel-audio' && method === 'GET')
     ) {
       return json(401, { ok: false, error: { code: 'unauthenticated', message: 'Please sign in to continue.' } });
     }
@@ -321,8 +323,9 @@ export function createMockApi() {
         return json(413, { ok: false, error: { code: 'payload_too_large', message: 'Photo is too big to upload.' } });
       }
       const photoId = `tph_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
-      // Local mock: accept the upload and return an id; GET serves a 1×1 png.
-      photoBytes.set(photoId, { tripId, mime: 'image/png' });
+      // Keep the uploaded bytes so a postcard shows its own photo; without them GET serves a 1×1 png.
+      const sent = (body as { file?: UploadedFile | null } | undefined)?.file;
+      photoBytes.set(photoId, sent ? { tripId, mime: sent.mime, bytes: sent.bytes } : { tripId, mime: 'image/png' });
       return json(201, { ok: true, data: { photo_id: photoId } });
     }
     if (path === '/api/travel-photo' && method === 'GET') {
@@ -338,12 +341,95 @@ export function createMockApi() {
       } else if (!authenticated) {
         return json(401, { ok: false, error: { code: 'unauthenticated', message: 'Please sign in to continue.' } });
       }
+      if (entry.bytes) return { status: 200, body: null, raw: { contentType: entry.mime, buffer: entry.bytes } };
       // Tiny transparent PNG — binary responses use `raw` for the Vite plugin.
       const png = Buffer.from(
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
         'base64'
       );
       return { status: 200, body: null, raw: { contentType: entry.mime, buffer: png } };
+    }
+
+    // ----- Postcards on check-ins: a voice clip, its words, and the postcard itself. -----
+    if (path === '/api/travel-audio' && method === 'POST') {
+      const tripId = url.searchParams.get('trip') ?? '';
+      if (!tripOr404(tripId)) {
+        return json(404, { ok: false, error: { code: 'not_found', message: 'Trip not found.' } });
+      }
+      const sent = (body as { file?: UploadedFile | null } | undefined)?.file;
+      if (!sent || sent.bytes.length === 0) {
+        return json(400, { ok: false, error: { code: 'validation_error', message: 'The recording is empty.' } });
+      }
+      const audioId = `tau_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+      audioBytes.set(audioId, { tripId, mime: sent.mime.split(';')[0]!.trim(), bytes: sent.bytes });
+      return json(201, { ok: true, data: { audio_id: audioId } });
+    }
+    if (path === '/api/travel-audio' && method === 'GET') {
+      const entry = audioBytes.get(url.searchParams.get('id') ?? '');
+      const token = url.searchParams.get('token');
+      if (!entry) return json(404, { ok: false, error: { code: 'not_found', message: 'Clip not found.' } });
+      if (token) {
+        if (shareTokens.get(token)?.tripId !== entry.tripId) {
+          return json(404, { ok: false, error: { code: 'not_found', message: 'This link has been turned off.' } });
+        }
+      } else if (!authenticated) {
+        return json(401, { ok: false, error: { code: 'unauthenticated', message: 'Please sign in to continue.' } });
+      }
+      return { status: 200, body: null, raw: { contentType: entry.mime, buffer: entry.bytes } };
+    }
+    if (path === '/api/travel-audio' && method === 'DELETE') {
+      const audioId = url.searchParams.get('id') ?? '';
+      audioBytes.delete(audioId);
+      return json(200, { ok: true, data: { id: audioId, deleted: true } });
+    }
+    if (path === '/api/travel-transcribe' && method === 'POST') {
+      const audioId = (body as { audio_id?: string } | undefined)?.audio_id ?? '';
+      if (!audioBytes.has(audioId)) {
+        return json(404, { ok: false, error: { code: 'not_found', message: 'Clip not found.' } });
+      }
+      // Invented words, so local runs show a written postcard without a transcription service.
+      return json(200, {
+        ok: true,
+        data: {
+          text: 'Made it to the market and it is busy in the best way. Smoke everywhere, plastic stools, and someone just walked past with a tray of grilled fish. Safe, full and very happy. Talk soon.'
+        }
+      });
+    }
+    if (path === '/api/travel-postcard' && (method === 'PUT' || method === 'DELETE')) {
+      const trip = tripOr404(url.searchParams.get('trip') ?? '');
+      const itemId = url.searchParams.get('item') ?? '';
+      if (!trip) return json(404, { ok: false, error: { code: 'not_found', message: 'Trip not found.' } });
+      const mine = trip.checkins.filter((c) => c.item_id === itemId);
+      const hasCard = mine.some((c) => c.postcard || c.photo_id);
+      if (method === 'DELETE') {
+        if (!hasCard) return json(404, { ok: false, error: { code: 'not_found', message: 'No postcard on this stop.' } });
+        for (const c of mine) {
+          if (c.postcard?.audio_id) audioBytes.delete(c.postcard.audio_id);
+          if (c.photo_id) photoBytes.delete(c.photo_id);
+          delete c.postcard;
+          delete c.photo_id;
+        }
+        trip.updated_at = nowIso();
+        return json(200, { ok: true, data: { trip, version: version(trip) } });
+      }
+      if (hasCard) {
+        return json(409, {
+          ok: false,
+          error: { code: 'postcard_exists', message: 'This stop already has a postcard. Remove it first.' }
+        });
+      }
+      const carrier = [...mine].sort((a, b) => b.at.localeCompare(a.at))[0];
+      if (!carrier) {
+        return json(400, { ok: false, error: { code: 'validation_error', message: 'Tick this stop safe first.' } });
+      }
+      const sent = (body as { postcard?: Omit<Postcard, 'posted_at'> } | undefined)?.postcard;
+      if (!sent?.photo_id || !Array.isArray(sent.address) || sent.address.length === 0) {
+        return json(400, { ok: false, error: { code: 'validation_error', message: 'A postcard needs a photo.' } });
+      }
+      carrier.postcard = { ...sent, posted_at: nowIso() };
+      carrier.photo_id = sent.photo_id;
+      trip.updated_at = nowIso();
+      return json(200, { ok: true, data: { trip, version: version(trip) } });
     }
 
     if (path === '/api/travel-share' && method === 'POST') {
@@ -428,7 +514,14 @@ export function createMockApi() {
       // An invented street per spot, so local screenshots show named moments.
       const streets = ['Rua do Exemplo', 'Travessa Inventada', 'Largo da Amostra', 'Cais do Ensaio'];
       const seed = Math.abs(Math.round(Number(url.searchParams.get('lat')) * 1000 + Number(url.searchParams.get('lon')) * 1000));
-      return json(200, { ok: true, data: { name: streets[seed % streets.length] } });
+      const street = streets[seed % streets.length];
+      return json(200, {
+        ok: true,
+        data: {
+          name: street,
+          address: { street, district: 'Bairro Inventado', postcode: '1000-001', city: 'Lisboa', country: 'Portugal' }
+        }
+      });
     }
     if (path === '/api/travel-places' && method === 'GET') {
       const q = url.searchParams.get('q') ?? '';
@@ -671,7 +764,7 @@ export function createMockApi() {
       if (req.method === 'POST' && (req.url ?? '').startsWith('/api/travel-journal-media-upload')) {
         requestBody = { raw: rawBuf };
       } else if (contentType.includes('multipart/form-data')) {
-        requestBody = { multipart: true, bytes: rawBuf.length };
+        requestBody = { multipart: true, bytes: rawBuf.length, file: multipartFile(rawBuf, contentType) };
       } else if (rawBuf.length) {
         try {
           requestBody = JSON.parse(rawBuf.toString('utf8'));
@@ -697,6 +790,25 @@ export function createMockApi() {
 }
 
 /** §4 redaction (mirrors netlify `travel-redact.mjs` for local public links). */
+interface UploadedFile {
+  mime: string;
+  bytes: Buffer;
+}
+
+/** The first file part of a multipart body: enough for the single-file uploads the hub makes. */
+function multipartFile(raw: Buffer, contentType: string): UploadedFile | null {
+  const boundary = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType);
+  if (!boundary) return null;
+  const marker = Buffer.from(`--${boundary[1] ?? boundary[2]}`);
+  const start = raw.indexOf(marker);
+  const headerEnd = start < 0 ? -1 : raw.indexOf('\r\n\r\n', start);
+  const next = headerEnd < 0 ? -1 : raw.indexOf(marker, headerEnd);
+  if (next < 0) return null;
+  const headers = raw.subarray(start, headerEnd).toString('utf8');
+  const mime = /content-type:\s*([^\r\n]+)/i.exec(headers)?.[1]?.trim() ?? 'application/octet-stream';
+  return { mime, bytes: raw.subarray(headerEnd + 4, next - 2) };
+}
+
 function redactTrip(trip: Trip) {
   const safeByItem = new Map<string, (typeof trip.checkins)[number]>();
   for (const c of trip.checkins) {
@@ -717,10 +829,29 @@ function redactTrip(trip: Trip) {
         void note;
         const withoutSource = 'source' in rest ? (({ source, ...r }) => r)(rest as { source?: string }) : rest;
         const safe = safeByItem.get(item.id);
+        const carrier = trip.checkins
+          .filter((c) => c.item_id === item.id && (c.postcard || c.photo_id))
+          .sort((a, b) => b.at.localeCompare(a.at))[0];
+        const card = carrier?.postcard;
         return {
           ...withoutSource,
           note: '',
-          ...(safe ? { safe_at: safe.at, ...(safe.photo_id ? { safe_photo_id: safe.photo_id } : {}) } : {})
+          ...(safe ? { safe_at: safe.at, ...(safe.photo_id ? { safe_photo_id: safe.photo_id } : {}) } : {}),
+          ...(carrier
+            ? {
+                postcard: card
+                  ? {
+                      id: carrier.id,
+                      at: card.posted_at || carrier.at,
+                      photo_id: card.photo_id,
+                      orientation: card.orientation,
+                      address: card.address,
+                      ...(card.audio_id ? { audio_id: card.audio_id, audio_s: card.audio_s } : {}),
+                      ...(card.text ? { text: card.text } : {})
+                    }
+                  : { id: carrier.id, at: carrier.at, photo_id: carrier.photo_id }
+              }
+            : {})
         };
       }),
     days: trip.days.map(({ penelope_prompt, ...rest }) => {
