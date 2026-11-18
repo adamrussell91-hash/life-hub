@@ -1,49 +1,92 @@
-/* Lesson footer: previous, finish tick, next; the finish check and end-of-lesson questions above it. Tokens only. */
-.lf { display: grid; gap: var(--space-3); margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--line); }
-.lf__row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--space-3); }
-.lf__link { display: grid; gap: 2px; min-width: 0; padding: var(--space-2); border-radius: var(--radius-sm); color: var(--ink); text-decoration: none; }
-.lf__link:hover, .lf__link:focus-visible { background: var(--paper); }
-.lf__link--next { text-align: right; }
-.lf__dir { font-size: var(--text-xs); color: var(--muted); }
-.lf__title { font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
-.lf__tick { width: 52px; height: 52px; display: grid; place-items: center; padding: 0; border: 2px solid var(--wave); border-radius: var(--radius-full); background: var(--paper); color: var(--wave); cursor: pointer; }
-.lf__tick svg { width: 24px; height: 24px; }
-.lf__tick[aria-pressed='true'] { background: var(--success); border-color: var(--success); color: #fff; }
-.lf__tick:focus-visible { outline: 3px solid var(--wave); outline-offset: 3px; }
-.lf__finish { display: flex; align-items: center; justify-content: center; gap: var(--space-4); min-width: 0; }
-.lf__done { display: grid; justify-items: center; gap: var(--space-1); }
-.lf__finish > .wn-card { flex: 1 1 22rem; max-width: 30rem; margin: 0; }
-.lf__status { margin: 0; min-height: 1.4em; text-align: center; font-weight: 600; color: var(--success); }
-.lf__panel { display: grid; gap: var(--space-3); max-width: 34rem; width: 100%; justify-self: center; padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--paper); }
-.lf__panel[hidden], .lf__error[hidden] { display: none; }
-.lf__heading { margin: 0; font-size: var(--text-lg); }
+/* Lesson end card: the head, the slot for the parts list, the Finish lesson row with the check and questions in its place, what's next, undo; previous and next lesson under it. Tokens only. */
+.lf { display: grid; gap: var(--space-3); margin-top: var(--space-8); }
+/* Everything in the card is shown and hidden with the hidden attribute. */
+.lf [hidden] { display: none !important; }
+
+.lf__card { position: relative; max-width: 44rem; width: 100%; justify-self: center; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface, #fff); box-shadow: var(--shadow); overflow: hidden; }
+/* The strip's last row flashes the card: keep its own corners. */
+.lf__card.lm-flash { border-radius: var(--radius-lg); }
+
+/* Head: "Before you finish" with the count and a bar; a green band once the lesson is completed. */
+.lf__head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--space-2) var(--space-4); padding: var(--space-5) var(--space-6) var(--space-2); }
+.lf__card:not(.has-parts) .lf__head { padding-bottom: var(--space-4); }
+.lf__words { min-width: 0; display: grid; gap: 2px; }
+.lf__kicker { margin: 0; font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.lf__name { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-bold); line-height: 1.2; color: var(--navy); }
+.lf__name:focus { outline: none; }
+.lf__count { font-size: var(--text-sm); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lf__bar { grid-column: 1 / -1; height: 6px; border-radius: var(--radius-full); background: var(--line); overflow: hidden; }
+.lf__bar i { display: block; height: 100%; border-radius: var(--radius-full); background: var(--success); transition: width 0.3s ease; }
+.lf__mark { width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--radius-full); background: var(--success); color: #fff; }
+.lf__mark svg { width: 22px; height: 22px; }
+.lf__sub { margin: 0; font-size: var(--text-sm); color: var(--pastel-sage-ink); }
+.lf__card.is-done .lf__head { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--space-4); padding: var(--space-4) var(--space-6); background: var(--success-surface); }
+.lf__card.is-done .lf__name { color: var(--success); }
+
+/* Text buttons inside a sentence: Show parts, Untick this lesson. */
+.lf__show, .lf__untick { position: relative; padding: 0; border: 0; background: none; color: var(--wave); font: inherit; font-weight: 600; cursor: pointer; }
+.lf__show::after, .lf__untick::after { content: ''; position: absolute; inset: -12px -8px; }
+.lf__show:hover, .lf__untick:hover { text-decoration: underline; }
+.lf__show:focus-visible, .lf__untick:focus-visible { outline: 3px solid var(--wave); outline-offset: 2px; border-radius: var(--radius-xs); }
+
+/* The lesson map's list of parts goes here. */
+.lf__parts { padding: var(--space-2) var(--space-6) 0; }
+
+/* Foot: one main button at a time. */
+.lf__foot { display: grid; gap: var(--space-3); padding: var(--space-4) var(--space-6) var(--space-5); border-top: 1px solid var(--line); background: var(--paper); }
+.lf__card.is-done .lf__foot, .lf__card.is-bare .lf__foot { padding-top: var(--space-5); border-top: 0; background: transparent; }
+.lf__go { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); }
+.lf__left { font-size: var(--text-sm); color: var(--muted); }
+.lf__finish svg { flex: none; width: 20px; height: 20px; }
+/* Pills, to match the buttons in "Next on your list". */
+.lf__card .btn { min-height: 48px; padding: var(--space-2) var(--space-6); border-radius: var(--radius-full); font-size: var(--text-md); font-weight: var(--weight-bold); }
+/* The check, the questions and the untick check take the Finish lesson row's place; what's next waits. */
+.lf__card.has-panel .wn-card { display: none; }
+.lf__foot > .wn-card:not(.is-ready):not(.is-open):not(.has-thing) { margin-top: calc(-1 * var(--space-3)); }
+.lf__undo { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.lf__status { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.lf__panel { display: grid; gap: var(--space-3); }
+.lf__heading { margin: 0; font-size: var(--text-md); font-weight: var(--weight-bold); line-height: 1.25; color: var(--navy); }
 .lf__list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-1); }
-.lf__ok::before { content: '✓ '; color: var(--success); }
+.lf__ok::before { content: '✓ '; color: var(--success); font-weight: var(--weight-bold); }
 .lf__warn { color: var(--ink); }
 .lf__warn::before { content: '! '; color: var(--warning); font-weight: 700; }
 .lf__note { margin: 0; font-size: var(--text-sm); color: var(--muted); }
 .lf__error { margin: 0; color: var(--danger); }
-.lf__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
-.lf__actions .btn { min-height: 44px; }
+.lf__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .lf__initials { min-height: 44px; width: min(100%, 14rem); font-size: 16px; text-transform: uppercase; }
 .lf__dots { display: flex; gap: 6px; }
 .lf__dots i { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--line); }
 .lf__dots i.is-on { background: var(--wave); }
 .lf__question { margin: 0; padding: 0; border: 0; display: grid; gap: var(--space-2); }
-.lf__prompt { padding: 0; font-weight: 600; }
+.lf__prompt { padding: 0 0 var(--space-2); font-weight: 600; }
 .lf__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.lf__chip { position: relative; display: inline-flex; align-items: center; min-height: 44px; padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-full); background: transparent; cursor: pointer; }
+.lf__chip { position: relative; display: inline-flex; align-items: center; min-height: 44px; padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-full); background: var(--surface, #fff); cursor: pointer; }
 .lf__chip input { position: absolute; opacity: 0; pointer-events: none; }
 .lf__chip:has(input:focus-visible) { outline: 3px solid var(--wave); outline-offset: 2px; }
 .lf__chip:has(input:checked) { background: var(--wave); border-color: var(--wave); color: #fff; }
 .lf__unclear { width: 100%; font: inherit; font-size: 16px; }
-/* Phone or a narrow column: the tick and the card take their own row above previous and next. */
-@media (max-width: 720px) {
-  .lf__row:has(.wn-card:not([hidden])) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .lf__row:has(.wn-card:not([hidden])) .lf__finish { grid-column: 1 / -1; order: -1; flex-direction: column; }
-  .lf__finish > .wn-card { flex: none; width: 100%; }
-}
+
+/* Previous and next lesson, under the card and as wide as it. */
+.lf__row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-3); max-width: 44rem; width: 100%; justify-self: center; }
+.lf__link { display: grid; align-content: center; gap: 2px; min-width: 0; min-height: 44px; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); color: var(--ink); text-decoration: none; }
+.lf__link:hover, .lf__link:focus-visible { background: var(--paper); }
+.lf__link:focus-visible { outline: 3px solid var(--wave); outline-offset: 2px; }
+.lf__link--next { text-align: right; }
+.lf__dir { font-size: var(--text-xs); color: var(--muted); }
+.lf__title { font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+
 @media (max-width: 480px) {
+  .lf__head, .lf__card.is-done .lf__head, .lf__parts, .lf__foot { padding-left: var(--space-4); padding-right: var(--space-4); }
+  /* The count goes under the title, so the title keeps one line. */
+  .lf__card:not(.is-done) .lf__head { grid-template-columns: minmax(0, 1fr); }
+  .lf__go, .lf__actions { display: grid; }
+  .lf__card .btn { width: 100%; }
   .lf__row { gap: var(--space-2); }
   .lf__title { font-size: var(--text-sm); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lf__bar i { transition: none; }
 }

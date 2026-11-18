@@ -1,6 +1,6 @@
 # Lesson End Card Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace the three pieces at the end of a student lesson (checklist card, finish tick row, What's next card) with one card, as specified in `docs/superpowers/specs/2026-11-18-lesson-end-card-design.md` and drawn in `docs/mockups/lesson-end-card.html`.
 
@@ -49,7 +49,7 @@ Footer classes: `lf__card` (`is-done`, `has-panel`, `has-parts`, `is-bare`), `lf
 
 **Files:** Modify `src/student/lesson-map.ts`, `tests/unit/lesson-map.test.ts`, `tests/unit/hinge-gate.test.ts`.
 
-- [ ] Rewrite the tests first. `mount()` builds a `div.lf__parts` slot and an `end` element, and records `onProgress` calls. Cases:
+- [x] Rewrite the tests first. `mount()` builds a `div.lf__parts` slot and an `end` element, and records `onProgress` calls. Cases:
   - the list sits in the slot; four rows; `onProgress` last called with `(0, 4)`; no `.lm-check__title`, `.lm-check__count`, `.lm-check__auto`, `.lm-check__start`; no row has `is-next`.
   - help line: "Parts you answer on screen tick themselves. Did one in your book? Tick it here."; with no self-ticking section, "Tick each part off as you go."
   - a row not ticked has `button.lm-check__go` ("Go to part ↑") that scrolls like the name; a ticked row hides it.
@@ -57,24 +57,24 @@ Footer classes: `lf__card` (`is-done`, `has-panel`, `has-parts`, `is-bare`), `lf
   - the strip's last row scrolls to `end`.
   - dispose removes the strip and the list.
   - hinge gate: a held-back part is hidden and left out of both numbers.
-- [ ] Run `npx vitest run tests/unit/lesson-map.test.ts tests/unit/hinge-gate.test.ts`; expect failures on the new cases.
-- [ ] Implement: drop the head, the count, the per-row labels, `is-next` and the pop-in observer; append the list to `slot`; add the `Go to part ↑` button; count visible parts and call `onProgress`; use `end` for the last row and for "where the student is".
-- [ ] Run the two files; expect all green. Commit.
+- [x] Run `npx vitest run tests/unit/lesson-map.test.ts tests/unit/hinge-gate.test.ts`; expect failures on the new cases.
+- [x] Implement: drop the head, the count, the per-row labels, `is-next` and the pop-in observer; append the list to `slot`; add the `Go to part ↑` button; count visible parts and call `onProgress`; use `end` for the last row and for "where the student is".
+- [x] Run the two files; expect all green. Commit.
 
 ## Task 2: Quiet and full "next" (`whats-next.ts`)
 
 **Files:** Modify `src/student/whats-next.ts`, `tests/unit/whats-next.test.ts`.
 
-- [ ] Tests first: kicker reads "Next on your list"; `has-thing` is set once a thing is named and absent for an empty list; `open: true` adds `is-open`; `setDone` still toggles `is-ready` and reads the list once.
-- [ ] Run `npx vitest run tests/unit/whats-next.test.ts`; expect the new cases to fail.
-- [ ] Implement the kicker text, the `aria-label`, `open` and `has-thing`.
-- [ ] Run; green. Commit.
+- [x] Tests first: kicker reads "Next on your list"; `has-thing` is set once a thing is named and absent for an empty list; `open: true` adds `is-open`; `setDone` still toggles `is-ready` and reads the list once.
+- [x] Run `npx vitest run tests/unit/whats-next.test.ts`; expect the new cases to fail.
+- [x] Implement the kicker text, the `aria-label`, `open` and `has-thing`.
+- [x] Run; green. Commit.
 
 ## Task 3: The card (`lesson-footer.ts`)
 
 **Files:** Modify `src/student/lesson-footer.ts`, `tests/unit/lesson-footer.test.ts`.
 
-- [ ] Tests first, replacing the tick helper with `finish(root)` (`.lf__finish`) and `card(root)` (`.lf__card`):
+- [x] Tests first, replacing the tick helper with `finish(root)` (`.lf__finish`) and `card(root)` (`.lf__card`):
   - previous and next keep `lf__link--prev` / `lf__link--next` and read "← Previous lesson" / "Next lesson →"; the Finish button reads "Finish lesson"; the card is not `is-done`.
   - quiz (`finish: false`): no `.lf__finish`, no profile calls, links present; with `beside` the card is `is-bare` and holds it.
   - full flow: Finish opens "Hand in and finish?" with the existing lines and hides `.lf__go`; hand in, two questions and the box; then the panel is hidden, the card is `is-done`, the title is "Lesson completed", `.lf__status` says "Lesson completed", `.lf__undo` shows. During the questions the card is not `is-done`.
@@ -82,29 +82,29 @@ Footer classes: `lf__card` (`is-done`, `has-panel`, `has-parts`, `is-bare`), `lf
   - untick from `.lf__untick`: the check opens with the card still `is-done`, Untick calls `undone`, the card leaves `is-done` and the Finish button is back.
   - `setParts(2, 4)`: count "2 of 4 parts done", bar width 50%, line "2 parts aren’t ticked. You can still finish."; `(3, 4)` gives "1 part isn’t ticked. You can still finish."; `(4, 4)` gives "All parts ticked."; with no parts the title is "End of lesson" and the slot is hidden.
   - finished with parts: slot hidden, sub line "2 of 4 parts ticked · ", `.lf__show` toggles the slot and its own label.
-- [ ] Run `npx vitest run tests/unit/lesson-footer.test.ts`; expect failures.
-- [ ] Implement the card as in the spec. `asking` is true from a successful hand-in until the questions close, so the completed look waits for them and the untick check keeps it.
-- [ ] Run; green. Commit.
+- [x] Run `npx vitest run tests/unit/lesson-footer.test.ts`; expect failures.
+- [x] Implement the card as in the spec. `asking` is true from a successful hand-in until the questions close, so the completed look waits for them and the untick check keeps it.
+- [x] Run; green. Commit.
 
 ## Task 4: Wiring (`lesson-view.ts`)
 
 **Files:** Modify `src/student/lesson-view.ts`, `tests/unit/lesson-view.test.ts`.
 
-- [ ] Add a test: a class lesson with two sections puts `.lm-check` inside `.lf__card .lf__parts` and the count in `.lf__count`.
-- [ ] Mount What's next with `open` on a quiz; mount the map with `slot: footer.partsSlot`, `end: footer.card`, `onProgress: footer.setParts`; put the organiser end card before `footer.element`.
-- [ ] Run `npx vitest run tests/unit` and `npx tsc --noEmit`; green. Commit.
+- [x] Add a test: a class lesson with two sections puts `.lm-check` inside `.lf__card .lf__parts` and the count in `.lf__count`.
+- [x] Mount What's next with `open` on a quiz; mount the map with `slot: footer.partsSlot`, `end: footer.card`, `onProgress: footer.setParts`; put the organiser end card before `footer.element`.
+- [x] Run `npx vitest run tests/unit` and `npx tsc --noEmit`; green. Commit.
 
 ## Task 5: Styles
 
 **Files:** Modify `src/student/lesson-footer.css`, `src/student/lesson-map.css`, `src/student/whats-next.css`.
 
-- [ ] Card, head, bar, band, foot, panel, undo, links: tokens only, `[hidden] { display: none }` for every element toggled with `hidden`, pills for buttons inside the card, full-width buttons at 480px and under.
-- [ ] List rows without the old labels; `Go to part ↑` hidden at 480px and under; drop the pop-in rules.
-- [ ] `.wn-card` quiet line and full block; hidden under `.lf__card.has-panel`.
-- [ ] Commit.
+- [x] Card, head, bar, band, foot, panel, undo, links: tokens only, `[hidden] { display: none }` for every element toggled with `hidden`, pills for buttons inside the card, full-width buttons at 480px and under.
+- [x] List rows without the old labels; `Go to part ↑` hidden at 480px and under; drop the pop-in rules.
+- [x] `.wn-card` quiet line and full block; hidden under `.lf__card.has-panel`.
+- [x] Commit.
 
 ## Task 6: Prove it in the running app
 
-- [ ] `npm run dev -- --host 127.0.0.1`, publish the invented four-part lesson into the mock class, and walk it as a student at 1280 and 390: arrive, hand tick, answer, Finish, completed, Show parts, Untick; then a quiz lesson and a one-section lesson.
-- [ ] Run the spec's failure-mode checks (V1, V3, V4, R2/R3, R5, I2, I12, I16) and compare each state with the mockup.
-- [ ] Set the spec's status to built. `npm run pre-pr-check` from the repo root; exit 0. Push; open the PR ready for review; enable auto-merge.
+- [x] `npm run dev -- --host 127.0.0.1`, publish the invented four-part lesson into the mock class, and walk it as a student at 1280 and 390: arrive, hand tick, answer, Finish, completed, Show parts, Untick; then a quiz lesson and a one-section lesson.
+- [x] Run the spec's failure-mode checks (V1, V3, V4, R2/R3, R5, I2, I12, I16) and compare each state with the mockup.
+- [x] Set the spec's status to built. `npm run pre-pr-check` from the repo root; exit 0. Push; open the PR ready for review; enable auto-merge.

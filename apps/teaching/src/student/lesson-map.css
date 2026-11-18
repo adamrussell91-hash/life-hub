@@ -1,4 +1,4 @@
-/* Lesson map: the pop-out section strip on the right and the "This lesson" checklist above the footer. Tokens only. */
+/* Lesson map: the pop-out section strip on the right, and the list of parts shown in the lesson end card. Tokens only. */
 .student-surface__content.has-lesson-map { padding-right: calc(clamp(var(--space-5), 3vw, var(--space-10)) + 28px); }
 
 .lm { position: fixed; right: 0; top: var(--lm-top, 3.5rem); bottom: 0; width: 28px; z-index: 15; overflow: hidden; background: var(--paper); border-left: 1px solid var(--line); transition: width 0.22s ease, box-shadow 0.22s ease; }
@@ -23,32 +23,28 @@
 
 .lm-flash { border-radius: var(--radius-xs); box-shadow: 0 0 0 3px var(--warning-surface), 0 0 0 4px var(--high-sea-ink); transition: box-shadow 0.3s; }
 
-.lm-check { display: grid; gap: var(--space-2); max-width: 40rem; width: 100%; margin: var(--space-6) auto 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--paper); transition: opacity 0.35s ease-out, transform 0.45s cubic-bezier(0.2, 1.3, 0.5, 1), box-shadow 0.3s; }
-.lm-check.is-armed:not(.is-in) { opacity: 0; transform: translateY(28px) scale(0.97); }
-.lm-check.is-in { box-shadow: var(--shadow); }
-.lm-check__head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
-.lm-check__title { margin: 0; font-size: var(--text-md, 1rem); }
-.lm-check__title:focus { outline: none; }
-.lm-check__count { font-size: var(--text-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
-.lm-check__list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
-.lm-check__row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; padding: 4px var(--space-2); border-radius: var(--radius-xs); }
-.lm-check__row.is-next { background: var(--warning-surface); }
-.lm-check__tick { width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 1.5px solid var(--navy-2); border-radius: var(--radius-xs); background: transparent; color: transparent; cursor: pointer; }
-.lm-check__tick svg { width: 14px; height: 14px; }
-.lm-check__tick:focus-visible, .lm-check__name:focus-visible { outline: 3px solid var(--wave); outline-offset: 2px; }
-.lm-check__row.is-done .lm-check__tick { background: var(--success); border-color: var(--success); border-style: solid; color: #fff; }
-.lm-check__label { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
-.lm-check__name { min-height: 28px; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
-.lm-check__name:hover { text-decoration: underline; }
-.lm-check__row.is-done .lm-check__name { color: var(--muted); text-decoration: line-through; }
-.lm-check__auto { color: var(--muted); font-size: var(--text-xs); }
-.lm-check__note { margin: 0; padding-top: var(--space-2); border-top: 1px solid var(--line); color: var(--ink); font-size: var(--text-sm); }
-.lm-check__start { display: none; padding: 0 6px; border-radius: var(--radius-full); background: var(--high-sea-ink); color: #fff; font-size: var(--text-2xs); font-weight: 600; white-space: nowrap; }
-.lm-check__row.is-next .lm-check__start { display: inline-block; }
-.lm-check__row.is-next .lm-check__name { color: var(--high-sea-ink); font-weight: 600; }
-.lm-check__status { font-size: var(--text-xs); color: var(--muted); white-space: nowrap; }
+/* The list of parts, in the lesson end card's slot (lesson-footer.css draws the card). A tick and a name per row. */
+.lm-check { display: grid; }
+.lm-check__list { display: grid; margin: 0; padding: 0; list-style: none; }
+.lm-check__row { display: flex; align-items: center; gap: var(--space-3); min-height: 48px; padding: var(--space-1) 0; }
+.lm-check__row + .lm-check__row { border-top: 1px solid var(--line); }
+.lm-check__row[hidden], .lm-check__status[hidden], .lm-check__go[hidden] { display: none; }
+.lm-check__tick { position: relative; flex: none; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 1.5px solid var(--navy-2); border-radius: var(--radius-xs); background: var(--surface, #fff); color: transparent; cursor: pointer; }
+/* A finger-sized target around the box. */
+.lm-check__tick::after { content: ''; position: absolute; inset: -10px; }
+.lm-check__tick svg { width: 15px; height: 15px; }
+.lm-check__row.is-done .lm-check__tick { background: var(--success); border-color: var(--success); color: #fff; }
+.lm-check__name { flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: var(--text-md); line-height: 1.3; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.lm-check__name:hover, .lm-check__go:hover { text-decoration: underline; }
+.lm-check__row.is-done .lm-check__name { color: var(--muted); }
+.lm-check__status { flex: none; font-size: var(--text-xs); color: var(--muted); white-space: nowrap; }
+.lm-check__go { flex: none; min-height: 44px; padding: 0 var(--space-1); border: 0; background: none; color: var(--wave); font: inherit; font-size: var(--text-sm); font-weight: 600; white-space: nowrap; cursor: pointer; }
+.lm-check__tick:focus-visible, .lm-check__name:focus-visible, .lm-check__go:focus-visible { outline: 3px solid var(--wave); outline-offset: 2px; border-radius: var(--radius-xs); }
+.lm-check__note { margin: 0; padding: var(--space-2) 0 var(--space-4); color: var(--muted); font-size: var(--text-sm); }
 
 @media (max-width: 480px) {
+  /* The name goes to the part too. */
+  .lm-check__go { display: none; }
   .lm { width: 22px; }
   .lm__tab { width: 22px; }
   .lm__go { grid-template-columns: minmax(0, 1fr) auto 22px; }
@@ -56,11 +52,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lm, .lm__label, .lm__status, .lm-check, .lm-flash { transition: none; }
-  .lm-check.is-armed:not(.is-in) { opacity: 1; transform: none; }
+  .lm, .lm__label, .lm__status, .lm-flash { transition: none; }
 }
 
 @media print {
   .lm { display: none; }
-  .lm-check { box-shadow: none; opacity: 1; transform: none; }
 }

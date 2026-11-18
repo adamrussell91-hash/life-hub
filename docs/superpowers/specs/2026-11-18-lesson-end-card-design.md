@@ -2,7 +2,7 @@
 
 Date: 18 November 2026
 Hub: Teaching
-Status: design approved from the mockup, not built
+Status: built
 Mockup: `docs/mockups/lesson-end-card.html`
 
 ## Purpose
@@ -50,7 +50,7 @@ Labels change from "← Previous" and "Next →" to "← Previous lesson" and "N
 | Fewer than two sections, or a lecture | No parts list, count or bar. Title "End of lesson", the Finish lesson button, the quiet next line. |
 | Quiz lesson | Handing the quiz in finishes it, so there is no Finish button and no head. The card is "Next on your list" in its full form, with previous and next lesson under it. |
 | Station rotation | Nothing, as now. |
-| A part a hinge gate still holds back | Left out of the list and the count, as now. |
+| A part a hinge gate still holds back | Left out of the list, as now, and now out of the count too, so the count matches the rows on screen. |
 | Phone (480px and under) | Buttons take the full width. "Go to part ↑" is dropped; tapping the name still goes there. |
 
 ## Words that change
@@ -105,7 +105,7 @@ Styles stay in the three existing files and use tokens only. Buttons inside the 
 - **I16** a mark students must decode with no words: the finish control carries the words "Finish lesson". Check: no icon-only button in the card.
 - **L13** corner control on the first line: none added.
 - **W12** class name already in use: new `lf__` and `lm-check__` names are grepped before use.
-- **P1** compare to the mockup: screenshots of the built card beside the mockup, desktop and 390, in the PR.
+- **P1** compare to the mockup: every state of the built card is checked against the mockup at 1280 and 390 before the PR.
 
 ## Verify
 
