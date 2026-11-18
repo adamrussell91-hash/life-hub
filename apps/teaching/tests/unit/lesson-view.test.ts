@@ -212,6 +212,27 @@ describe('mountStudentLessonView', () => {
     );
   });
 
+  it('a station rotation has no finish tick, What\'s next or lesson links: Back to the map stands in', async () => {
+    const rotation = { dial: 'standard', path: 'free_all', evidence: 'none', link_words: [], stations: [], finale: { build_prompt: 'Write it.', formats: [], debrief: [] }, behind_fallback: 'none', pretest_count: 0 };
+    vi.mocked(apiGet).mockImplementation(async (path: string) => {
+      if (path.includes('/published/classes/')) return publishedClass();
+      if (path.includes('/published/lessons/')) return { ...publishedLesson(), pedagogical_mode: 'station_rotation', rotation };
+      throw new Error(path);
+    });
+
+    const root = document.createElement('div');
+    document.body.append(root);
+    mountStudentLessonView({ root, lessonId: 'lesson_lkeep_008', classId: CLASS_ID });
+
+    await vi.waitFor(() => {
+      expect(root.querySelector('.rot-player')).not.toBeNull();
+      expect(root.querySelector('a.st-token')).not.toBeNull();
+    });
+    expect(root.querySelector('.lf')).toBeNull();
+    expect(root.querySelector('a.lf__link--next')).toBeNull();
+    expect(root.querySelector('.wn-card')).toBeNull();
+  });
+
   it('class-scoped opens a published side lesson that is off the schedule', async () => {
     vi.mocked(apiGet).mockImplementation(async (path: string) => {
       if (path.includes('/published/classes/')) {

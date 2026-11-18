@@ -27,6 +27,19 @@ export type StationCardOptions = {
 
 export type StationCard = { root: HTMLElement; update(status: RotationStatus): void; dispose(): void };
 
+const MAP_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>';
+
+/** The big "Back to the map" button: at the top and bottom of a station and the finale. */
+export function mapButton(onClick: () => void): HTMLButtonElement {
+  const b = el('button', 'rot-btn rot-btn--map');
+  b.type = 'button';
+  b.dataset.rotMap = '';
+  b.innerHTML = MAP_SVG;
+  b.append(el('span', '', 'Back to the map'));
+  b.addEventListener('click', onClick);
+  return b;
+}
+
 const LOCK_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 
 /** A stable shuffle per student and station, so option order never gives the answer away and doesn't jump on reload. */
@@ -62,10 +75,7 @@ export function mountStationCard(o: StationCardOptions): StationCard {
   const head = el('div', 'rot-row rot-row--between');
   const titles = el('div');
   titles.append(el('p', 'rot-eyebrow', `${s.kind === 'teacher' ? 'Teacher station' : `Station ${o.number}`} · ${ROTATION_KIND_INFO[s.kind].label}`), el('h2', '', s.title));
-  const back = el('button', 'rot-btn rot-btn--small', '← Map');
-  back.type = 'button';
-  back.addEventListener('click', o.onBack);
-  head.append(titles, back);
+  head.append(titles, mapButton(o.onBack));
   const err = el('p', 'rot-err');
   err.setAttribute('role', 'alert');
   const steps = el('div', 'rot-steps');
@@ -78,7 +88,10 @@ export function mountStationCard(o: StationCardOptions): StationCard {
   const help = el('div', 'rot-panel');
   aside.append(about, kitBox, help);
   const completeBox = el('div', 'rot-complete-host');
-  root.append(main, aside, completeBox);
+  // The way back sits at the bottom too, so a student who scrolled through the station never hunts for it.
+  const footBar = el('div', 'rot-mapbar');
+  footBar.append(mapButton(o.onBack));
+  root.append(main, aside, completeBox, footBar);
 
   const act = async (go: () => Promise<RotationStatus>, btn?: HTMLButtonElement): Promise<RotationStatus | null> => {
     err.textContent = '';
@@ -419,6 +432,8 @@ export function mountStationCard(o: StationCardOptions): StationCard {
     const sig = JSON.stringify([passed, ready, collected, kit.map((k) => k.lock)]);
     if (sigs.complete === sig) return;
     sigs.complete = sig;
+    // A collected station's panel has its own Back to the map button; one is enough.
+    footBar.hidden = collected;
     if (!passed && !collected) { completeBox.replaceChildren(); return; }
     const panel = el('section', 'rot-complete');
     panel.dataset.collected = String(collected);

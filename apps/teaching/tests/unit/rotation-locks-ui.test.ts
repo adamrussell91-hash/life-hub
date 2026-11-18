@@ -153,6 +153,26 @@ describe('station lock chain', () => {
   });
 });
 
+describe('back to the map', () => {
+  it('puts a big Back to the map button at the top and the bottom of a station', () => {
+    const onBack = vi.fn();
+    const c = mountStationCard({ station, number: 2, rotation, blocks: snapshotBlocks, lessonId: 'rot1', unitId: 'unit1', pageBlocks: lesson.blocks as Block[], client: client(), run: async (go) => go(), onBack });
+    document.body.append(c.root);
+    c.update(status([k1Open(), k2Locked, k3Locked]));
+    const buttons = [...c.root.querySelectorAll<HTMLButtonElement>('[data-rot-map]')];
+    expect(buttons).toHaveLength(2);
+    expect(buttons.every((b) => b.textContent === 'Back to the map')).toBe(true);
+    expect(c.root.querySelector('.rot-mapbar')?.contains(buttons[1]!)).toBe(true);
+    buttons[1]!.click();
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the bottom button once the Station complete panel shows its own', () => {
+    const c = card(status([k1Passed(), k2Locked, k3Locked], { work: { ...status([]).work!, collected: ['s4'] } }));
+    expect(c.root.querySelector<HTMLElement>('.rot-mapbar')!.hidden).toBe(true);
+  });
+});
+
 describe('rush round', () => {
   it('fills a pip for each right answer and moves to the server’s next question', async () => {
     const lock = k1Open();

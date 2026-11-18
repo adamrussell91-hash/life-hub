@@ -384,6 +384,9 @@ export function mountStudentLessonView(
         from: cls ? `/s/classes/${cls.id}/lessons/${lesson.lesson_id}` : `/s/lessons/${lesson.lesson_id}?class=${workClass}`
       });
       header.append(token.element);
+      // A station rotation keeps students inside it: no finish tick (it would mark the whole rotation done)
+      // and no What's next or next-lesson links (they lead out of it). The player's Back to the map buttons stand in.
+      if (lesson.pedagogical_mode === 'station_rotation') return;
       const { prev, next } = cls ? scheduleNeighbors(cls.schedule, lesson.lesson_id) : { prev: null, next: null };
       const linkTo = (row: typeof prev) => (row && cls ? { href: `/s/classes/${cls.id}/lessons/${row.lesson_id}`, title: row.title } : null);
       const here = cls ? `/s/classes/${cls.id}/lessons/${lesson.lesson_id}` : `/s/lessons/${lesson.lesson_id}?class=${workClass}`;
