@@ -718,6 +718,11 @@ export function trimWhisper(raw) {
   };
 }
 
+async function gone(store, queueKey, id) {
+  await store.delete(queueKey).catch(() => undefined);
+  return { id, skipped: true };
+}
+
 async function transcribeOne(store, env, queueKey, deps) {
   const [, lesson, block, id] = queueKey.split('/');
   const key = voiceKeys.submission(lesson, block, id);
@@ -738,12 +743,15 @@ async function transcribeOne(store, env, queueKey, deps) {
     });
     const payload = await response.json().catch(() => null);
     if (!response.ok) throw new Error(typeof payload?.error === 'string' ? payload.error : `Transcribe failed (${response.status})`);
-    const fresh = (await read(store, key)) ?? record;
+    // Whisper can take a minute: the teacher may have deleted the take meanwhile. Writing the record back would bring it back without its audio.
+    const fresh = await read(store, key);
+    if (!fresh) return gone(store, queueKey, id);
     await store.setJSON(key, { ...fresh, transcript: trimWhisper(payload), transcript_status: 'done', transcript_error: undefined });
     await store.delete(queueKey).catch(() => undefined);
     return { id, done: true };
   } catch (error) {
-    const fresh = (await read(store, key)) ?? record;
+    const fresh = await read(store, key);
+    if (!fresh) return gone(store, queueKey, id);
     const attempts = (Number(fresh.transcribe_attempts) || 0) + 1;
     const failed = attempts >= MAX_TRANSCRIBE_ATTEMPTS;
     await store.setJSON(key, {
