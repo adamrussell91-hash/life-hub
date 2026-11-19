@@ -7375,7 +7375,8 @@ var GAME_KINDS = [
   "connections",
   "articulate",
   "pictionary",
-  "who_said_it"
+  "who_said_it",
+  "answer_chain"
 ];
 var GameKindSchema = z20.enum(GAME_KINDS);
 var GAME_LIMITS = {
@@ -7405,7 +7406,10 @@ var GAME_LIMITS = {
   prompt: 1e3,
   criterion: 200,
   chips: 6,
-  chip: 60
+  chip: 60,
+  /** Answer chain: the answer every chain starts from, and the topic line. */
+  startAnswer: 40,
+  theme: 120
 };
 var GAME_COUNTS = {
   crossword: { min: 6, max: 30 },
@@ -7575,6 +7579,22 @@ var BattlesSchema = z20.object({
   settings: z20.object({ write_minutes: z20.number().int().min(2).max(8).default(4) }).prefault({}),
   ...ItemTagsShape
 });
+var AnswerChainSchema = z20.object({
+  ...base2,
+  kind: z20.literal("answer_chain"),
+  /** The answer every team's chain starts from (one word or a short name). */
+  start_answer: Text2(GAME_LIMITS.startAnswer),
+  /** Optional: keeps every link on topic ("The water cycle"). */
+  theme: Text2(GAME_LIMITS.theme),
+  settings: z20.object({
+    /** Links per chain: question, answer, question… always even, so a chain ends on an answer. */
+    links: z20.number().int().min(4).max(12).default(6),
+    question_seconds: z20.number().int().min(10).max(60).default(20),
+    answer_seconds: z20.number().int().min(5).max(30).default(10),
+    review_seconds: z20.number().int().min(30).max(180).default(90)
+  }).prefault({}),
+  ...ItemTagsShape
+});
 var WagerSchema = z20.object({
   ...base2,
   kind: z20.literal("wager"),
@@ -7627,7 +7647,8 @@ var GameSchema = z20.discriminatedUnion("kind", [
   ConnectionsSchema,
   ArticulateSchema,
   PictionarySchema,
-  WhoSaidItSchema
+  WhoSaidItSchema,
+  AnswerChainSchema
 ]);
 var GameLessonSchema = z20.object({
   games: z20.array(GameSchema).max(GAME_LIMITS.games).default([]),
@@ -7701,6 +7722,7 @@ function gameItems(game) {
     case "connections":
       return game.walls.flatMap((w) => w.groups);
     case "battles":
+    case "answer_chain":
       return [];
   }
 }
@@ -7840,6 +7862,9 @@ function gameIssues(lesson) {
         if (game.items.length >= GAME_COUNTS.team_match.min && distinct.size < 12) out.push(`${where2} needs at least 12 different answers.`);
         break;
       }
+      case "answer_chain":
+        if (!game.start_answer.trim()) out.push(`${where2}: give the answer every chain starts from.`);
+        break;
       case "battles":
         if (!game.prompt.trim() && !game.question_ref) out.push(`${where2}: write the prompt students answer.`);
         if (!game.criterion.trim()) out.push(`${where2}: say what makes one answer better.`);

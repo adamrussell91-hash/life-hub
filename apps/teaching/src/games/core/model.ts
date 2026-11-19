@@ -122,6 +122,8 @@ export type LiveContent = {
   cards?: Record<string, { banned: string[]; clues: Array<{ kind: string; text: string }>; draw?: string }>;
   /** Battles: the prompt students write to, what makes one answer better, the chips judges can tick and the prompt's tags. */
   battle?: { prompt: string; criterion: string; chips: string[]; tags: string[] };
+  /** Answer chain: the start answer every chain grows from and the optional topic line. */
+  chain?: { start: string; theme: string; tags: string[] };
 };
 
 /**
@@ -211,6 +213,7 @@ export function gameItems(game: Game): GameItem[] {
     case 'connections':
       return game.walls.flatMap((w) => w.groups);
     case 'battles':
+    case 'answer_chain':
       return [];
   }
 }
@@ -469,6 +472,9 @@ export function gameIssues(lesson: { game?: GameLesson | undefined }): string[] 
         if (game.items.length >= GAME_COUNTS.team_match.min && distinct.size < 12) out.push(`${where} needs at least 12 different answers.`);
         break;
       }
+      case 'answer_chain':
+        if (!game.start_answer.trim()) out.push(`${where}: give the answer every chain starts from.`);
+        break;
       case 'battles':
         if (!game.prompt.trim() && !game.question_ref) out.push(`${where}: write the prompt students answer.`);
         if (!game.criterion.trim()) out.push(`${where}: say what makes one answer better.`);
@@ -693,7 +699,7 @@ export function splitGame(game: Game, random: Random = Math.random): { public: P
     }
     count = pubItems.length;
   }
-  if (game.kind === 'battles') count = 1;
+  if (game.kind === 'battles' || game.kind === 'answer_chain') count = 1;
   if (!info.solo && pubItems.length) {
     keys.live = { items: pubItems };
     if (game.kind === 'jeopardy') {
@@ -719,6 +725,9 @@ export function splitGame(game: Game, random: Random = Math.random): { public: P
       };
     }
     keys.live = { items: keys.live?.items ?? pubItems, ...keys.live, cards };
+  }
+  if (game.kind === 'answer_chain') {
+    keys.live = { items: [], chain: { start: game.start_answer.trim(), theme: game.theme.trim(), tags: evidenceTags(game) } };
   }
   if (game.kind === 'battles') {
     keys.live = {
