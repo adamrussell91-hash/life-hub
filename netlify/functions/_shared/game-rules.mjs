@@ -2393,9 +2393,10 @@ function sizeOf(id) {
   return SHIP_SIZES[SHIP_IDS.indexOf(id)];
 }
 function shipsFor(team, owner) {
-  const at = team.owners.indexOf(owner);
+  const placers = team.owners.filter((o) => !(team.late ?? []).includes(o));
+  const at = placers.indexOf(owner);
   if (at < 0) return [];
-  const split = team.owners.length === 3 ? [["s0"], ["s1", "s3"], ["s2"]] : [["s0", "s3"], ["s1", "s2"]];
+  const split = placers.length === 3 ? [["s0"], ["s1", "s3"], ["s2"]] : [["s0", "s3"], ["s1", "s2"]];
   return split[at] ? [...split[at]] : [];
 }
 function isStraight(squares) {
@@ -2612,9 +2613,18 @@ function settleHit(state, hit, filed) {
   hit.status = filed[hit.id] != null ? "full" : "half";
   state.damage[hit.team] = (state.damage[hit.team] ?? 0) + (hit.status === "full" ? hit.full : halfDamage(hit.full));
 }
+function noReporter(pairing, team, shooter, absent) {
+  const t = pairing?.teams.find((x) => x.id === team);
+  return !!t && !t.owners.some((o) => o !== shooter && !absent.includes(o));
+}
 function settleHits(state, input, round) {
+  const absent = input.absent ?? [];
   for (const hit of state.hits) {
     if (hit.status !== "owed") continue;
+    if (absent.length && noReporter(input.pairing, hit.team, hit.owner, absent)) {
+      settleHit(state, hit, { [hit.id]: hit.round });
+      continue;
+    }
     hit.rejected = input.rejected[hit.id] ?? 0;
     hit.due = hit.round + 1 + Math.min(hit.rejected, 1);
     if (round === void 0 || round >= hit.due) settleHit(state, hit, input.filed);
@@ -2700,7 +2710,7 @@ function resolveRound(prev, input) {
       } else {
         chart[shot.square] = "hit";
         const full = (shot.sure ? DAMAGE.sure : DAMAGE.hit) + (shot.returning ? DAMAGE.returning : 0);
-        const alone = !team.owners.some((o) => o !== shot.owner);
+        const alone = noReporter(pairing, team.id, shot.owner, input.absent ?? []);
         const hit = {
           id: `h${round}-${shot.owner}-${shot.seq}`,
           owner: shot.owner,

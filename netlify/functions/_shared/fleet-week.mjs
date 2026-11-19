@@ -24,15 +24,15 @@
 import { loadRoster } from './class-claims.mjs';
 import { deviceHash, read, reject } from './question-drop.mjs';
 import { isSafeId } from './class-examples.mjs';
-import { campaignIndexKey, gameKeys } from './game-store.mjs';
+import { FLEET_ACTIONS, campaignIndexKey, gameKeys } from './game-store.mjs';
 import { cleanWritingLog } from './quiz-core.mjs';
 import { checkAnswer, fleet } from './game-rules.mjs';
 import {
-  LATE_GRACE_MS, SHOTS_PER_ROUND, aliasFor, ensureCampaign, findCampaign, hashFor, list, loadFleetGame, markClock, obj, reportInputs,
+  LATE_GRACE_MS, SHOTS_PER_ROUND, aliasFor, ensureCampaign, ensureResolved, firesIn, findCampaign, hashFor, list, loadFleetGame, markClock, obj, reportInputs,
   roundClosing, roundOpen, roundsOf, touchClock, updateJSON
 } from './fleet-week-store.mjs';
 
-export const FLEET_ACTIONS = ['fleet_state', 'fleet_place', 'fleet_commit', 'fleet_answer', 'fleet_report', 'fleet_recall', 'signals', 'signals_seen'];
+export { FLEET_ACTIONS };
 export { LATE_GRACE_MS };
 const TEXT_MAX = 300;
 
@@ -149,7 +149,7 @@ export async function viewFor(store, k, campaign, keys, state, clock, owner, now
     rounds: roundsOf(campaign),
     closes_at: phase === 'placement' || phase === 'firing' ? clock.closes_at : null,
     labels: { columns: keys.live.fleet.columns, rows: keys.live.fleet.rows },
-    me: { sign: signs[owner], ships: fleet.shipsFor(team, owner), placed },
+    me: { sign: signs[owner], ships: fleet.shipsFor(team, owner), placed, ...(firesIn(campaign, owner, clock.round) ? {} : { joins_at: obj(campaign.late)[owner] }) },
     team: {
       signs: Object.fromEntries(team.owners.filter((o) => o !== owner).map((o) => [aliasFor(campaign, owner, o), signs[o]])),
       fleet: fleetShips,
@@ -162,7 +162,7 @@ export async function viewFor(store, k, campaign, keys, state, clock, owner, now
       duds
     },
     shots: {
-      left: phase === 'firing' ? Math.max(0, SHOTS_PER_ROUND - myShots.length) : 0,
+      left: phase === 'firing' && firesIn(campaign, owner, clock.round) ? Math.max(0, SHOTS_PER_ROUND - myShots.length) : 0,
       ...(open ? { open: { square: open.square, sure: open.sure, question: publicQuestion(keys, open.item), deadline: open.deadline } } : {}),
       returning,
       fired
@@ -273,6 +273,7 @@ async function holdForShot(ctx, shot, count) {
 async function commit(ctx, body) {
   const { store, k, campaign, keys, state, clock, owner, now } = ctx;
   if (clock.round < 1 || !roundOpen(campaign, clock)) reject(409, 'not_firing', 'Wait for the next round.');
+  if (!firesIn(campaign, owner, clock.round)) reject(409, 'joins_next', 'You join the fleet next round.');
   const square = Number(body.square);
   if (!Number.isInteger(square) || square < 0 || square >= fleet.SQUARES) reject(400, 'bad_square', 'Pick a square on the chart.');
   const sure = body.sure === true;
@@ -470,9 +471,6 @@ const SIGNAL_ID = /^([a-f0-9]{16}):(round_open|report_ready|hit|report_owed|reve
 const SEEN_BATCH = 50;
 const INDEX_MAX = 20;
 
-/** Whether `owner` may fire in `round` (a late joiner waits for the round after they joined; §3.5). */
-export const firesIn = (campaign, owner, round) => (obj(campaign.late)[owner] ?? 0) <= round;
-
 /**
  * Every event waiting for `owner` in one campaign, not yet shown (§2). Ids are
  * `${campaign}:${kind}:${round}`, so each event shows once. Resolves the round
@@ -565,6 +563,37 @@ export async function fleetClassSignalsSeen(store, classId, studentId, ids) {
   return markSeen(store, await classCampaigns(store, classId), studentOwner(classId, studentId), ids);
 }
 
+/**
+ * A student on the class list who wasn't in the game when it opened (§3.5):
+ * they join the team of two that has dealt the least damage (ties: team
+ * order) as a third member, firing from the next round, with no ships to
+ * place. Placement or a firing round only; after the last round they wait
+ * for the next game. One etag write on the campaign, so two joins can't race.
+ */
+async function lateJoin(store, k, found, owner, studentId, now) {
+  const { state, clock } = await ensureResolved(store, k, found, now);
+  if (!roundOpen(found, clock)) reject(403, 'not_in_game', 'You joined after this game started. You’ll be in the next one.');
+  const from = clock.round + 1;
+  if (from > roundsOf(found)) reject(403, 'not_in_game', 'You joined after this game started. You’ll be in the next one.');
+  const { data } = await updateJSON(store, k.campaign(found.game_id, found.id), (c) => {
+    if (list(c.joined).includes(owner)) return undefined;
+    if (c.revealed_at || c.closed_at) reject(403, 'not_in_game', 'You joined after this game started. You’ll be in the next one.');
+    const playing = c.pairing.teams.filter((t) => !t.ghost && t.owners.length);
+    const pool = playing.some((t) => t.owners.length === 2) ? playing.filter((t) => t.owners.length === 2) : playing;
+    if (!pool.length) reject(403, 'not_in_game', 'You joined after this game started. You’ll be in the next one.');
+    const damage = (t) => state.damage?.[t.id] ?? 0;
+    const team = pool.reduce((best, t) => (damage(t) < damage(best) ? t : best), pool[0]);
+    return {
+      ...c,
+      pairing: { ...c.pairing, teams: c.pairing.teams.map((t) => (t.id === team.id ? { ...t, owners: [...t.owners, owner], late: [...list(t.late), owner] } : t)) },
+      joined: [...list(c.joined), owner],
+      students: { ...obj(c.students), [owner]: studentId },
+      late: { ...obj(c.late), [owner]: from }
+    };
+  });
+  return data;
+}
+
 /** Student actions on a Fleet week campaign (`identify()` has run; `owner` is the student's). */
 export async function fleetStudentAction(store, lessonId, body, { classId, student, owner, now = Date.now() }) {
   const action = body.action;
@@ -576,9 +605,12 @@ export async function fleetStudentAction(store, lessonId, body, { classId, stude
     const campaigns = await lessonCampaigns(store, lessonId, classId, body.game_id);
     return action === 'signals' ? collectSignals(store, campaigns, owner, now) : markSeen(store, campaigns, owner, body.ids);
   }
-  const found = await findCampaign(store, k, body.game_id, classId, body.campaign_id);
+  let found = await findCampaign(store, k, body.game_id, classId, body.campaign_id);
   if (!found || found.game_id !== body.game_id) reject(409, 'no_campaign', 'Your teacher hasn’t started this game yet.');
-  if (!list(found.joined).includes(owner)) reject(403, 'not_in_game', 'You joined after this game started. You’ll be in the next one.');
+  if (!list(found.joined).includes(owner)) {
+    if (action !== 'fleet_state') reject(403, 'not_in_game', 'You joined after this game started. You’ll be in the next one.');
+    found = await lateJoin(store, k, found, owner, student.id, now);
+  }
   const { keys } = await loadFleetGame(store, k, found.game_id, found.version);
   if (action !== 'fleet_state' && (found.closed_at || found.revealed_at)) reject(409, 'closed', 'This game has finished.');
   const resolved = await ensureCampaign(store, k, found, now);

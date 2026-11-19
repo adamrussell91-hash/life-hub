@@ -20,6 +20,7 @@
 import { createHmac } from 'node:crypto';
 import { mapBounded } from './blobs-list.mjs';
 import { read, reject } from './question-drop.mjs';
+import { loadRoster } from './class-claims.mjs';
 import { fleet } from './game-rules.mjs';
 import { list, obj, readWithEtag, updateJSON } from './etag-json.mjs';
 import { foldRound } from './fleet-week-fold.mjs';
@@ -137,6 +138,20 @@ export const isDone = (clock, owner, round, now) => {
   return !!d && d.round === round && now > (d.until ?? 0);
 };
 
+/** Whether `owner` may fire in `round`: a late joiner waits for the round after they joined (§3.5). */
+export const firesIn = (campaign, owner, round) => (obj(campaign.late)[owner] ?? 0) <= round;
+
+/**
+ * Owners whose student has left the class list (§3.5). Their ships stay and
+ * their partner fires alone. With no class record at all, nobody counts as gone.
+ */
+export async function absentOwners(store, campaign) {
+  const roster = await loadRoster(store, campaign.class_id);
+  if (!roster) return [];
+  const ids = new Set(roster.students.map((s) => s.id));
+  return list(campaign.joined).filter((o) => !ids.has(obj(campaign.students)[o]));
+}
+
 /**
  * Who is active in the open round (decision 8): seen since the round opened, or
  * placed (for round 1), or fired in the round before.
@@ -146,7 +161,7 @@ export function activeOwners(campaign, clock) {
   const seen = obj(clock.seen);
   const done = obj(clock.done);
   const fired = obj(clock.fired);
-  return list(campaign.joined).filter((o) => seen[o] === r || (r === 1 ? done[o]?.round === 0 : r > 1 && fired[o] === r - 1));
+  return list(campaign.joined).filter((o) => firesIn(campaign, o, r)).filter((o) => seen[o] === r || (r === 1 ? done[o]?.round === 0 : r > 1 && fired[o] === r - 1));
 }
 
 /** A committed shot still waiting for its answer holds the round open (`open[owner] = { round, until }`). */
@@ -166,7 +181,7 @@ export function roundClosed(campaign, clock, now) {
   if (clock.round === 0) {
     if (roundClosing(clock, now)) return true;
     // Placement waits for the whole class: every rostered player in the pairing (never the ghost) must place.
-    const players = campaign.pairing.teams.filter((t) => !t.ghost).flatMap((t) => t.owners);
+    const players = campaign.pairing.teams.filter((t) => !t.ghost).flatMap((t) => t.owners.filter((o) => !list(t.late).includes(o)));
     return players.length > 0 && players.every((o) => isDone(clock, o, 0, now));
   }
   if (roundClosing(clock, now)) return !heldOpen(clock, now);
@@ -236,7 +251,7 @@ async function roundInput(store, k, campaign, round) {
     stored = await roundShots(store, k, campaign, round);
     base.shots = stored.map(toShot);
   }
-  return { input: { ...base, ...reports }, stored };
+  return { input: { ...base, ...reports, absent: await absentOwners(store, campaign) }, stored };
 }
 
 /**
@@ -295,7 +310,7 @@ export async function revealCampaign(store, k, campaign, now) {
   if (campaign.revealed_at) return campaign;
   const { state } = await ensureResolved(store, k, campaign, now);
   const finalKey = k.campaignResolved(campaign.game_id, campaign.id, 'final');
-  const settled = fleet.settleAll(state, reportInputs(await allReports(store, k, campaign)));
+  const settled = fleet.settleAll(state, { ...reportInputs(await allReports(store, k, campaign)), pairing: campaign.pairing, absent: await absentOwners(store, campaign) });
   await store.setJSON(finalKey, settled, { onlyIfNew: true });
   const { data } = await updateJSON(store, k.campaign(campaign.game_id, campaign.id), (c) => (c.revealed_at ? undefined : { ...c, revealed_at: now }));
   return data;

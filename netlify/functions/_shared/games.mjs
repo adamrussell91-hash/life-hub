@@ -31,9 +31,9 @@ import { addColumnWithMarks, sydneyDay } from './markbook.mjs';
 import { organiserKey, sendPiecesToBoxOne } from './organiser.mjs';
 import { upgradeOrganiser } from './organiser-model.mjs';
 import { newMarkbookId } from './markbook-schema.mjs';
-import { gameKeys } from './game-store.mjs';
+import { FLEET_ACTIONS, gameKeys } from './game-store.mjs';
 import { list, obj, updateJSON } from './etag-json.mjs';
-import { FLEET_ACTIONS, fleetStudentAction } from './fleet-week.mjs';
+import { fleetStudentAction } from './fleet-week.mjs';
 import { QUIZ_KIND_INFO } from './quiz-core.mjs';
 import { GAME_KIND_INFO, GameLessonSchema } from './game-schema.mjs';
 import {

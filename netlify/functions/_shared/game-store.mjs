@@ -37,6 +37,13 @@ export const gameKeys = (lesson) => ({
  */
 export const campaignIndexKey = (cls) => `game-campaigns/${cls}`;
 
+/**
+ * Fleet week's student actions (fleet-week.mjs). Kept in this leaf module so
+ * games.mjs can list them at load time whatever order the modules load in
+ * (fleet-week.mjs reaches games.mjs through the learning-data fold).
+ */
+export const FLEET_ACTIONS = ['fleet_state', 'fleet_place', 'fleet_commit', 'fleet_answer', 'fleet_report', 'fleet_recall', 'signals', 'signals_seen'];
+
 /** A live room's join code → where it is. Freed when the room folds, or once it is 6 h old. */
 export const roomCodeKey = (code) => `game-rooms/codes/${code}`;
 

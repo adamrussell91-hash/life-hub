@@ -25,7 +25,8 @@ export const SHIP_IDS = ['s0', 's1', 's2', 's3'] as const;
 export type ShipId = (typeof SHIP_IDS)[number];
 /** A placed ship. Its squares are in a straight line. */
 export type Ship = { id: ShipId; squares: number[] };
-export type Team = { id: string; owners: string[]; ghost?: boolean };
+/** `late`: owners who joined after the game began (§3.5). They fire and file reports but place no ships. */
+export type Team = { id: string; owners: string[]; ghost?: boolean; late?: string[] };
 export type Match = { id: string; teams: [string, string] };
 export type Pairing = { teams: Team[]; matches: Match[] };
 export type Rng = () => number;
@@ -98,9 +99,10 @@ function sizeOf(id: ShipId): number {
  * late joiner, a stranger) and the ghost place nothing.
  */
 export function shipsFor(team: Team, owner: string): ShipId[] {
-  const at = team.owners.indexOf(owner);
+  const placers = team.owners.filter((o) => !(team.late ?? []).includes(o));
+  const at = placers.indexOf(owner);
   if (at < 0) return [];
-  const split: ShipId[][] = team.owners.length === 3 ? [['s0'], ['s1', 's3'], ['s2']] : [['s0', 's3'], ['s1', 's2']];
+  const split: ShipId[][] = placers.length === 3 ? [['s0'], ['s1', 's3'], ['s2']] : [['s0', 's3'], ['s1', 's2']];
   return split[at] ? [...split[at]] : [];
 }
 
@@ -393,6 +395,8 @@ export type RoundInput = {
   rejected: Record<string, number>;
   /** `${target}:${ship}` → recall line answered right. */
   recalls: Record<string, boolean>;
+  /** Owners who have left the class (§3.5): their ships stay, but they can't file a report, so a hit with no one else to report it counts in full. */
+  absent?: string[];
 };
 
 /** Damage table (§1.7; decision 5). */
@@ -455,10 +459,25 @@ function settleHit(state: FleetState, hit: Hit, filed: Record<string, number>): 
   state.damage[hit.team] = (state.damage[hit.team] ?? 0) + (hit.status === 'full' ? hit.full : halfDamage(hit.full));
 }
 
-/** Settle owed hits whose deadline has passed by `round`, or all of them when `round` is omitted (the reveal). */
-function settleHits(state: FleetState, input: Pick<RoundInput, 'filed' | 'rejected'>, round?: number): void {
+/** True when nobody but the shooter is left on their team to file a report (decision 6; §3.5). */
+function noReporter(pairing: Pairing | undefined, team: string, shooter: string, absent: readonly string[]): boolean {
+  const t = pairing?.teams.find((x) => x.id === team);
+  return !!t && !t.owners.some((o) => o !== shooter && !absent.includes(o));
+}
+
+/**
+ * Settle owed hits whose deadline has passed by `round`, or all of them when
+ * `round` is omitted (the reveal). A hit whose reporters have all left the
+ * class settles in full at once, as a partnerless hit does.
+ */
+function settleHits(state: FleetState, input: Pick<RoundInput, 'filed' | 'rejected'> & Partial<Pick<RoundInput, 'pairing' | 'absent'>>, round?: number): void {
+  const absent = input.absent ?? [];
   for (const hit of state.hits) {
     if (hit.status !== 'owed') continue;
+    if (absent.length && noReporter(input.pairing, hit.team, hit.owner, absent)) {
+      settleHit(state, hit, { [hit.id]: hit.round });
+      continue;
+    }
     hit.rejected = input.rejected[hit.id] ?? 0;
     hit.due = hit.round + 1 + Math.min(hit.rejected, 1);
     if (round === undefined || round >= hit.due) settleHit(state, hit, input.filed);
@@ -564,7 +583,7 @@ export function resolveRound(prev: FleetState, input: RoundInput): FleetState {
       } else {
         chart[shot.square] = 'hit';
         const full = (shot.sure ? DAMAGE.sure : DAMAGE.hit) + (shot.returning ? DAMAGE.returning : 0);
-        const alone = !team.owners.some((o) => o !== shot.owner);
+        const alone = noReporter(pairing, team.id, shot.owner, input.absent ?? []);
         const hit: Hit = {
           id: `h${round}-${shot.owner}-${shot.seq}`, owner: shot.owner, team: team.id, target, square: shot.square, round,
           full, due: round + 1, rejected: 0, status: 'owed'
@@ -589,7 +608,7 @@ export function resolveRound(prev: FleetState, input: RoundInput): FleetState {
 }
 
 /** At the reveal: settle every open hit as if due, and every pending recall line (§1.6, §1.7; decision 6). */
-export function settleAll(state: FleetState, input: Pick<RoundInput, 'filed' | 'rejected' | 'recalls'>): FleetState {
+export function settleAll(state: FleetState, input: Pick<RoundInput, 'filed' | 'rejected' | 'recalls'> & Partial<Pick<RoundInput, 'pairing' | 'absent'>>): FleetState {
   const next = clone(state);
   settleHits(next, input);
   settleRecalls(next, input.recalls);

@@ -466,6 +466,125 @@ test('balance random is the default and stays seeded from the secret', async () 
   assert.equal(c.pairing.teams.length, 4);
 });
 
+// ---------------------------------------------------------------- 6. edge cases (§3.5)
+
+import { deviceHash } from '../../netlify/functions/_shared/question-drop.mjs';
+import { tokenFor } from './helpers/fleet-fixture.mjs';
+
+/** A ninth student added to the class list after the game opened, with their initials already claimed on device 9. */
+function addNinth(store) {
+  const cls = store.data.get(classKey('class1'));
+  store.data.set(classKey('class1'), { ...cls, students: [...cls.students, { id: 'st_09', name: 'Kit Rowe', initials: 'KR' }] });
+  const device = deviceHash(tokenFor(9));
+  store.data.set('class-claims/class1/students/st_09', { device, devices: [device], claimed_at: '2026-11-19T00:00:00.000Z' });
+  store.data.set(`class-claims/class1/devices/${device}`, { student_id: 'st_09', claimed_at: '2026-11-19T00:00:00.000Z' });
+}
+/** Drop a student from the class list (they left the class). */
+function removeStudent(store, id) {
+  const cls = store.data.get(classKey('class1'));
+  store.data.set(classKey('class1'), { ...cls, students: cls.students.filter((s) => s.id !== id) });
+}
+
+test('a late joiner joins the team of two with the least damage, firing from the next round, placing nothing', async () => {
+  const { store, c, T } = await lessonGame();
+  // Make one team the clear lowest scorer.
+  const zero = await store.get(k.campaignResolved('fw', c.id, 0));
+  const weakest = c.pairing.teams.filter((t) => !t.ghost)[2].id;
+  store.data.set(k.campaignResolved('fw', c.id, 0), { ...zero, damage: Object.fromEntries(Object.keys(zero.damage).map((t) => [t, t === weakest ? 1 : 3])) });
+  const before = await play(store, 1, 'fleet_state', {}, T + 5);
+  addNinth(store);
+  await rejectsWith(play(store, 9, 'fleet_commit', { square: 0, sure: false }, T + 6), 'not_in_game');
+  const view = await play(store, 9, 'fleet_state', {}, T + 10);
+  assert.equal(view.phase, 'firing');
+  assert.deepEqual(view.me.ships, []);
+  assert.equal(view.me.joins_at, 2);
+  assert.equal(view.shots.left, 0);
+  assert.equal(Object.keys(view.team.signs).length, 2);
+  const joined = await campaignOf(store);
+  const team = joined.pairing.teams.find((t) => t.id === weakest);
+  assert.deepEqual(team.owners.slice(2), [ownerOf(9)]);
+  assert.deepEqual(team.late, [ownerOf(9)]);
+  assert.equal(joined.students[ownerOf(9)], 'st_09');
+  await rejectsWith(play(store, 9, 'fleet_commit', { square: 0, sure: false }, T + 11), 'joins_next');
+  await rejectsWith(play(store, 9, 'fleet_place', { ships: [] }, T + 11), 'placement_over');
+  // Nobody else's call sign changes; teammates now see a third sign.
+  const after = await play(store, 1, 'fleet_state', {}, T + 12);
+  assert.equal(after.me.sign, before.me.sign);
+  assert.deepEqual(after.rival.signs.slice(0, before.rival.signs.length), before.rival.signs);
+  // The waiting joiner doesn't hold up an early close: the other eight finish and round 1 closes.
+  for (const n of N) {
+    for (let i = 0; i < 4; i++) {
+      await play(store, n, 'fleet_commit', { square: i + 10 * (n % 2), sure: false }, T + 100 + n * 10 + i);
+      await play(store, n, 'fleet_answer', { answer: 'nope', writing }, T + 100 + n * 10 + i);
+    }
+  }
+  const next = await play(store, 9, 'fleet_state', {}, T + 500);
+  assert.equal(next.round, 2);
+  assert.equal(next.me.joins_at, undefined);
+  assert.equal(next.shots.left, 4);
+  const shot = await play(store, 9, 'fleet_commit', { square: 12, sure: false }, T + 510);
+  assert.ok(shot.question);
+  // Joining again is a no-op.
+  await play(store, 9, 'fleet_state', {}, T + 520);
+  assert.equal((await campaignOf(store)).joined.filter((o) => o === ownerOf(9)).length, 1);
+});
+
+test('a late joiner can’t join once the last round has closed', async () => {
+  const { store, T } = await lessonGame();
+  for (let i = 0; i < 3; i++) await teach(store, 'campaign_next', {}, T + 10 + i);
+  addNinth(store);
+  await rejectsWith(play(store, 9, 'fleet_state', {}, T + 20), 'not_in_game');
+});
+
+test('a student who leaves the class: their ships stay, their partner fires alone and reports settle in full', async () => {
+  const { store, c, state, T } = await lessonGame();
+  const team = fleet.teamOf(c.pairing, ownerOf(1));
+  const partner = nOf(team.owners.find((o) => o !== ownerOf(1)));
+  const rival = fleet.rivalOf(c.pairing, team.id);
+  // Round 1: a hit while the partner is still here is owed.
+  let shot = await play(store, 1, 'fleet_commit', { square: state.fleets[rival][3].squares[0], sure: false }, T + 10);
+  await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, T + 11);
+  await teach(store, 'campaign_next', {}, T + 12);
+  assert.equal((await store.get(k.campaignResolved('fw', c.id, 1))).hits[0].status, 'owed');
+  removeStudent(store, `st_0${partner}`);
+  // Round 2: a hit with nobody left to report it counts in full at once; the owed one settles in full too.
+  shot = await play(store, 1, 'fleet_commit', { square: state.fleets[rival][0].squares[0], sure: true }, T + 20);
+  await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, T + 21);
+  await teach(store, 'campaign_next', {}, T + 22);
+  const two = await store.get(k.campaignResolved('fw', c.id, 2));
+  assert.deepEqual(two.hits.map((h) => h.status), ['full', 'full']);
+  assert.equal(two.damage[team.id], 2 + 4);
+  assert.deepEqual(two.fleets[team.id].length, 4);
+  // Nothing crashes: the control room, the player, the insight and the reveal.
+  const room = await teach(store, 'campaign_state', {}, T + 30);
+  assert.ok(room.teams.flatMap((t) => t.members).some((m) => m.name === 'Unknown'));
+  assert.equal((await play(store, 1, 'fleet_state', {}, T + 31)).round, 3);
+  assert.equal((await teach(store, 'campaign_insight', {}, T + 32)).calibration.length, 8);
+  await teach(store, 'campaign_reveal', {}, T + 33);
+  assert.equal((await play(store, 1, 'fleet_state', {}, T + 34)).phase, 'reveal');
+});
+
+test('the teacher can open the reveal at any phase', async () => {
+  // During placement.
+  const { store } = await fleetLesson();
+  await teach(store, 'campaign_open', { mode: 'week' });
+  await play(store, 1, 'fleet_state', {}, MON_9AM + 10);
+  const room = await teach(store, 'campaign_reveal', {}, MON_9AM + 20);
+  assert.ok(room.revealed_at);
+  const view = await play(store, 1, 'fleet_state', {}, MON_9AM + 30);
+  assert.equal(view.phase, 'reveal');
+  assert.deepEqual(view.reveal.fleets, { us: [], them: [] });
+  assert.equal(view.reveal.standings.winner, null);
+  // Mid-round, with a shot in flight.
+  const game = await lessonGame();
+  await play(game.store, 1, 'fleet_commit', { square: 3, sure: true }, game.T + 10);
+  await teach(game.store, 'campaign_reveal', {}, game.T + 20);
+  const mid = await play(game.store, 2, 'fleet_state', {}, game.T + 30);
+  assert.equal(mid.phase, 'reveal');
+  assert.equal(mid.reveal.fleets.them.length, 4);
+  await rejectsWith(play(game.store, 1, 'fleet_answer', { answer: 'x', writing }, game.T + 31), 'closed');
+});
+
 // ---------------------------------------------------------------- phone view extras
 
 test('the view lists my team’s fired squares this round and its duds still unknown', async () => {

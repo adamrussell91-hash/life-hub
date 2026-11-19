@@ -529,6 +529,39 @@ describe('fleet_week resolveRound: purity', () => {
   });
 });
 
+describe('fleet_week edge cases (§3.5)', () => {
+  it('a late joiner places nothing and leaves the others’ ships as they were', () => {
+    const t: Team = { id: 't1', owners: ['ann', 'ben', 'eve'], late: ['eve'] };
+    expect(shipsFor(t, 'ann')).toEqual(['s0', 's3']);
+    expect(shipsFor(t, 'ben')).toEqual(['s1', 's2']);
+    expect(shipsFor(t, 'eve')).toEqual([]);
+  });
+
+  it('a late joiner’s shots resolve, and their partners’ hits need a report from someone', () => {
+    const trio: Pairing = { teams: [{ id: 't1', owners: ['ann', 'ben', 'eve'], late: ['eve'] }, duel.teams[1]], matches: duel.matches };
+    const s1 = play(placed(trio), 1, [shot(1, 'eve', 4)], {}, trio);
+    expect(results(s1)[0].outcome).toBe('hit');
+    expect(s1.hits[0].status).toBe('owed');
+  });
+
+  it('a hit with every teammate gone from the class counts in full at once', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 4)], { absent: ['ben'] });
+    expect(s1.hits[0].status).toBe('full');
+    expect(s1.damage.t1).toBe(2);
+  });
+
+  it('an owed hit settles in full once its only reporter has left', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 4)]);
+    expect(s1.hits[0].status).toBe('owed');
+    const s2 = play(s1, 2, [], { absent: ['ben'] });
+    expect(s2.hits[0].status).toBe('full');
+    expect(s2.damage.t1).toBe(2);
+    // At the reveal too.
+    const final = settleAll(s1, { filed: {}, rejected: {}, recalls: {}, pairing: duel, absent: ['ben'] });
+    expect(final.hits[0].status).toBe('full');
+  });
+});
+
 describe('fleet_week plans 2–4 helpers', () => {
   it('pairTeamsMixed pairs the strongest with the weakest, seeded', async () => {
     const { pairTeamsMixed, rng } = await import('../../src/games/kinds/fleet-week/rules');
