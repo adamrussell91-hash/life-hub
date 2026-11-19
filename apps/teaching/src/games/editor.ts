@@ -334,10 +334,13 @@ export function mountGameEditor(o: GameEditorOptions): GameEditorHandle {
     kindLine.append(el('span', '', GAME_KIND_INFO[game.kind].label), modeChips(game.kind));
     titleWrap.append(title, kindLine);
     head.append(gameGlyph(game.kind, 'lg'), titleWrap);
+    const api = o.api;
     const ctx = {
       // The Layout panel owns the seed, the lock and the hidden message: an older copy from another editor keeps them.
       onChange: (next: Game) => putGame(game.id, keepGridFields(next, current().games.find((g) => g.id === game.id))),
-      ...(isListGame(game) ? { openBuild: () => { buildOpen = true; paintMain(); } } : {})
+      ...(isListGame(game) ? { openBuild: () => { buildOpen = true; paintMain(); } } : {}),
+      // Fleet week runs its own picker (squares and recall lines); the unit loads once per editor.
+      ...(game.kind === 'fleet_week' && api ? { sources: () => (sources ? Promise.resolve(sources) : api.sources().then((s) => (sources = s))) } : {})
     };
     issuesHost = el('div', 'gm-issues-host');
     main.append(head, flashNode, settingsRow(game, ctx), issuesHost);

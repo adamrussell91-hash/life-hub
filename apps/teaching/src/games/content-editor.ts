@@ -15,6 +15,7 @@ import {
 } from './core/schema';
 import { checkbox, field, itemEditor, numberInput, pills, questionEditor, tagsCell, textArea, textInput, type ItemEditorContext } from './item-editors';
 import { fleetContent } from './kinds/fleet-week/editor';
+import type { UnitSources } from './api';
 import { SHAPE_LABELS, isListGame, listShapes, maxItems, newGameId, newItem, type ListGame } from './seed';
 
 /**
@@ -29,6 +30,8 @@ export type ContentContext = {
   onChange: (next: Game) => void;
   /** Opens Build from this unit for a list game. */
   openBuild?: () => void;
+  /** The unit's ready-made items, for kinds that run their own Build from this unit (Fleet week). Absent without a server. */
+  sources?: () => Promise<UnitSources>;
 };
 
 /* ── Settings row ──────────────────────────────────────────────────── */

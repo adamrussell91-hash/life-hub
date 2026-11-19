@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Lesson } from '@/schemas/lesson';
-import type { GameLesson, GameOf } from '@/games/core/schema';
+import type { GameLesson, GameOf, QuestionItem, QuoteItem, TermItem } from '@/games/core/schema';
 import { mountGameEditor } from '@/games/editor';
 import { newGame } from '@/games/seed';
-import { parseAnswers } from '@/games/kinds/fleet-week/editor';
+import { completeTheLine, fleetCandidates, parseAnswers, placeInFleet } from '@/games/kinds/fleet-week/editor';
+import type { UnitSources } from '@/games/api';
 import { closeHubMenu } from '../../design-kit/js/hub-list.js';
 
 // Invented content only: the play "The Lantern Keeper" and its made-up characters.
@@ -14,7 +15,30 @@ function lessonWith(game: GameLesson): Lesson {
   return { id: 'lesson_fw', type: 'lesson', title: 'Lantern Keeper games', unit_id: 'unit_fw', pedagogical_mode: 'game', blocks: [], game } as unknown as Lesson;
 }
 
-function setup(game: GameLesson) {
+const tags = (pieces: string[] = []) => ({ pieces, outcomes: [], skills: [], tech: [] });
+const sa = (id: string, prompt: string, accepted: string[], pieces: string[] = []) =>
+  ({ id, shape: 'question', question: { id, kind: 'short_answer', prompt, marks: 1, accepted }, ...tags(pieces) }) as unknown as QuestionItem;
+
+const SOURCES: UnitSources = {
+  unit_id: 'unit_fw',
+  terms: [
+    { section: 'Vocabulary', line_id: 'l1', item: { id: 't_l1', shape: 'term', term: 'Foreshadowing', accept: ['foreshadow'], clues: [{ kind: 'definition', text: 'A hint of what is to come' }], banned: [], decoys: [], ...tags(['kp_fore1ab']) } as TermItem },
+    { section: 'Vocabulary', line_id: 'l2', item: { id: 't_l2', shape: 'term', term: 'Blank', accept: [], clues: [], banned: [], decoys: [], ...tags() } as TermItem }
+  ],
+  questions: [
+    { lesson_id: 'l_a', lesson_title: 'Act one', block_id: 'b1', item: sa('q_a1', 'Who lights the lamp in act one?', ['Tomas'], ['kp_lamp1ab']) },
+    { lesson_id: 'l_a', lesson_title: 'Act one', block_id: 'b1', item: sa('q_a2', 'Where does the play open?', ['the lighthouse']) },
+    {
+      lesson_id: 'l_a',
+      lesson_title: 'Act one',
+      block_id: 'b1',
+      item: { id: 'q_mc', shape: 'question', question: { id: 'q_mc', kind: 'multiple_choice', prompt: 'Pick one', marks: 1, options: [], correct: [] }, ...tags() } as unknown as QuestionItem
+    }
+  ],
+  quotes: [{ lesson_id: 'l_b', lesson_title: 'Act two', block_id: 'b2', attribution: 'Mirela, act two', item: { id: 'u_b1', shape: 'quote', text: '“The tide keeps no promises, sir.”', speaker: '', accept: [], ...tags(['kp_tide1ab']) } as QuoteItem }]
+};
+
+function setup(game: GameLesson, sources: UnitSources = { unit_id: 'unit_fw', terms: [], questions: [], quotes: [] }) {
   let lesson = lessonWith(game);
   const host = document.createElement('div');
   document.body.append(host);
@@ -27,7 +51,7 @@ function setup(game: GameLesson) {
     api: {
       results: vi.fn(async () => ({ version: 'v1', class_id: 'class_fw', games: [] })),
       pushToMarkbook: vi.fn(async () => ({ column_id: 'c1', count: 1 })),
-      sources: vi.fn(async () => ({ unit_id: 'unit_fw', terms: [], questions: [], quotes: [] }))
+      sources: vi.fn(async () => sources)
     }
   });
   host.append(editor.root);
@@ -118,5 +142,105 @@ describe('Fleet week editor', () => {
   it('splits answers on commas, or on lines when there are any', () => {
     expect(parseAnswers('a, b ,, c')).toEqual(['a', 'b', 'c']);
     expect(parseAnswers('one, two\nthree')).toEqual(['one, two', 'three']);
+  });
+});
+
+const flush = () => new Promise((r) => setTimeout(r, 0));
+const prompt = (item: QuestionItem | undefined) => (item?.question as unknown as { prompt: string }).prompt;
+const accepted = (item: QuestionItem | undefined) => (item?.question as unknown as { accepted: string[] }).accepted;
+
+describe('Fleet week: Build from this unit', () => {
+  it('makes a quote into a complete-the-line recall, accepting the missing words', () => {
+    expect(completeTheLine('“The tide keeps no promises, sir.”')).toEqual({ prompt: 'Complete the line: “The tide keeps no …”', accepted: ['promises, sir', 'promises, sir.'] });
+    expect(completeTheLine('Light the lamp.')).toEqual({ prompt: 'Complete the line: “Light the …”', accepted: ['lamp', 'lamp.'] });
+    expect(completeTheLine('Go now')).toBeNull();
+  });
+
+  it('offers short-answer questions, organiser lines and quotes, keeping source ids and piece tags', () => {
+    const c = fleetCandidates(SOURCES);
+    expect(c.map((x) => x.item.id)).toEqual(['q_a1', 'q_a2', 't_l1', 'u_b1']);
+    expect(c.map((x) => x.group)).toEqual(['Quiz questions', 'Quiz questions', 'Organiser · Vocabulary', 'Quotes · complete the line']);
+    const term = c[2]!.item;
+    expect(prompt(term)).toBe('Name the term: A hint of what is to come');
+    expect(accepted(term)).toEqual(['Foreshadowing', 'foreshadow']);
+    expect(term.question.kind).toBe('short_answer');
+    expect(term.pieces).toEqual(['kp_fore1ab']);
+    expect(c[0]!.item.pieces).toEqual(['kp_lamp1ab']);
+    expect(c[3]!.item.pieces).toEqual(['kp_tide1ab']);
+    expect(prompt(c[3]!.item)).toBe('Complete the line: “The tide keeps no …”');
+  });
+
+  it('places lines in blank slots only, skipping ones already in and ones with no room', () => {
+    const g = newGame('fleet_week', 'g_fw') as Fleet;
+    const [q1, q2, t1, u1] = fleetCandidates(SOURCES).map((c) => c.item);
+    // A1's first variant is written already.
+    g.squares[0]!.variants[0] = sa('i_own', 'Who keeps the light?', ['Tomas']);
+    const one = placeInFleet(g, 0, [q1!, q2!]);
+    expect(one.added).toBe(1);
+    expect(one.skipped).toBe(1);
+    expect(prompt(one.game.squares[0]!.variants[0])).toBe('Who keeps the light?');
+    expect(one.game.squares[0]!.variants[1]!.id).toBe('q_a1');
+    const empty = placeInFleet(one.game, 'empty', [q1!, q2!, t1!]);
+    expect(empty.added).toBe(2);
+    expect(empty.skipped).toBe(1);
+    expect(empty.game.squares[1]!.variants.map((v) => v.id)).toEqual(['q_a2', 't_l1']);
+    const rec = placeInFleet(empty.game, 'recall', [u1!]);
+    expect(rec.game.recall[0]!.id).toBe('u_b1');
+    expect(rec.game.recall).toHaveLength(4);
+    expect(rec.game.squares).toHaveLength(25);
+  });
+
+  it('ticks unit lines into the open square from the editor', async () => {
+    const { host, fleet } = setup({ games: [newGame('fleet_week', 'g_fw')] }, SOURCES);
+    host.querySelector<HTMLButtonElement>('.fw-cell[data-square="B3"]')!.click();
+    const open = [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Build from this unit')!;
+    open.click();
+    await flush();
+    const panel = host.querySelector('.fw-build')!;
+    expect(panel).not.toBeNull();
+    const target = panel.querySelector<HTMLSelectElement>('.fw-build__target')!;
+    expect(target.value).toBe('7');
+    expect(panel.querySelectorAll('input[type="checkbox"]')).toHaveLength(4);
+    for (const id of ['q_a1', 't_l1']) {
+      const box = panel.querySelector<HTMLInputElement>(`input[data-item-id="${id}"]`)!;
+      box.checked = true;
+      box.dispatchEvent(new Event('change'));
+    }
+    const add = [...panel.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Add 2')!;
+    add.click();
+    expect(fleet().squares[7]!.variants.map((v) => v.id)).toEqual(['q_a1', 't_l1']);
+    expect(fleet().squares[7]!.variants[0]!.pieces).toEqual(['kp_lamp1ab']);
+    expect(host.querySelector('.fw-build')).toBeNull();
+    expect(host.querySelector('.fw-cell[data-square="B3"]')?.getAttribute('data-state')).toBe('full');
+    expect(host.querySelector('.fw-build-status')?.textContent).toBe('Added 2 to square B3.');
+    // The square stays open with the new lines in its boxes.
+    expect(host.querySelector<HTMLTextAreaElement>('[aria-label="Variant A prompt"]')?.value).toBe('Who lights the lamp in act one?');
+  });
+
+  it('fills recall lines from quotes and marks lines already in the game', async () => {
+    const { host, fleet } = setup({ games: [newGame('fleet_week', 'g_fw')] }, SOURCES);
+    const openBuild = () => [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Build from this unit')!.click();
+    openBuild();
+    await flush();
+    const target = host.querySelector<HTMLSelectElement>('.fw-build__target')!;
+    expect(target.value).toBe('empty');
+    target.value = 'recall';
+    const box = host.querySelector<HTMLInputElement>('input[data-item-id="u_b1"]')!;
+    box.checked = true;
+    box.dispatchEvent(new Event('change'));
+    [...host.querySelectorAll<HTMLButtonElement>('.fw-build button')].find((b) => b.textContent === 'Add 1')!.click();
+    expect(fleet().recall[0]!.id).toBe('u_b1');
+    expect(accepted(fleet().recall[0])).toEqual(['promises, sir', 'promises, sir.']);
+    openBuild();
+    const again = host.querySelector<HTMLInputElement>('input[data-item-id="u_b1"]')!;
+    expect(again.disabled).toBe(true);
+    expect(again.closest('.gm-source')?.textContent).toContain('Already in this game');
+  });
+
+  it('has no picker without a server', () => {
+    let lesson = lessonWith({ games: [newGame('fleet_week', 'g_fw')] });
+    const editor = mountGameEditor({ getLesson: () => lesson, emitLesson: (n) => (lesson = n) });
+    document.body.append(editor.root);
+    expect([...editor.root.querySelectorAll('button')].some((b) => b.textContent === 'Build from this unit')).toBe(false);
   });
 });

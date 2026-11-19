@@ -41,6 +41,13 @@
 .fw-variant .gm-input { font-size: 16px; min-height: 44px; }
 .fw-recall { display: grid; gap: var(--space-4); }
 
+/* Build from this unit: the target picker and the tick rows (R4: 44px rows, 16px select). */
+.fw-build-btn { min-height: 44px; }
+.fw-build-status[hidden] { display: none; }
+.fw-build__target.gm-input { font-size: 16px; min-height: 44px; max-width: 24rem; }
+.fw-build .gm-source { min-height: 44px; align-items: center; }
+.fw-build .gm-source input { width: 20px; height: 20px; margin-top: 0; }
+
 @media (max-width: 480px) {
   .fw-grid { gap: 3px; }
   .fw-label.gm-input { padding: 4px; }
