@@ -131,3 +131,7 @@
 .cs-turn[data-who='examiner'] { background: transparent; color: var(--muted, #6b7788); font-style: italic; }
 .cs-turn__who { display: block; font-style: normal; font-size: 0.6875rem; letter-spacing: 0.06em; color: var(--muted, #6b7788); margin-bottom: 2px; }
 .cs-tasks { border-top: 2px solid var(--line); padding-top: 14px; display: grid; gap: 14px; }
+
+/* Try it as a student: the class moves under "Your move" (practice.ts). */
+.cpractice__moves { display: flex; flex-wrap: wrap; gap: 8px; }
+.cpractice__student { min-width: 0; }

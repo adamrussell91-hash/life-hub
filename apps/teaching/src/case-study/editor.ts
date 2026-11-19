@@ -14,6 +14,8 @@ export type CaseEditorOptions = {
   onTab?: (tab: CaseTab) => void;
   /** Called when the teacher picks a part to add blocks to, so the page can make its section and show it. */
   onPartBlocks?: (partId: string, title: string) => void;
+  /** When set, the bar gets a Try it as a student button that calls this. */
+  onTryIt?: () => void;
 };
 
 export type CaseEditorHandle = {
@@ -43,8 +45,14 @@ export function mountCaseEditor(o: CaseEditorOptions): CaseEditorHandle {
   const panels = el('div', 'cse__panels');
   const checklist = el('aside', 'cse__check');
   const tabs = createCaseTabs({ onTab: (tab) => { paint(); o.onTab?.(tab); } });
-  const bar = el('div', 'cse__bar');
+  const bar = el('div', 'cse__bar sprint-edit-bar');
   bar.append(tabs.root);
+  if (o.onTryIt) {
+    const tryIt = button('Try it as a student', 'secondary', () => o.onTryIt?.());
+    tryIt.classList.add('cse__try');
+    tryIt.title = 'Walk through the case as a student on a private copy. Your class, the case board and the real case see nothing.';
+    bar.append(tryIt);
+  }
   root.append(bar, el('div', 'cse__body'));
   root.lastElementChild!.append(panels, checklist);
   let marked = '';
