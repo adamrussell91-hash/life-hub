@@ -164,3 +164,134 @@ test('week mode catches up over missed rounds, in order, then opens the reveal b
   assert.ok((await campaignOf(store)).revealed_at);
   assert.ok(await store.get(k.campaignResolved('fw', c.id, 'final')));
 });
+
+// ---------------------------------------------------------------- 2. signals
+
+/** A lesson-mode game with everyone placed; returns the store, campaign and the round-0 state. Round 1 opens at T. */
+async function lessonGame(opts = {}) {
+  const { store } = await fleetLesson(opts);
+  await teach(store, 'campaign_open', { mode: 'lesson', ...(opts.open ?? {}) });
+  const c = await campaignOf(store);
+  for (const team of c.pairing.teams) {
+    const laid = [];
+    for (const owner of team.owners) {
+      const ships = fleet.autoPlace(fleet.shipsFor(team, owner), laid, laid.flatMap((s) => s.squares), fleet.rng(`sig:${owner}`));
+      await play(store, nOf(owner), 'fleet_place', { ships }, MON_9AM + 10);
+      laid.push(...ships);
+    }
+  }
+  const T = MON_9AM + 1000;
+  await play(store, 1, 'fleet_state', {}, T);
+  return { store, c: await campaignOf(store), state: await store.get(k.campaignResolved('fw', c.id, 0)), T };
+}
+const kinds = (r) => r.events.map((e) => e.kind).sort();
+
+test('signals: round open, then the dawn report, a hit and an owed report, each once', async () => {
+  const { store, c, state, T } = await lessonGame();
+  const first = await play(store, 1, 'signals', {}, T + 5);
+  assert.deepEqual(first.events, [{ id: `${c.id}:round_open:1`, kind: 'round_open', line: 'Four shells ready.', game_id: 'fw', lesson_id: 'gl1' }]);
+  assert.deepEqual(await play(store, 1, 'signals_seen', { ids: [first.events[0].id] }, T + 6), { ok: true });
+  assert.deepEqual((await play(store, 1, 'signals', {}, T + 7)).events, []);
+  // Student 1 sinks a rival's one-square ship.
+  const team = fleet.teamOf(c.pairing, ownerOf(1));
+  const rival = c.pairing.teams.find((t) => t.id === fleet.rivalOf(c.pairing, team.id));
+  const sq = state.fleets[rival.id][3].squares[0];
+  const shot = await play(store, 1, 'fleet_commit', { square: sq, sure: false }, T + 10);
+  await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, T + 11);
+  await teach(store, 'campaign_next', {}, T + 12);
+  const partner = nOf(team.owners.find((o) => o !== ownerOf(1)));
+  const victim = nOf(rival.owners[0]);
+  assert.deepEqual(kinds(await play(store, 1, 'signals', {}, T + 13)), ['report_ready', 'round_open']);
+  assert.deepEqual(kinds(await play(store, partner, 'signals', {}, T + 13)), ['report_owed', 'report_ready', 'round_open']);
+  const hit = await play(store, victim, 'signals', {}, T + 13);
+  assert.deepEqual(kinds(hit), ['hit', 'report_ready', 'round_open']);
+  assert.equal(hit.events.find((e) => e.kind === 'hit').line, "You've been hit.");
+  assert.equal(hit.events.find((e) => e.kind === 'report_ready').line, 'Dawn report is in.');
+  const owed = (await play(store, partner, 'signals', {}, T + 13)).events.find((e) => e.kind === 'report_owed');
+  assert.equal(owed.line, 'Your partner hit something. Confirm it.');
+  assert.equal(owed.id, `${c.id}:report_owed:1`);
+  await play(store, victim, 'signals_seen', { ids: hit.events.map((e) => e.id) }, T + 14);
+  assert.deepEqual((await play(store, victim, 'signals', {}, T + 15)).events, []);
+  // The reveal.
+  await teach(store, 'campaign_reveal', {}, T + 20);
+  const fog = await play(store, victim, 'signals', {}, T + 21);
+  assert.deepEqual(fog.events.map((e) => [e.kind, e.line, e.id]), [['reveal', 'The fog is lifting.', `${c.id}:reveal:final`]]);
+});
+
+test('signals reach any student page with no lesson id, through the class profile endpoint', async () => {
+  const { profileAction } = await import('../../netlify/functions/_shared/profile.mjs');
+  const { store, c, T } = await lessonGame();
+  const ask = (action, extra = {}) => profileAction(store, 'class1', { action, class_token: whoFleet(1).class_token, ...extra }, { now: new Date(T + 5) });
+  const got = await ask('fleet_signals');
+  assert.deepEqual(got.events.map((e) => e.id), [`${c.id}:round_open:1`]);
+  assert.equal(got.events[0].lesson_id, 'gl1');
+  assert.deepEqual(await ask('fleet_signals_seen', { ids: [got.events[0].id, 'nonsense'] }), { ok: true });
+  assert.deepEqual((await ask('fleet_signals')).events, []);
+  // Seen through one door, seen through the other.
+  assert.deepEqual((await play(store, 1, 'signals', {}, T + 6)).events, []);
+  // Closing the campaign takes it off the class index.
+  await teach(store, 'campaign_close', {}, T + 7);
+  assert.deepEqual((await store.get('game-campaigns/class1')).campaigns, []);
+  assert.deepEqual((await ask('fleet_signals')).events, []);
+});
+
+test('seen ids are capped at 200 per player, oldest first out', async () => {
+  const { store, c, T } = await lessonGame();
+  const seenKey = k.campaignSeen('fw', c.id, ownerOf(1));
+  store.data.set(seenKey, { ids: Array.from({ length: 200 }, (_, i) => `${c.id}:hit:${i % 99}x${i}`) });
+  await play(store, 1, 'signals_seen', { ids: [`${c.id}:round_open:1`] }, T + 5);
+  const ids = (await store.get(seenKey)).ids;
+  assert.equal(ids.length, 200);
+  assert.equal(ids[199], `${c.id}:round_open:1`);
+  assert.equal(ids[0], `${c.id}:hit:1x1`);
+  await rejectsWith(play(store, 1, 'signals_seen', { ids: [] }, T + 6), 'bad_ids');
+});
+
+// ---------------------------------------------------------------- phone view extras
+
+test('the view lists my team’s fired squares this round and its duds still unknown', async () => {
+  const { store } = await fleetLesson();
+  await teach(store, 'campaign_open', { mode: 'lesson' });
+  const c = await campaignOf(store);
+  const T = MON_9AM + 120000;
+  await play(store, 1, 'fleet_state', {}, T);
+  const team = fleet.teamOf(c.pairing, ownerOf(1));
+  const partner = nOf(team.owners.find((o) => o !== ownerOf(1)));
+  const state0 = await store.get(k.campaignResolved('fw', c.id, 0));
+  const rivalShips = state0.fleets[fleet.rivalOf(c.pairing, team.id)].flatMap((s) => s.squares);
+  const [a, b] = [...Array(25).keys()].filter((x) => !rivalShips.includes(x));
+  const s1 = await play(store, 1, 'fleet_commit', { square: a, sure: false }, T + 10);
+  await play(store, 1, 'fleet_answer', { answer: 'wrong', writing }, T + 20);
+  const s2 = await play(store, partner, 'fleet_commit', { square: b, sure: false }, T + 30);
+  await play(store, partner, 'fleet_answer', { answer: typed(s2.question), writing }, T + 40);
+  assert.ok(s1.question);
+  const during = await play(store, 1, 'fleet_state', {}, T + 50);
+  assert.deepEqual(during.shots.fired, [a, b].sort((x, y) => x - y));
+  assert.deepEqual(during.rival.duds, []);
+  await teach(store, 'campaign_next', {}, T + 60);
+  const after = await play(store, partner, 'fleet_state', {}, T + 70);
+  assert.equal(after.round, 2);
+  assert.deepEqual(after.shots.fired, []);
+  // a was a dud (wrong answer) and is still unknown; b was a right miss, so it is on the chart, not a dud.
+  assert.deepEqual(after.rival.duds, [a]);
+  assert.equal(after.rival.chart[b], 'miss');
+});
+
+// ---------------------------------------------------------------- control room extras
+
+test('campaign_state carries the server time and every shot in the open round, with no answer text', async () => {
+  const { store } = await fleetLesson();
+  await teach(store, 'campaign_open', { mode: 'lesson' });
+  const T = MON_9AM + 120000;
+  await play(store, 1, 'fleet_state', {}, T);
+  const shot = await play(store, 1, 'fleet_commit', { square: 7, sure: true }, T + 10);
+  await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, T + 20);
+  await play(store, 2, 'fleet_commit', { square: 0, sure: false }, T + 30);
+  const room = await teach(store, 'campaign_state', {}, T + 40);
+  assert.equal(room.now, T + 40);
+  assert.equal(room.shots.length, 2);
+  const one = room.shots.find((s) => s.owner === ownerOf(1));
+  assert.deepEqual({ ...one, seq: 0 }, { round: 1, owner: ownerOf(1), owner_name: 'Ivo Penn', seq: 0, square: 7, square_label: 'B3', sure: true, answered: true });
+  assert.equal(room.shots.find((s) => s.owner === ownerOf(2)).answered, false);
+  assert.ok(!JSON.stringify(room.shots).includes('mast'));
+});

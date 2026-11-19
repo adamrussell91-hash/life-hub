@@ -388,6 +388,8 @@ test('leak sweep: no answer, secret, name, id, owner or rival fleet reaches a st
     const shot = await play(store, n, 'fleet_commit', { square: free[0], sure: n % 2 === 0 }, (now += 7));
     await play(store, n, 'fleet_answer', { answer: typed(shot.question), writing }, (now += 7));
   }
+  // Mid-round views carry the fired marks.
+  for (const n of N) await play(store, n, 'fleet_state', {}, (now += 7));
   await rejectsWith(play(store, 1, 'fleet_report', { hit: 'nope', text: 'x' }, (now += 7)), 'bad_hit');
   now += 240000;
   for (const n of N) views[n] = await play(store, n, 'fleet_state', {}, (now += 7));
@@ -416,6 +418,14 @@ test('leak sweep: no answer, secret, name, id, owner or rival fleet reaches a st
     if (v.round >= 1) assert.deepEqual(teamFleet, state.fleets[own.id]);
     else for (const ship of teamFleet) assert.ok(state.fleets[own.id].some((s) => s.id === ship.id), 'placement shows own team ships only');
   }
+  // rival.duds and shots.fired carry square numbers and nothing else.
+  const squaresOnly = (v) => Array.isArray(v) && v.every((x) => Number.isInteger(x) && x >= 0 && x < 25);
+  for (const { reply: v } of viewsSent) {
+    assert.ok(squaresOnly(v.rival.duds), 'rival.duds is squares only');
+    assert.ok(squaresOnly(v.shots.fired), 'shots.fired is squares only');
+  }
+  assert.ok(viewsSent.some(({ reply: v }) => v.rival.duds.length), 'some view shows a dud');
+  assert.ok(viewsSent.some(({ reply: v }) => v.shots.fired.length), 'some view shows a fired square');
   // The report shows this player's side only, as call signs.
   for (const n of N) {
     const { rival } = sides(c, n);

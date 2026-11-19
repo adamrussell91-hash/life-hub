@@ -9,7 +9,12 @@
  *   fleet_answer  { game_id, answer, writing } → { ok: true }: never right or wrong before the round closes
  *   fleet_report  { game_id, hit, text, writing } a damage report for a teammate's hit
  *   fleet_recall  { game_id, ship_key, answer, writing } the recall line for a ship this player sank
- *   signals       → { events: [] } (plan 2)
+ *   signals       { game_id? } → { events }: what is waiting for this player in every open
+ *                 Fleet week campaign in the lesson (or just that game), each shown once
+ *   signals_seen  { ids } → { ok: true }: those events have been shown
+ *
+ * The same signals for a whole class, with no lesson id, come through the
+ * student profile endpoint (fleet_signals, fleet_signals_seen; profile.mjs).
  *
  * What a student never receives before the reveal: an accepted answer, the
  * rival fleet, the match secret, a real owner hash, a student id or a name.
@@ -17,8 +22,9 @@
  * teammates and hits by opaque aliases.
  */
 import { loadRoster } from './class-claims.mjs';
-import { read, reject } from './question-drop.mjs';
-import { gameKeys } from './game-store.mjs';
+import { deviceHash, read, reject } from './question-drop.mjs';
+import { isSafeId } from './class-examples.mjs';
+import { campaignIndexKey, gameKeys } from './game-store.mjs';
 import { cleanWritingLog } from './quiz-core.mjs';
 import { checkAnswer, fleet } from './game-rules.mjs';
 import {
@@ -26,7 +32,7 @@ import {
   roundClosing, roundOpen, roundsOf, touchClock, updateJSON
 } from './fleet-week-store.mjs';
 
-export const FLEET_ACTIONS = ['fleet_state', 'fleet_place', 'fleet_commit', 'fleet_answer', 'fleet_report', 'fleet_recall', 'signals'];
+export const FLEET_ACTIONS = ['fleet_state', 'fleet_place', 'fleet_commit', 'fleet_answer', 'fleet_report', 'fleet_recall', 'signals', 'signals_seen'];
 export { LATE_GRACE_MS };
 const TEXT_MAX = 300;
 
@@ -107,6 +113,14 @@ export async function viewFor(store, k, campaign, keys, state, clock, owner, now
 
   const myShots = phase === 'firing' ? list(await read(store, shotsKey(campaign, k, clock.round, owner))) : [];
   const open = myShots.find((s) => shotOpen(s, now));
+  // Squares my team has committed this round (mine and my teammates'), so a reload keeps the marks. Squares only.
+  const teamShots = phase === 'firing'
+    ? [myShots, ...(await Promise.all(team.owners.filter((o) => o !== owner).map((o) => read(store, shotsKey(campaign, k, clock.round, o)))))]
+    : [];
+  const fired = [...new Set(teamShots.flatMap((rows) => list(rows)).filter((s) => !s.voided).map((s) => s.square))].sort((a, b) => a - b);
+  // Squares my team dudded in a resolved round that are still unknown on the rival chart.
+  const rivalChart = obj(shown.charts?.[rival.id]);
+  const duds = [...new Set(shown.log.flatMap((l) => l.results).filter((r) => r.outcome === 'dud' && team.owners.includes(r.owner) && !rivalChart[r.square]).map((r) => r.square))].sort((a, b) => a - b);
   const returning = shown.returns.filter((r) => r.owner === owner && r.due <= clock.round).map((r) => r.square);
 
   // A rejected report comes back with one more round to file it (decision 6).
@@ -144,12 +158,14 @@ export async function viewFor(store, k, campaign, keys, state, clock, owner, now
     rival: {
       signs: rival.owners.map((o) => signs[o]),
       chart: obj(shown.charts?.[rival.id]),
-      sunk: shown.sinks.filter((s) => s.target === rival.id).map((s) => s.ship)
+      sunk: shown.sinks.filter((s) => s.target === rival.id).map((s) => s.ship),
+      duds
     },
     shots: {
       left: phase === 'firing' ? Math.max(0, SHOTS_PER_ROUND - myShots.length) : 0,
       ...(open ? { open: { square: open.square, sure: open.sure, question: publicQuestion(keys, open.item), deadline: open.deadline } } : {}),
-      returning
+      returning,
+      fired
     },
     owed,
     ...(recallDue && recallItem ? { recall: { ship_key: recallDue.ship, prompt: publicQuestion(keys, recallItem) } } : {}),
@@ -424,16 +440,131 @@ async function recall(ctx, body) {
   return { ok: true };
 }
 
+// ---------------------------------------------------------------- signals (§2)
+
+/** The toast line for each event, exactly as spec §2's table. */
+export const SIGNAL_LINES = {
+  round_open: 'Four shells ready.',
+  report_ready: 'Dawn report is in.',
+  hit: "You've been hit.",
+  report_owed: 'Your partner hit something. Confirm it.',
+  reveal: 'The fog is lifting.'
+};
+/** Most signal ids kept per player per campaign; the oldest drop off first. */
+export const SEEN_MAX = 200;
+const SIGNAL_ID = /^([a-f0-9]{16}):(round_open|report_ready|hit|report_owed|reveal):(\d{1,2}|final)$/;
+const SEEN_BATCH = 50;
+const INDEX_MAX = 20;
+
+/** Whether `owner` may fire in `round` (a late joiner waits for the round after they joined; §3.5). */
+export const firesIn = (campaign, owner, round) => (obj(campaign.late)[owner] ?? 0) <= round;
+
+/**
+ * Every event waiting for `owner` in one campaign, not yet shown (§2). Ids are
+ * `${campaign}:${kind}:${round}`, so each event shows once. Resolves the round
+ * first (as any request does), so a report or a hit shows as soon as it exists.
+ */
+export async function signalsFor(store, k, found, owner, now) {
+  if (found.closed_at || !list(found.joined).includes(owner)) return [];
+  const { campaign, state, clock } = await ensureCampaign(store, k, found, now);
+  if (campaign.closed_at) return [];
+  const team = fleet.teamOf(campaign.pairing, owner);
+  if (!team) return [];
+  const seen = new Set(list(obj(await read(store, k.campaignSeen(campaign.game_id, campaign.id, owner))).ids));
+  const shown = await viewState(store, k, campaign, state);
+  const events = [];
+  const add = (kind, round) => events.push({ id: `${campaign.id}:${kind}:${round}`, kind, line: SIGNAL_LINES[kind], game_id: campaign.game_id, lesson_id: campaign.lesson });
+  if (campaign.revealed_at) {
+    add('reveal', 'final');
+  } else {
+    const last = shown.round >= 1 ? shown.log.find((l) => l.round === shown.round) : null;
+    if (list(last?.results).some((r) => r.target === team.id && r.outcome === 'hit')) add('hit', shown.round);
+    const reports = await readTeam(store, k, campaign, team.owners, reportsKey);
+    const owed = owedHits(shown, team, owner, reports);
+    if (owed.length) add('report_owed', Math.max(...owed.map((h) => h.round)));
+    if (last) add('report_ready', shown.round);
+    if (clock.round >= 1 && roundOpen(campaign, clock) && !roundClosing(clock, now) && firesIn(campaign, owner, clock.round)) {
+      const shots = list(await read(store, shotsKey(campaign, k, clock.round, owner)));
+      if (shots.length < SHOTS_PER_ROUND) add('round_open', clock.round);
+    }
+  }
+  return events.filter((e) => !seen.has(e.id));
+}
+
+/** Record shown signal ids in each campaign's seen/{owner} (etag append, newest SEEN_MAX kept). */
+async function markSeen(store, campaignsById, owner, ids) {
+  if (!Array.isArray(ids) || !ids.length || ids.length > SEEN_BATCH) reject(400, 'bad_ids', 'Nothing to mark.');
+  const byCampaign = new Map();
+  for (const id of ids) {
+    const m = typeof id === 'string' ? SIGNAL_ID.exec(id) : null;
+    if (!m || !campaignsById.has(m[1])) continue;
+    byCampaign.set(m[1], [...(byCampaign.get(m[1]) ?? []), id]);
+  }
+  for (const [id, fresh] of byCampaign) {
+    const { k, campaign } = campaignsById.get(id);
+    if (!list(campaign.joined).includes(owner)) continue;
+    await updateJSON(store, k.campaignSeen(campaign.game_id, campaign.id, owner), (held) => {
+      const kept = list(obj(held).ids);
+      const add = [...new Set(fresh)].filter((x) => !kept.includes(x));
+      return add.length ? { ids: [...kept, ...add].slice(-SEEN_MAX) } : undefined;
+    });
+  }
+  return { ok: true };
+}
+
+/** The open Fleet week campaigns of a lesson for a class (each fleet game's current campaign), by id. */
+async function lessonCampaigns(store, lessonId, classId, gameId) {
+  const k = gameKeys(lessonId);
+  const current = await read(store, k.current);
+  const record = current?.version ? await read(store, k.version(current.version)) : null;
+  const games = list(record?.order).filter((g) => record.games?.[g]?.kind === 'fleet_week' && (gameId === undefined || g === gameId));
+  const found = await Promise.all(games.map((g) => findCampaign(store, k, g, classId)));
+  return new Map(found.filter((c) => c && !c.closed_at).map((c) => [c.id, { k, campaign: c }]));
+}
+
+/** The open Fleet week campaigns of a class across lessons, from the class index. */
+async function classCampaigns(store, classId) {
+  const index = list(obj(await read(store, campaignIndexKey(classId))).campaigns).slice(-INDEX_MAX);
+  const found = await Promise.all(index.map(async (e) => {
+    if (!isSafeId(e?.lesson_id) || !isSafeId(e?.game_id)) return null;
+    const k = gameKeys(e.lesson_id);
+    const c = await findCampaign(store, k, e.game_id, classId, e.id);
+    return c && !c.closed_at ? { k, campaign: c } : null;
+  }));
+  return new Map(found.filter(Boolean).map((x) => [x.campaign.id, x]));
+}
+
+async function collectSignals(store, campaignsById, owner, now) {
+  const lists = await Promise.all([...campaignsById.values()].map(({ k, campaign }) => signalsFor(store, k, campaign, owner, now)));
+  return { events: lists.flat() };
+}
+
+const studentOwner = (classId, studentId) => deviceHash(`student:${classId}:${studentId}`);
+
+/** The class-wide entry point for the student now strip and other student pages (no lesson id needed). */
+export async function fleetClassSignals(store, classId, studentId, { now = Date.now() } = {}) {
+  return collectSignals(store, await classCampaigns(store, classId), studentOwner(classId, studentId), now);
+}
+
+/** Mark class-wide signals shown. */
+export async function fleetClassSignalsSeen(store, classId, studentId, ids) {
+  return markSeen(store, await classCampaigns(store, classId), studentOwner(classId, studentId), ids);
+}
+
 /** Student actions on a Fleet week campaign (`identify()` has run; `owner` is the student's). */
 export async function fleetStudentAction(store, lessonId, body, { classId, student, owner, now = Date.now() }) {
   const action = body.action;
   if (!FLEET_ACTIONS.includes(action)) reject(400, 'bad_action', 'Unknown action.');
   if (!student) reject(409, 'need_roster', 'Fleet week needs a class list. Ask your teacher.');
   const k = gameKeys(lessonId);
+  if (action === 'signals' || action === 'signals_seen') {
+    if (body.game_id !== undefined && typeof body.game_id !== 'string') reject(400, 'bad_game', 'That game isn’t in this lesson.');
+    const campaigns = await lessonCampaigns(store, lessonId, classId, body.game_id);
+    return action === 'signals' ? collectSignals(store, campaigns, owner, now) : markSeen(store, campaigns, owner, body.ids);
+  }
   const found = await findCampaign(store, k, body.game_id, classId, body.campaign_id);
   if (!found || found.game_id !== body.game_id) reject(409, 'no_campaign', 'Your teacher hasn’t started this game yet.');
   if (!list(found.joined).includes(owner)) reject(403, 'not_in_game', 'You joined after this game started. You’ll be in the next one.');
-  if (action === 'signals') return { events: [] };
   const { keys } = await loadFleetGame(store, k, found.game_id, found.version);
   if (action !== 'fleet_state' && (found.closed_at || found.revealed_at)) reject(409, 'closed', 'This game has finished.');
   const resolved = await ensureCampaign(store, k, found, now);

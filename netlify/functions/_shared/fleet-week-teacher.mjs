@@ -17,13 +17,16 @@ import { isDeletedRecord } from './record-liveness.mjs';
 import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
 import { loadRoster } from './class-claims.mjs';
 import { deviceHash, read, reject } from './question-drop.mjs';
-import { gameKeys } from './game-store.mjs';
+import { campaignIndexKey, gameKeys } from './game-store.mjs';
 import { fleet } from './game-rules.mjs';
 import { mapBounded } from './blobs-list.mjs';
 import {
   FLEET_TZ, allReports, ensureCampaign, ensureResolved, findCampaign, firstClock, revealCampaign, validZone, weekCloses, isDone, list, loadFleetGame, obj, readWithEtag, reportInputs, roundOpen, roundsOf,
   seedFor, updateJSON
 } from './fleet-week-store.mjs';
+
+/** Campaigns kept in a class's index (the oldest drop off). */
+const INDEX_KEEP = 20;
 
 /** Week mode's firing days by default (Tuesday to Thursday when opened on a Monday). */
 const WEEK_ROUNDS = 3;
@@ -104,6 +107,11 @@ async function openCampaign(store, lessonId, body, { k, roster, classId }, now) 
   }
   await store.setJSON(k.campaignClock(body.game_id, id), firstClock(campaign, now), { onlyIfNew: true });
   await store.setJSON(k.campaign(body.game_id, id), campaign, { onlyIfNew: true });
+  // The class index, so student pages with no lesson id can find this campaign's signals.
+  await updateJSON(store, campaignIndexKey(classId), (held) => {
+    const kept = list(obj(held).campaigns).filter((e) => e?.id !== id);
+    return { campaigns: [...kept, { lesson_id: lessonId, game_id: body.game_id, id, at: now }].slice(-INDEX_KEEP) };
+  });
   return campaign;
 }
 
@@ -162,7 +170,16 @@ async function campaignState(store, k, opened, roster, now) {
     owed,
     flags,
     log: shown.log.map((l) => ({ round: l.round, results: l.results.map((r) => ({ ...r, name: nameOf(r.owner) })) })),
-    standings: fleet.standings(shown, campaign.pairing)
+    standings: fleet.standings(shown, campaign.pairing),
+    // The server clock, so the control room's countdown never trusts the device's.
+    now,
+    // Every shot committed in the open round, for Void shot (`owner` and `seq` are what void_shot takes). No answer text.
+    shots: roundOpen(campaign, clock) && clock.round >= 1
+      ? owners.flatMap((o) => (shotsBy.get(`${clock.round}:${o}`) ?? []).map((s) => ({
+        round: clock.round, owner: o, owner_name: nameOf(o), seq: s.seq, square: s.square, square_label: fleet.squareLabel(s.square), sure: !!s.sure,
+        answered: typeof s.correct === 'boolean', ...(s.voided ? { voided: true } : {})
+      })))
+      : []
   };
 }
 
@@ -210,6 +227,11 @@ async function close(store, k, campaign, now) {
   const currentKey = k.campaignCurrent(campaign.game_id, campaign.class_id);
   const current = await read(store, currentKey);
   if (current?.id === campaign.id) await store.delete(currentKey);
+  await updateJSON(store, campaignIndexKey(campaign.class_id), (held) => {
+    const kept = list(obj(held).campaigns);
+    const left = kept.filter((e) => e?.id !== campaign.id);
+    return held && left.length !== kept.length ? { campaigns: left } : undefined;
+  });
   return data;
 }
 
