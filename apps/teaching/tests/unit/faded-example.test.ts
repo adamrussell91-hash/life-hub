@@ -59,8 +59,10 @@ const tickAll = (root: HTMLElement) =>
   });
 
 describe('checkAttempt', () => {
-  it('sorts short, odd and real attempts', () => {
-    expect(checkAttempt(['one two three four'])).toBe('short');
+  it('stops only empty boxes; one word can be the answer', () => {
+    expect(checkAttempt(['and'])).toBe('ok');
+    expect(checkAttempt(['and', '  '])).toBe('empty');
+    expect(checkAttempt(['one two three four'])).toBe('ok');
     expect(checkAttempt(['mmmmmmm one two three four'])).toBe('odd');
     expect(checkAttempt([GOOD])).toBe('ok');
   });
@@ -96,18 +98,25 @@ describe('worked step', () => {
 });
 
 describe('writing step', () => {
-  it('keeps a short attempt in write', () => {
-    const root = mount(writing);
-    toTick(root, 'too few words');
-    expect(root.querySelector('.block-faded__nudge')?.textContent).toBe('Write a full sentence in each box, then check it.');
+  it('names the empty box and keeps the student writing', () => {
+    const root = mount(mkBlock('f2', [step('s2', [0, 1])]));
+    toTick(root, 'and', ' ');
+    expect(root.querySelector('.block-faded__nudge')?.textContent).toBe("Write something under “Effect” first. One word is fine if that's the answer.");
     expect(root.querySelector('fieldset')).toBeNull();
-    expect(root.querySelector<HTMLTextAreaElement>('textarea')!.readOnly).toBe(false);
+    expect(root.querySelectorAll('textarea')[1]!.getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('lets a one-word answer through to the ticks', () => {
+    const root = mount(mkBlock('f4', [step('s4', [0])]));
+    toTick(root, 'and');
+    expect(root.querySelector('fieldset')).not.toBeNull();
+    expect(root.textContent).toContain('and');
   });
 
   it('asks about an odd attempt once, then lets the second press through', () => {
     const root = mount(writing);
     toTick(root, 'mmmmmmm is what I really wanted to say');
-    expect(root.querySelector('.block-faded__nudge')?.textContent).toBe('Is that what you meant to write?');
+    expect(root.querySelector('.block-faded__nudge')?.textContent).toContain('Is that what you meant to write?');
     expect(root.querySelector('fieldset')).toBeNull();
     click(root.querySelector('.block-faded__check'));
     expect(root.querySelector('fieldset')).not.toBeNull();
@@ -185,7 +194,7 @@ describe('sequence', () => {
     listen(LECTURE_ANSWERED, answered);
     const again = mount(three);
     expect(again.querySelector('fieldset')).not.toBeNull();
-    expect(again.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe(GOOD);
+    expect(again.querySelector('.block-faded__yours')?.textContent).toContain(GOOD);
     click(again.querySelector('.block-faded__model-btn'));
     expect(faded).toHaveBeenCalledTimes(1);
     again.remove();
@@ -195,6 +204,48 @@ describe('sequence', () => {
     expect(done.textContent).toContain('Model effect a');
     expect(faded).toHaveBeenCalledTimes(1);
     expect(answered).not.toHaveBeenCalled();
+  });
+});
+
+describe('calm layout', () => {
+  it('says worked example or your turn with where they are', () => {
+    const root = mount(mkBlock('h', [worked, step('s', [1])]));
+    expect(root.querySelector('.block-faded__where')?.textContent).toBe('Worked example · 1 of 2');
+    expect(root.querySelector('.block-faded__mode')).toBeNull();
+  });
+
+  it('shows the block question on the first example only', () => {
+    const root = mount(mkBlock('q', [step('w', []), step('s', [1])]));
+    expect(root.querySelector('.block-faded__prompt')?.textContent).toBe('Name the effect.');
+    click(root.querySelector('.block-faded__next'));
+    expect(root.querySelector('.block-faded__prompt')).toBeNull();
+    expect(root.querySelector('.block-faded__where')?.textContent).toBe('Your turn · 2 of 2');
+  });
+
+  it('a long passage gets a fold; a sentence does not', () => {
+    const long = 'word '.repeat(40).trim();
+    const root = mount(mkBlock('l', [step('s', [1], { extract: long })]));
+    expect(root.querySelector('.block-faded__step--long')).not.toBeNull();
+    const fold = root.querySelector<HTMLButtonElement>('.block-faded__fold')!;
+    click(fold);
+    expect(root.querySelector<HTMLElement>('.block-faded__extract')!.hidden).toBe(true);
+    expect(fold.textContent).toBe('Show the passage');
+    document.body.innerHTML = '';
+    expect(mount(writing).querySelector('.block-faded__fold')).toBeNull();
+  });
+
+  it('going back shows the earlier example with the work kept', () => {
+    const two = mkBlock('b2', [step('a', [1]), step('b', [1])]);
+    const root = mount(two);
+    toTick(root);
+    click(root.querySelector('.block-faded__model-btn'));
+    click(root.querySelector('.block-faded__next'));
+    write(root, GOOD2);
+    click(root.querySelectorAll<HTMLButtonElement>('.block-faded-rail__mark')[0]!);
+    expect(root.querySelector('.block-faded__yours')?.textContent).toContain(GOOD);
+    expect(root.textContent).toContain('Model effect a');
+    click(root.querySelectorAll<HTMLButtonElement>('.block-faded-rail__mark')[1]!);
+    expect(root.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe(GOOD2);
   });
 });
 
@@ -208,7 +259,7 @@ describe('old saved shape and converted blocks', () => {
     listen(FADED_EVENT, faded);
     const root = mount(old);
     expect(root.querySelector('.block-faded-rail')).toBeNull();
-    expect(root.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('It feels sad');
+    expect(root.querySelector('.block-faded__yours')?.textContent).toContain('It feels sad');
     expect(root.textContent).toContain('Lonely');
     expect([...root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].every((b) => b.checked)).toBe(true);
     expect(faded).not.toHaveBeenCalled();
