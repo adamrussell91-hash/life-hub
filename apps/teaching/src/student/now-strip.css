@@ -187,12 +187,12 @@
 }
 
 /* Fleet week (spec §2): the anchor sits before Show me; alone, the strip shows only while something waits. */
-.ns-strip--fleet:has(.fws-anchor[hidden]) { display: none; }
+.ns-strip--quiet { display: none; }
 .ns-strip .fws-anchor { box-shadow: 0 0 0 2px color-mix(in srgb, var(--paper) 35%, transparent); }
 .ns-strip .fws-anchor.fws-anchor--waiting { box-shadow: 0 0 0 2px var(--pastel-gold), 0 0 14px 2px color-mix(in srgb, var(--pastel-gold) 55%, transparent); }
 
 @media (max-width: 600px) {
   /* Text, anchor and × share the top row; Show me keeps the row under them. */
   .ns-strip .fws-anchor { order: 2; }
-  .ns-strip__in:has(> .fws-anchor:not([hidden])) .ns-strip__text { flex-basis: calc(100% - 112px); }
+  .ns-strip__in--anchor .ns-strip__text { flex-basis: calc(100% - 112px); }
 }

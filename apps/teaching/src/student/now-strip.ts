@@ -103,7 +103,8 @@ function fleetOnlyStrip(fleet: FleetSignals): HTMLElement {
   const inner = el('div', 'ns-strip__in');
   const text = el('div', 'ns-strip__text');
   text.append(el('span', 'ns-strip__kicker', 'Fleet week'), el('span', 'ns-strip__what', 'Something is waiting at sea.'));
-  inner.append(text, fleet.badge({ label: 'Fleet week', hideWhenQuiet: true }));
+  // Shown only while something waits (a class, not :has(), so older browsers hide it too).
+  inner.append(text, fleet.badge({ label: 'Fleet week', hideWhenQuiet: true, onCount: (n) => strip.classList.toggle('ns-strip--quiet', n === 0) }));
   strip.append(inner);
   return strip;
 }
@@ -125,7 +126,7 @@ export function renderNowStrip(todo: TodoPayload | undefined, options: NowStripO
   close.type = 'button';
   close.setAttribute('aria-label', 'Hide this for now');
   inner.append(text);
-  if (options.fleet) inner.append(options.fleet.badge({ label: 'Fleet week', hideWhenQuiet: true }));
+  if (options.fleet) inner.append(options.fleet.badge({ label: 'Fleet week', hideWhenQuiet: true, onCount: (n) => inner.classList.toggle('ns-strip__in--anchor', n > 0) }));
   inner.append(go, close);
   strip.append(inner);
 
