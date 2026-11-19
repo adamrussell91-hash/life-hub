@@ -15,6 +15,7 @@ import { canvasShowsOn, createGameTabs, type GameTab } from './editor-tabs';
 import { gridPanel, isGridGame, keepGridFields, type GridPanel } from './grid-editor';
 import { liveLauncher } from './live/launcher';
 import { fleetLauncher } from './kinds/fleet-week/control-room';
+import { fleetInsightPanel } from './kinds/fleet-week/insight';
 import './games.css';
 
 export type GameEditorOptions = {
@@ -515,6 +516,9 @@ export function mountGameEditor(o: GameEditorOptions): GameEditorHandle {
     });
     head.append(push);
     card.append(head, status);
+    // Fleet week's own insight (heat map, first try v returning, calibration, confident errors).
+    const fleetGame = r.kind === 'fleet_week' ? current().games.find((g) => g.id === r.game_id) : undefined;
+    if (r.kind === 'fleet_week') card.append(fleetInsightPanel({ game: fleetGame ?? ({ id: r.game_id, kind: r.kind, title: r.title } as Game), classId: resultsClass, api: o.api?.fleet ?? null }));
     if (!r.plays) {
       card.append(el('p', 'gm-note', 'Nobody has played this game yet.'));
       return card;

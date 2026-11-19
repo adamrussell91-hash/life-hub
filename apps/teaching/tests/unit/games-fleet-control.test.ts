@@ -84,7 +84,7 @@ describe('Fleet week control room', () => {
     pill.click();
     buttonNamed(room.root, 'Open campaign')!.click();
     await flush();
-    expect(api.open).toHaveBeenCalledWith('g_fleet', 'c_11y', { rounds: 4, round_cap_s: 180 });
+    expect(api.open).toHaveBeenCalledWith('g_fleet', 'c_11y', { mode: 'lesson', rounds: 4, round_cap_s: 180, balance: 'random' });
     expect(room.root.querySelector('.fc-phase')!.textContent).toContain('Round 1 of 4');
     expect(room.root.querySelector('.fc-time')!.textContent).toMatch(/\d:\d\d left/);
   });
@@ -195,5 +195,124 @@ describe('Fleet week helpers and launcher', () => {
     expect(document.querySelector('.fc')).toBeTruthy();
     document.querySelector<HTMLButtonElement>('.fc-top .btn')!.click();
     expect(fleetLauncher({ games: [], classes: CLASSES, classId: null, lessonId: 'l1', api })).toBeNull();
+  });
+});
+
+describe('Fleet week control room: week mode, shots and written answers', () => {
+  const pill = (root: HTMLElement, text: string) => [...root.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find((b) => b.textContent === text)!;
+
+  it('posts week mode with the cut-off and balance', async () => {
+    const call = vi.fn(async () => ({}));
+    await fleetControlApi(call as never).open('g', 'c', { mode: 'week', rounds: 3, cutoff: '19:30', balance: 'mixed' });
+    expect(call).toHaveBeenCalledWith('campaign_open', { game_id: 'g', class_id: 'c', mode: 'week', rounds: 3, cutoff: '19:30', balance: 'mixed' });
+  });
+
+  it('week-mode open sends mode, cutoff and balance, with the week schedule shown first', async () => {
+    const api = fakeApi(() => makeState({ mode: 'week' }));
+    // Monday 17 Nov 2025, 9:00 am on this device.
+    const monday = new Date(2025, 10, 17, 9, 0).getTime();
+    room = openFleetControlRoom(document.body, { lessonId: 'l1', game: GAME, classes: CLASSES, api, pollMs: 60000, now: () => monday });
+    expect(room.root.querySelector('input[name="cutoff"]')).toBeNull();
+    pill(room.root, 'Week').click();
+    const cut = room.root.querySelector<HTMLInputElement>('input[name="cutoff"]')!;
+    expect(cut.value).toBe('20:00');
+    expect(room.root.querySelector('select[name="round_cap_s"]')).toBeNull();
+    expect(room.root.querySelector('.fc-schedule')!.textContent).toContain('Placement until Mon 8:00 pm, firing Tue–Thu, reveal Fri');
+    cut.value = '19:30';
+    cut.dispatchEvent(new Event('change'));
+    expect(room.root.querySelector('.fc-schedule')!.textContent).toContain('Mon 7:30 pm');
+    pill(room.root, 'Mixed by recent accuracy').click();
+    buttonNamed(room.root, 'Open campaign')!.click();
+    await flush();
+    expect(api.open).toHaveBeenCalledWith('g_fleet', 'c_10x', { mode: 'week', rounds: 3, cutoff: '19:30', balance: 'mixed' });
+  });
+
+  it('hides Next round in week mode and shows the next cut-off on the server clock', async () => {
+    const device = 1_000_000;
+    const server = device + 5 * 60_000;
+    const api = fakeApi(() =>
+      makeState({ mode: 'week', now: server, closes_at: server + 3 * 3_600_000, cutoff: '20:00', tz: 'Australia/Sydney', schedule: [server - 3_600_000, server + 3 * 3_600_000, server + 27 * 3_600_000, server + 51 * 3_600_000] })
+    );
+    room = openFleetControlRoom(document.body, { lessonId: 'l1', game: GAME, classes: CLASSES, api, pollMs: 60000, now: () => device });
+    buttonNamed(room.root, 'Open campaign')!.click();
+    await flush();
+    expect(buttonNamed(room.root, 'Next round')).toBeUndefined();
+    expect(buttonNamed(room.root, 'Reveal')).toBeTruthy();
+    expect(room.root.querySelector('.fc-time')!.textContent).toMatch(/^Next cut-off \w{3} \d{1,2}:\d\d [ap]m · 3 h left$/);
+    expect(room.root.querySelector('.fc-main .fc-schedule')!.textContent).toMatch(/^Placement until .*, firing .*, reveal \w{3}\./);
+  });
+
+  it('counts lesson-mode time left from the server clock, not the device', async () => {
+    const device = 5_000_000;
+    const api = fakeApi(() => makeState({ now: device - 60_000, closes_at: device + 60_000 }));
+    room = openFleetControlRoom(document.body, { lessonId: 'l1', game: GAME, classes: CLASSES, api, pollMs: 60000, now: () => device });
+    buttonNamed(room.root, 'Open campaign')!.click();
+    await flush();
+    expect(room.root.querySelector('.fc-time')!.textContent).toBe('2:00 left');
+  });
+
+  it('voids an unflagged shot from the open round’s shot list', async () => {
+    const { api, root } = await opened({
+      shots: [
+        { round: 1, owner: 'o3', owner_name: 'Rafe Okonjo', seq: 1234, square: 7, square_label: 'B3', sure: false, answered: true },
+        { round: 1, owner: 'o1', owner_name: 'Pip Marlow', seq: 55, square: 12, square_label: 'C3', sure: true, answered: false },
+        { round: 1, owner: 'o2', owner_name: 'Juno Castell', seq: 56, square: 4, square_label: 'A5', sure: false, answered: true, voided: true }
+      ]
+    });
+    const rows = [...root.querySelectorAll('.fc-shot')];
+    expect(rows).toHaveLength(3);
+    expect(rows[0]!.textContent).toContain('Flagged');
+    expect(rows[1]!.textContent).toContain('Pip Marlow');
+    expect(rows[1]!.textContent).toContain('C3');
+    expect(rows[1]!.textContent).toContain('Sure');
+    expect(rows[1]!.textContent).toContain('Waiting');
+    expect(rows[1]!.textContent).not.toContain('Flagged');
+    expect(rows[2]!.querySelector('button')).toBeNull();
+    // The flag list no longer carries its own Void shot.
+    expect(root.querySelector('.fc-flag button.btn--secondary')).toBeNull();
+    root.querySelector<HTMLButtonElement>('button[aria-label="Void Pip Marlow’s shot at C3"]')!.click();
+    await flush();
+    expect(api.voidShot).toHaveBeenCalledWith('g_fleet', 'c_10x', { round: 1, owner: 'o1', seq: 55 }, 'camp1');
+  });
+
+  it('lists written answers with a typing replay and rejects a written report', async () => {
+    const writing = { chars: 31, typed_s: 4, pastes: 1, away: 0, jumps: 0, cut: 0, flags: ['Tried to paste once'], log: { start: 0, base: '', ms: 4000, pastes: 1, away: 0, jumps: 0, steps: [[1, 0, 0, 'Because the rhyme'], [9, 17, 0, ' is half-rhyme.']] } };
+    const { api, root } = await opened({
+      written: [
+        { kind: 'report', hit: 'h1', owner: 'o2', name: 'Juno Castell', shooter: 'Pip Marlow', round: 1, square: 10, prompt: 'Name the rhyme in stanza two.', answer: 'half rhyme', text: 'Because the rhyme is half-rhyme.', writing: writing as never },
+        { kind: 'recall', ship: 's1', owner: 'o3', name: 'Rafe Okonjo', round: 1, prompt: 'Name the speaker.', text: 'The ferryman', correct: true, writing: null }
+      ]
+    });
+    const card = root.querySelector('.fc-written')!;
+    expect(card.querySelector('.fc-h3')!.textContent).toBe('Written answers (2)');
+    expect(card.textContent).toContain('Juno Castell · damage report · round 1 · C1');
+    expect(card.textContent).toContain('Pip Marlow’s answer: half rhyme');
+    expect(card.textContent).toContain('Rafe Okonjo · recall line · round 1 · right');
+    expect(card.textContent).toContain('Tried to paste once');
+    const watch = buttonNamed(card as HTMLElement, 'Watch it being written')!;
+    watch.click();
+    expect(card.querySelector('.qz-replay')).toBeTruthy();
+    // Reject sits with the written report only (not on the owed list too).
+    expect([...root.querySelectorAll('button')].filter((b) => b.textContent === 'Reject report')).toHaveLength(1);
+    buttonNamed(card as HTMLElement, 'Reject report')!.click();
+    await flush();
+    expect(api.rejectReport).toHaveBeenCalledWith('g_fleet', 'c_10x', 'h1', 'camp1');
+  });
+
+  it('the reveal board lists the class’s hardest squares from the server board', async () => {
+    const { root } = await opened({
+      revealed_at: Date.now(),
+      board: {
+        squares: [],
+        hardest: [
+          { square: 18, label: 'D4', row: 'Poem D', column: 'Sound', answered: 4, right: 1, accuracy: 0.25 },
+          { square: 2, label: 'A3', row: 'Poem A', column: 'Image', answered: 3, right: 3, accuracy: 1 }
+        ]
+      }
+    });
+    buttonNamed(root, 'Show the reveal board')!.click();
+    const board = root.querySelector('.fc-board')!;
+    expect(board.textContent).toContain('D4 (Poem D · Sound): 1 of 4 right');
+    expect(board.textContent).not.toContain('A3 (Poem A');
   });
 });

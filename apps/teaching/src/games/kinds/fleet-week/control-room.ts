@@ -1,25 +1,28 @@
 import { el } from '@/quiz/dom';
 import { replayText, type WritingStep } from '@/quiz/writing';
+import { writingPanel } from '@/quiz/writing-replay';
 import { gameTeacherApi } from '../../api';
 import { GAME_KIND_INFO, type Game } from '../../core/schema';
 import { gameGlyph } from '../../glyphs';
 import { pills } from '../../item-editors';
 import { GRID, squareLabel } from './rules';
-import type { FleetCampaignState, FleetControlApi, FleetFlag, FleetLogResult, FleetMember, FleetTeamState } from './control-api';
+import type { FleetCampaignState, FleetControlApi, FleetFlag, FleetLogResult, FleetMember, FleetShot, FleetTeamState, FleetWritten } from './control-api';
 import { calm } from '../../motion/motion';
 import { createSea, type Sea } from './sea';
 import './control-room.css';
 
 /**
- * Fleet week, the teacher's control room (spec §1.6–§1.9, §5). Before a
- * campaign: class, rounds and round cap, then Open campaign (lesson mode).
- * During: polls `campaign_state` every 2 s and shows the phase, every match
- * with real names, who has placed or fired, owed damage reports, writing
- * flags with a typing replay, and standings, with Next round, Void shot,
- * Reject report, Reveal and Close. After the reveal, a large-type board view
- * for the projector: both fleets per match, hits and misses, names, the
- * winner and the hardest squares. A student's typed answer never reaches the
- * board view.
+ * Fleet week, the teacher's control room (spec §1.3, §1.6–§1.9, §5). Before a
+ * campaign: class, Lesson or Week mode (rounds and round cap, or the cut-off
+ * time and the week's schedule) and how teams are balanced, then Open
+ * campaign. During: polls `campaign_state` every 2 s and shows the phase and
+ * time left on the server's clock, every match with real names, who has
+ * placed or fired, the open round's shots (Void shot on any of them), owed
+ * damage reports, written answers (Reject report, typing replay), writing
+ * flags and standings, with Next round (lesson mode only), Reveal and Close.
+ * After the reveal, a large-type board view for the projector: both fleets
+ * per match, hits and misses, names, the winner and the class's hardest
+ * squares. A student's typed answer never reaches the board view.
  */
 
 export type FleetControlOptions = {
@@ -42,7 +45,11 @@ export type FleetControlRoom = {
   dispose(): void;
 };
 
-type FleetSettings = { rounds?: number; round_cap_s?: number };
+type FleetSettings = { rounds?: number; round_cap_s?: number; cutoff?: string };
+type Mode = 'lesson' | 'week';
+type Balance = 'random' | 'mixed';
+const CUTOFF = /^([01]\d|2[0-3]):[0-5]\d$/;
+const DAY_MS = 86_400_000;
 
 const errText = (e: unknown, fallback: string) => (e instanceof Error && e.message ? e.message : fallback);
 const btn = (text: string, kind: 'primary' | 'secondary' | 'ghost' | 'danger', onClick: () => void): HTMLButtonElement => {
@@ -55,6 +62,59 @@ const clock = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
+/** "2 h 15 min", "14 min", or m:ss under ten minutes. */
+const longClock = (ms: number) => {
+  const mins = Math.max(0, Math.ceil(ms / 60_000));
+  if (mins < 10) return clock(ms);
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  return `${h} h${mins % 60 ? ` ${mins % 60} min` : ''}`;
+};
+const zoned = (ms: number, tz: string | undefined, opts: Intl.DateTimeFormatOptions): string => {
+  try {
+    return new Intl.DateTimeFormat('en-AU', { ...opts, ...(tz ? { timeZone: tz } : {}) }).format(ms);
+  } catch {
+    return new Intl.DateTimeFormat('en-AU', opts).format(ms);
+  }
+};
+/** "8:00 pm" in the class's time zone. */
+const timeAt = (ms: number, tz?: string): string =>
+  zoned(ms, tz, { hour: 'numeric', minute: '2-digit', hour12: true })
+    .replace(/\s*([ap])\.?\s*m\.?/i, ' $1m')
+    .toLowerCase();
+/** "Tue 8:00 pm" in the class's time zone. */
+export const cutoffAt = (ms: number, tz?: string): string => `${zoned(ms, tz, { weekday: 'short' })} ${timeAt(ms, tz)}`;
+
+/**
+ * The week in a line from every close (placement first, then each firing
+ * round): "Placement until Mon 8:00 pm, firing Tue–Thu, reveal Fri".
+ */
+export function weekScheduleText(closes: number[], tz?: string): string {
+  if (!closes.length) return '';
+  const day = (ms: number) => zoned(ms, tz, { weekday: 'short' });
+  const fire = closes.slice(1);
+  const firing = !fire.length ? '' : fire.length === 1 ? `, firing ${day(fire[0]!)}` : `, firing ${day(fire[0]!)}–${day(fire[fire.length - 1]!)}`;
+  return `Placement until ${cutoffAt(closes[0]!, tz)}${firing}, reveal ${day(closes[closes.length - 1]! + DAY_MS)}`;
+}
+
+/**
+ * The week's closes before a campaign is open, on this device's clock: the
+ * placement closes at today's cut-off (tomorrow's once it has passed), then a
+ * firing round closes at each following day's cut-off. The server fixes the
+ * real schedule in the class's time zone at the open.
+ */
+export function previewWeek(at: number, cutoff: string, rounds: number): number[] {
+  const [hh, mm] = (CUTOFF.test(cutoff) ? cutoff : '20:00').split(':').map(Number) as [number, number];
+  const first = new Date(at);
+  first.setHours(hh, mm, 0, 0);
+  if (first.getTime() <= at) first.setDate(first.getDate() + 1);
+  return Array.from({ length: rounds + 1 }, (_, i) => {
+    const d = new Date(first);
+    d.setDate(first.getDate() + i);
+    return d.getTime();
+  });
+}
+
 const capLabel = (s: number) => (s % 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s / 60} min`);
 
 /** "Ana Example & Ben Sample", or "Ghost fleet". */
@@ -201,6 +261,13 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
   let classId: string | null = o.classId ?? o.classes[0]?.id ?? null;
   let rounds = settings.rounds ?? 5;
   let capS = settings.round_cap_s ?? 240;
+  let mode: Mode = 'lesson';
+  let cutoff = settings.cutoff && CUTOFF.test(settings.cutoff) ? settings.cutoff : '20:00';
+  let weekRounds = 3;
+  let balance: Balance = 'random';
+  /** Server clock minus this device's, from the latest `campaign_state.now`. */
+  let offset = 0;
+  const serverNow = () => now() + offset;
   let state: FleetCampaignState | null = null;
   let painted = '';
   let busy = false;
@@ -280,6 +347,7 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
   }
 
   function apply(next: FleetCampaignState): void {
+    if (typeof next.now === 'number' && Number.isFinite(next.now)) offset = next.now - now();
     state = next;
     paintTop();
     const key = JSON.stringify(next);
@@ -306,7 +374,10 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
       return;
     }
     phase.textContent = `${phaseText(state)} · ${className()}`;
-    timeLeft.textContent = roundOpen(state) && state.closes_at !== null ? `${clock(state.closes_at - now())} left` : '';
+    const closes = roundOpen(state) ? state.closes_at : null;
+    if (closes === null) timeLeft.textContent = '';
+    else if (state.mode === 'week') timeLeft.textContent = `Next cut-off ${cutoffAt(closes, state.tz)} · ${longClock(closes - serverNow())} left`;
+    else timeLeft.textContent = `${clock(closes - serverNow())} left`;
   }
   const tick = setInterval(() => {
     if (state) paintTop();
@@ -316,7 +387,16 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
   function paintSetup(): void {
     main.replaceChildren();
     const card = el('section', 'fc-card fc-setup');
-    card.append(el('h3', 'fc-h3', 'Open a campaign'), el('p', 'gm-note', 'Lesson mode: phones poll, and you move the class on with Next round. If one is already running for the class, this picks it up.'));
+    card.append(
+      el('h3', 'fc-h3', 'Open a campaign'),
+      el(
+        'p',
+        'gm-note',
+        mode === 'week'
+          ? 'Week mode: placement first, then one firing round a day, each closing at the cut-off. Phones load the game when students open it. If one is already running for the class, this picks it up.'
+          : 'Lesson mode: phones poll, and you move the class on with Next round. If one is already running for the class, this picks it up.'
+      )
+    );
     if (o.classes.length) {
       const field = el('div', 'gm-field');
       field.append(
@@ -328,41 +408,95 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
       card.append(field);
     } else card.append(el('p', 'gm-note', 'No class teaches this unit yet. Add a class first.'));
 
+    const modeField = el('div', 'gm-field fc-mode');
+    modeField.append(
+      el('span', 'gm-field__label', 'Mode'),
+      pills<Mode>([['lesson', 'Lesson'], ['week', 'Week']], mode, 'Mode', (v) => {
+        mode = v;
+        paintSetup();
+        main.querySelector<HTMLButtonElement>('.fc-mode .hub-pills__btn[aria-pressed="true"]')?.focus();
+      })
+    );
+    card.append(modeField);
+
     const roundsField = el('label', 'gm-field');
     const roundsPick = el('select', 'gm-select');
     roundsPick.name = 'rounds';
-    for (let n = 2; n <= 8; n += 1) {
-      const opt = el('option', '', `${n} rounds`);
+    const picked = mode === 'week' ? weekRounds : rounds;
+    for (let n = mode === 'week' ? 1 : 2; n <= 8; n += 1) {
+      const opt = el('option', '', `${n} round${n === 1 ? '' : 's'}`);
       opt.value = String(n);
-      opt.selected = n === rounds;
+      opt.selected = n === picked;
       roundsPick.append(opt);
     }
-    roundsPick.addEventListener('change', () => (rounds = Number(roundsPick.value)));
-    roundsField.append(el('span', 'gm-field__label', 'Rounds'), roundsPick);
-
-    const capField = el('label', 'gm-field');
-    const capPick = el('select', 'gm-select');
-    capPick.name = 'round_cap_s';
-    const caps = new Set([60, 90, 120, 150, 180, 240, 300, 360, 420, 480, 540, 600, capS]);
-    for (const s of [...caps].sort((a, b) => a - b)) {
-      const opt = el('option', '', capLabel(s));
-      opt.value = String(s);
-      opt.selected = s === capS;
-      capPick.append(opt);
-    }
-    capPick.addEventListener('change', () => (capS = Number(capPick.value)));
-    capField.append(el('span', 'gm-field__label', 'Round cap'), capPick);
-
+    roundsField.append(el('span', 'gm-field__label', mode === 'week' ? 'Firing rounds' : 'Rounds'), roundsPick);
     const row = el('div', 'fc-row');
-    row.append(roundsField, capField);
+    row.append(roundsField);
+
+    const schedule = el('p', 'fc-schedule');
+    schedule.setAttribute('aria-live', 'polite');
+    const paintSchedule = () => {
+      schedule.textContent = `${weekScheduleText(previewWeek(now(), cutoff, weekRounds))}. The server sets the exact times in the class’s time zone when you open.`;
+    };
+    if (mode === 'week') {
+      roundsPick.addEventListener('change', () => {
+        weekRounds = Number(roundsPick.value);
+        paintSchedule();
+      });
+      const cutField = el('label', 'gm-field');
+      const cutPick = el('input', 'gm-input fc-cutoff');
+      cutPick.type = 'time';
+      cutPick.name = 'cutoff';
+      cutPick.value = cutoff;
+      cutPick.addEventListener('change', () => {
+        if (CUTOFF.test(cutPick.value)) cutoff = cutPick.value;
+        paintSchedule();
+      });
+      cutField.append(el('span', 'gm-field__label', 'Cut-off time'), cutPick);
+      row.append(cutField);
+      paintSchedule();
+    } else {
+      roundsPick.addEventListener('change', () => (rounds = Number(roundsPick.value)));
+      const capField = el('label', 'gm-field');
+      const capPick = el('select', 'gm-select');
+      capPick.name = 'round_cap_s';
+      const caps = new Set([60, 90, 120, 150, 180, 240, 300, 360, 420, 480, 540, 600, capS]);
+      for (const sec of [...caps].sort((a, b) => a - b)) {
+        const opt = el('option', '', capLabel(sec));
+        opt.value = String(sec);
+        opt.selected = sec === capS;
+        capPick.append(opt);
+      }
+      capPick.addEventListener('change', () => (capS = Number(capPick.value)));
+      capField.append(el('span', 'gm-field__label', 'Round cap'), capPick);
+      row.append(capField);
+    }
+    card.append(row);
+    if (mode === 'week') card.append(schedule);
+
+    const teamsField = el('div', 'gm-field fc-balance');
+    teamsField.append(
+      el('span', 'gm-field__label', 'Teams'),
+      pills<Balance>([['random', 'Random'], ['mixed', 'Mixed by recent accuracy']], balance, 'Teams', (v) => {
+        balance = v;
+      }),
+      el('p', 'gm-note', 'Mixed pairs stronger with weaker players by their recent accuracy in this lesson’s games.')
+    );
+    card.append(teamsField);
+
     const open = btn('Open campaign', 'primary', () => {
       if (!classId || !api) return;
       const id = classId;
-      void act(`Opening Fleet week for ${className()}…`, () => api.open(o.game.id, id, { rounds, round_cap_s: capS }), 'Campaign open. Students open the game on their phones to place ships.');
+      const opts = mode === 'week' ? { mode, rounds: weekRounds, cutoff, balance } : { mode, rounds, round_cap_s: capS, balance };
+      void act(
+        `Opening Fleet week for ${className()}…`,
+        () => api.open(o.game.id, id, opts),
+        mode === 'week' ? 'Campaign open for the week. Students open the game on their phones to place ships before the cut-off.' : 'Campaign open. Students open the game on their phones to place ships.'
+      );
     });
     open.classList.add('fc-open');
     open.disabled = !classId || !api;
-    card.append(row, open);
+    card.append(open);
     if (!api) card.append(el('p', 'gm-note', 'The control room needs the server.'));
     main.append(card);
   }
@@ -394,8 +528,13 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
       )
     );
     close.disabled = !live;
-    bar.append(next, reveal, close);
+    if (s.mode !== 'week') bar.append(next);
+    bar.append(reveal, close);
     main.append(bar);
+    if (s.mode === 'week' && s.schedule?.length) {
+      const zone = s.tz ? ` (${s.tz.replace(/_/g, ' ')})` : '';
+      main.append(el('p', 'fc-schedule', `${weekScheduleText(s.schedule, s.tz)}. Each round closes at ${timeAt(s.schedule[0]!, s.tz)}${zone}.`));
+    }
 
     // Matches, grouped by team.
     const matches = el('section', 'fc-card');
@@ -438,12 +577,19 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
       li.append(el('p', 'fc-item__head', `${h.by} hit ${squareLabel(h.square)} in round ${h.round} · ${partner ? `${partner} owes` : 'owed'} the report by round ${h.due}${h.rejected ? ' · returned once' : ''}`));
       if (h.filed) {
         li.append(el('p', 'fc-item__text', `Filed by ${h.filed.by}: “${h.filed.text}”`));
-        if (live && !h.rejected) li.append(btn('Reject report', 'secondary', () => void act('Returning the report…', () => api!.rejectReport(o.game.id, classId!, h.hit, s.campaign_id), 'Report returned to the partner.')));
+        // Reject sits with the written answer (below); an older server without that list keeps it here.
+        if (live && !h.rejected && !s.written) li.append(rejectBtn(h.hit));
       } else li.append(el('p', 'gm-note', 'Not filed yet.'));
       owedList.append(li);
     }
     owed.append(owedList);
     main.append(owed);
+
+    // Shots this round: Void shot on any of them.
+    if (s.round >= 1 && roundOpen(s) && s.shots) main.append(shotsCard(s, live));
+
+    // Written answers: damage reports and recall lines.
+    if (s.written) main.append(writtenCard(s, live));
 
     // Writing flags.
     const flags = el('section', 'fc-card');
@@ -455,7 +601,7 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
       const what = f.kind === 'answer' ? `answer at ${squareLabel(f.square ?? -1)}` : f.kind === 'report' ? 'damage report' : 'recall line';
       const marks = [f.pastes ? `${f.pastes} paste${f.pastes === 1 ? '' : 's'}` : '', f.away ? `${f.away}× away` : '', f.jumps ? `${f.jumps} burst${f.jumps === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
       li.append(el('p', 'fc-item__head', `${f.name} · round ${f.round} · ${what}`), el('p', 'fc-flag__marks', marks));
-      if (f.kind === 'answer' && typeof f.seq === 'number' && live && roundOpen(s) && f.round === s.round) {
+      if (!s.shots && f.kind === 'answer' && typeof f.seq === 'number' && live && roundOpen(s) && f.round === s.round) {
         const shot = { round: f.round, owner: f.owner, seq: f.seq };
         li.append(btn('Void shot', 'secondary', () => void act('Voiding the shot…', () => api!.voidShot(o.game.id, classId!, shot, s.campaign_id), 'Shot voided: it becomes a dud that doesn’t return.')));
       }
@@ -497,6 +643,79 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
       log.append(ul);
       main.append(log);
     }
+  }
+
+  function rejectBtn(hit: string): HTMLButtonElement {
+    return btn('Reject report', 'secondary', () =>
+      void act('Returning the report…', () => api!.rejectReport(o.game.id, classId!, hit, state!.campaign_id), 'Report returned to the partner.')
+    );
+  }
+
+  function shotsCard(s: FleetCampaignState, live: boolean): HTMLElement {
+    const shots = s.shots ?? [];
+    const card = el('section', 'fc-card fc-shots');
+    card.append(el('h3', 'fc-h3', `Shots this round (${shots.length})`));
+    if (!shots.length) {
+      card.append(el('p', 'gm-note', 'No shots yet this round.'));
+      return card;
+    }
+    card.append(el('p', 'gm-note', 'Void any shot: it becomes a dud that doesn’t return.'));
+    const flagged = new Set(s.flags.filter((f) => f.kind === 'answer' && f.round === s.round).map((f) => `${f.owner}:${f.seq}`));
+    const list = el('ul', 'fc-list fc-shotlist');
+    for (const shot of shots) list.append(shotRow(shot, s, live, flagged.has(`${shot.owner}:${shot.seq}`)));
+    card.append(list);
+    return card;
+  }
+
+  function shotRow(shot: FleetShot, s: FleetCampaignState, live: boolean, flagged: boolean): HTMLElement {
+    const label = shot.square_label || squareLabel(shot.square);
+    const li = el('li', `fc-shot${shot.voided ? ' is-voided' : ''}`);
+    const tags = el('span', 'fc-shot__tags');
+    tags.append(el('span', `fc-pill fc-pill--${shot.sure ? 'busy' : 'idle'}`, shot.sure ? 'Sure' : 'Unsure'));
+    tags.append(el('span', `fc-pill fc-pill--${shot.answered ? 'done' : 'idle'}`, shot.answered ? 'Answered' : 'Waiting'));
+    if (flagged) tags.append(el('span', 'fc-pill fc-pill--flag', 'Flagged'));
+    if (shot.voided) tags.append(el('span', 'fc-pill fc-pill--void', 'Voided'));
+    li.append(el('span', 'fc-shot__who', shot.owner_name), el('span', 'fc-shot__square', label), tags);
+    if (!shot.voided && live && roundOpen(s)) {
+      const v = btn('Void shot', 'secondary', () =>
+        void act('Voiding the shot…', () => api!.voidShot(o.game.id, classId!, { round: shot.round, owner: shot.owner, seq: shot.seq }, s.campaign_id), 'Shot voided: it becomes a dud that doesn’t return.')
+      );
+      v.setAttribute('aria-label', `Void ${shot.owner_name}’s shot at ${label}`);
+      li.append(v);
+    }
+    return li;
+  }
+
+  function writtenCard(s: FleetCampaignState, live: boolean): HTMLElement {
+    const written = s.written ?? [];
+    const card = el('section', 'fc-card fc-written');
+    card.append(el('h3', 'fc-h3', `Written answers (${written.length})`));
+    if (!written.length) {
+      card.append(el('p', 'gm-note', 'No damage reports or recall lines yet.'));
+      return card;
+    }
+    const owed = new Map(s.owed.map((h) => [h.hit, h]));
+    const list = el('ul', 'fc-list');
+    for (const w of written) list.append(writtenRow(w, w.kind === 'report' ? owed.get(w.hit) : undefined, live));
+    card.append(list);
+    return card;
+  }
+
+  function writtenRow(w: FleetWritten, owed: FleetCampaignState['owed'][number] | undefined, live: boolean): HTMLElement {
+    const li = el('li', `fc-item fc-written__item fc-written__item--${w.kind}`);
+    if (w.kind === 'report') {
+      li.append(el('p', 'fc-item__head', `${w.name} · damage report · round ${w.round}${w.square !== null ? ` · ${squareLabel(w.square)}` : ''}`));
+      if (w.prompt) li.append(el('p', 'fc-written__prompt', `Question: ${w.prompt}`));
+      if (w.answer) li.append(el('p', 'fc-written__prompt', `${w.shooter}’s answer: ${w.answer}`));
+    } else {
+      li.append(el('p', 'fc-item__head', `${w.name} · recall line · round ${w.round} · ${w.correct ? 'right' : 'not right'}`));
+      if (w.prompt) li.append(el('p', 'fc-written__prompt', `Question: ${w.prompt}`));
+    }
+    li.append(el('p', 'fc-item__text', w.text ? `“${w.text}”` : 'Nothing written.'));
+    if (w.writing) li.append(writingPanel(w.writing, w.writing.log, w.text));
+    if (w.kind === 'report' && owed?.rejected) li.append(el('p', 'gm-note', 'Returned once already.'));
+    else if (w.kind === 'report' && live && owed?.filed) li.append(rejectBtn(w.hit));
+    return li;
   }
 
   // ------------------------------------------------------------ board (projector)
@@ -583,17 +802,20 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
     }
     boardEl.append(sides);
     liftSeas();
-    const hard = hardestSquares(s);
+    // The class's hardest squares: the server's board when it sent one, else the resolved log. Never an answer.
+    const cols = (o.game as { columns?: string[] }).columns ?? [];
+    const rows = (o.game as { rows?: string[] }).rows ?? [];
+    const hard = s.board
+      ? s.board.hardest
+          .filter((h) => h.right < h.answered)
+          .slice(0, 3)
+          .map((h) => ({ square: h.square, label: h.label, topic: [h.row, h.column].filter(Boolean).join(' · '), right: h.right, total: h.answered }))
+      : hardestSquares(s).map((h) => ({ ...h, label: squareLabel(h.square), topic: [rows[Math.floor(h.square / GRID)], cols[h.square % GRID]].filter(Boolean).join(' · ') }));
     if (hard.length) {
-      const cols = (o.game as { columns?: string[] }).columns ?? [];
-      const rows = (o.game as { rows?: string[] }).rows ?? [];
       const box = el('section', 'fc-board__hard');
-      box.append(el('h3', 'fc-board__team', 'Hardest squares'));
+      box.append(el('h3', 'fc-board__team', 'The class’s hardest squares'));
       const ul = el('ul', 'fc-board__hardlist');
-      for (const h of hard) {
-        const topic = [rows[Math.floor(h.square / GRID)], cols[h.square % GRID]].filter(Boolean).join(' · ');
-        ul.append(el('li', '', `${squareLabel(h.square)}${topic ? ` (${topic})` : ''}: ${h.right} of ${h.total} right`));
-      }
+      for (const h of hard) ul.append(el('li', '', `${h.label || squareLabel(h.square)}${h.topic ? ` (${h.topic})` : ''}: ${h.right} of ${h.total} right`));
       box.append(ul);
       boardEl.append(box);
     }

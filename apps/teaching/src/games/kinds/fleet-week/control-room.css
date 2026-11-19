@@ -441,3 +441,78 @@
     transition: background-color 0.3s var(--game-ease, ease);
   }
 }
+
+/* Week mode: the schedule line under the actions, and the setup preview. */
+.fc-schedule {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-left: 4px solid var(--navy, #17375e);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--pastel-blue, #dceafa);
+  font-weight: 600;
+}
+.fc-cutoff {
+  min-height: 44px;
+  font-size: max(16px, var(--text-base, 1rem));
+}
+.fc-balance .gm-note {
+  margin: var(--space-1, 0.25rem) 0 0;
+}
+
+/* Shots this round: one row per shot, Void shot on each. */
+.fc-shot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--paper, #fbfaf7);
+}
+.fc-shot__who {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.fc-shot__square {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  justify-self: end;
+}
+.fc-shot__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1, 0.25rem);
+}
+.fc-shot .btn {
+  min-height: 44px;
+  justify-self: end;
+}
+.fc-shot.is-voided .fc-shot__who,
+.fc-shot.is-voided .fc-shot__square {
+  color: var(--muted, #6b7a90);
+  text-decoration: line-through;
+}
+.fc-pill--flag {
+  background: var(--game-wrong-surface, #fbe7e6);
+  color: var(--danger, #b3261e);
+}
+.fc-pill--void {
+  background: var(--ink, #1b2433);
+  color: var(--cotton, #fff);
+}
+
+/* Written answers: damage reports and recall lines with the typing replay. */
+.fc-written__prompt {
+  color: var(--muted, #6b7a90);
+  font-size: var(--text-sm, 0.875rem);
+  overflow-wrap: anywhere;
+}
+.fc-written__item .btn {
+  min-height: 44px;
+  justify-self: start;
+}
+.fc-written__item .qz-writing {
+  margin-top: var(--space-1, 0.25rem);
+}
