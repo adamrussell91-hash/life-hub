@@ -1,6 +1,6 @@
 import { apiPost } from '@/api/client';
 import { deviceToken } from '@/quiz/dom';
-import type { SetResult } from './model';
+import type { Edit, Finding, PairPrediction, SetResult } from './model';
 import type { LabJudge, LabLevel, LabStep } from './schema';
 
 // ---------------------------------------------------------------------------
@@ -11,7 +11,36 @@ import type { LabJudge, LabLevel, LabStep } from './schema';
 /** The round as anyone may see it. `step` is an index into `steps`; one past the last means the lab is finished. */
 export type LabRound = { session: string; step: number; step_name: LabStep | null; steps: LabStep[]; revealed: boolean; finished: boolean };
 /** A text to judge, as a reader sees it: the words, never which option they are. */
-export type LabReadingItem = { kind: 'text'; text: string } | { kind: 'set'; pieces: string[] };
+export type LabReadingItem =
+  | { kind: 'text'; text: string }
+  | { kind: 'set'; pieces: string[] }
+  /** Pairs design it: the control or a pair's version, line by line, with no marks to say which. */
+  | { kind: 'lines'; lines: string[] };
+
+/** Pairs design it: the student's own pair. Any member's save is the pair's. */
+export type LabPairView = {
+  edit: Edit;
+  /** On the bench: locked until a member takes it off. */
+  ready: boolean;
+  pred: PairPrediction | null;
+  feature: number | null;
+  /** The pair has changed something, so it has a version for readers. */
+  trial: boolean;
+};
+/** The control's ratings, lowest first. */
+export type LabControlReading = { mean: number; n: number; ratings: number[] };
+/** A trial as any student may see it: the change in words and what it did. */
+export type LabOpenTrial = Pick<Finding, 'desc' | 'shift' | 'n' | 'verdict' | 'thin'> & { mine: boolean };
+/** Pairs design it, from the Result step: the class's trials, and the student's own pair's in full (null when the pair has none). */
+export type LabFindings = {
+  control: LabControlReading;
+  threshold: number;
+  trials: LabOpenTrial[];
+  mine: (LabOpenTrial & { edit: Edit; ratings: number[]; mean: number; pred: PairPrediction | null; held: boolean }) | null;
+};
+/** A trial as the teacher's board has it: the pair, its members' initials, its edit and its ratings. */
+export type LabBoardTrial = Finding & { pair: string; number: number; initials: string[]; edit: Edit; ratings: number[] };
+export type LabBoardFindings = { control: LabControlReading; threshold: number; trials: LabBoardTrial[] };
 export type LabMe = {
   pred: number | null;
   reason: string;
@@ -31,12 +60,16 @@ export type LabStatus = {
   /** Null until the teacher starts the lab, and after the round goes idle. */
   round: LabRound | null;
   me: LabMe | null;
-  /** Pairs design it: the pair's record (Task 4). Null until then. */
-  pair: null;
+  /** Pairs design it: the student's pair. Null at the other levels, and for a student who is in no pair. */
+  pair: LabPairView | null;
+  /** Pairs design it: the control text, once the round is open. */
+  control?: string | null;
   /** At Test: where this reader is up to. `item` is null once every text is judged. */
   reading: { index: number; total: number; item: LabReadingItem | null } | null;
   /** Null before the Result step. */
   results: SetResult | null;
+  /** Pairs design it. Null before the Result step. */
+  findings?: LabFindings | null;
 };
 
 export type LabClient = {
@@ -46,6 +79,12 @@ export type LabClient = {
   note(step: LabStep, text: string): Promise<LabStatus>;
   /** Students write it: saves this student's version for one option. */
   write(option: number, text: string): Promise<LabStatus>;
+  /** Pairs design it: saves the pair's edit to the control. The last save wins. */
+  bench(edit: Edit): Promise<LabStatus>;
+  /** Pairs design it: puts the pair's version on the bench, or takes it off. */
+  ready(on: boolean): Promise<LabStatus>;
+  /** Pairs design it: the pair's prediction for its own change. */
+  pairPredict(pred: PairPrediction): Promise<LabStatus>;
   rate(item: number, value: number): Promise<LabStatus>;
   /** `choice` is the position tapped; the server knows which option sat there. */
   pick(item: number, choice: number): Promise<LabStatus>;
@@ -71,6 +110,9 @@ export function labClient(lessonId: string, classId: string): LabClient {
     predict: (pred, reason) => act('predict', { pred, reason }),
     note: (step, text) => act('note', { step, text }),
     write: (option, text) => act('write', { option, text }),
+    bench: (edit) => act('bench', { edit }),
+    ready: (on) => act('ready', { on }),
+    pairPredict: (pred) => act('pair_predict', { pred }),
     rate: (item, value) => act('rate', { item, value }),
     pick: (item, choice) => act('pick', { item, choice }),
     explain: () => act('explain')
@@ -93,7 +135,7 @@ export type LabBoard = {
   judge: LabJudge;
   /** `here`: students who have joined the round. `done`: how many have finished the current step. `total`: the class list. */
   counts: { here: number; done: number; total: number };
-  /** Per option. At Predict only once revealed; always from Result on. */
+  /** Per option; for Pairs design it, how many pairs predicted lower, about the same, higher. At Predict only once revealed; always from Result on. */
   predictions: number[] | null;
   /** Null before the Result step. */
   results: SetResult | null;
@@ -104,11 +146,23 @@ export type LabBoard = {
   held?: LabHeld[];
   /** Students write it, from Result on. */
   best?: LabBestPiece | null;
+  /** Pairs design it: how many pairs there are, have changed something, are on the bench, have predicted. */
+  pairs?: { total: number; changed: number; ready: number; predicted: number } | null;
+  /** Pairs design it. Null before the Result step. */
+  findings?: LabBoardFindings | null;
   /** The teacher's debrief notes, at the last step and after. */
   debrief: string | null;
 };
 export type LabPastRound = { session: string; started_at: string | null; students: number; live: boolean };
-export type LabStudentRecord = { student_id: string; record: (LabMe & { ratings?: number[]; picks?: number[] }) | null; items: unknown[] };
+export type LabStudentRecord = {
+  student_id: string;
+  record: (LabMe & { ratings?: number[]; picks?: number[] }) | null;
+  items: unknown[];
+  /** Pairs design it: the student's pair, its saved record and its change in words. */
+  pair?: { id: string; students: string[]; record: (LabPairView & { flagged?: boolean }) | null; change: string[] } | null;
+  /** Pairs design it, from the Result step: the pair's trial. */
+  trial?: Omit<LabBoardTrial, 'initials'> | null;
+};
 
 export type LabTeacherApi = {
   endpoint: string;

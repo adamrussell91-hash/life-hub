@@ -119,6 +119,7 @@ import { createCaseHandler } from '../../../netlify/functions/case.mjs';
 import { createPublishedLabHandler } from '../../../netlify/functions/published-lab.mjs';
 import { createLabHandler } from '../../../netlify/functions/lab.mjs';
 import { prepareLabPublish, storeLabConfig } from '../../../netlify/functions/_shared/lab.mjs';
+import { LAB_CLASS_ID, LAB_ROSTER, LAB_WALKS, isLabWalk, labClassAct, labClassJoin, type LabWalkId } from './mock-lab-class';
 import { createPublishedRotationHandler } from '../../../netlify/functions/published-rotation.mjs';
 import { createRotationHandler } from '../../../netlify/functions/rotation.mjs';
 import { createGamesHandler } from '../../../netlify/functions/games.mjs';
@@ -1018,9 +1019,45 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     store.setJSON(`markbook/${classId}`, { columns, marks, hidden_quizzes: [], focus: {}, took: {}, groups: [], history: [] });
   }
 
+  /**
+   * Three walkable Lab lessons, dev walk and preview: an invented Year 12 class of 17 in eight pairs and
+   * one lab per level, published. The rest of the class is played by mock-lab-class.ts: they join when the
+   * teacher starts a lab and finish each step when the teacher presses Next. All invented.
+   * Walk: teacher `/lessons/lesson_lab_passive`, `/lessons/lesson_lab_storm`, `/lessons/lesson_lab_hesitant`;
+   * student `/s/classes/class_2026_12lab/lessons/<lesson id>` as KT (pair 1) or JM (pair 2).
+   */
+  function seedLabLessons(): void {
+    if (process.env.VITEST) return;
+    const unit = options.seed.units[0] as { id: string; lesson_ids: string[] } | undefined;
+    const template = options.seed.classes[0] as Record<string, unknown> | undefined;
+    if (!unit || !template) return;
+    const stamp = '2026-11-19T09:00:00.000Z';
+    store.setJSON(classKey(LAB_CLASS_ID), {
+      ...template, id: LAB_CLASS_ID, code: '12LAB', title: 'Year 12 English Lab', slug: '12lab', display_name: '12LAB',
+      students: LAB_ROSTER.map((r) => ({ id: r.id, name: r.name, skip_picker: false })), current_scheduled_lesson_id: undefined
+    });
+    seedIds.classes.push(LAB_CLASS_ID);
+    (Object.keys(LAB_WALKS) as LabWalkId[]).forEach((lessonId, i) => {
+      const walk = LAB_WALKS[lessonId];
+      const unitNow = store.getJSON<{ lesson_ids?: string[] }>(unitKey(unit.id)) ?? unit;
+      const draft = {
+        id: lessonId, type: 'lesson', title: walk.title, slug: lessonId.replace(/^lesson_/, ''), unit_id: unit.id, sequence: (unitNow.lesson_ids ?? []).length + 1 + i,
+        pedagogical_mode: 'lab', lab: walk.lab, blocks: [], status: 'active', created_at: stamp, updated_at: stamp, schema_version: 1, tags: [], syllabus_outcomes: [], outcome_ids: []
+      };
+      const pub = prepareLabPublish(draft);
+      if (pub.problems.length || !pub.snapshot || !pub.config) { console.error('lab seed', lessonId, pub.problems); return; }
+      void storeLabConfig(functionBlobStore(), lessonId, pub.config);
+      store.setJSON(draftLessonKey(lessonId), { ...draft, blocks: pub.draftBlocks, published_at: stamp });
+      store.setJSON(publishedLessonKey(lessonId), { lesson_id: lessonId, title: walk.title, unit_id: unit.id, blocks: pub.blocks, published_at: stamp, schema_version: 1, pedagogical_mode: 'lab', lab: pub.snapshot });
+      store.setJSON(unitKey(unit.id), { ...unitNow, lesson_ids: [...(unitNow.lesson_ids ?? []), lessonId] });
+      seedIds.lessons.push(lessonId);
+    });
+  }
+
   seedStudentProgress();
   seedStationRotation();
   seedGameLesson();
+  seedLabLessons();
 
   /**
    * Over time walk, dev only: nine weekly quizzes for 12ENGADV2 across Term 3 and Term 4 (holiday gap
@@ -4416,6 +4453,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       : path.startsWith('/api/published/quiz/')
         ? createPublishedQuizHandler(deps)
         : createPublishedQuestionDropHandler(deps);
+    // The walkable labs have an invented class: it finishes the step the teacher is leaving, and joins a fresh round.
+    const labWalk = method === 'POST' && getSession(cookie).authenticated ? /^\/api\/lessons\/([^/]+)\/lab$/.exec(path)?.[1] : undefined;
+    const labMove = labWalk && isLabWalk(labWalk) ? (body as { action?: string } | null)?.action : undefined;
+    if (labWalk && isLabWalk(labWalk) && labMove === 'next') await labClassAct(functionBlobStore(), labWalk);
     const response: Response = await handler(
       new Request(`http://mock.local${pathWithQuery}`, {
         method,
@@ -4424,6 +4465,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       }),
       {}
     );
+    if (labWalk && isLabWalk(labWalk) && labMove === 'start' && response.ok) await labClassJoin(functionBlobStore(), labWalk);
     return jsonResponse(response.status, await response.json());
   }
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { labAction, labTeacherAction } from '../../netlify/functions/_shared/lab.mjs';
 import { labKeys } from '../../netlify/functions/_shared/lab-keys.mjs';
 import { isPublicStudentApi } from '../../netlify/functions/_shared/public-student-routes.mjs';
-import { ROSTER, STUDENTS, SUPPLIED, device, labStore } from './helpers/lab-store.js';
+import { PAIRS, PAIRS_LAB, ROSTER, STUDENTS, SUPPLIED, device, labStore } from './helpers/lab-store.js';
 
 const teacher = (store, action, extra = {}) => labTeacherAction(store, 'lab1', { action, ...extra });
 const student = (store, i, action, extra = {}) => labAction(store, 'lab1', { ...device(i), action, ...extra });
@@ -429,4 +429,219 @@ test('Result, students write it: choices by option, each writer’s own counts, 
   const mine = await student(store, 0, 'status');
   assert.deepEqual(mine.me.own, { chosen: [0, 6, 0], readers: 6 });
   assert.deepEqual(mine.results.values, [0, 48, 0]);
+});
+
+// ---------------------------------------------------------------------------
+// Pairs design it
+// ---------------------------------------------------------------------------
+
+// The fixture's control, by word: 0 I, 1 meant, 2 to, 3 tell, 4 you / 5 but, 6 the, 7 words, 8 I, 9 think, / 10 were, 11 somewhere, 12 else.
+const EDITS = [{ cut: [8, 9] }, { join: [4] }, { rep: { 1: 'wanted' } }, { cut: [5] }, { brk: [6] }, { cut: [12] }, { join: [9] }];
+/** The first student of pair `p` (0-based) and their partner. */
+const first = (p) => p * 2;
+const pairIdOf = (i) => PAIRS.find((pair) => pair.students.includes(ROSTER[i].id)).id;
+
+/** A round at Design with all 17 joined. */
+async function atDesign() {
+  const { store, session } = await started(17, PAIRS_LAB);
+  await next(store, 1);
+  return { store, session };
+}
+/** Pairs 1 to 7 each put a different change on the bench; pair 8 changes nothing. */
+async function benched(store) {
+  for (let p = 0; p < 7; p += 1) {
+    await student(store, first(p), 'bench', { edit: EDITS[p] });
+    await student(store, first(p) + 1, 'ready');
+  }
+}
+
+test('Design: either partner saves the pair’s edit, the last save wins, and the bench needs a change', async () => {
+  const { store } = await atDesign();
+  let status = await student(store, 0, 'status');
+  assert.equal(status.control, PAIRS_LAB.control);
+  assert.deepEqual(status.pair, { edit: {}, ready: false, pred: null, feature: null, trial: false });
+  await code(student(store, 0, 'ready'), 'no_change');
+  // KT cuts two words; the partner RV sees it, then saves a different edit over it.
+  await student(store, 0, 'bench', { edit: { cut: [8, 9, 99, -1, 'x'], rep: { 1: '  meant ' }, join: [3] } });
+  status = await student(store, 1, 'status');
+  assert.deepEqual(status.pair.edit, { cut: [8, 9] }, 'out-of-range indexes, a same-word replacement and a join where no break is are dropped');
+  assert.equal(status.pair.trial, true);
+  status = await student(store, 1, 'bench', { edit: { join: [4] } });
+  assert.deepEqual((await student(store, 0, 'status')).pair.edit, { join: [4] });
+  // Another pair's bench is their own.
+  assert.deepEqual((await student(store, 2, 'status')).pair.edit, {});
+  // Either partner puts it on the bench; then it is locked until one takes it off.
+  status = await student(store, 0, 'ready');
+  assert.equal(status.pair.ready, true);
+  await code(student(store, 1, 'bench', { edit: {} }), 'locked');
+  const board = await teacher(store, 'board');
+  assert.deepEqual(board.pairs, { total: 8, changed: 1, ready: 1, predicted: 0 });
+  status = await student(store, 1, 'ready', { on: false });
+  assert.equal(status.pair.ready, false);
+  await student(store, 1, 'bench', { edit: { cut: [5] } });
+  // The bench belongs to this level and this step.
+  await next(store, 2);
+  await code(student(store, 0, 'bench', { edit: {} }), 'wrong_step');
+  const other = await started(1);
+  await code(student(other.store, 0, 'bench', { edit: {} }), 'bad_action');
+});
+
+test('Predict: the pair predicts once for its own change, and a pair with no change has nothing to predict', async () => {
+  const { store } = await atDesign();
+  await benched(store);
+  await next(store, 2);
+  await code(student(store, 0, 'predict', { pred: 0 }), 'bad_action');
+  await code(student(store, 0, 'pair_predict', { pred: 2 }), 'bad_pred');
+  let status = await student(store, 1, 'pair_predict', { pred: -1 });
+  assert.equal(status.pair.pred, -1);
+  assert.equal((await student(store, 0, 'status')).pair.pred, -1, 'the partner sees it locked');
+  await code(student(store, 0, 'pair_predict', { pred: 1 }), 'locked');
+  await code(student(store, 14, 'pair_predict', { pred: 0 }), 'no_trial');
+  await student(store, 2, 'pair_predict', { pred: 1 });
+  // Predictions stay off the board until the teacher reveals them.
+  let board = await teacher(store, 'board');
+  assert.equal(board.predictions, null);
+  assert.equal(board.pairs.predicted, 2);
+  board = await teacher(store, 'reveal', { session: board.round.session, on: true });
+  assert.deepEqual(board.predictions, [1, 0, 1]);
+});
+
+test('Test, pairs: two controls mixed in with four other pairs’ versions, never a reader’s own pair, counts within one', async () => {
+  const { store, session } = await atDesign();
+  await benched(store);
+  await next(store, 2);
+  await next(store, 3);
+  const dealt = dealOf(store, session);
+  assert.deepEqual(dealt.pool.versions, ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7']);
+  const readers = new Map();
+  for (let i = 0; i < 17; i += 1) {
+    const items = dealt.lists[ROSTER[i].id];
+    assert.equal(items.length, 6);
+    assert.equal(items.filter((item) => item.kind === 'control').length, 2);
+    const versions = items.filter((item) => item.kind === 'version').map((item) => item.pair);
+    assert.equal(new Set(versions).size, 4);
+    assert.equal(versions.includes(pairIdOf(i)), false, 'never their own pair’s version');
+    for (const v of versions) readers.set(v, (readers.get(v) ?? 0) + 1);
+  }
+  const counts = dealt.pool.versions.map((v) => readers.get(v) ?? 0);
+  assert.ok(Math.max(...counts) - Math.min(...counts) <= 1, `readers per version: ${counts}`);
+  // The controls are not always first: across the class they turn up in different places.
+  assert.ok(new Set(Object.values(dealt.lists).map((items) => items.findIndex((item) => item.kind === 'control'))).size > 1);
+
+  // A reader gets lines to rate, with nothing to say whether they are the control or whose version they are.
+  const items = dealt.lists[ROSTER[0].id];
+  let status = await student(store, 0, 'status');
+  assert.equal(status.reading.total, 6);
+  for (let item = 0; item < 6; item += 1) {
+    const it = items[item];
+    const expected = it.kind === 'control' ? PAIRS_LAB.control.split('\n')
+      : it.pair === 'p2' ? ['I meant to tell you but the words, I think,', 'were somewhere else.']
+        : it.pair === 'p3' ? ['I wanted to tell you', 'but the words, I think,', 'were somewhere else.'] : null;
+    assert.deepEqual(Object.keys(status.reading.item).sort(), ['kind', 'lines']);
+    assert.equal(status.reading.item.kind, 'lines');
+    if (expected) assert.deepEqual(status.reading.item.lines, expected);
+    assert.equal(status.findings, null);
+    await code(student(store, 0, 'pick', { item, choice: 0 }), 'bad_item');
+    status = await student(store, 0, 'rate', { item, value: 5 });
+  }
+  assert.equal(status.reading.item, null);
+  assert.equal(status.me.done.Test, true);
+  await code(student(store, 0, 'rate', { item: 0, value: 5 }), 'locked');
+});
+
+test('Result, pairs: findings wait for the Result step; a student gets changes with no pair on them, the teacher gets initials', async () => {
+  const { store, session } = await atDesign();
+  await benched(store);
+  await next(store, 2);
+  await student(store, 0, 'pair_predict', { pred: -1 });
+  await student(store, 2, 'pair_predict', { pred: 1 });
+  await next(store, 3);
+  const lists = dealOf(store, session).lists;
+  // Every reader gives the control 6, pair 1's version 3 and every other version 6.
+  for (let i = 0; i < 17; i += 1) {
+    const items = lists[ROSTER[i].id];
+    for (let item = 0; item < items.length; item += 1) {
+      const before = await student(store, i, 'rate', { item, value: items[item].kind === 'version' && items[item].pair === 'p1' ? 3 : 6 });
+      assert.equal(before.findings, null);
+      assert.equal(before.results, null);
+    }
+  }
+  let board = await teacher(store, 'board');
+  assert.equal(board.findings, null);
+  assert.equal(board.predictions, null);
+  board = await next(store, 4);
+  assert.deepEqual(board.findings.control, { mean: 6, n: 34, ratings: Array.from({ length: 34 }, () => 6) });
+  assert.equal(board.findings.trials.length, 7);
+  const p1 = board.findings.trials.find((t) => t.pair === 'p1');
+  assert.deepEqual({ desc: p1.desc, shift: p1.shift, verdict: p1.verdict, pred: p1.pred, held: p1.held, thin: p1.thin, number: p1.number, initials: p1.initials, edit: p1.edit },
+    { desc: ['cut "I think,"'], shift: -3, verdict: -1, pred: -1, held: true, thin: false, number: 1, initials: ['KT', 'RV'], edit: { cut: [8, 9] } });
+  assert.equal(p1.ratings.length, p1.n);
+  const p2 = board.findings.trials.find((t) => t.pair === 'p2');
+  assert.deepEqual([p2.shift, p2.verdict, p2.pred, p2.held], [0, 0, 1, false]);
+  assert.deepEqual(board.predictions, [1, 0, 1]);
+
+  // KT, in pair 1: their own trial in full, everyone else's by its change alone.
+  const mine = (await student(store, 0, 'status')).findings;
+  assert.deepEqual(mine.mine, { desc: ['cut "I think,"'], shift: -3, n: p1.n, verdict: -1, thin: false, mine: true, edit: { cut: [8, 9] }, ratings: p1.ratings, mean: 3, pred: -1, held: true });
+  assert.equal(mine.trials.length, 7);
+  assert.equal(mine.trials.filter((t) => t.mine).length, 1);
+  for (const t of mine.trials) assert.deepEqual(Object.keys(t).sort(), ['desc', 'mine', 'n', 'shift', 'thin', 'verdict']);
+  const sent = JSON.stringify(mine);
+  for (const s of ROSTER) assert.equal(sent.includes(s.id) || sent.includes(`"${s.initials}"`), false);
+  assert.equal(/"p[1-8]"/.test(sent), false, 'no pair ids');
+
+  // Pair 8 changed nothing: no trial, they read as normal, and they get the class findings.
+  assert.equal(lists[ROSTER[16].id].filter((item) => item.kind === 'version').length, 4);
+  const none = await student(store, 16, 'status');
+  assert.equal(none.pair.trial, false);
+  assert.equal(none.findings.mine, null);
+  assert.equal(none.findings.trials.length, 7);
+
+  // For marking: one student's record with their pair's version and trial.
+  const record = await teacher(store, 'student', { student_id: ROSTER[1].id });
+  assert.equal(record.pair.id, 'p1');
+  assert.deepEqual(record.pair.change, ['cut "I think,"']);
+  assert.equal(record.trial.shift, -3);
+  assert.equal(record.items.length, 6);
+});
+
+test('a flagged replacement word holds the pair’s version: out of the reading until the teacher releases it', async () => {
+  const run = async (decide) => {
+    const { store, session } = await atDesign();
+    await benched(store);
+    const status = await student(store, 4, 'bench').catch(() => null);
+    assert.equal(status, null, 'pair 3 is on the bench, so it takes its version off to change it');
+    await student(store, 4, 'ready', { on: false });
+    await student(store, 5, 'bench', { edit: { rep: { 11: 'stupid' } } });
+    await student(store, 5, 'ready');
+    // The pair is not told; to them the version is on the bench.
+    assert.equal((await student(store, 4, 'status')).pair.trial, true);
+    const board = await teacher(store, 'board');
+    assert.deepEqual(board.held, [{ owner: 'pair.p3', initials: 'BN, CD', pieces: [{ label: 'Their change', text: 'Changed "somewhere" to "stupid"', flagged: true }] }]);
+    if (decide) assert.deepEqual((await teacher(store, decide, { session, owner: 'pair.p3' })).held, []);
+    await next(store, 2);
+    await next(store, 3);
+    return dealOf(store, session).pool.versions.includes('p3');
+  };
+  assert.equal(await run(null), false);
+  assert.equal(await run('release'), true);
+  assert.equal(await run('remove'), false);
+});
+
+test('a small class: fewer than four other versions means all of them plus two controls, and a thin trial is marked', async () => {
+  const { store, session } = await started(4, PAIRS_LAB);
+  await next(store, 1);
+  await student(store, 0, 'bench', { edit: EDITS[0] });
+  await student(store, 2, 'bench', { edit: EDITS[1] });
+  await next(store, 2);
+  await next(store, 3);
+  const lists = dealOf(store, session).lists;
+  // A change left unsent when the teacher moved on still counts as the pair's version.
+  for (let i = 0; i < 4; i += 1) {
+    assert.deepEqual(lists[ROSTER[i].id].map((item) => item.kind).sort(), ['control', 'control', 'version']);
+    assert.equal(lists[ROSTER[i].id].find((item) => item.kind === 'version').pair, i < 2 ? 'p2' : 'p1');
+    for (let item = 0; item < 3; item += 1) await student(store, i, 'rate', { item, value: 4 });
+  }
+  const board = await next(store, 4);
+  assert.deepEqual(board.findings.trials.map((t) => [t.pair, t.n, t.thin]), [['p1', 2, true], ['p2', 2, true]]);
 });

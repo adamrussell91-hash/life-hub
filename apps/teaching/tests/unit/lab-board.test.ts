@@ -221,3 +221,104 @@ describe('the lab board, students write it', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Pairs design it
+// ---------------------------------------------------------------------------
+
+describe('the lab board, pairs design it', () => {
+  const STANZA = 'I meant to tell you\nbut the words, I think,\nwere somewhere else.';
+  const HESITANT: LabSettings = {
+    ...seedLab('class1', 'pairs'), question: 'What makes this speaker sound hesitant?', claim: 'The line breaks create the hesitation.', control: STANZA,
+    judge_question: 'How hesitant does the speaker sound?', pairs: [{ id: 'p1', students: ['st_01', 'st_02'] }, { id: 'p2', students: ['st_03', 'st_04'] }], debrief: 'The hedges do more.'
+  };
+  const PAIR_STEPS = ['Question', 'Design', 'Predict', 'Test', 'Result', 'Name it', 'Explain'] as const;
+  const COUNTS = { total: 8, changed: 7, ready: 5, predicted: 3 };
+  const pairsAt = (step: number, over: Partial<LabBoard> = {}, revealed = false): LabBoard => ({
+    ...at(step), round: { session: SESSION, step, step_name: PAIR_STEPS[step] ?? null, steps: [...PAIR_STEPS], revealed, finished: step >= PAIR_STEPS.length },
+    level: 'pairs', judge: 'rate', held: [], best: null, pairs: COUNTS, findings: null, ...over
+  });
+  const trial = (pair: string, number: number, desc: string, edit: object, shift: number, n: number, pred: -1 | 0 | 1) => ({
+    id: pair, pair, number, initials: ['KT', 'RV'], desc: [desc], edit, ratings: Array.from({ length: n }, () => 5), mean: 5, n, shift,
+    verdict: (shift <= -1 ? -1 : shift >= 1 ? 1 : 0) as -1 | 0 | 1, pred, held: false, thin: n < 4, feature: null
+  });
+  const FOUND = {
+    control: { mean: 6.5, n: 8, ratings: [5, 6, 6, 6, 7, 7, 7, 8] }, threshold: 1,
+    trials: [trial('p1', 1, 'cut "I think,"', { cut: [8, 9] }, -1.8, 5, -1), trial('p2', 2, 'joined lines 1 and 2', { join: [4] }, -0.4, 5, 0), trial('p3', 3, 'broke line 2 after "the"', { brk: [6] }, 2.1, 3, 1)]
+  };
+  function mountPairs(first: LabBoard) {
+    const mounted = mount(first);
+    const lesson = { id: 'lab1', lab: HESITANT, blocks: [] } as unknown as Lesson;
+    const board = mountLabBoard({ api: mounted.api, getLesson: () => lesson, pollMs: 60_000 });
+    document.body.replaceChildren(board.root);
+    return { ...mounted, board, act: (name: string) => board.root.querySelector(`[data-act="${name}"]`) as HTMLButtonElement, text: () => board.root.textContent ?? '' };
+  }
+
+  it('Question and Design show the control, and Design counts the pairs on the bench', async () => {
+    const question = mountPairs(pairsAt(0));
+    await question.board.refresh();
+    expect(question.text()).toContain('Claim to test: The line breaks create the hesitation.');
+    expect([...question.board.root.querySelectorAll('.lab-poem li')].map((li) => li.textContent)).toEqual(STANZA.split('\n'));
+    expect(question.text()).toContain('16 students here, in 8 pairs');
+    const design = mountPairs(pairsAt(1));
+    await design.board.refresh();
+    expect(design.board.root.querySelector('h2')?.textContent).toBe('Change one thing in the text');
+    expect(design.text()).toContain('5 of 8 pairs on the bench');
+    expect(design.act('next').textContent).toBe('Next: Predict');
+  });
+
+  it('Predict keeps the pairs’ predictions hidden until Reveal', async () => {
+    const { board, api, act, text } = mountPairs(pairsAt(2));
+    (api.reveal as ReturnType<typeof vi.fn>).mockImplementation((_s: string, on: boolean) => Promise.resolve(pairsAt(2, { predictions: on ? [4, 1, 2] : null }, on)));
+    await board.refresh();
+    expect(text()).toContain('3 of 7 pairs locked in');
+    expect(board.root.querySelector('.lab-bars')).toBeNull();
+    act('reveal').click();
+    await flush();
+    expect(board.root.querySelector('h2')?.textContent).toBe('What the pairs predict');
+    expect([...board.root.querySelectorAll('.lab-bar')].map((r) => r.textContent)).toEqual(['Lower4', 'Higher2', 'About the same1']);
+  });
+
+  it('Test shows progress only', async () => {
+    const { board, text } = mountPairs(pairsAt(3, { counts: { here: 16, done: 6, total: 17 } }));
+    await board.refresh();
+    expect(text()).toContain('Each reader gets up to six versions with the changes unmarked.');
+    expect(text()).toContain('6 of 16 readers finished');
+    expect(board.root.querySelector('.lab-finds')).toBeNull();
+  });
+
+  it('Result is the findings chart; a row opens that pair’s marked version beside its dots and the control’s', async () => {
+    const { board, text } = mountPairs(pairsAt(4, { findings: FOUND, predictions: [1, 1, 1] }));
+    await board.refresh();
+    // The headline is the biggest shift among trials with enough readers.
+    expect(board.root.querySelector('h2')?.textContent).toBe('Biggest shift: cut "I think,"');
+    const rows = () => [...board.root.querySelectorAll('button.lab-find')] as HTMLButtonElement[];
+    expect(rows().map((r) => r.querySelector('.lab-find__value')?.textContent)).toEqual(['−1.8', '−0.4', '+2.1']);
+    expect(rows().map((r) => r.classList.contains('is-pale'))).toEqual([false, true, true]);
+    expect(text()).toContain('Control average 6.5 from 8 ratings. Tap a row to see its readings.');
+    expect(board.root.querySelector('.lab-find-detail')).toBeNull();
+    rows()[0]!.click();
+    const detail = board.root.querySelector('.lab-find-detail')!;
+    expect(detail.querySelector('.lab-label')?.textContent).toBe('Pair 1: cut "I think,"');
+    expect([...detail.querySelectorAll('.lab-tok.is-cut')].map((t) => t.textContent)).toEqual(['I', 'think,']);
+    expect([...detail.querySelectorAll('.lab-reading')].map((r) => [r.querySelector('b')?.textContent, r.querySelectorAll('circle').length])).toEqual([['Control', 8], ['This version', 5]]);
+    // The same row again closes it.
+    rows()[0]!.click();
+    expect(board.root.querySelector('.lab-find-detail')).toBeNull();
+  });
+
+  it('Explain shows the claim, the findings and the debrief; a held word is listed for the teacher', async () => {
+    const held = [{ owner: 'pair.p3', initials: 'BN, CD', pieces: [{ label: 'Their change', text: 'Changed "somewhere" to "rude"', flagged: true }] }];
+    const { board, api, act, text } = mountPairs(pairsAt(6, { findings: FOUND, debrief: 'The hedges do more.', explained: 9, held }));
+    await board.refresh();
+    expect(board.root.querySelector('h2')?.textContent).toBe('Does the evidence support the claim?');
+    expect(text()).toContain('Claim: The line breaks create the hesitation.');
+    expect(board.root.querySelectorAll('.lab-find').length).toBe(3);
+    expect(text()).toContain('Your notes: The hedges do more.');
+    expect(text()).toContain('9 of 16 handed in');
+    expect(board.root.querySelector('.lab-held')?.textContent).toContain('BN, CD');
+    act('release').click();
+    await flush();
+    expect(api.release).toHaveBeenCalledWith('pair.p3');
+  });
+});
+

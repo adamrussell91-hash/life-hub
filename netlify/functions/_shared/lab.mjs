@@ -13,6 +13,8 @@
  *                                                                one past the last step means the lab is finished
  *   student  { student_id, pred, reason, notes: { [step]: text }, ratings?, picks?, done: { [step]: true },
  *              writing?: [text per option], flagged?: [bool per option], written_at? }      Students write it
+ *   pair     { edit, flagged, edited_at, ready, pred, feature, by, at }                     Pairs design it: any member
+ *              saves the pair's edit to the control and the last save wins
  *   held     { status: 'released' | 'removed', at }   the teacher's call on flagged writing; it stands
  *                                                      until the writer changes the writing again
  *
@@ -25,7 +27,7 @@
  */
 import { randomBytes } from 'node:crypto';
 import { LabSettingsSchema, LAB_EXPLAIN_BLOCK_ID, labIssues, publicLab, withExplainBlock } from './lab-schema.mjs';
-import { deal, dealLate, setResult, stepsFor } from './lab-model.mjs';
+import { applyEdits, changeLabel, deal, dealLate, describeEdits, hasChange, pairFindings, sanitiseEdit, setResult, stepsFor, tokenise } from './lab-model.mjs';
 import { labKeys } from './lab-keys.mjs';
 import { isSafeId } from './class-examples.mjs';
 import { isDeletedRecord } from './record-liveness.mjs';
@@ -76,6 +78,9 @@ const MAX_REASON = 300;
 const MAX_WRITING = 2000;
 /** Pick one, Students write it: how many writers each reader gets. */
 const WRITERS_EACH = 6;
+/** Pairs design it: each reader rates two controls and up to four other pairs' versions. */
+const VERSIONS_EACH = 4;
+const CONTROLS_EACH = 2;
 const clean = (text, max) => (typeof text === 'string' ? text.trim().slice(0, max) : '');
 const list = (value) => (Array.isArray(value) ? value : []);
 const ownerOf = (classId, studentId) => deviceHash(`student:${classId}:${studentId}`);
@@ -157,13 +162,87 @@ function writerTallies(config, records, lists) {
 }
 
 // ---------------------------------------------------------------------------
+// Pairs design it: the pairs, their versions, and what readers made of them
+// ---------------------------------------------------------------------------
+
+const controlTokens = (config) => tokenise(config.control ?? '');
+const pairOfStudent = (config, studentId) => list(config.pairs).find((p) => list(p.students).includes(studentId)) ?? null;
+/** A pair's key among the held work, apart from any student's. */
+const pairHeldOwner = (pairId) => `pair.${pairId}`;
+
+/** Every pair's record in the round, by pair id. A pair that has saved nothing is absent. */
+async function allPairs(store, k, config, session) {
+  const rows = await mapBounded(list(config.pairs), 8, async (pair) => [pair.id, await read(store, k.pair(session, pair.id))]);
+  return new Map(rows.filter(([, record]) => record));
+}
+
+/** 'in' the reading, 'held' for the teacher (a flagged word), 'removed' by the teacher, or 'none' when nothing is changed. */
+function pairState(tokens, record, decision) {
+  if (!record || !hasChange(tokens, record.edit)) return 'none';
+  if (decision === 'removed') return 'removed';
+  if (record.flagged && decision !== 'released') return 'held';
+  return 'in';
+}
+/** The pair has a trial as far as its own members can tell: a held version looks the same to them as one in the reading. */
+const hasTrial = (state) => state === 'in' || state === 'held';
+
+/**
+ * What the class's trials found, worked out from every reader's ratings.
+ * Each trial carries its pair id, its edit and its ratings (sorted, so a
+ * rating can't be traced to a reader); callers cut that down for students.
+ */
+export async function labFindings(store, k, config, session) {
+  const tokens = controlTokens(config);
+  const [records, { lists }, pairs, decisions] = await Promise.all([allRecords(store, k, session), allLists(store, k, session), allPairs(store, k, config, session), heldDecisions(store, k, session)]);
+  const control = [];
+  const byPair = new Map();
+  for (const [, record] of records) {
+    list(lists[record.student_id]).forEach((item, i) => {
+      const value = record.ratings?.[i];
+      if (!Number.isFinite(value)) return;
+      if (item.kind === 'control') control.push(value);
+      if (item.kind === 'version') byPair.set(item.pair, [...(byPair.get(item.pair) ?? []), value]);
+    });
+  }
+  const sorted = (values) => [...values].sort((a, b) => a - b);
+  const inTrial = list(config.pairs).filter((p) => pairState(tokens, pairs.get(p.id), decisionFor(decisions, pairHeldOwner(p.id), pairs.get(p.id)?.edited_at)) === 'in');
+  const found = pairFindings({
+    tokens,
+    threshold: config.threshold,
+    control,
+    trials: inTrial.map((p) => {
+      const record = pairs.get(p.id);
+      return { id: p.id, edit: record.edit, ratings: sorted(byPair.get(p.id) ?? []), pred: [-1, 0, 1].includes(record.pred) ? record.pred : null, feature: Number.isInteger(record.feature) ? record.feature : null };
+    })
+  });
+  return {
+    control: { ...found.control, ratings: sorted(control) },
+    threshold: config.threshold,
+    trials: found.trials.map((t) => ({ ...t, pair: t.id, number: list(config.pairs).findIndex((p) => p.id === t.id) + 1, edit: pairs.get(t.id).edit, ratings: sorted(byPair.get(t.id) ?? []) }))
+  };
+}
+
+/** The findings as a student may have them: every trial by its change alone, and their own pair's in full. */
+function findingsForStudent(findings, pairId) {
+  const mine = findings.trials.find((t) => t.pair === pairId) ?? null;
+  const open = (t) => ({ desc: t.desc, shift: t.shift, n: t.n, verdict: t.verdict, thin: t.thin, mine: t.pair === pairId });
+  return {
+    control: findings.control,
+    threshold: findings.threshold,
+    trials: findings.trials.map(open),
+    mine: mine ? { ...open(mine), edit: mine.edit, ratings: mine.ratings, mean: mine.mean, pred: mine.pred, held: mine.held } : null
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Who reads what
 // ---------------------------------------------------------------------------
 
 /**
  * What the deal is made from, without the readers. Students write it deals
  * the writers whose every version is written and is not held; Pairs design it
- * (Task 4: pairs with a change on the bench) adds its case here.
+ * deals the pairs with a change on the bench that is not held. A pair with no
+ * change has no trial, and its members read like anyone else.
  */
 async function dealPool(store, k, config, session) {
   if (config.level === 'supplied') {
@@ -173,6 +252,14 @@ async function dealPool(store, k, config, session) {
     const [records, decisions] = await Promise.all([allRecords(store, k, session), heldDecisions(store, k, session)]);
     const writers = records.filter(([owner, r]) => writerState(config, r, decisionFor(decisions, owner, r.written_at)) === 'in').map(([, r]) => r.student_id).sort();
     return { kind: 'writers', writers, options: optionCount(config), per: WRITERS_EACH };
+  }
+  if (config.level === 'pairs') {
+    const tokens = controlTokens(config);
+    const [pairs, decisions] = await Promise.all([allPairs(store, k, config, session), heldDecisions(store, k, session)]);
+    const versions = list(config.pairs).filter((p) => pairState(tokens, pairs.get(p.id), decisionFor(decisions, pairHeldOwner(p.id), pairs.get(p.id)?.edited_at)) === 'in').map((p) => p.id);
+    // Every member of every pair, here or not, so a reader who joins late is still kept from their own pair's version.
+    const pairOf = Object.fromEntries(list(config.pairs).flatMap((p) => list(p.students).map((s) => [s, p.id])));
+    return { kind: 'pairs', pairOf, versions, per: VERSIONS_EACH, controls: CONTROLS_EACH };
   }
   return null;
 }
@@ -221,6 +308,9 @@ async function itemView(store, k, config, session, item) {
     const writing = writingOf(config, writer);
     return { kind: 'set', pieces: list(item.order).map((i) => writing[i] ?? '') };
   }
+  // The control and a pair's version look the same to a reader: lines, with no marks.
+  if (item.kind === 'control') return { kind: 'lines', lines: applyEdits(controlTokens(config), {}).lines };
+  if (item.kind === 'version') return { kind: 'lines', lines: applyEdits(controlTokens(config), (await read(store, k.pair(session, item.pair)))?.edit ?? {}).lines };
   return null;
 }
 
@@ -255,7 +345,7 @@ async function classResult(store, k, config, round) {
   return setResult({ judge: config.judge, options, picks, ratings, predictions, readers, threshold: config.threshold });
 }
 
-/** Results exist for the two supplied levels (Pairs design it adds its findings in Task 4). */
+/** The class result for the two supplied levels. Pairs design it has findings instead (labFindings). */
 const resultsFor = async (store, k, config, steps, round) =>
   config.level !== 'pairs' && reached(steps, round, 'Result') ? classResult(store, k, config, round) : null;
 
@@ -263,7 +353,7 @@ const resultsFor = async (store, k, config, steps, round) =>
 // Student side
 // ---------------------------------------------------------------------------
 
-const STUDENT_ACTIONS = ['status', 'claim', 'predict', 'note', 'write', 'rate', 'pick', 'explain'];
+const STUDENT_ACTIONS = ['status', 'claim', 'predict', 'note', 'write', 'bench', 'ready', 'pair_predict', 'rate', 'pick', 'explain'];
 
 export async function labAction(store, lessonId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
@@ -281,7 +371,7 @@ export async function labAction(store, lessonId, body) {
   const identity = { need: who.need, initials: who.student?.initials ?? null };
   const active = await read(store, k.active);
   const round = roundView(active, steps);
-  const empty = { identity, round, me: null, pair: null, reading: null, results: null };
+  const empty = { identity, round, me: null, pair: null, control: null, reading: null, results: null, findings: null };
   const asking = action === 'status' || action === 'claim';
   if (who.need === 'initials') {
     if (!asking) reject(403, 'need_initials', 'Type your initials first.');
@@ -325,7 +415,7 @@ export async function labAction(store, lessonId, body) {
   };
 
   if (action === 'predict') {
-    // Pairs design it predicts as a pair (Task 4: pair_predict).
+    // Pairs design it predicts as a pair (pair_predict).
     if (config.level === 'pairs') reject(400, 'bad_action', 'Unknown action.');
     during('Predict');
     if (record.pred !== null && record.pred !== undefined) reject(409, 'locked', 'Your prediction is locked in.');
@@ -351,6 +441,46 @@ export async function labAction(store, lessonId, body) {
     const now = new Date().toISOString();
     // Flagged writing still saves; it waits for the teacher before any reader gets it.
     await save({ writing, flagged: writing.map((t) => flagText(t)), written_at: now, done: { ...record.done, Make: writing.every((t) => t.trim()) } });
+  }
+
+  // Pairs design it: the version, its place on the bench and the prediction are the pair's. Any member acts for the pair.
+  const pair = config.level === 'pairs' ? pairOfStudent(config, who.student.id) : null;
+  const tokens = config.level === 'pairs' ? controlTokens(config) : [];
+  let pairRecord = pair ? await read(store, k.pair(round.session, pair.id)) : null;
+  const savePair = async (change) => {
+    pairRecord = { edit: {}, flagged: false, ready: false, pred: null, feature: null, ...pairRecord, ...change, by: who.student.id, at: new Date().toISOString() };
+    await store.setJSON(k.pair(round.session, pair.id), pairRecord);
+  };
+  const needPair = () => {
+    only('pairs');
+    if (!pair) reject(403, 'no_pair', 'You are a reader in this lab. Ask your teacher to add you to a pair.');
+  };
+  const pairStateNow = async () => (pair ? pairState(tokens, pairRecord, decisionFor(await heldDecisions(store, k, round.session), pairHeldOwner(pair.id), pairRecord?.edited_at)) : 'none');
+  if (action === 'bench') {
+    // The last save wins, whichever partner made it.
+    needPair();
+    during('Design');
+    if (pairRecord?.ready) reject(409, 'locked', 'Your version is on the bench. Take it off to change it.');
+    const edit = sanitiseEdit(tokens, body.edit);
+    const words = Object.values(edit.rep ?? {});
+    // A replaced word is the one thing a pair types that readers see, so it goes through the filter.
+    await savePair({ edit, flagged: words.some((w) => flagText(w)) || flagText(words.join(' ')), edited_at: new Date().toISOString() });
+  }
+  if (action === 'ready') {
+    needPair();
+    during('Design');
+    const on = body.on !== false;
+    if (on && !hasChange(tokens, pairRecord?.edit)) reject(400, 'no_change', 'Change one thing first.');
+    await savePair({ ready: on });
+  }
+  if (action === 'pair_predict') {
+    needPair();
+    during('Predict');
+    if (!hasTrial(await pairStateNow())) reject(409, 'no_trial', 'Your pair has no version on the bench.');
+    if (pairRecord.pred === -1 || pairRecord.pred === 0 || pairRecord.pred === 1) reject(409, 'locked', 'Your pair’s prediction is locked in.');
+    const pred = Number(body.pred);
+    if (![-1, 0, 1].includes(pred)) reject(400, 'bad_pred', 'Choose lower, about the same or higher.');
+    await savePair({ pred });
   }
   if (action === 'rate' || action === 'pick') {
     during('Test');
@@ -404,7 +534,16 @@ export async function labAction(store, lessonId, body) {
       }
     }
   }
-  return { identity, round, me, pair: null, reading, results: await resultsFor(store, k, config, steps, round) };
+  const pairView = pair
+    ? { edit: pairRecord?.edit ?? {}, ready: pairRecord?.ready === true, pred: [-1, 0, 1].includes(pairRecord?.pred) ? pairRecord.pred : null, feature: Number.isInteger(pairRecord?.feature) ? pairRecord.feature : null, trial: hasTrial(await pairStateNow()) }
+    : null;
+  const findings = config.level === 'pairs' && reached(steps, round, 'Result') ? findingsForStudent(await labFindings(store, k, config, round.session), pair?.id ?? null) : null;
+  return {
+    identity, round, me, pair: pairView,
+    // The control reaches a student through the round: it is on the Question screen.
+    control: config.level === 'pairs' ? config.control ?? '' : null,
+    reading, results: await resultsFor(store, k, config, steps, round), findings
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -417,9 +556,20 @@ const TEACHER_ACTIONS = ['board', 'start', 'next', 'reveal', 'rounds', 'resume',
 
 /** Flagged work waiting for the teacher: who (initials, for the teacher only) and the words. */
 async function heldWork(store, k, config, round, roster, records) {
-  if (config.level !== 'students') return [];
+  if (config.level === 'supplied') return [];
   const decisions = await heldDecisions(store, k, round.session);
   const initials = new Map(list(roster?.students).map((s) => [s.id, s.initials ?? '']));
+  if (config.level === 'pairs') {
+    const tokens = controlTokens(config);
+    const pairs = await allPairs(store, k, config, round.session);
+    return list(config.pairs)
+      .filter((p) => pairState(tokens, pairs.get(p.id), decisionFor(decisions, pairHeldOwner(p.id), pairs.get(p.id)?.edited_at)) === 'held')
+      .map((p) => ({
+        owner: pairHeldOwner(p.id),
+        initials: list(p.students).map((s) => initials.get(s) ?? '').filter(Boolean).join(', '),
+        pieces: [{ label: 'Their change', text: changeLabel(describeEdits(tokens, pairs.get(p.id).edit)), flagged: true }]
+      }));
+  }
   return records
     .filter(([owner, r]) => writerState(config, r, decisionFor(decisions, owner, r.written_at)) === 'held')
     .map(([owner, r]) => ({
@@ -447,7 +597,7 @@ async function board(store, k, config, steps, active) {
   const round = roundView(active, steps);
   const roster = config.class_id ? await loadRoster(store, config.class_id) : null;
   const total = list(roster?.students).length;
-  const base = { round, level: config.level, judge: config.judge, counts: { here: 0, done: 0, total }, predictions: null, results: null, texts: null, debrief: null, held: [], best: null };
+  const base = { round, level: config.level, judge: config.judge, counts: { here: 0, done: 0, total }, predictions: null, results: null, texts: null, debrief: null, held: [], best: null, pairs: null, findings: null };
   if (!round) return base;
   const owned = await allRecords(store, k, round.session);
   const records = owned.map(([, r]) => r);
@@ -456,12 +606,34 @@ async function board(store, k, config, steps, active) {
     : name === 'Question' || name === 'Result' || !name ? records.length
       : records.filter((r) => r.done?.[name]).length;
   const options = optionCount(config);
-  const showPredictions = config.level !== 'pairs' && ((name === 'Predict' && round.revealed) || reached(steps, round, 'Result'));
+  const showPredictions = (name === 'Predict' && round.revealed) || reached(steps, round, 'Result');
   const results = await resultsFor(store, k, config, steps, round);
+  let pairCounts = null;
+  let pairPredictions = null;
+  let findings = null;
+  if (config.level === 'pairs') {
+    const tokens = controlTokens(config);
+    const [pairs, decisions] = await Promise.all([allPairs(store, k, config, round.session), heldDecisions(store, k, round.session)]);
+    const withTrial = list(config.pairs).filter((p) => hasTrial(pairState(tokens, pairs.get(p.id), decisionFor(decisions, pairHeldOwner(p.id), pairs.get(p.id)?.edited_at))));
+    const preds = withTrial.map((p) => pairs.get(p.id).pred).filter((v) => v === -1 || v === 0 || v === 1);
+    // How the pairs are going: on the bench at Design, locked in at Predict.
+    pairCounts = { total: list(config.pairs).length, changed: withTrial.length, ready: withTrial.filter((p) => pairs.get(p.id).ready === true).length, predicted: preds.length };
+    // Lower, about the same, higher.
+    pairPredictions = [-1, 0, 1].map((v) => preds.filter((x) => x === v).length);
+    if (reached(steps, round, 'Result')) {
+      const found = await labFindings(store, k, config, round.session);
+      const initials = new Map(list(roster?.students).map((s) => [s.id, s.initials ?? '']));
+      const members = new Map(list(config.pairs).map((p) => [p.id, list(p.students).map((s) => initials.get(s) ?? '').filter(Boolean)]));
+      // The teacher sees who is in each pair; nothing a student is sent carries this.
+      findings = { ...found, trials: found.trials.map((t) => ({ ...t, initials: members.get(t.pair) ?? [] })) };
+    }
+  }
   return {
     ...base,
     counts: { here: records.length, done, total },
-    predictions: showPredictions ? Array.from({ length: options }, (_, i) => records.filter((r) => r.pred === i).length) : null,
+    predictions: !showPredictions ? null : config.level === 'pairs' ? pairPredictions : Array.from({ length: options }, (_, i) => records.filter((r) => r.pred === i).length),
+    pairs: pairCounts,
+    findings,
     results,
     // The versions side by side, once nobody is still reading one blind.
     texts: config.level === 'supplied' && results ? list(config.texts) : null,
@@ -526,7 +698,15 @@ export async function labTeacherAction(store, lessonId, body) {
     const owner = ownerOf(config.class_id, body.student_id);
     const record = await read(store, k.student(active.session, owner));
     const { lists } = await allLists(store, k, active.session);
-    return { student_id: body.student_id, record: record ?? null, items: lists[body.student_id] ?? [] };
+    const out = { student_id: body.student_id, record: record ?? null, items: lists[body.student_id] ?? [], pair: null, trial: null };
+    const pair = config.level === 'pairs' ? pairOfStudent(config, body.student_id) : null;
+    if (pair) {
+      // The pair's version and, once the readings are in, its trial.
+      const pairRecord = await read(store, k.pair(active.session, pair.id));
+      out.pair = { id: pair.id, students: list(pair.students), record: pairRecord ?? null, change: pairRecord ? describeEdits(controlTokens(config), pairRecord.edit) : [] };
+      if (reached(steps, active, 'Result')) out.trial = (await labFindings(store, k, config, active.session)).trials.find((t) => t.pair === pair.id) ?? null;
+    }
+    return out;
   }
   return board(store, k, config, steps, active);
 }

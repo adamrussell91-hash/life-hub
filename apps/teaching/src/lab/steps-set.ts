@@ -101,8 +101,26 @@ const predict: LabStepView = (ctx) => {
   return [el('h2', '', predictQuestion(lab)), muted(`Readers will answer: ${lab.judge_question}`), chips, reason, lock];
 };
 
+/** The line a reader rates on, 0 to 10, with the lab's two end labels. What is set waits in `draft.rating` until it is sent. */
+export function ratingScale(lab: PublicLab, draft: Record<string, unknown>): { scale: HTMLElement; range: HTMLInputElement } {
+  const range = el('input');
+  range.type = 'range';
+  range.min = '0';
+  range.max = '10';
+  range.step = '1';
+  range.value = String(typeof draft.rating === 'number' ? draft.rating : 5);
+  range.setAttribute('aria-label', `${lab.judge_question} From 0, ${lab.ends?.[0] ?? 'low'}, to 10, ${lab.ends?.[1] ?? 'high'}.`);
+  range.addEventListener('input', () => { draft.rating = Number(range.value); });
+  const ends = el('div', 'lab-ends');
+  ends.append(el('span', '', lab.ends?.[0] ?? ''), el('span', '', lab.ends?.[1] ?? ''));
+  const scale = el('div', 'lab-scale');
+  scale.append(range, ends);
+  return { scale, range };
+}
+
 const NUMBER_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six'];
-const count = (n: number, one: string, many: string): string => `${NUMBER_WORDS[n] ?? String(n)} ${n === 1 ? one : many}`;
+/** "Six versions", "One writer". */
+export const count = (n: number, one: string, many: string): string => `${NUMBER_WORDS[n] ?? String(n)} ${n === 1 ? one : many}`;
 
 /** Students write it: one box per option, one at a time. Each version saves as the student moves on. */
 const make: LabStepView = (ctx) => {
@@ -173,18 +191,7 @@ const test: LabStepView = (ctx) => {
   const item = reading.item;
   if (item.kind === 'text') {
     const piece = el('div', 'lab-piece', item.text);
-    const range = el('input');
-    range.type = 'range';
-    range.min = '0';
-    range.max = '10';
-    range.step = '1';
-    range.value = String(typeof draft.rating === 'number' ? draft.rating : 5);
-    range.setAttribute('aria-label', `${lab.judge_question} From 0, ${lab.ends?.[0] ?? 'low'}, to 10, ${lab.ends?.[1] ?? 'high'}.`);
-    range.addEventListener('input', () => { draft.rating = Number(range.value); });
-    const ends = el('div', 'lab-ends');
-    ends.append(el('span', '', lab.ends?.[0] ?? ''), el('span', '', lab.ends?.[1] ?? ''));
-    const scale = el('div', 'lab-scale');
-    scale.append(range, ends);
+    const { scale, range } = ratingScale(lab, draft);
     const send = button('Send', 'primary', () => {
       send.disabled = true;
       void ctx.act(() => ctx.client.rate(reading.index, Number(range.value)));
@@ -194,6 +201,7 @@ const test: LabStepView = (ctx) => {
     nodes.push(send);
     return nodes;
   }
+  if (item.kind !== 'set') return null;
   // Every version, in a dealt order, with the option names hidden.
   const nodes: HTMLElement[] = [el('h2', '', lab.judge_question)];
   item.pieces.forEach((text, position) => {
@@ -257,7 +265,7 @@ export function explainBlock(ctx: Pick<LabStepContext, 'lesson' | 'classId'>): H
 }
 
 const explain: LabStepView = (ctx) => {
-  const { lab, me, status, round } = ctx;
+  const { lab, me, status } = ctx;
   const labels = options(lab);
   const handed = me.done.Explain === true;
   const nodes: HTMLElement[] = [el('h2', '', handed ? 'Handed in' : explainQuestion({ level: lab.level, judge: lab.judge, options: labels, prompt: lab.explain_prompt, result: status.results }))];
@@ -267,7 +275,14 @@ const explain: LabStepView = (ctx) => {
     why.append(el('span', 'lab-muted', 'Why we tested it: '), lab.why);
     nodes.push(why);
   }
-  const panel = notesPanel(ctx.notes, round.steps);
+  return [...nodes, ...explainAnswer(ctx)];
+};
+
+/** The bottom of every Explain screen: the student's lab notes, the answer box and Hand in. */
+export function explainAnswer(ctx: LabStepContext): HTMLElement[] {
+  const handed = ctx.me.done.Explain === true;
+  const nodes: HTMLElement[] = [];
+  const panel = notesPanel(ctx.notes, ctx.round.steps);
   if (panel) nodes.push(panel);
   const block = explainBlock(ctx);
   if (!block) return [...nodes, el('p', 'lab__note', 'This lab was published before its answer box was added. Ask your teacher to publish it again.')];
@@ -280,7 +295,7 @@ const explain: LabStepView = (ctx) => {
   nodes.push(send);
   if (handed) nodes.push(muted('Your explanation is with your teacher. You can change it and hand it in again.'));
   return nodes;
-};
+}
 
 /** Called once by the player: puts the supplied levels' steps in its registry. */
 export function registerSetSteps(register: (level: LabLevel, step: LabStep, view: LabStepView) => void): void {

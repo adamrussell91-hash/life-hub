@@ -5,6 +5,7 @@ import type { LabLevel, LabStep, PublicLab } from './schema';
 import type { LabClient, LabMe, LabRound, LabStatus } from './api';
 import type { LabNotesContext } from './notes';
 import { registerSetSteps } from './steps-set';
+import { registerPairsSteps } from './steps-pairs';
 import './lab.css';
 
 export type LabPlayerOptions = {
@@ -48,6 +49,7 @@ export function registerLabStep(level: LabLevel, step: LabStep, view: LabStepVie
 }
 export const labStepView = (level: LabLevel, step: LabStep): LabStepView | undefined => VIEWS.get(`${level}:${step}`);
 registerSetSteps(registerLabStep);
+registerPairsSteps(registerLabStep);
 
 export const WAITING = 'Waiting for your teacher.';
 export const waiting = (): HTMLElement => el('p', 'lab__note', WAITING);
@@ -70,7 +72,9 @@ function viewKey(status: LabStatus | null): string {
   if (!status) return '';
   return JSON.stringify([
     status.identity, status.anonymous, status.not_for_you, status.round && [status.round.session, status.round.step, status.round.finished],
-    status.me && [status.me.pred, status.me.done, status.me.read], status.reading && [status.reading.index, status.reading.total], status.results
+    status.me && [status.me.pred, status.me.done, status.me.read, status.me.own], status.reading && [status.reading.index, status.reading.total], status.results,
+    // A partner's save changes the pair's bench on this device too.
+    status.pair, status.control, status.findings
   ]);
 }
 

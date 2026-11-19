@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applyEdits, deal, dealLate, describeEdits, hasChange, levelGroups, markEdits, pickResult, setHeadline, setResult, shift, stepsFor, tokenise, verdict,
+  applyEdits, biggestShift, changeLabel, deal, dealLate, describeEdits, formatShift, hasChange, levelGroups, markEdits, pairFindings, pickResult, predictionWord, sanitiseEdit, setHeadline, setResult, shift, stepsFor, tokenise, verdict,
   type Deal, type ReadingItem
 } from '@/lab/model';
 import { LAB_DEFAULT_FEATURES } from '@/lab/schema';
@@ -196,5 +196,47 @@ describe('what the readings show', () => {
       { level: 'Form', trials: 1, meanAbsShift: 0.4 },
       { level: 'Word', trials: 1, meanAbsShift: 0.3 }
     ]);
+  });
+});
+
+describe('pairs design it: a saved edit and the class findings', () => {
+  // By word: 0 I, 1 meant, 2 to, 3 tell, 4 you / 5 but, 6 the, 7 words, 8 I, 9 think, / 10 were, 11 somewhere, 12 else.
+  const control = tokenise('I meant to tell you\nbut the words, I think,\nwere somewhere else.');
+
+  it('an edit is cleaned before it is kept: indexes inside the text, real breaks, trimmed words', () => {
+    expect(sanitiseEdit(control, { cut: [9, 8, 8, 40, -1, 1.5, '2'], rep: { 1: '  wanted  ', 2: 'to', 99: 'x', 3: '', 4: 5 }, join: [4, 6], brk: [6, 4, 12] }))
+      .toEqual({ cut: [8, 9], rep: { 1: 'wanted' }, join: [4], brk: [6] });
+    expect(sanitiseEdit(control, null)).toEqual({});
+    expect(sanitiseEdit(control, { cut: 'all', rep: ['x'] })).toEqual({});
+    expect(sanitiseEdit(control, { rep: { 1: 'w'.repeat(60) } }).rep?.[1]).toHaveLength(40);
+  });
+
+  it('each trial is set against the control: shift, verdict, whether the prediction held, and thin data', () => {
+    const found = pairFindings({
+      tokens: control, threshold: 1, control: [6, 6, 7, 7],
+      trials: [
+        { id: 'p1', edit: { cut: [8, 9] }, ratings: [4, 5, 5, 5], pred: -1, feature: 1 },
+        { id: 'p2', edit: { join: [4] }, ratings: [6, 7, 6, 7], pred: -1, feature: 0 },
+        { id: 'p3', edit: { brk: [6] }, ratings: [9, 9], pred: 1, feature: null },
+        { id: 'p4', edit: { rep: { 1: 'wanted' } }, ratings: [], pred: null, feature: null }
+      ]
+    });
+    expect(found.control).toEqual({ mean: 6.5, n: 4 });
+    expect(found.trials.map((t) => [t.id, t.desc[0], t.mean, t.n, t.shift, t.verdict, t.held, t.thin])).toEqual([
+      ['p1', 'cut "I think,"', 4.8, 4, -1.7, -1, true, false],
+      ['p2', 'joined lines 1 and 2', 6.5, 4, 0, 0, false, false],
+      ['p3', 'broke line 2 after "the"', 9, 2, 2.5, 1, true, true],
+      ['p4', 'changed "meant" to "wanted"', 0, 0, 0, 0, false, true]
+    ]);
+    // The biggest shift is taken from trials with enough readers when there are any.
+    expect(biggestShift(found.trials)?.id).toBe('p1');
+    expect(biggestShift(found.trials.filter((t) => t.thin))?.id).toBe('p3');
+    expect(biggestShift([])).toBeNull();
+  });
+
+  it('a shift, a prediction and a change in words', () => {
+    expect([formatShift(1.2), formatShift(-0.8), formatShift(0)]).toEqual(['+1.2', '−0.8', '0.0']);
+    expect([-1, 0, 1].map(predictionWord)).toEqual(['lower', 'about the same', 'higher']);
+    expect(changeLabel(['cut "I think,"', 'joined lines 1 and 2'])).toBe('Cut "I think,", joined lines 1 and 2');
   });
 });

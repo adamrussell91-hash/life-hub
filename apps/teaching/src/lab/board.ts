@@ -3,8 +3,9 @@ import { ApiClientError } from '@/api/client';
 import { confirmBringBack, pastRounds } from '@/blocks/past-rounds';
 import { button, el, errorText } from '@/quiz/dom';
 import { bars, meter } from './charts';
-import { explainQuestion, setEvidence, setHeadline } from './model';
+import { biggestShift, explainQuestion, formatShift, setEvidence, setHeadline } from './model';
 import { stepStrip } from './player';
+import { registerPairsBoard } from './board-pairs';
 import { factsBlock, predictQuestion } from './steps-set';
 import { publicLab, type LabSettings, type LabStep, type PublicLab } from './schema';
 import type { LabBoard, LabTeacherApi } from './api';
@@ -153,6 +154,7 @@ for (const level of ['supplied', 'students'] as const) {
   registerLabBoardStep(level, 'Test', test);
 }
 registerLabBoardStep('students', 'Make', make);
+registerPairsBoard(registerLabBoardStep);
 
 /**
  * Flagged work waiting for the teacher, under the stage: initials, the words,
@@ -249,6 +251,13 @@ export function mountLabBoard(o: LabBoardOptions): LabBoardHandle {
         el('p', '', `${setHeadline({ options: lab.options ?? [], judge: lab.judge, result: b.results })} ${setEvidence({ options: lab.options ?? [], judge: lab.judge, result: b.results })}`),
         muted(`${b.explained ?? 0} of ${b.counts.here} explanations handed in.`)
       );
+    }
+    if (b.findings && lab.level === 'pairs') {
+      const top = biggestShift(b.findings.trials);
+      const held = b.findings.trials.filter((t) => t.held).length;
+      if (lab.claim) card.append(el('p', '', `Claim tested: ${lab.claim}`));
+      if (top) card.append(el('p', '', `Biggest shift: ${top.desc.join(', ')}, ${formatShift(top.shift)}.`));
+      card.append(muted(`${held} of ${b.findings.trials.length} ${b.findings.trials.length === 1 ? 'pair' : 'pairs'} predicted their result. ${b.explained ?? 0} of ${b.counts.here} explanations handed in.`));
     }
     if (b.debrief) card.append(muted(`Your notes: ${b.debrief}`));
     const again = button('Run it again', 'secondary', () => void run(o.api.start()));

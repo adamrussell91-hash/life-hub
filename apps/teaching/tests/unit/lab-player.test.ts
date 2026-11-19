@@ -36,6 +36,9 @@ function mount(first: LabStatus, settings: LabSettings = SETTINGS) {
     predict: vi.fn((pred: number, reason: string) => reply(at(1, {}, { pred, reason, done: { Predict: true } }))),
     note: vi.fn(() => Promise.resolve(current)),
     write: vi.fn(() => Promise.resolve(current)),
+    bench: vi.fn(() => Promise.resolve(current)),
+    ready: vi.fn(() => Promise.resolve(current)),
+    pairPredict: vi.fn(() => Promise.resolve(current)),
     rate: vi.fn(() => reply(at(2, { reading: { index: 1, total: 1, item: null } }, { done: { Test: true } }))),
     pick: vi.fn(() => reply(at(2, { reading: { index: 1, total: 1, item: null } }, { done: { Test: true } }))),
     explain: vi.fn(() => reply(at(4, { results: RESULT }, { pred: 1, done: { Explain: true } })))
@@ -314,6 +317,169 @@ describe('the lab player, students write it', () => {
     expect(text()).toContain('96 choices from 16 readers.');
     expect(text()).toContain('Your writing: 4 of your 6 readers chose your touch version.');
     expect(text()).toContain('Your other versions: Sight 1, Sound 1.');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pairs design it
+// ---------------------------------------------------------------------------
+
+const STANZA = 'I meant to tell you\nbut the words, I think,\nwere somewhere else.';
+const HESITANT: LabSettings = {
+  ...seedLab('class1', 'pairs'), question: 'What makes this speaker sound hesitant?', claim: 'The line breaks create the hesitation.',
+  why: 'Your essay will claim that form creates meaning.', control: STANZA, judge_question: 'How hesitant does the speaker sound?', notes_on: false,
+  pairs: [{ id: 'p1', students: ['st_01', 'st_02'] }], debrief: 'Teacher only.'
+};
+const PAIR_STEPS = ['Question', 'Design', 'Predict', 'Test', 'Result', 'Name it', 'Explain'] as const;
+type Pair = NonNullable<LabStatus['pair']>;
+const NO_PAIR: Pair = { edit: {}, ready: false, pred: null, feature: null, trial: false };
+const pairs = (step: number, pair: Partial<Pair> | null = {}, over: Partial<LabStatus> = {}): LabStatus => {
+  const status = at(step, { control: STANZA, findings: null, pair: pair ? { ...NO_PAIR, ...pair } : null, ...over });
+  status.round = { ...status.round!, steps: [...PAIR_STEPS], step_name: PAIR_STEPS[step] ?? null, finished: step >= PAIR_STEPS.length };
+  return status;
+};
+const FOUND: NonNullable<LabStatus['findings']> = {
+  control: { mean: 6.5, n: 8, ratings: [5, 6, 6, 6, 7, 7, 7, 8] }, threshold: 1,
+  trials: [
+    { desc: ['cut "I think,"'], shift: -1.8, n: 5, verdict: -1, thin: false, mine: true },
+    { desc: ['joined lines 1 and 2'], shift: -0.4, n: 5, verdict: 0, thin: false, mine: false },
+    { desc: ['broke line 2 after "the"'], shift: 2.1, n: 4, verdict: 1, thin: false, mine: false }
+  ],
+  mine: { desc: ['cut "I think,"'], shift: -1.8, n: 5, verdict: -1, thin: false, mine: true, edit: { cut: [8, 9] }, ratings: [4, 4, 5, 5, 6], mean: 4.7, pred: -1, held: true }
+};
+
+describe('the lab player, pairs design it', () => {
+  it('Question shows the claim, the why and the control with numbered lines', async () => {
+    const { host, text } = mount(pairs(0), HESITANT);
+    await flush();
+    expect(host.querySelector('h2')?.textContent).toBe('What makes this speaker sound hesitant?');
+    expect(text()).toContain('Claim to test: The line breaks create the hesitation.');
+    expect(text()).toContain('Why we are testing it: Your essay will claim that form creates meaning.');
+    expect([...host.querySelectorAll('.lab-poem li')].map((li) => li.textContent)).toEqual(STANZA.split('\n'));
+    expect(text()).not.toContain('Teacher only.');
+  });
+
+  it('Design: a tool saves the pair’s edit, and Put it on the bench sends it', async () => {
+    const { host, client, text } = mount(pairs(1), HESITANT);
+    (client.bench as ReturnType<typeof vi.fn>).mockImplementation((edit) => Promise.resolve(pairs(1, { edit, trial: true })));
+    (client.ready as ReturnType<typeof vi.fn>).mockImplementation((on: boolean) => Promise.resolve(pairs(1, { edit: { cut: [9] }, trial: true, ready: on })));
+    await flush();
+    expect(host.querySelector('h2')?.textContent).toBe('Change one thing');
+    const ready = () => host.querySelector('[data-act="ready"]') as HTMLButtonElement;
+    expect(ready().disabled).toBe(true);
+    ([...host.querySelectorAll('button.lab-tok')].find((b) => b.textContent === 'think,') as HTMLButtonElement).click();
+    (host.querySelector('[data-tool="cut"]') as HTMLButtonElement).click();
+    // The change shows straight away, before the save is back.
+    expect(host.querySelector('.lab-change')?.textContent).toBe('One change: cut "think,".');
+    await flush();
+    expect(client.bench).toHaveBeenLastCalledWith({ cut: [9] });
+    expect(host.querySelector('.lab-tok.is-sel')?.textContent).toBe('think,');
+    ready().click();
+    await flush();
+    expect(client.ready).toHaveBeenCalledWith(true);
+    expect(host.querySelector('h2')?.textContent).toBe('On the bench');
+    expect(host.querySelector('.lab-pane.is-live .is-cut')?.textContent).toBe('think,');
+    expect(text()).toContain('Your change: cut "think,".');
+    expect(text()).toContain('Waiting for your teacher.');
+    (host.querySelector('[data-act="unready"]') as HTMLButtonElement).click();
+    await flush();
+    expect(client.ready).toHaveBeenLastCalledWith(false);
+    expect(host.querySelector('h2')?.textContent).toBe('Change one thing');
+  });
+
+  it('Design: a partner’s save arrives with the next check', async () => {
+    const { host, player, set } = mount(pairs(1), HESITANT);
+    await flush();
+    set(pairs(1, { edit: { join: [4] }, trial: true }));
+    await player.refresh();
+    expect(host.querySelector('.lab-change')?.textContent).toBe('One change: joined lines 1 and 2.');
+  });
+
+  it('Predict: the pair says what its change will do, once', async () => {
+    const { host, client, click, text } = mount(pairs(2, { edit: { cut: [8, 9] }, trial: true, ready: true }), HESITANT);
+    (client.pairPredict as ReturnType<typeof vi.fn>).mockImplementation((pred) => Promise.resolve(pairs(2, { edit: { cut: [8, 9] }, trial: true, ready: true, pred })));
+    await flush();
+    expect(host.querySelector('h2')?.textContent).toBe('If we cut "I think,", readers will rate it…');
+    expect(text()).toContain('Readers answer: How hesitant does the speaker sound?');
+    expect([...host.querySelectorAll('.lab-chip')].map((c) => c.textContent)).toEqual(['Lower', 'About the same', 'Higher']);
+    const lock = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Lock it in') as HTMLButtonElement;
+    expect(lock.disabled).toBe(true);
+    click('Lower');
+    lock.click();
+    await flush();
+    expect(client.pairPredict).toHaveBeenCalledWith(-1);
+    expect(host.querySelector('h2')?.textContent).toBe('Locked in: lower');
+  });
+
+  it('a pair that kept the original reads this round, at Design’s end and at Predict', async () => {
+    const kept = mount(pairs(2, { trial: false }), HESITANT);
+    await flush();
+    expect(kept.host.querySelector('h2')?.textContent).toBe('You are a reader this round');
+    expect(kept.text()).toContain('Your pair kept the original');
+    const alone = mount(pairs(1, null), HESITANT);
+    await flush();
+    expect(alone.host.querySelector('h2')?.textContent).toBe('You are a reader in this lab');
+  });
+
+  it('Test: each version is lines to rate, unmarked, and the next one follows', async () => {
+    const lines = ['I meant to tell you but the words, I think,', 'were somewhere else.'];
+    const { host, client, click, text } = mount(pairs(3, { edit: { cut: [9] }, trial: true }, { reading: { index: 0, total: 6, item: { kind: 'lines', lines } } }), HESITANT);
+    (client.rate as ReturnType<typeof vi.fn>).mockImplementation(() => Promise.resolve(pairs(3, { edit: { cut: [9] }, trial: true }, { reading: { index: 1, total: 6, item: { kind: 'lines', lines: STANZA.split('\n') } } })));
+    await flush();
+    expect(host.querySelector('h2')?.textContent).toBe('How hesitant does the speaker sound?');
+    expect([...host.querySelectorAll('.lab-poem li')].map((li) => li.textContent)).toEqual(lines);
+    expect(host.querySelector('.lab-tok.is-cut, .lab-tok.is-changed, .lab-mk')).toBeNull();
+    expect([...host.querySelectorAll('.lab-ends span')].map((s) => s.textContent)).toEqual(['Not at all', 'Completely']);
+    expect(text()).toContain('Version 1 of 6. Some are changed and some are the original.');
+    const range = host.querySelector('input[type="range"]') as HTMLInputElement;
+    range.value = '8';
+    range.dispatchEvent(new Event('input'));
+    click('Send');
+    await flush();
+    expect(client.rate).toHaveBeenCalledWith(0, 8);
+    expect(text()).toContain('Version 2 of 6.');
+    expect((host.querySelector('input[type="range"]') as HTMLInputElement).value).toBe('5');
+    const done = mount(pairs(3, {}, { reading: { index: 6, total: 6, item: null } }), HESITANT);
+    await flush();
+    expect(done.host.querySelector('h2')?.textContent).toBe('Six versions rated');
+  });
+
+  it('Result: the control’s dots above the pair’s own, the shift, and whether the prediction held', async () => {
+    const { host, text } = mount(pairs(4, { edit: { cut: [8, 9] }, trial: true, pred: -1 }, { findings: FOUND }), HESITANT);
+    await flush();
+    expect(host.querySelector('h2')?.textContent).toBe('Your change moved the rating lower. As you predicted.');
+    const readings = [...host.querySelectorAll('.lab-reading')];
+    expect(readings.map((r) => r.querySelector('b')?.textContent)).toEqual(['Control', 'Your version']);
+    expect(readings.map((r) => r.querySelectorAll('circle').length)).toEqual([8, 5]);
+    expect(readings[0]!.classList.contains('is-control')).toBe(true);
+    expect(text()).toContain('Shift −1.8. A shift of 1 point or more counts as a change.');
+    const missed = mount(pairs(4, { edit: { cut: [8, 9] }, trial: true, pred: 1 }, { findings: { ...FOUND, mine: { ...FOUND.mine!, shift: 0.2, verdict: 0, pred: 1, held: false } } }), HESITANT);
+    await flush();
+    expect(missed.host.querySelector('h2')?.textContent).toBe('Your change made no clear difference. You predicted higher.');
+  });
+
+  it('Result for a pair with no trial is what the class found', async () => {
+    const { host, text } = mount(pairs(4, { trial: false }, { findings: { ...FOUND, mine: null, trials: FOUND.trials.map((t) => ({ ...t, mine: false })) } }), HESITANT);
+    await flush();
+    expect(host.querySelector('h2')?.textContent).toBe('What the class found');
+    expect(host.querySelectorAll('.lab-find').length).toBe(3);
+    expect(host.querySelector('button.lab-find')).toBeNull();
+    expect(text()).toContain('Each row is one pair’s change.');
+  });
+
+  it('Explain shows the claim, the pair’s shift and the biggest shift in the class above the answer box', async () => {
+    const { host, client, click, text, handIn } = mount(pairs(6, { edit: { cut: [8, 9] }, trial: true, pred: -1 }, { findings: FOUND }), HESITANT);
+    (client.explain as ReturnType<typeof vi.fn>).mockImplementation(() => Promise.resolve(pairs(6, { edit: { cut: [8, 9] }, trial: true, pred: -1 }, { findings: FOUND, me: { pred: null, reason: '', notes: {}, done: { Explain: true } } })));
+    await flush();
+    expect(host.querySelector('h2')?.textContent).toBe('Does the evidence support the claim?');
+    expect(text()).toContain('Claim: The line breaks create the hesitation.');
+    expect(text()).toContain('Your trial: cut "I think,", shift −1.8. Biggest shift in the class: broke line 2 after "the", +2.1.');
+    expect(host.querySelector('.lab-explain textarea')).not.toBeNull();
+    click('Hand in');
+    await flush();
+    expect(handIn).toHaveBeenCalledTimes(1);
+    expect(client.explain).toHaveBeenCalledTimes(1);
+    expect(host.querySelector('h2')?.textContent).toBe('Handed in');
   });
 });
 
