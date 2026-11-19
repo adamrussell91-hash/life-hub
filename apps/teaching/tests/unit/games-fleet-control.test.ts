@@ -316,3 +316,46 @@ describe('Fleet week control room: week mode, shots and written answers', () => 
     expect(board.textContent).not.toContain('A3 (Poem A');
   });
 });
+
+describe('Fleet week control room: an ended game', () => {
+  it('hides every action button on a read-only state and links to Results', async () => {
+    const onResults = vi.fn();
+    const api = fakeApi(() =>
+      makeState({
+        phase: 'closed', read_only: true, closed_at: Date.now(), revealed_at: Date.now(),
+        shots: [{ round: 1, owner: 'o1', owner_name: 'Pip Marlow', seq: 55, square: 12, square_label: 'C3', sure: true, answered: false }],
+        written: [{ kind: 'report', hit: 'h1', owner: 'o2', name: 'Juno Castell', shooter: 'Pip Marlow', round: 1, square: 10, prompt: '', answer: '', text: 'Half-rhyme.', writing: null }]
+      })
+    );
+    room = openFleetControlRoom(document.body, { lessonId: 'l1', game: GAME, classes: CLASSES, api, pollMs: 60000, onResults });
+    buttonNamed(room.root, 'Open campaign')!.click();
+    await flush();
+    const root = room.root;
+    expect(root.querySelector('.fc-ended')!.textContent).toContain('This game has ended');
+    for (const name of ['Next round', 'Reveal', 'Show the reveal board', 'Close campaign', 'Void shot', 'Reject report']) expect(buttonNamed(root, name)).toBeUndefined();
+    expect(root.querySelector('.fc-actions')).toBeNull();
+    // The game is still there to read.
+    expect(root.textContent).toContain('Pip Marlow & Juno Castell');
+    const link = root.querySelector<HTMLAnchorElement>('.fc-ended__link')!;
+    expect(link.textContent).toBe('See the results');
+    link.click();
+    expect(onResults).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.fc')).toBeNull();
+    room = null;
+  });
+
+  it('does not poll an ended game', async () => {
+    vi.useFakeTimers();
+    try {
+      const api = fakeApi(() => makeState({ phase: 'closed', read_only: true }));
+      room = openFleetControlRoom(document.body, { lessonId: 'l1', game: GAME, classes: CLASSES, api });
+      buttonNamed(room.root, 'Open campaign')!.click();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(api.state).not.toHaveBeenCalled();
+    } finally {
+      room?.dispose();
+      room = null;
+      vi.useRealTimers();
+    }
+  });
+});
