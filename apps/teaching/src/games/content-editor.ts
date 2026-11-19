@@ -14,6 +14,8 @@ import {
   type QuestionItem
 } from './core/schema';
 import { checkbox, field, itemEditor, numberInput, pills, questionEditor, tagsCell, textArea, textInput, type ItemEditorContext } from './item-editors';
+import { fleetContent } from './kinds/fleet-week/editor';
+import type { UnitSources } from './api';
 import { SHAPE_LABELS, isListGame, listShapes, maxItems, newGameId, newItem, type ListGame } from './seed';
 
 /**
@@ -28,6 +30,10 @@ export type ContentContext = {
   onChange: (next: Game) => void;
   /** Opens Build from this unit for a list game. */
   openBuild?: () => void;
+  /** The unit's ready-made items, for kinds that run their own Build from this unit (Fleet week). Absent without a server. */
+  sources?: () => Promise<UnitSources>;
+  /** Starts Ann on this lesson with a brief (Fleet week's Ask Ann to draft). Absent without a server. */
+  startAnn?: (brief: string) => Promise<'started' | 'busy'>;
 };
 
 /* ── Settings row ──────────────────────────────────────────────────── */
@@ -489,6 +495,8 @@ export function gameContent(game: Game, ctx: ContentContext): HTMLElement {
       return battlesContent(game, ctx);
     case 'answer_chain':
       return answerChainContent(game, ctx);
+    case 'fleet_week':
+      return fleetContent(game, ctx);
     default:
       return el('div');
   }

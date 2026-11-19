@@ -197,6 +197,11 @@ export function checkAnswer(key: ItemKey, response: unknown): CheckResult {
 /* ── Items of a game ───────────────────────────────────────────────── */
 
 /** Every answerable item in a game, nested ones included (Jeopardy tiles, Wheel banks, the find-a-word message question). */
+/** Fleet week: a square's variants that have a question written (a blank second variant is a draft, not a question). */
+export function fleetVariants(sq: { variants: QuestionItem[] }): QuestionItem[] {
+  return sq.variants.filter((v) => typeof (v.question as { prompt?: unknown }).prompt === 'string' && ((v.question as { prompt: string }).prompt).trim() !== '');
+}
+
 export function gameItems(game: Game): GameItem[] {
   switch (game.kind) {
     case 'crossword':
@@ -215,7 +220,7 @@ export function gameItems(game: Game): GameItem[] {
     case 'connections':
       return game.walls.flatMap((w) => w.groups);
     case 'fleet_week':
-      return [...game.squares.flatMap((sq) => sq.variants), ...game.recall];
+      return [...game.squares.flatMap(fleetVariants), ...game.recall];
     case 'battles':
     case 'answer_chain':
       return [];
@@ -477,7 +482,7 @@ export function gameIssues(lesson: { game?: GameLesson | undefined }): string[] 
         break;
       }
       case 'fleet_week': {
-        if (game.squares.length < 25 || game.squares.some((sq) => sq.variants.length === 0)) out.push(`${where} needs all 25 squares filled.`);
+        if (game.squares.length < 25 || game.squares.some((sq) => fleetVariants(sq).length === 0)) out.push(`${where} needs all 25 squares filled.`);
         const labelled = (l: string[]) => l.length === 5 && l.every((x) => x.trim());
         if (!labelled(game.columns) || !labelled(game.rows)) out.push(`${where} needs five row and five column labels.`);
         if (game.recall.length < 4) out.push(`${where} needs a recall line for each of the four ships.`);
@@ -527,7 +532,7 @@ export function gameWarnings(lesson: { game?: GameLesson | undefined }): string[
     if (untagged) out.push(`${where}: ${untagged} ${untagged === 1 ? 'item has' : 'items have'} no tags, so ${untagged === 1 ? 'it' : 'they'} won’t show in Results by knowledge piece.`);
     if (game.kind === 'fleet_week') {
       game.squares.forEach((sq, si) => {
-        if (sq.variants.length === 1) out.push(`${where}: square ${'ABCDE'[Math.floor(si / 5)]}${(si % 5) + 1} has only one question, so partners may share answers.`);
+        if (fleetVariants(sq).length === 1) out.push(`${where}: square ${'ABCDE'[Math.floor(si / 5)]}${(si % 5) + 1} has only one question, so partners may share answers.`);
       });
     }
     if (game.kind === 'articulate') {
@@ -749,7 +754,7 @@ export function splitGame(game: Game, random: Random = Math.random): { public: P
       fleet: {
         columns: game.columns.map((c) => c.trim()),
         rows: game.rows.map((r) => r.trim()),
-        squares: game.squares.map((sq) => sq.variants.map((v) => v.id)),
+        squares: game.squares.map((sq) => fleetVariants(sq).map((v) => v.id)),
         recall: game.recall.map((r) => r.id)
       }
     };

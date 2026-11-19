@@ -3,13 +3,18 @@
  * spec §3.3, plan Task 6). The control room sees real names; students never do
  * until the reveal.
  *
- *   campaign_open    { game_id, class_id, mode: 'lesson', rounds?, round_cap_s?, balance? } → campaign_state
+ *   campaign_open    { game_id, class_id, mode: 'lesson' | 'week', rounds?, round_cap_s?, cutoff? ('20:00'), balance? } → campaign_state
  *   campaign_state   { game_id, class_id } → names, matches, who has fired, owed reports, flags, standings
  *   campaign_next    lesson mode: close the open round now (it resolves on this request)
  *   void_shot        { round, owner, seq } while that round is open: the shot becomes a void dud that does not return
  *   reject_report    { hit } return a filed damage report to the partner, once
- *   campaign_reveal  settle every open hit and recall line (resolved/final); students see names and both fleets
+ *   campaign_reveal  (any phase) settle every open hit and recall line (resolved/final); students see names and both fleets
  *   campaign_close   end it and free the class for a new campaign
+ *   campaign_list    { game_id, class_id } → { campaigns: [{ id, mode, opened_at, closed_at, revealed_at }] }, newest first
+ *   campaign_state and campaign_insight take an optional campaign_id; otherwise the open campaign, then the
+ *                    class's latest one (kept after close), so Results can be read once a game has ended
+ *   campaign_insight { game_id, class_id, campaign_id? } → the Results insight: grid heat map, first-try v returning,
+ *                    calibration by student, confident errors (teacher only), hardest squares
  */
 import { randomBytes } from 'node:crypto';
 import { isSafeId } from './class-examples.mjs';
@@ -17,18 +22,29 @@ import { isDeletedRecord } from './record-liveness.mjs';
 import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
 import { loadRoster } from './class-claims.mjs';
 import { deviceHash, read, reject } from './question-drop.mjs';
-import { gameKeys } from './game-store.mjs';
+import { campaignIndexKey, gameKeys } from './game-store.mjs';
+import { phaseOf, revealBoard } from './fleet-week.mjs';
 import { fleet } from './game-rules.mjs';
 import { mapBounded } from './blobs-list.mjs';
+import { cleanWritingLog, summariseWriting } from './quiz-core.mjs';
 import {
-  allReports, ensureResolved, findCampaign, firstClock, isDone, list, loadFleetGame, obj, readWithEtag, reportInputs, roundOpen, roundsOf,
+  FLEET_TZ, allReports, ensureCampaign, ensureResolved, findCampaign, firstClock, revealCampaign, validZone, weekCloses, isDone, list, loadFleetGame, obj, readWithEtag, reportInputs, roundOpen, roundsOf,
   seedFor, updateJSON
 } from './fleet-week-store.mjs';
+
+/** Past campaigns of one game kept per class for campaign_list (the oldest drop off). */
+const HISTORY_KEEP = 50;
+
+/** Campaigns kept in a class's index (the oldest drop off). */
+const INDEX_KEEP = 20;
+
+/** Week mode's firing days by default (Tuesday to Thursday when opened on a Monday). */
+const WEEK_ROUNDS = 3;
 
 /** A pointer whose campaign blob never arrived (its open died half way) is free after this long. */
 const POINTER_STALE_MS = 10000;
 
-export const FLEET_TEACHER_ACTIONS = ['campaign_open', 'campaign_state', 'campaign_next', 'void_shot', 'reject_report', 'campaign_reveal', 'campaign_close'];
+export const FLEET_TEACHER_ACTIONS = ['campaign_open', 'campaign_state', 'campaign_next', 'void_shot', 'reject_report', 'campaign_reveal', 'campaign_close', 'campaign_insight', 'campaign_list'];
 export const isFleetTeacherAction = (action) => typeof action === 'string' && (action.startsWith('campaign_') || action === 'void_shot' || action === 'reject_report');
 
 const clampInt = (v, min, max, fallback) => (Number.isFinite(Number(v)) ? Math.min(max, Math.max(min, Math.round(Number(v)))) : fallback);
@@ -46,9 +62,14 @@ async function teacherContext(store, lessonId, body) {
   return { k, roster, classId: roster.cls.id };
 }
 
+const CUTOFF = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 async function openCampaign(store, lessonId, body, { k, roster, classId }, now) {
-  if (body.mode === 'week') reject(409, 'week_mode_later', 'Week mode isn’t ready yet. Play it in one lesson for now.');
-  if (body.mode !== undefined && body.mode !== 'lesson') reject(400, 'bad_mode', 'Pick lesson mode.');
+  const mode = body.mode ?? 'lesson';
+  if (mode !== 'lesson' && mode !== 'week') reject(400, 'bad_mode', 'Pick week or lesson mode.');
+  const balance = body.balance ?? 'random';
+  if (balance !== 'random' && balance !== 'mixed') reject(400, 'bad_balance', 'Pick random or mixed teams.');
+  if (body.cutoff !== undefined && (typeof body.cutoff !== 'string' || !CUTOFF.test(body.cutoff))) reject(400, 'bad_cutoff', 'Give the cut-off as a time, like 20:00.');
   if (!roster.students.length) reject(409, 'need_roster', 'Fleet week needs a class list. Add one first.');
   const { record } = await loadFleetGame(store, k, body.game_id);
   const currentKey = k.campaignCurrent(body.game_id, classId);
@@ -69,22 +90,29 @@ async function openCampaign(store, lessonId, body, { k, roster, classId }, now) 
     game_id: body.game_id,
     version: record.version,
     class_id: classId,
-    mode: 'lesson',
+    mode,
+    balance,
     secret,
     created_at: now,
     settings: {
-      rounds: clampInt(body.rounds ?? settings.rounds, 2, 8, 5),
+      // Week mode: placement on the open day, then three firing days (§1.3) unless the teacher says otherwise.
+      rounds: mode === 'week' ? clampInt(body.rounds, 1, 8, WEEK_ROUNDS) : clampInt(body.rounds ?? settings.rounds, 2, 8, 5),
       round_cap_ms: clampInt(body.round_cap_s ?? settings.round_cap_s, 60, 600, 240) * 1000,
       placement_cap_ms: clampInt(settings.placement_cap_s, 30, 300, 120) * 1000,
-      answer_ms: clampInt(settings.answer_s, 20, 120, 60) * 1000
+      answer_ms: clampInt(settings.answer_s, 20, 120, 60) * 1000,
+      ...(mode === 'week' ? { cutoff: body.cutoff ?? (CUTOFF.test(settings.cutoff ?? '') ? settings.cutoff : '20:00'), tz: validZone(roster.cls.time_zone) ?? FLEET_TZ } : {})
     },
-    // Random teams; "mixed by accuracy" balancing arrives with plan 4.
-    pairing: fleet.pairTeams(joined, fleet.rng(seedFor(secret, 'teams'))),
+    // Random teams, or mixed by recent accuracy (§1.2): high paired with low. Seeded from the secret either way.
+    pairing: balance === 'mixed'
+      ? fleet.pairTeamsMixed(joined, await recentAccuracy(store, k, record, body.game_id, classId, roster, ownerFor), fleet.rng(seedFor(secret, 'teams')))
+      : fleet.pairTeams(joined, fleet.rng(seedFor(secret, 'teams'))),
     joined,
     students: Object.fromEntries(roster.students.map((s) => [ownerFor(classId, s.id), s.id])),
     revealed_at: null,
     closed_at: null
   };
+  // Week mode: every round's close, fixed at the open (placement first).
+  if (mode === 'week') campaign.schedule = weekCloses(now, campaign.settings.cutoff, campaign.settings.rounds, campaign.settings.tz);
   // The class pointer first, create-only (or over the closed one we read): a losing open writes nothing.
   const pointed = await store.setJSON(currentKey, { id, at: now }, held.data ? (held.etag ? { onlyIfMatch: held.etag } : {}) : { onlyIfNew: true });
   if (pointed?.modified === false) {
@@ -94,14 +122,53 @@ async function openCampaign(store, lessonId, body, { k, roster, classId }, now) 
   }
   await store.setJSON(k.campaignClock(body.game_id, id), firstClock(campaign, now), { onlyIfNew: true });
   await store.setJSON(k.campaign(body.game_id, id), campaign, { onlyIfNew: true });
+  // The class's latest campaign of this game, kept after close so Results can still find it, with its past ones.
+  await updateJSON(store, k.campaignLatest(body.game_id, classId), (held) => ({
+    id, at: now, ids: [...list(obj(held).ids).filter((x) => x !== id), id].slice(-HISTORY_KEEP)
+  }));
+  // The class index, so student pages with no lesson id can find this campaign's signals.
+  await updateJSON(store, campaignIndexKey(classId), (held) => {
+    const kept = list(obj(held).campaigns).filter((e) => e?.id !== id);
+    return { campaigns: [...kept, { lesson_id: lessonId, game_id: body.game_id, id, at: now }].slice(-INDEX_KEEP) };
+  });
   return campaign;
+}
+
+/**
+ * Each student's recent accuracy for balancing (§1.2), by owner: their latest
+ * play of this game in the class summary (right / answered), or, when nobody
+ * has played this game yet, their latest plays across the lesson's other games
+ * pooled. Students with nothing get null (the balancer counts them as the mean).
+ */
+async function recentAccuracy(store, k, record, gameId, classId, roster, ownerOf) {
+  const latest = (summary) => {
+    const out = {};
+    for (const [sid, row] of Object.entries(obj(summary?.students))) {
+      const l = obj(row?.latest);
+      if (Number.isFinite(l.answered) && l.answered > 0) out[sid] = { right: Number(l.right) || 0, answered: l.answered };
+    }
+    return out;
+  };
+  let tallies = latest(await read(store, k.summary(gameId, classId)));
+  if (!Object.keys(tallies).length) {
+    tallies = {};
+    const others = list(record.order).filter((g) => g !== gameId);
+    const rows = await mapBounded(others, 8, (g) => read(store, k.summary(g, classId)));
+    for (const row of rows) {
+      for (const [sid, t] of Object.entries(latest(row))) {
+        const held = tallies[sid] ?? { right: 0, answered: 0 };
+        tallies[sid] = { right: held.right + t.right, answered: held.answered + t.answered };
+      }
+    }
+  }
+  return Object.fromEntries(roster.students.map((s) => [ownerOf(classId, s.id), tallies[s.id] ? tallies[s.id].right / tallies[s.id].answered : null]));
 }
 
 const flagged = (w) => !!w && (w.pastes > 0 || w.away > 0 || w.jumps > 0);
 
 /** The control room: real names, who has fired this round, owed reports, writing flags with their logs, standings. */
-async function campaignState(store, k, campaign, roster, now) {
-  const { state, clock } = await ensureResolved(store, k, campaign, now);
+async function campaignState(store, k, opened, roster, now) {
+  const { campaign, state, clock } = await ensureCampaign(store, k, opened, now);
   const shown = (campaign.revealed_at && (await read(store, k.campaignResolved(campaign.game_id, campaign.id, 'final')))) || state;
   const byId = new Map(roster.students.map((s) => [s.id, s]));
   const nameOf = (owner) => byId.get(campaign.students[owner])?.name ?? 'Unknown';
@@ -113,6 +180,8 @@ async function campaignState(store, k, campaign, roster, now) {
   rounds.flatMap((r) => owners.map((o) => [r, o])).forEach(([r, o], i) => shotsBy.set(`${r}:${o}`, list(shotRows[i])));
   const reports = await allReports(store, k, campaign);
   const { rejected } = reportInputs(reports);
+  const { keys } = await loadFleetGame(store, k, campaign.game_id, campaign.version);
+  const written = writtenAnswers(campaign, keys, shown, reports, shotsBy, nameOf);
 
   const flags = [];
   for (const [key, shots] of shotsBy) {
@@ -140,7 +209,11 @@ async function campaignState(store, k, campaign, roster, now) {
   });
   return {
     campaign_id: campaign.id,
+    // 'closed' once the campaign has ended: read-only from then on.
+    phase: phaseOf(campaign, clock),
+    read_only: !!campaign.closed_at,
     mode: campaign.mode,
+    ...(campaign.mode === 'week' ? { cutoff: campaign.settings.cutoff, tz: campaign.settings.tz, schedule: list(campaign.schedule) } : {}),
     round: clock.round,
     rounds: roundsOf(campaign),
     closes_at: clock.closes_at,
@@ -151,8 +224,105 @@ async function campaignState(store, k, campaign, roster, now) {
     owed,
     flags,
     log: shown.log.map((l) => ({ round: l.round, results: l.results.map((r) => ({ ...r, name: nameOf(r.owner) })) })),
-    standings: fleet.standings(shown, campaign.pairing)
+    standings: fleet.standings(shown, campaign.pairing),
+    written,
+    // The board's reveal: per-square accuracy and the hardest squares, never an answer.
+    ...(campaign.revealed_at ? { board: revealBoard(keys, shown) } : {}),
+    // The server clock, so the control room's countdown never trusts the device's.
+    now,
+    // Every shot committed in the open round, for Void shot (`owner` and `seq` are what void_shot takes). No answer text.
+    shots: roundOpen(campaign, clock) && clock.round >= 1
+      ? owners.flatMap((o) => (shotsBy.get(`${clock.round}:${o}`) ?? []).map((s) => ({
+        round: clock.round, owner: o, owner_name: nameOf(o), seq: s.seq, square: s.square, square_label: fleet.squareLabel(s.square), sure: !!s.sure,
+        answered: typeof s.correct === 'boolean', ...(s.voided ? { voided: true } : {})
+      })))
+      : []
   };
+}
+
+/** Square label and its row and column topics, e.g. { label: 'B3', row: 'Pride', column: 'Cora' }. */
+const squareInfo = (keys, square) => ({
+  label: fleet.squareLabel(square),
+  row: list(keys.live?.fleet?.rows)[fleet.rowOf(square)] ?? '',
+  column: list(keys.live?.fleet?.columns)[fleet.colOf(square)] ?? ''
+});
+
+/**
+ * The Results insight (§4): heat map by accuracy, first try against returning
+ * per square, calibration per student with real names, confident errors
+ * (sure and wrong; the wrong answer is for the teacher only) and the hardest squares.
+ */
+async function campaignInsight(store, k, opened, roster, now) {
+  const { campaign, state } = await ensureCampaign(store, k, opened, now);
+  const shown = (campaign.revealed_at && (await read(store, k.campaignResolved(campaign.game_id, campaign.id, 'final')))) || state;
+  const { keys } = await loadFleetGame(store, k, campaign.game_id, campaign.version);
+  const byId = new Map(roster.students.map((s) => [s.id, s]));
+  const nameOf = (owner) => byId.get(campaign.students[owner])?.name ?? 'Unknown';
+  const stats = fleet.squareStats(shown);
+  const cal = fleet.calibration(shown);
+  const rounds = shown.log.map((l) => l.round);
+  const owners = list(campaign.joined);
+  const pairs = rounds.flatMap((r) => owners.map((o) => [r, o]));
+  const rows = await mapBounded(pairs, 8, ([r, o]) => read(store, k.campaignShots(campaign.game_id, campaign.id, r, o)));
+  const storedBy = new Map();
+  pairs.forEach(([r, o], i) => list(rows[i]).forEach((s) => storedBy.set(`${r}:${o}:${s.seq}`, s)));
+  const errors = shown.log.flatMap((l) => l.results.filter((r) => r.sure && r.correct !== true && r.outcome !== 'void' && !r.voided).map((r) => ({
+    round: l.round, owner: r.owner, student_id: campaign.students[r.owner] ?? null, name: nameOf(r.owner), square: r.square, ...squareInfo(keys, r.square),
+    prompt: promptOf(keys, r.item), answer: storedBy.get(`${l.round}:${r.owner}:${r.seq}`)?.answer ?? '', returning: !!r.returning
+  })));
+  const rate = (t) => (t.answered ? Math.round((t.right / t.answered) * 100) / 100 : null);
+  return {
+    campaign_id: campaign.id,
+    game_id: campaign.game_id,
+    rounds: shown.round,
+    grid: stats.map((s) => ({
+      square: s.square, ...squareInfo(keys, s.square), answered: s.answered, right: s.right, accuracy: rate(s),
+      first: { ...s.first, accuracy: rate(s.first) }, returning: { ...s.returning, accuracy: rate(s.returning) }
+    })),
+    calibration: owners.map((o) => {
+      const c = cal[o] ?? { sure: { answered: 0, right: 0 }, unsure: { answered: 0, right: 0 } };
+      return { owner: o, student_id: campaign.students[o] ?? null, name: nameOf(o), sure_right: c.sure.right, sure_total: c.sure.answered, unsure_right: c.unsure.right, unsure_total: c.unsure.answered, calibration: rate(c.sure) };
+    }),
+    confident_errors: errors,
+    hardest: fleet.hardestSquares(stats).map((s) => ({ ...s, ...squareInfo(keys, s.square) }))
+  };
+}
+
+/** A question's prompt from the published keys' public items (never the answer). */
+const promptOf = (keys, itemId) => list(keys.live?.items).find((i) => i.id === itemId)?.question?.prompt ?? '';
+/** The writing log as a quiz's short written answer shows it: the summary (check on `block`) with the log for replay. */
+const writingOf = (raw, text) => {
+  const log = cleanWritingLog(raw);
+  return log ? { ...summariseWriting(log, text, 'block'), log } : null;
+};
+
+/**
+ * Damage reports and recall lines as short written answers (§4): who wrote
+ * what, for which question, with the writing log for the typing replay. A
+ * report shows the question and the shooter's typed answer it explains.
+ */
+function writtenAnswers(campaign, keys, state, reports, shotsBy, nameOf) {
+  const out = [];
+  for (const [owner, r] of Object.entries(reports)) {
+    for (const [hit, f] of Object.entries(obj(r.filed))) {
+      const h = state.hits.find((x) => x.id === hit);
+      const seq = Number(/-(\d+)$/.exec(hit)?.[1]);
+      const shot = h ? list(shotsBy.get(`${h.round}:${h.owner}`)).find((s) => s.seq === seq) : null;
+      out.push({
+        kind: 'report', hit, owner: f.by ?? owner, name: nameOf(f.by ?? owner), round: f.round, square: h?.square ?? null,
+        prompt: shot ? promptOf(keys, shot.item) : '', answer: shot?.answer ?? '', shooter: nameOf(owner), text: f.text ?? '', writing: writingOf(f.writing, f.text ?? '')
+      });
+    }
+    for (const [key, line] of Object.entries(obj(r.recall))) {
+      const ship = key.split(':')[1];
+      const item = list(keys.live?.fleet?.recall)[fleet.SHIP_IDS.indexOf(ship)];
+      out.push({
+        kind: 'recall', ship_key: key, ship, owner, name: nameOf(owner), round: line.round, prompt: item ? promptOf(keys, item) : '',
+        text: line.answer ?? '', correct: line.correct === true, writing: writingOf(line.writing, line.answer ?? '')
+      });
+    }
+  }
+  return out.sort((a, b) => a.round - b.round || a.kind.localeCompare(b.kind));
 }
 
 async function nextRound(store, k, campaign) {
@@ -194,22 +364,38 @@ async function rejectReport(store, k, campaign, body, now) {
   });
 }
 
-async function reveal(store, k, campaign, now) {
-  if (campaign.revealed_at) return campaign;
-  const { state } = await ensureResolved(store, k, campaign, now);
-  const finalKey = k.campaignResolved(campaign.game_id, campaign.id, 'final');
-  const settled = fleet.settleAll(state, reportInputs(await allReports(store, k, campaign)));
-  await store.setJSON(finalKey, settled, { onlyIfNew: true });
-  const { data } = await updateJSON(store, k.campaign(campaign.game_id, campaign.id), (c) => (c.revealed_at ? undefined : { ...c, revealed_at: now }));
-  return data;
-}
-
 async function close(store, k, campaign, now) {
   const { data } = await updateJSON(store, k.campaign(campaign.game_id, campaign.id), (c) => (c.closed_at ? undefined : { ...c, closed_at: now }));
   const currentKey = k.campaignCurrent(campaign.game_id, campaign.class_id);
   const current = await read(store, currentKey);
   if (current?.id === campaign.id) await store.delete(currentKey);
+  await updateJSON(store, campaignIndexKey(campaign.class_id), (held) => {
+    const kept = list(obj(held).campaigns);
+    const left = kept.filter((e) => e?.id !== campaign.id);
+    return held && left.length !== kept.length ? { campaigns: left } : undefined;
+  });
   return data;
+}
+
+/** The class's latest campaign of this game (open or closed), or null. */
+async function latestCampaign(store, k, gameId, classId) {
+  const latest = await read(store, k.campaignLatest(gameId, classId));
+  return latest?.id ? findCampaign(store, k, gameId, classId, latest.id) : null;
+}
+
+/** Every campaign of this game this class has played, newest first, for Results to pick from. */
+async function campaignList(store, k, gameId, classId) {
+  if (typeof gameId !== 'string' || !gameId) reject(400, 'bad_game', 'That game isn’t in this lesson.');
+  const latest = obj(await read(store, k.campaignLatest(gameId, classId)));
+  const current = await read(store, k.campaignCurrent(gameId, classId));
+  const ids = [...new Set([...list(latest.ids), ...(current?.id ? [current.id] : [])])];
+  const rows = await mapBounded(ids, 8, (id) => findCampaign(store, k, gameId, classId, id));
+  return {
+    campaigns: rows
+      .filter((c) => c && c.game_id === gameId)
+      .map((c) => ({ id: c.id, mode: c.mode, opened_at: c.created_at, closed_at: c.closed_at ?? null, revealed_at: c.revealed_at ?? null }))
+      .sort((a, b) => b.opened_at - a.opened_at)
+  };
 }
 
 /** Teacher actions on a Fleet week campaign. */
@@ -221,15 +407,20 @@ export async function fleetTeacherAction(store, lessonId, body, { now = Date.now
     const campaign = await openCampaign(store, lessonId, body, ctx, now);
     return campaignState(store, ctx.k, campaign, ctx.roster, now);
   }
+  if (action === 'campaign_list') return campaignList(store, ctx.k, body.game_id, ctx.classId);
+  const readOnly = action === 'campaign_state' || action === 'campaign_insight';
   let campaign = await findCampaign(store, ctx.k, body.game_id, ctx.classId, body.campaign_id);
-  if (!campaign) reject(404, 'no_campaign', 'No Fleet week is running for this class.');
+  // Reading Results after a game has ended: the class's latest campaign, kept after close.
+  if (!campaign && readOnly && body.campaign_id === undefined) campaign = await latestCampaign(store, ctx.k, body.game_id, ctx.classId);
+  if (!campaign || campaign.game_id !== body.game_id) reject(404, 'no_campaign', 'No Fleet week is running for this class.');
   // The keys the campaign opened with: a republish never changes a running game.
   await loadFleetGame(store, ctx.k, campaign.game_id, campaign.version);
-  if (action !== 'campaign_state' && campaign.closed_at) reject(409, 'closed', 'This game has finished.');
+  if (!readOnly && campaign.closed_at) reject(409, 'closed', 'This game has finished.');
   if (action === 'campaign_next') await nextRound(store, ctx.k, campaign);
   if (action === 'void_shot') await voidShot(store, ctx.k, campaign, body, now);
   if (action === 'reject_report') await rejectReport(store, ctx.k, campaign, body, now);
-  if (action === 'campaign_reveal') campaign = await reveal(store, ctx.k, campaign, now);
+  if (action === 'campaign_reveal') campaign = await revealCampaign(store, ctx.k, campaign, now);
   if (action === 'campaign_close') campaign = await close(store, ctx.k, campaign, now);
+  if (action === 'campaign_insight') return campaignInsight(store, ctx.k, campaign, ctx.roster, now);
   return campaignState(store, ctx.k, campaign, ctx.roster, now);
 }

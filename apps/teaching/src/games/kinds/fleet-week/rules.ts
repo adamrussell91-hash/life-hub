@@ -25,7 +25,8 @@ export const SHIP_IDS = ['s0', 's1', 's2', 's3'] as const;
 export type ShipId = (typeof SHIP_IDS)[number];
 /** A placed ship. Its squares are in a straight line. */
 export type Ship = { id: ShipId; squares: number[] };
-export type Team = { id: string; owners: string[]; ghost?: boolean };
+/** `late`: owners who joined after the game began (§3.5). They fire and file reports but place no ships. */
+export type Team = { id: string; owners: string[]; ghost?: boolean; late?: string[] };
 export type Match = { id: string; teams: [string, string] };
 export type Pairing = { teams: Team[]; matches: Match[] };
 export type Rng = () => number;
@@ -98,9 +99,10 @@ function sizeOf(id: ShipId): number {
  * late joiner, a stranger) and the ghost place nothing.
  */
 export function shipsFor(team: Team, owner: string): ShipId[] {
-  const at = team.owners.indexOf(owner);
+  const placers = team.owners.filter((o) => !(team.late ?? []).includes(o));
+  const at = placers.indexOf(owner);
   if (at < 0) return [];
-  const split: ShipId[][] = team.owners.length === 3 ? [['s0'], ['s1', 's3'], ['s2']] : [['s0', 's3'], ['s1', 's2']];
+  const split: ShipId[][] = placers.length === 3 ? [['s0'], ['s1', 's3'], ['s2']] : [['s0', 's3'], ['s1', 's2']];
   return split[at] ? [...split[at]] : [];
 }
 
@@ -205,7 +207,7 @@ export const GHOST_ID = 'ghost';
  * Pair a class into teams and matches (§1.2). Shuffle, cut into twos; an odd
  * last owner joins the previous team as a third. Teams t1…tn are matched in
  * order (m1 = t1 v t2, …); an odd team out plays the ghost fleet.
- * "Mixed by accuracy" balancing is deferred to plan 4.
+ * pairTeamsMixed (below) is the "mixed by accuracy" balance.
  */
 export function pairTeams(owners: string[], random: Rng): Pairing {
   const shuffled = shuffleWith(owners, random);
@@ -213,6 +215,38 @@ export function pairTeams(owners: string[], random: Rng): Pairing {
   for (let i = 0; i < shuffled.length; i += 2) groups.push(shuffled.slice(i, i + 2));
   const last = groups[groups.length - 1];
   if (groups.length > 1 && last.length === 1) groups[groups.length - 2].push(...(groups.pop() as string[]));
+  return pairingOf(groups);
+}
+
+/**
+ * Teams mixed by recent accuracy (§1.2 "mixed by recent accuracy"). Owners are
+ * shuffled (so ties fall at random), sorted by accuracy, highest first, and the
+ * strongest is paired with the weakest, the next with the next, inward. An odd
+ * middle owner joins the last pair as a third. An owner with no accuracy yet
+ * counts as the class's mean (0.5 when nobody has one). The teams are then
+ * shuffled before matching, so a match is not always the top pair against the
+ * next. Seeded: the same owners, accuracies and seed give the same pairing.
+ */
+export function pairTeamsMixed(owners: string[], accuracy: Record<string, number | null | undefined>, random: Rng): Pairing {
+  const known = owners.map((o) => accuracy[o]).filter((a): a is number => typeof a === 'number' && Number.isFinite(a));
+  const mean = known.length ? known.reduce((n, a) => n + a, 0) / known.length : 0.5;
+  const score = (o: string) => {
+    const a = accuracy[o];
+    return typeof a === 'number' && Number.isFinite(a) ? a : mean;
+  };
+  const sorted = shuffleWith(owners, random)
+    .map((o, k) => ({ o, k, a: score(o) }))
+    .sort((x, y) => y.a - x.a || x.k - y.k)
+    .map((x) => x.o);
+  const groups: string[][] = [];
+  for (let lo = 0, hi = sorted.length - 1; lo <= hi; lo++, hi--) groups.push(lo === hi ? [sorted[lo]] : [sorted[lo], sorted[hi]]);
+  const last = groups[groups.length - 1];
+  if (groups.length > 1 && last.length === 1) groups[groups.length - 2].push(...(groups.pop() as string[]));
+  return pairingOf(shuffleWith(groups, random));
+}
+
+/** Teams t1…tn from groups, matched in order, with the ghost fleet for an odd team out (§1.2). */
+function pairingOf(groups: string[][]): Pairing {
   const teams: Team[] = groups.map((g, k) => ({ id: `t${k + 1}`, owners: g }));
   if (teams.length % 2 === 1) teams.push({ id: GHOST_ID, owners: [], ghost: true });
   const matches: Match[] = [];
@@ -361,6 +395,8 @@ export type RoundInput = {
   rejected: Record<string, number>;
   /** `${target}:${ship}` → recall line answered right. */
   recalls: Record<string, boolean>;
+  /** Owners who have left the class (§3.5): their ships stay, but they can't file a report, so a hit with no one else to report it counts in full. */
+  absent?: string[];
 };
 
 /** Damage table (§1.7; decision 5). */
@@ -423,10 +459,25 @@ function settleHit(state: FleetState, hit: Hit, filed: Record<string, number>): 
   state.damage[hit.team] = (state.damage[hit.team] ?? 0) + (hit.status === 'full' ? hit.full : halfDamage(hit.full));
 }
 
-/** Settle owed hits whose deadline has passed by `round`, or all of them when `round` is omitted (the reveal). */
-function settleHits(state: FleetState, input: Pick<RoundInput, 'filed' | 'rejected'>, round?: number): void {
+/** True when nobody but the shooter is left on their team to file a report (decision 6; §3.5). */
+function noReporter(pairing: Pairing | undefined, team: string, shooter: string, absent: readonly string[]): boolean {
+  const t = pairing?.teams.find((x) => x.id === team);
+  return !!t && !t.owners.some((o) => o !== shooter && !absent.includes(o));
+}
+
+/**
+ * Settle owed hits whose deadline has passed by `round`, or all of them when
+ * `round` is omitted (the reveal). A hit whose reporters have all left the
+ * class settles in full at once, as a partnerless hit does.
+ */
+function settleHits(state: FleetState, input: Pick<RoundInput, 'filed' | 'rejected'> & Partial<Pick<RoundInput, 'pairing' | 'absent'>>, round?: number): void {
+  const absent = input.absent ?? [];
   for (const hit of state.hits) {
     if (hit.status !== 'owed') continue;
+    if (absent.length && noReporter(input.pairing, hit.team, hit.owner, absent)) {
+      settleHit(state, hit, { [hit.id]: hit.round });
+      continue;
+    }
     hit.rejected = input.rejected[hit.id] ?? 0;
     hit.due = hit.round + 1 + Math.min(hit.rejected, 1);
     if (round === undefined || round >= hit.due) settleHit(state, hit, input.filed);
@@ -532,7 +583,7 @@ export function resolveRound(prev: FleetState, input: RoundInput): FleetState {
       } else {
         chart[shot.square] = 'hit';
         const full = (shot.sure ? DAMAGE.sure : DAMAGE.hit) + (shot.returning ? DAMAGE.returning : 0);
-        const alone = !team.owners.some((o) => o !== shot.owner);
+        const alone = noReporter(pairing, team.id, shot.owner, input.absent ?? []);
         const hit: Hit = {
           id: `h${round}-${shot.owner}-${shot.seq}`, owner: shot.owner, team: team.id, target, square: shot.square, round,
           full, due: round + 1, rejected: 0, status: 'owed'
@@ -557,11 +608,69 @@ export function resolveRound(prev: FleetState, input: RoundInput): FleetState {
 }
 
 /** At the reveal: settle every open hit as if due, and every pending recall line (§1.6, §1.7; decision 6). */
-export function settleAll(state: FleetState, input: Pick<RoundInput, 'filed' | 'rejected' | 'recalls'>): FleetState {
+export function settleAll(state: FleetState, input: Pick<RoundInput, 'filed' | 'rejected' | 'recalls'> & Partial<Pick<RoundInput, 'pairing' | 'absent'>>): FleetState {
   const next = clone(state);
   settleHits(next, input);
   settleRecalls(next, input.recalls);
   return next;
+}
+
+// ---------------------------------------------------------------------------
+// Results insight (§4)
+// ---------------------------------------------------------------------------
+
+export type Tally = { answered: number; right: number };
+export type SquareStat = Tally & { square: number; first: Tally; returning: Tally };
+
+/** A resolved shot that counts as an answer: everything but a voided shot (no answer in time is a wrong one). */
+function answeredShot(r: ShotResult): boolean {
+  return r.outcome !== 'void' && !r.voided;
+}
+
+/**
+ * Accuracy per square across every resolved round (§4 heat map): answered and
+ * right, split into first tries and returning squares. Always 25 entries, in
+ * square order.
+ */
+export function squareStats(state: Pick<FleetState, 'log'>): SquareStat[] {
+  const out: SquareStat[] = Array.from({ length: SQUARES }, (_, square) => ({ square, answered: 0, right: 0, first: { answered: 0, right: 0 }, returning: { answered: 0, right: 0 } }));
+  for (const entry of state.log) {
+    for (const r of entry.results) {
+      if (!answeredShot(r) || !onGrid(r.square)) continue;
+      const stat = out[r.square];
+      const part = r.returning ? stat.returning : stat.first;
+      const right = r.correct === true ? 1 : 0;
+      stat.answered++;
+      stat.right += right;
+      part.answered++;
+      part.right += right;
+    }
+  }
+  return out;
+}
+
+/** The class's hardest squares (§4, the board): lowest accuracy first, then most answered, then square order. Answered squares only. */
+export function hardestSquares(stats: SquareStat[], count = 5): Array<Tally & { square: number; accuracy: number }> {
+  return stats
+    .filter((s) => s.answered > 0)
+    .map((s) => ({ square: s.square, answered: s.answered, right: s.right, accuracy: s.right / s.answered }))
+    .sort((a, b) => a.accuracy - b.accuracy || b.answered - a.answered || a.square - b.square)
+    .slice(0, count);
+}
+
+/** Calibration per owner (§4): how often Sure was right, and Unsure for comparison. Voided shots don't count. */
+export function calibration(state: Pick<FleetState, 'log'>): Record<string, { sure: Tally; unsure: Tally }> {
+  const out: Record<string, { sure: Tally; unsure: Tally }> = {};
+  for (const entry of state.log) {
+    for (const r of entry.results) {
+      if (!answeredShot(r)) continue;
+      const row = (out[r.owner] ??= { sure: { answered: 0, right: 0 }, unsure: { answered: 0, right: 0 } });
+      const part = r.sure ? row.sure : row.unsure;
+      part.answered++;
+      if (r.correct === true) part.right++;
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

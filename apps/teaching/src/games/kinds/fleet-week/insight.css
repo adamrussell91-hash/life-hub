@@ -1,0 +1,299 @@
+/* Fleet week insight in the Results tab (insight.ts). One blue ramp, light to
+   dark as accuracy rises; every cell also prints its number, so the map reads
+   without colour. Ink flips to white from step 4 (contrast ≥ 4.5:1 on each). */
+.fwi-panel {
+  --fwi-0: var(--paper, #fbfaf7);
+  --fwi-1: #eef4fb;
+  --fwi-2: #cfe0f3;
+  --fwi-3: #9cc0e8;
+  --fwi-4: #2f6db3;
+  --fwi-5: #17375e;
+  --fwi-hard: var(--game-wrong, #d4544f);
+  display: grid;
+  gap: var(--space-3, 0.75rem);
+  min-width: 0;
+  padding-top: var(--space-3, 0.75rem);
+  border-top: 1px solid var(--line, rgba(23, 55, 94, 0.14));
+}
+.fwi-panel__body,
+.fwi {
+  display: grid;
+  gap: var(--space-4, 1rem);
+  min-width: 0;
+}
+.fwi-panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2, 0.5rem) var(--space-4, 1rem);
+}
+.fwi-pick .gm-select {
+  min-height: 44px;
+  font-size: max(16px, var(--text-sm, 0.875rem));
+}
+.fwi-h4 {
+  margin: 0;
+  font-size: var(--text-base, 1rem);
+  color: var(--navy, #17375e);
+}
+.fwi-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Heat map */
+.fwi-heat-wrap {
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+  min-width: 0;
+  max-width: 44rem;
+}
+.fwi-heat {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 3px;
+  font-size: var(--text-sm, 0.875rem);
+}
+.fwi-heat caption {
+  text-align: left;
+  font-weight: 700;
+  color: var(--navy, #17375e);
+  padding-bottom: var(--space-1, 0.25rem);
+}
+.fwi-heat__corner {
+  width: 5.5rem;
+}
+.fwi-heat__col,
+.fwi-heat__row {
+  font-weight: 600;
+  color: var(--muted, #6b7a90);
+  font-size: var(--text-xs, 0.75rem);
+  vertical-align: bottom;
+  /* Hyphenate a long topic rather than split it mid-word (C1). */
+  overflow-wrap: normal;
+  word-break: normal;
+  -webkit-hyphens: auto;
+  hyphens: auto;
+}
+.fwi-heat__row {
+  text-align: left;
+  vertical-align: middle;
+}
+.fwi-heat__key {
+  display: block;
+  color: var(--ink, #1b2433);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 700;
+}
+.fwi-heat__topic {
+  display: block;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.fwi-heat__cell {
+  height: 3.25rem;
+  padding: 2px;
+  border-radius: 6px;
+  text-align: center;
+  vertical-align: middle;
+  color: var(--ink, #1b2433);
+  font-variant-numeric: tabular-nums;
+  background: var(--fwi-0);
+  box-shadow: inset 0 0 0 1px var(--line, rgba(23, 55, 94, 0.14));
+}
+.fwi-heat__cell--0 {
+  background: repeating-linear-gradient(135deg, var(--fwi-0) 0 6px, var(--cotton, #f1efe9) 6px 12px);
+  color: var(--muted, #6b7a90);
+}
+.fwi-heat__cell--1 { background: var(--fwi-1); }
+.fwi-heat__cell--2 { background: var(--fwi-2); }
+.fwi-heat__cell--3 { background: var(--fwi-3); }
+.fwi-heat__cell--4 { background: var(--fwi-4); color: #fff; }
+.fwi-heat__cell--5 { background: var(--fwi-5); color: #fff; }
+.fwi-heat__cell.is-hard {
+  box-shadow: inset 0 0 0 3px var(--fwi-hard);
+}
+.fwi-heat__pct {
+  display: block;
+  font-weight: 700;
+  font-size: var(--text-base, 1rem);
+}
+.fwi-heat__n {
+  display: block;
+  font-size: var(--text-xs, 0.75rem);
+}
+.fwi-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted, #6b7a90);
+}
+.fwi-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fwi-legend__swatch {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--line, rgba(23, 55, 94, 0.14));
+}
+.fwi-legend__swatch--hard {
+  background: var(--fwi-0);
+  box-shadow: inset 0 0 0 3px var(--fwi-hard);
+}
+
+/* First try against returning: number first, a thin bar under it. */
+.fwi-meter {
+  display: grid;
+  gap: 3px;
+  min-width: 6.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.fwi-meter__bar {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fwi-1);
+  overflow: hidden;
+}
+.fwi-meter__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--fwi-4);
+}
+.fwi .gm-table th[scope='row'] {
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--ink, #1b2433);
+  font-weight: 600;
+  white-space: normal;
+}
+
+/* Confident errors (teacher only). */
+.fwi-errors {
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+}
+.fwi-errors__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+}
+.fwi-error {
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-left: 4px solid var(--fwi-hard);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--game-wrong-surface, #fbe7e6);
+}
+.fwi-error p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.fwi-error__head {
+  font-weight: 600;
+}
+.fwi-error__prompt {
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--muted, #6b7a90);
+}
+
+@media (max-width: 480px) {
+  .fwi-heat__corner {
+    width: 3.25rem;
+  }
+  .fwi-heat__topic {
+    font-size: 0.6875rem;
+    hyphens: auto;
+  }
+  .fwi-heat__col,
+  .fwi-heat__row {
+    font-size: 0.625rem;
+  }
+  .fwi-heat__cell {
+    height: 2.75rem;
+  }
+  .fwi-heat__pct {
+    font-size: var(--text-sm, 0.875rem);
+  }
+}
+@media (max-width: 350px) {
+  .fwi-heat__topic,
+  .fwi-heat__col,
+  .fwi-heat__row {
+    font-size: 0.5625rem;
+  }
+}
+
+/* Below 480px the per-square and calibration tables stack: one card per row, "label: value" lines, no sideways scroll. */
+@media (max-width: 480px) {
+  .fwi-stack.gm-table-scroll {
+    overflow-x: visible;
+    border: 0;
+  }
+  .fwi-stack .gm-table,
+  .fwi-stack .gm-table tbody,
+  .fwi-stack .gm-table tr,
+  .fwi-stack .gm-table th,
+  .fwi-stack .gm-table td {
+    display: block;
+    width: auto;
+  }
+  .fwi-stack .gm-table caption {
+    display: block;
+    text-align: left;
+    font-weight: 700;
+    padding-bottom: var(--space-1, 0.25rem);
+  }
+  .fwi-stack .gm-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .fwi-stack .gm-table tbody {
+    display: grid;
+    gap: var(--space-2, 0.5rem);
+  }
+  .fwi-stack .gm-table tr {
+    border: 1px solid var(--line, #d9dee7);
+    border-radius: var(--radius-sm, 8px);
+    padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  }
+  .fwi-stack .gm-table th,
+  .fwi-stack .gm-table td {
+    display: grid;
+    grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
+    gap: var(--space-2, 0.5rem);
+    align-items: center;
+    padding: 4px 0;
+    border: 0;
+    text-align: left;
+    overflow-wrap: normal;
+  }
+  .fwi-stack .gm-table th::before,
+  .fwi-stack .gm-table td::before {
+    content: attr(data-label);
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: 600;
+    color: var(--muted, #6b7a90);
+  }
+  .fwi-stack .fwi-meter {
+    min-width: 0;
+  }
+}

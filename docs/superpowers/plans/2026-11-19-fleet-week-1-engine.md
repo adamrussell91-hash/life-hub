@@ -547,3 +547,101 @@ Server (Tasks 4–6):
 - §1.1 grid and variants → Tasks 1 and 2. §1.2 teams and ghost → Task 2. §1.3 lesson clock → Task 4 (week clock → plan 4). §1.4 outcomes and confidence → Task 3. §1.5 sinking → Task 3 and Task 5 (`fleet_recall`). §1.6 reports → Tasks 3, 5 and 6. §1.7 scoring → Task 3. §1.8 call signs and anonymity → Tasks 2 and 5. §1.9 two-step commit, server timer and writing logs → Task 5. Flags → Task 6.
 - §2 signals → plan 2. §3.4 client → plans 2 and 3. §4 learning data → plan 4 (events are already in `state.log` with `sure`, `returning`, `on_ship` and `voided`, ready to fold). §5 editor → plan 2 (the grid editor is part of the teacher's first screen).
 - §8 pure and server rows → Tasks 2 to 6.
+
+## Plan 2–4 server (as built, 19 Nov)
+
+Server only. The screens (arcade, content editor, launcher, campaign, editor, control room) were built in parallel and are not touched here. Tests: `tests/unit/fleet-week-week.test.js` (node:test) and new cases in `apps/teaching/tests/unit/games-fleet-week.test.ts` (Vitest).
+
+### What was built
+
+1. **Week mode** (§1.3, §3.2).
+   - `campaign_open` takes `mode: 'week'` and an optional `cutoff` ('HH:MM'); the `week_mode_later` refusal is gone. A bad cut-off gets 400 `bad_cutoff`.
+   - `weekCloses(openedAt, cutoff, rounds, tz)` and `zonedInstant(tz, y, m, d, hh, mm)` in `fleet-week-store.mjs` are pure and use Intl only. They are tested across both Sydney DST changes, a skipped wall time and a repeated one.
+   - The schedule (`campaign.schedule`, every round's close) is fixed at the open. `clock.closes_at` comes from it. `roundClosed` in week mode is the clock only (plus the hold of a shot still in flight). There is no early close, and `campaign_next` refuses with `lesson_only`.
+   - Catch-up: `ensureResolved` already resolves one round at a time. In week mode each catch-up round's `opened_at` is the previous round's close.
+   - The reveal opens by itself once the last firing round has resolved (`ensureCampaign`, used by every student and teacher read).
+2. **Signals** (§2).
+   - `signals` (lesson endpoint, optional `game_id`) returns `{ events }` across the lesson's open fleet campaigns. `signals_seen { ids }` stores ids in `seen/{owner}` (etag append, newest 200 kept, at most 50 per call).
+   - The class-wide entry point: profile actions `fleet_signals` and `fleet_signals_seen` on `/api/published/profile/:class`. They read a new class index `game-campaigns/{class}`, written at `campaign_open` and trimmed at `campaign_close`. Both doors share the same seen blob.
+3. **Learning data** (§4).
+   - `_shared/fleet-week-fold.mjs` `foldRound` is called by the request whose create-only write of `resolved/{r}` won (r ≥ 1). It writes GameEvents, the play record and box 1 for duds, then runs `rebuildSummary`.
+   - It is idempotent: it replaces that round's events by `cid` (`r{round}-{seq}`). A failed fold is logged and never blocks play.
+   - Retry (follow-up fixes): each fold claims `folded/{round}` create-only (`{ at, tries, boxed }`), and on success the marker becomes `{ done: true, at, boxed }`.
+     - A fold that throws keeps its marker as `{ failed_at, tries }`. It is tried again only after an exponential backoff: 30 s, then 60 s, then 2 min and so on, capped at 15 min (`foldBackoff`). So a fold that keeps failing runs once per backoff, never once per poll.
+     - Every `ensureResolved` call ends with `ensureFolded`: one marker read per resolved round, and any round whose fold is due is folded again, in order.
+     - A claim with no failure that is older than `FOLD_LEASE_MS` (60 s) counts as a dead request and can be taken over.
+     - The box-1 step is recorded per player in the marker's `boxed` (owner → cards moved) as soon as `sendPiecesToBoxOne` returns. A retry skips any player already recorded, so a card is never sent back twice.
+     - The play record keeps `boxed_by_round`, and its `boxed` is their sum, so a re-fold counts a round once.
+   - Damage reports and recall lines appear in `campaign_state.written` as short written answers, with the quiz writing summary (check `block`) and the log for replay.
+4. **Results insight.** `campaign_insight` is added. Pure `squareStats`, `hardestSquares` and `calibration` are in rules.ts. The reveal carries `reveal.class` (student view) and `board` (`campaign_state` once revealed): per-square accuracy and the hardest squares, with no answers or names.
+5. **Balance.** `balance: 'mixed'` uses `pairTeamsMixed` (rules.ts, seeded from the secret). `campaign.balance` is stored, and any other value gets 400 `bad_balance`.
+6. **Edge cases.**
+   - Late joiners: `Team.late`, `campaign.late[owner] = fromRound`, `firesIn`. A late joiner who tries to fire too early gets 409 `joins_next`.
+   - Leavers: `RoundInput.absent` and `settleAll(…, { pairing, absent })`.
+   - The reveal opens at any phase.
+7. **Coordinator additions.**
+   - `campaign_state.now` (server ms) and `campaign_state.shots` (the open round's shots: `{ round, owner, owner_name, seq, square, square_label, sure, answered, voided? }`, with no answer text).
+   - The view gains `rival.duds` and `shots.fired` (square numbers only; the leak sweep checks both).
+
+8. **Results after a game has ended** (follow-up fix).
+   - `campaigns/latest/{class}` (`{ id, at, ids }`) is set at `campaign_open` and kept at `campaign_close`, unlike `current/{class}`.
+   - `campaign_state` and `campaign_insight` take an optional `campaign_id`. Without one they use the open campaign, then the latest. They work on a closed campaign, and `campaign_state` then returns `phase: 'closed'` and `read_only: true`. Every other action on a closed campaign is still refused with `closed`.
+   - `campaign_list { game_id, class_id }` returns `{ campaigns: [{ id, mode, opened_at, closed_at, revealed_at }] }`, newest first. It comes from the latest pointer's `ids` (the last 50) plus the open campaign.
+
+### Interpretations
+
+- **Time zone.** Classes have no time zone field. Week mode uses `cls.time_zone` if it is a valid IANA name, otherwise Australia/Sydney, stored as `settings.tz`.
+- **Schedule.**
+  - The schedule follows the school week (follow-up fix).
+    - Placement closes at a Monday-to-Thursday cut-off: today's if the campaign opens before it on one of those days, otherwise the next such day's (exactly at the cut-off counts as after). So a campaign opened on a Friday, a Saturday or a Sunday places until Monday's cut-off and fires Tuesday to Thursday.
+    - Firing rounds close on the following school days and skip Saturday and Sunday. For example, placement on a Wednesday gives firing on Thursday, Friday and Monday.
+    - Weekdays come from the class's time-zone date (Sydney), never UTC.
+  - Week rounds default to 3 (`body.rounds`, 1–8). They ignore the game's lesson-mode `settings.rounds`.
+  - The cut-off is `body.cutoff`, then the game's `settings.cutoff`, then '20:00'.
+- **Dawn rule (week mode; follow-up fix, §1.3 "ready the next morning", "the reveal is Friday").**
+  - A firing round still resolves at its cut-off, and the teacher sees it at once (`campaign_state`, `campaign_insight`).
+  - Students see each round's results from 06:00 Sydney on the day after its cut-off (`dawnAfter`). Until then, `visibleState` gives their view and signals the latest round whose dawn has passed. That covers the report, both charts, sunk ships, the recall prompt, owed reports, duds and the `hit` and `report_ready` signals.
+  - The commit's "already known" check uses that same visible state, so firing before dawn at a square the team hit last night is allowed and resolves as a duplicate, instead of giving the hit away with a refusal.
+  - The reveal opens by itself at 06:00 on the day after the last round's cut-off (Friday in a normal week). The teacher can open it at any time before then.
+  - The next round still opens at the cut-off, so `round_open` ("Four shells ready.") can show the evening before.
+- **Signals.**
+  - `round_open` shows only in a firing round the player can fire in, with shots left and the round not closing. Placement raises no signal.
+  - `hit` means any hit on the player's team's fleet in the last resolved round.
+  - `report_owed` uses the latest owed hit's round.
+  - `report_ready` uses the last resolved firing round.
+  - `reveal` id is `{campaign}:reveal:final`.
+  - Closed campaigns give no signals.
+  - The lines are copied exactly from the spec (straight apostrophe in "You've been hit.").
+- **Events.**
+  - A voided shot is stored with `correct: null`, so it is never evidence. An unanswered shot is `correct: false` with `response: ''`.
+  - `time_ms` runs from commit to answer.
+  - `extra` also carries `square`, `round` and `outcome`.
+  - `play_id` is `sha256('fleet:' + campaign + ':' + owner)`, cut to 16 hex.
+  - The play record is rewritten each round, with `mode` 'live' (lesson) or 'campaign' (week; the play record has no mode schema), plus `campaign_id` and `rounds`.
+  - Box 1 uses every wrong answer in the round whose item carries a `kp:` tag: duds, and wrong practice and duplicate shots too (a wrong answer is a wrong answer), never a voided shot. `sendPiecesToBoxOne` decides whether the piece is on an organiser line.
+  - Signals isolate campaigns: one campaign that throws (for example a missing clock blob) is logged and skipped, and the other campaigns still signal.
+- **Written answers** stay in the reports blob, where plan 1 stored them. `campaign_state.written` presents them in the quiz's short-written-answer shape. A report rejected by the teacher disappears from the list, because the filing is deleted.
+- **Insight.**
+  - "Answered" counts every shot except voided ones, practice shots included.
+  - Hardest squares: lowest accuracy, then most answered, top 5, answered squares only.
+  - Calibration is null when a student made no Sure shots.
+- **Mixed balance.**
+  - Accuracy is each student's `latest` right / answered in this game's class summary. If nobody has played this game, it is pooled across the lesson's other games.
+  - Unknown accuracy counts as the class mean.
+  - Pairs are made strongest-with-weakest, an odd middle player joins the last pair, and teams are shuffled before matching.
+- **Late joiner.**
+  - Joins on `fleet_state` during placement or a firing round, from `clock.round + 1`. They are refused if that is after the last round.
+  - They join the two-player team with the least damage (ties go to team order), or the lowest-damage team when no team of two exists.
+  - They never count toward an early close before their first round.
+  - Race: a resolution that read the campaign before the join would void a joiner's shots in their first round. This is narrow and accepted.
+- **Leaver.**
+  - Absent means the owner's student id is no longer on the class list. A deleted class counts nobody as absent.
+  - A hit with no present teammate settles full at once. This includes owed hits from before the partner left, at the next resolution or at the reveal.
+  - Their shots in a round still open still resolve (they are still in the pairing).
+- **Module cycle.** `FLEET_ACTIONS` moved to `game-store.mjs`: profile → fleet-week → store → fold → games.mjs read it before it was initialised.
+
+### Gaps
+
+- Each request reads one `folded/{round}` marker for every resolved round (at most 8) to find a fold that needs retrying.
+- Week mode has no minimum placement window. School holidays are not skipped. The dawn hour is fixed at 06:00 and is not a setting.
+- The class index keeps the newest 20 campaigns. A lesson deleted under an open campaign is skipped, not cleaned up.

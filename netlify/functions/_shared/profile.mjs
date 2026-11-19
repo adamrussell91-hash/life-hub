@@ -24,6 +24,7 @@ import { teacherHabits } from './teacher-habits.mjs';
 import { todoFor } from './profile-todo.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { requestStore } from './request-store.mjs';
+import { fleetClassSignals, fleetClassSignalsSeen } from './fleet-week.mjs';
 
 const ROLES = new Set(['core', 'support', 'extension', 'optional']);
 
@@ -69,7 +70,7 @@ async function unitLessons(store, unit) {
 export async function profileAction(store, classId, body, { now = new Date() } = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
   const action = body.action ?? 'status';
-  if (!['status', 'done', 'undone', 'claim', 'progress', 'returned', 'piece', 'seen', 'steps', 'token', 'skills', 'pointer_off'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
+  if (!['status', 'done', 'undone', 'claim', 'progress', 'returned', 'piece', 'seen', 'steps', 'token', 'skills', 'pointer_off', 'fleet_signals', 'fleet_signals_seen'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   const roster = await loadRoster(store, classId);
   if (!roster) reject(404, 'not_found', 'Class not found.');
   if (action === 'claim') return profileFor(store, roster, await claimInitials(store, roster, body.class_token, body.initials, body.code));
@@ -79,6 +80,9 @@ export async function profileAction(store, classId, body, { now = new Date() } =
     return { need: 'initials' };
   }
   // The initials token on every lesson page.
+  // Fleet week signals for any student page (the now strip): every open campaign in the class, no lesson id (§2).
+  if (action === 'fleet_signals') return fleetClassSignals(store, roster.cls.id, student.id, { now: now.getTime() });
+  if (action === 'fleet_signals_seen') return fleetClassSignalsSeen(store, roster.cls.id, student.id, body.ids);
   if (action === 'token') return { need: null, initials: student.initials, unseen: await unseenFor(store, roster, student) };
   // The lesson footer: whether this student's own tick (or a teacher's complete mark) is on, nothing else.
   if (action === 'status' && body.quick === true && typeof body.lesson_id === 'string') {
