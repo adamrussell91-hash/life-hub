@@ -35,6 +35,8 @@ export type FleetControlOptions = {
   api?: FleetControlApi | null;
   pollMs?: number;
   now?: () => number;
+  /** "See the results" on an ended game. Defaults to leaving the room (it opens from the Results tab). */
+  onResults?: () => void;
 };
 
 export type FleetControlRoom = {
@@ -362,7 +364,7 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
   function schedule(): void {
     if (pollTimer) clearTimeout(pollTimer);
     pollTimer = null;
-    if (disposed || !state || state.closed_at) return;
+    if (disposed || !state || state.closed_at || state.read_only) return;
     pollTimer = setTimeout(() => void handle.refresh(), pollMs);
   }
 
@@ -507,7 +509,23 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
     if (!s) return paintSetup();
     main.replaceChildren();
     const teamById = new Map(s.teams.map((t) => [t.id, t]));
-    const live = !s.closed_at;
+    const live = !s.closed_at && !s.read_only;
+
+    if (s.read_only) {
+      // An ended game: no actions, a way to its results.
+      const ended = el('div', 'fc-ended');
+      ended.setAttribute('role', 'status');
+      ended.append(el('p', 'fc-ended__text', 'This game has ended'));
+      const go = el('a', 'fc-ended__link', 'See the results');
+      go.href = '#results';
+      go.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (o.onResults) o.onResults();
+        handle.dispose();
+      });
+      ended.append(go);
+      main.append(ended);
+    }
 
     const bar = el('div', 'fc-actions');
     const next = btn('Next round', 'primary', () => void act('Closing this round…', () => api!.next(o.game.id, classId!, s.campaign_id), 'Round closed.'));
@@ -530,7 +548,7 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
     close.disabled = !live;
     if (s.mode !== 'week') bar.append(next);
     bar.append(reveal, close);
-    main.append(bar);
+    if (!s.read_only) main.append(bar);
     if (s.mode === 'week' && s.schedule?.length) {
       const zone = s.tz ? ` (${s.tz.replace(/_/g, ' ')})` : '';
       main.append(el('p', 'fc-schedule', `${weekScheduleText(s.schedule, s.tz)}. Each round closes at ${timeAt(s.schedule[0]!, s.tz)}${zone}.`));

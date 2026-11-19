@@ -2,7 +2,7 @@ import { el } from '@/quiz/dom';
 import { ApiClientError } from '@/api/client';
 import type { Game } from '../../core/schema';
 import { GRID, squareLabel } from './rules';
-import type { FleetControlApi, FleetInsight } from './control-api';
+import type { FleetCampaignSummary, FleetControlApi, FleetInsight } from './control-api';
 import './insight.css';
 
 /**
@@ -184,36 +184,85 @@ export function renderFleetInsight(data: FleetInsight, game: Game | null = null)
   return box;
 }
 
+const NO_GAMES = 'No Fleet week games yet for this class.';
+
+/** "Mon 17 Nov · Week · ended", for the past-games picker. */
+export function campaignLabel(c: FleetCampaignSummary): string {
+  const date = new Intl.DateTimeFormat('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }).format(c.opened_at).replace(/,/g, '');
+  const status = c.closed_at ? 'ended' : c.revealed_at ? 'revealed' : 'running';
+  return `${date} · ${c.mode === 'week' ? 'Week' : 'Lesson'} · ${status}`;
+}
+
 /**
  * The Fleet week insight panel for one game and the Results tab's class. It
- * loads `campaign_insight` itself and says plainly when there's no campaign.
+ * lists the class's campaigns (`campaign_list`, newest first), offers a
+ * picker of past games when there's more than one, and loads
+ * `campaign_insight` for the one picked. It says plainly when there's none.
  */
 export function fleetInsightPanel(o: { game: Game; classId: string | null; api: FleetControlApi | null | undefined }): HTMLElement {
   const panel = el('section', 'fwi-panel');
-  panel.append(el('h4', 'fwi-h4 fwi-panel__title', 'Fleet week insight'));
+  const head = el('div', 'fwi-panel__head');
+  head.append(el('h4', 'fwi-h4 fwi-panel__title', 'Fleet week insight'));
+  panel.append(head);
   const body = el('div', 'fwi-panel__body');
   body.setAttribute('aria-live', 'polite');
   panel.append(body);
-  if (!o.classId) {
+  const classId = o.classId;
+  const api = o.api;
+  if (!classId) {
     body.append(el('p', 'gm-note', 'Pick a class to see the Fleet week insight.'));
     return panel;
   }
-  if (!o.api?.insight) {
+  if (!api?.insight) {
     body.append(el('p', 'gm-note', 'The insight needs the server.'));
     return panel;
   }
+  const insight = api.insight;
+  const fail = (e: unknown) => {
+    const text =
+      e instanceof ApiClientError && e.code === 'no_campaign'
+        ? NO_GAMES
+        : e instanceof Error && e.message
+          ? e.message
+          : 'The insight didn’t load. Try Refresh.';
+    body.replaceChildren(el('p', 'gm-note', text));
+  };
+  let asked = 0;
+  const load = (campaignId?: string) => {
+    const ticket = ++asked;
+    body.replaceChildren(el('p', 'gm-note', 'Loading the insight…'));
+    insight(o.game.id, classId, campaignId)
+      .then((data) => ticket === asked && body.replaceChildren(renderFleetInsight(data, o.game)))
+      .catch((e: unknown) => ticket === asked && fail(e));
+  };
+  if (!api.list) {
+    load();
+    return panel;
+  }
   body.append(el('p', 'gm-note', 'Loading the insight…'));
-  o.api
-    .insight(o.game.id, o.classId)
-    .then((data) => body.replaceChildren(renderFleetInsight(data, o.game)))
-    .catch((e: unknown) => {
-      const text =
-        e instanceof ApiClientError && e.code === 'no_campaign'
-          ? 'No Fleet week campaign is open for this class. The insight shows while one runs and after the reveal.'
-          : e instanceof Error && e.message
-            ? e.message
-            : 'The insight didn’t load. Try Refresh.';
-      body.replaceChildren(el('p', 'gm-note', text));
-    });
+  api
+    .list(o.game.id, classId)
+    .then(({ campaigns }) => {
+      const list = Array.isArray(campaigns) ? campaigns : [];
+      if (!list.length) {
+        body.replaceChildren(el('p', 'gm-note', NO_GAMES));
+        return;
+      }
+      const field = el('label', 'gm-field fwi-pick');
+      const pick = el('select', 'gm-select');
+      pick.name = 'campaign';
+      for (const c of list) {
+        const opt = el('option', '', campaignLabel(c));
+        opt.value = c.id;
+        pick.append(opt);
+      }
+      pick.value = list[0]!.id;
+      pick.addEventListener('change', () => load(pick.value));
+      field.append(el('span', 'gm-field__label', 'Game'), pick);
+      pick.disabled = list.length < 2;
+      head.append(field);
+      load(list[0]!.id);
+    })
+    .catch(fail);
   return panel;
 }

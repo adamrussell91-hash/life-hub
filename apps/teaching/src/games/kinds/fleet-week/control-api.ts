@@ -64,6 +64,10 @@ export type FleetLogResult = {
 };
 export type FleetCampaignState = {
   campaign_id: string;
+  /** 'placement' | 'firing' | 'waiting' | 'reveal' | 'closed' (newer servers). */
+  phase?: string;
+  /** The campaign has ended: nothing can be changed any more. */
+  read_only?: boolean;
   mode: 'lesson' | 'week';
   /** 0 = placing ships; rounds + 1 = every round played. */
   round: number;
@@ -114,6 +118,9 @@ export type FleetInsight = {
   hardest: Array<FleetSquareInfo & { answered: number; right: number; accuracy: number }>;
 };
 
+/** One of the class's campaigns of a game (campaign_list), newest first. */
+export type FleetCampaignSummary = { id: string; mode: 'lesson' | 'week'; opened_at: number; closed_at: number | null; revealed_at: number | null };
+
 export type FleetOpenOptions = { mode?: 'lesson' | 'week'; rounds?: number; round_cap_s?: number; cutoff?: string; balance?: 'random' | 'mixed' };
 
 export type FleetControlApi = {
@@ -124,8 +131,10 @@ export type FleetControlApi = {
   rejectReport(gameId: string, classId: string, hit: string, campaignId?: string): Promise<FleetCampaignState>;
   reveal(gameId: string, classId: string, campaignId?: string): Promise<FleetCampaignState>;
   close(gameId: string, classId: string, campaignId?: string): Promise<FleetCampaignState>;
-  /** The Results insight for the class's current campaign. */
-  insight?(gameId: string, classId: string): Promise<FleetInsight>;
+  /** The Results insight: one campaign, or the open one, then the latest. */
+  insight?(gameId: string, classId: string, campaignId?: string): Promise<FleetInsight>;
+  /** The class's campaigns of a game, newest first. */
+  list?(gameId: string, classId: string): Promise<{ campaigns: FleetCampaignSummary[] }>;
 };
 
 type Call = <T>(action: string, extra?: Record<string, unknown>) => Promise<T>;
@@ -150,6 +159,7 @@ export function fleetControlApi(call: Call): FleetControlApi {
     rejectReport: (g, c, hit, id) => call('reject_report', { ...at(g, c, id), hit }),
     reveal: (g, c, id) => call('campaign_reveal', at(g, c, id)),
     close: (g, c, id) => call('campaign_close', at(g, c, id)),
-    insight: (g, c) => call('campaign_insight', at(g, c))
+    insight: (g, c, id) => call('campaign_insight', at(g, c, id)),
+    list: (g, c) => call('campaign_list', { game_id: g, class_id: c })
   };
 }

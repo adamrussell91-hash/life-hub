@@ -97,31 +97,66 @@ describe('Fleet week insight', () => {
     expect(renderFleetInsight(empty, GAME).textContent).toContain('No shots answered yet');
   });
 
-  it('the panel loads campaign_insight for the class', async () => {
-    const call = vi.fn(async () => makeInsight());
-    const api = fleetControlApi(call as never);
+  const CAMPAIGNS = [
+    { id: 'camp2', mode: 'week' as const, opened_at: new Date(2026, 10, 16, 9).getTime(), closed_at: new Date(2026, 10, 20, 15).getTime(), revealed_at: new Date(2026, 10, 20, 9).getTime() },
+    { id: 'camp1', mode: 'lesson' as const, opened_at: new Date(2026, 10, 10, 11).getTime(), closed_at: new Date(2026, 10, 10, 12).getTime(), revealed_at: null }
+  ];
+  const listingApi = (campaigns: unknown[]) => {
+    const call = vi.fn(async (action: string, body: Record<string, unknown>) =>
+      action === 'campaign_list' ? { campaigns } : makeInsight({ campaign_id: String(body.campaign_id ?? '') })
+    );
+    return { call, api: fleetControlApi(call as never) };
+  };
+
+  it('lists past campaigns, defaults to the newest and passes its campaign_id', async () => {
+    const { call, api } = listingApi(CAMPAIGNS);
     const panel = fleetInsightPanel({ game: GAME, classId: 'c_10x', api });
     document.body.append(panel);
     expect(panel.textContent).toContain('Loading the insight');
     await flush();
-    expect(call).toHaveBeenCalledWith('campaign_insight', { game_id: 'g_fleet', class_id: 'c_10x' });
+    await flush();
+    expect(call).toHaveBeenCalledWith('campaign_list', { game_id: 'g_fleet', class_id: 'c_10x' });
+    expect(call).toHaveBeenCalledWith('campaign_insight', { game_id: 'g_fleet', class_id: 'c_10x', campaign_id: 'camp2' });
+    const pick = panel.querySelector<HTMLSelectElement>('select[name="campaign"]')!;
+    expect(pick.value).toBe('camp2');
+    expect([...pick.options].map((op) => op.textContent)).toEqual(['Mon 16 Nov · Week · ended', 'Tue 10 Nov · Lesson · ended']);
+    expect(panel.querySelectorAll('.fwi-heat__cell')).toHaveLength(25);
+    pick.value = 'camp1';
+    pick.dispatchEvent(new Event('change'));
+    await flush();
+    expect(call).toHaveBeenLastCalledWith('campaign_insight', { game_id: 'g_fleet', class_id: 'c_10x', campaign_id: 'camp1' });
     expect(panel.querySelectorAll('.fwi-heat__cell')).toHaveLength(25);
   });
 
-  it('the panel explains a class with no campaign', async () => {
-    const api = fleetControlApi((async () => {
-      throw new ApiClientError({ code: 'no_campaign', message: 'No Fleet week is running for this class.' } as never);
-    }) as never);
+  it('says there are no Fleet week games yet when the list is empty', async () => {
+    const { call, api } = listingApi([]);
     const panel = fleetInsightPanel({ game: GAME, classId: 'c_10x', api });
     await flush();
-    expect(panel.textContent).toContain('No Fleet week campaign is open for this class.');
-    expect(fleetInsightPanel({ game: GAME, classId: null, api }).textContent).toContain('Pick a class');
+    await flush();
+    expect(panel.textContent).toContain('No Fleet week games yet for this class.');
+    expect(panel.querySelector('select')).toBeNull();
+    expect(call).not.toHaveBeenCalledWith('campaign_insight', expect.anything());
+  });
+
+  it('without campaign_list, loads the current insight and explains no campaign', async () => {
+    const insight = vi.fn(async () => makeInsight());
+    const panel = fleetInsightPanel({ game: GAME, classId: 'c_10x', api: { insight } as never });
+    await flush();
+    expect(insight).toHaveBeenCalledWith('g_fleet', 'c_10x', undefined);
+    expect(panel.querySelectorAll('.fwi-heat__cell')).toHaveLength(25);
+    const none = fleetInsightPanel({
+      game: GAME, classId: 'c_10x',
+      api: { insight: async () => { throw new ApiClientError({ code: 'no_campaign', message: 'No Fleet week is running for this class.' } as never); } } as never
+    });
+    await flush();
+    expect(none.textContent).toContain('No Fleet week games yet for this class.');
+    expect(fleetInsightPanel({ game: GAME, classId: null, api: { insight } as never }).textContent).toContain('Pick a class');
   });
 
   it('the editor’s Results tab shows the insight for a Fleet week game', async () => {
     const fleetGame = newGame('fleet_week', 'g_fw');
     let lesson = { id: 'lesson_fw', type: 'lesson', title: 'Fleet lesson', unit_id: 'unit_fw', pedagogical_mode: 'game', blocks: [], game: { games: [fleetGame] } } as unknown as Lesson;
-    const call = vi.fn(async (action: string) => (action === 'campaign_insight' ? makeInsight() : {}));
+    const call = vi.fn(async (action: string) => (action === 'campaign_insight' ? makeInsight() : action === 'campaign_list' ? { campaigns: [{ id: 'camp9', mode: 'lesson', opened_at: Date.now(), closed_at: Date.now(), revealed_at: null }] } : {}));
     const host = document.createElement('div');
     document.body.append(host);
     const editor = mountGameEditor({
@@ -142,7 +177,7 @@ describe('Fleet week insight', () => {
     await flush();
     await flush();
     await flush();
-    expect(call).toHaveBeenCalledWith('campaign_insight', { game_id: 'g_fw', class_id: 'class_fw' });
+    expect(call).toHaveBeenCalledWith('campaign_insight', { game_id: 'g_fw', class_id: 'class_fw', campaign_id: 'camp9' });
     const panel = host.querySelector('.gm-result .fwi-panel')!;
     expect(panel.querySelector('.fwi-panel__title')!.textContent).toBe('Fleet week insight');
     expect(panel.querySelectorAll('.fwi-heat__cell')).toHaveLength(25);

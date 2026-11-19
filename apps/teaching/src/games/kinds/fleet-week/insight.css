@@ -21,6 +21,17 @@
   gap: var(--space-4, 1rem);
   min-width: 0;
 }
+.fwi-panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2, 0.5rem) var(--space-4, 1rem);
+}
+.fwi-pick .gm-select {
+  min-height: 44px;
+  font-size: max(16px, var(--text-sm, 0.875rem));
+}
 .fwi-h4 {
   margin: 0;
   font-size: var(--text-base, 1rem);
