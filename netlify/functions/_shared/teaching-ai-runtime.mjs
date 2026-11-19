@@ -7729,6 +7729,9 @@ function normaliseAnswer(value2) {
 }
 var gridWord = (term) => normaliseAnswer(term).toUpperCase();
 var messageLetters = (text2) => String(text2 ?? "").normalize("NFD").replace(/\p{M}+/gu, "").toUpperCase().replace(/[^A-Z]/g, "");
+function fleetVariants(sq) {
+  return sq.variants.filter((v) => typeof v.question.prompt === "string" && v.question.prompt.trim() !== "");
+}
 function gameItems(game) {
   switch (game.kind) {
     case "crossword":
@@ -7747,7 +7750,7 @@ function gameItems(game) {
     case "connections":
       return game.walls.flatMap((w) => w.groups);
     case "fleet_week":
-      return [...game.squares.flatMap((sq) => sq.variants), ...game.recall];
+      return [...game.squares.flatMap(fleetVariants), ...game.recall];
     case "battles":
     case "answer_chain":
       return [];
@@ -7890,7 +7893,7 @@ function gameIssues(lesson) {
         break;
       }
       case "fleet_week": {
-        if (game.squares.length < 25 || game.squares.some((sq) => sq.variants.length === 0)) out.push(`${where2} needs all 25 squares filled.`);
+        if (game.squares.length < 25 || game.squares.some((sq) => fleetVariants(sq).length === 0)) out.push(`${where2} needs all 25 squares filled.`);
         const labelled = (l) => l.length === 5 && l.every((x) => x.trim());
         if (!labelled(game.columns) || !labelled(game.rows)) out.push(`${where2} needs five row and five column labels.`);
         if (game.recall.length < 4) out.push(`${where2} needs a recall line for each of the four ships.`);
