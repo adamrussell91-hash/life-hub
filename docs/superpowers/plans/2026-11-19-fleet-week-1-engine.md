@@ -566,6 +566,7 @@ Server only. The screens (arcade, content editor, launcher, campaign, editor, co
 3. **Learning data** (§4).
    - `_shared/fleet-week-fold.mjs` `foldRound` is called by the request whose create-only write of `resolved/{r}` won (r ≥ 1). It writes GameEvents, the play record and box 1 for duds, then runs `rebuildSummary`.
    - It is idempotent: it replaces that round's events by `cid` (`r{round}-{seq}`). A failed fold is logged and never blocks play.
+   - Retry (follow-up fix): each fold claims `folded/{round}` create-only (`{ at }`), and on success the marker becomes `{ done: true, at }`. A fold that throws deletes its claim. Every `ensureResolved` call ends with `ensureFolded`: one marker read per resolved round, and any round without `done` is folded again, in order. A claim older than `FOLD_LEASE_MS` (60 s) counts as a dead request and can be taken over.
    - Damage reports and recall lines appear in `campaign_state.written` as short written answers, with the quiz writing summary (check `block`) and the log for replay.
 4. **Results insight.** `campaign_insight` is added. Pure `squareStats`, `hardestSquares` and `calibration` are in rules.ts. The reveal carries `reveal.class` (student view) and `board` (`campaign_state` once revealed): per-square accuracy and the hardest squares, with no answers or names.
 5. **Balance.** `balance: 'mixed'` uses `pairTeamsMixed` (rules.ts, seeded from the secret). `campaign.balance` is stored, and any other value gets 400 `bad_balance`.
@@ -581,8 +582,10 @@ Server only. The screens (arcade, content editor, launcher, campaign, editor, co
 
 - **Time zone.** Classes have no time zone field. Week mode uses `cls.time_zone` if it is a valid IANA name, otherwise Australia/Sydney, stored as `settings.tz`.
 - **Schedule.**
-  - Placement closes at today's cut-off if the campaign opens before it, otherwise tomorrow's (exactly at the cut-off counts as after).
-  - Weekends are not skipped: opening on a Friday fires Saturday to Monday.
+  - The schedule follows the school week (follow-up fix).
+    - Placement closes at a Monday-to-Thursday cut-off: today's if the campaign opens before it on one of those days, otherwise the next such day's (exactly at the cut-off counts as after). So a campaign opened on a Friday, a Saturday or a Sunday places until Monday's cut-off and fires Tuesday to Thursday.
+    - Firing rounds close on the following school days and skip Saturday and Sunday. For example, placement on a Wednesday gives firing on Thursday, Friday and Monday.
+    - Weekdays come from the class's time-zone date (Sydney), never UTC.
   - Week rounds default to 3 (`body.rounds`, 1–8). They ignore the game's lesson-mode `settings.rounds`.
   - The cut-off is `body.cutoff`, then the game's `settings.cutoff`, then '20:00'.
 - **"Reveal open after round 3"** is read as the reveal opening automatically once the last round has resolved, on the next request after that cut-off. The teacher can still reveal earlier.
@@ -623,6 +626,6 @@ Server only. The screens (arcade, content editor, launcher, campaign, editor, co
 
 ### Gaps
 
-- The fold runs only on the winning resolve. If that request dies between the resolved write and the fold, the round's events are lost. Nothing retries.
-- Weekend skipping, a minimum placement window and a "reveal at" time for week mode are not built.
+- Each request reads one `folded/{round}` marker for every resolved round (at most 8) to find a fold that needs retrying.
+- Week mode has no minimum placement window and no "reveal at" time. School holidays are not skipped.
 - The class index keeps the newest 20 campaigns. A lesson deleted under an open campaign is skipped, not cleaned up.

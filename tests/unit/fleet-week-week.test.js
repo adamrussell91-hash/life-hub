@@ -54,15 +54,42 @@ test('weekCloses: opened after the cut-off, placement runs to tomorrow’s', () 
 });
 
 test('weekCloses keeps the wall-clock cut-off across the clocks going forward (October)', () => {
-  // Friday 2 October 2026, 10:00 am AEST; daylight saving starts on Sunday 4 October.
-  const closes = weekCloses(Date.parse('2026-10-02T00:00:00.000Z'), '20:00', 3, 'Australia/Sydney');
-  assert.deepEqual(closes.map(iso), ['2026-10-02T10:00:00.000Z', '2026-10-03T10:00:00.000Z', '2026-10-04T09:00:00.000Z', '2026-10-05T09:00:00.000Z']);
+  // Thursday 1 October 2026, 10:00 am AEST; daylight saving starts on Sunday 4 October.
+  // Placement Thursday, firing Friday, then (over the weekend) Monday and Tuesday.
+  const closes = weekCloses(Date.parse('2026-10-01T00:00:00.000Z'), '20:00', 3, 'Australia/Sydney');
+  assert.deepEqual(closes.map(iso), ['2026-10-01T10:00:00.000Z', '2026-10-02T10:00:00.000Z', '2026-10-05T09:00:00.000Z', '2026-10-06T09:00:00.000Z']);
 });
 
 test('weekCloses keeps the wall-clock cut-off across the clocks going back (April)', () => {
-  // Friday 2 April 2027, 12:00 pm AEDT; daylight saving ends on Sunday 4 April.
-  const closes = weekCloses(Date.parse('2027-04-02T01:00:00.000Z'), '20:00', 3, 'Australia/Sydney');
-  assert.deepEqual(closes.map(iso), ['2027-04-02T09:00:00.000Z', '2027-04-03T09:00:00.000Z', '2027-04-04T10:00:00.000Z', '2027-04-05T10:00:00.000Z']);
+  // Thursday 1 April 2027, 12:00 pm AEDT; daylight saving ends on Sunday 4 April.
+  const closes = weekCloses(Date.parse('2027-04-01T01:00:00.000Z'), '20:00', 3, 'Australia/Sydney');
+  assert.deepEqual(closes.map(iso), ['2027-04-01T09:00:00.000Z', '2027-04-02T09:00:00.000Z', '2027-04-05T10:00:00.000Z', '2027-04-06T10:00:00.000Z']);
+});
+
+/** 8 pm Sydney on a November 2026 day (AEDT, UTC+11), as an ISO string. */
+const novCutoff = (d) => `2026-11-${String(d).padStart(2, '0')}T09:00:00.000Z`;
+
+test('weekCloses follows the school week: opened on a Friday, placement runs to Monday and firing is Tue–Thu', () => {
+  // Friday 20 November 2026, 9:00 am Sydney.
+  const closes = weekCloses(Date.parse('2026-11-19T22:00:00.000Z'), '20:00', 3);
+  assert.deepEqual(closes.map(iso), [novCutoff(23), novCutoff(24), novCutoff(25), novCutoff(26)]);
+});
+
+test('weekCloses: opened on a Saturday or a Sunday, placement runs to the next Monday', () => {
+  for (const open of ['2026-11-21T01:00:00.000Z', '2026-11-22T12:00:00.000Z']) {
+    assert.deepEqual(weekCloses(Date.parse(open), '20:00', 3).map(iso), [novCutoff(23), novCutoff(24), novCutoff(25), novCutoff(26)]);
+  }
+  // Late Sunday night Sydney time is already Sunday in Sydney even though it is Sunday morning in UTC.
+  assert.equal(iso(weekCloses(Date.parse('2026-11-22T12:30:00.000Z'), '20:00', 3)[0]), novCutoff(23));
+});
+
+test('weekCloses skips the weekend between firing days', () => {
+  // Wednesday 18 November, 9:00 am: placement Wednesday, firing Thursday, Friday, then Monday.
+  assert.deepEqual(weekCloses(Date.parse('2026-11-17T22:00:00.000Z'), '20:00', 3).map(iso), [novCutoff(18), novCutoff(19), novCutoff(20), novCutoff(23)]);
+  // Thursday after the cut-off: Friday can't host placement, so it runs to Monday.
+  assert.deepEqual(weekCloses(Date.parse('2026-11-19T10:00:00.000Z'), '20:00', 3).map(iso), [novCutoff(23), novCutoff(24), novCutoff(25), novCutoff(26)]);
+  // Sydney's Monday morning is still Sunday in UTC: it counts as Monday.
+  assert.equal(iso(weekCloses(Date.parse('2026-11-22T20:00:00.000Z'), '20:00', 3)[0]), novCutoff(23));
 });
 
 test('zonedInstant: a skipped wall time lands after the gap; a repeated one takes the first', () => {
@@ -327,6 +354,64 @@ test('a resolved round folds its shots into game events, a play, box 1 and the s
   await foldRound(store, k, c, resolved, 1, stored, { now: T + 9100 });
   assert.deepEqual(await store.get(k.events('fw', playId, ownerOf(1))), events);
   assert.equal((await store.get(k.play('fw', playId))).boxed, 1);
+});
+
+test('a fold that throws is retried by the next request, then marked done', async () => {
+  const { store, c, T } = await lessonGame();
+  const shot = await play(store, 1, 'fleet_commit', { square: 3, sure: false }, T + 10);
+  await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, T + 20);
+  const playId = fleetPlayId(c, ownerOf(1));
+  const eventsKey = k.events('fw', playId, ownerOf(1));
+  const foldedKey = k.campaignFolded('fw', c.id, 1);
+  // Every fold during the first request dies writing its events (that request's own retry pass fails too).
+  const orig = store.setJSON.bind(store);
+  let failures = 0;
+  store.setJSON = async (key, v, o) => {
+    if (key === eventsKey) { failures += 1; throw new Error('blob store hiccup'); }
+    return orig(key, v, o);
+  };
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    await teach(store, 'campaign_next', {}, T + 30);
+  } finally {
+    console.error = quiet;
+    store.setJSON = orig;
+  }
+  assert.equal(failures, 2); // the winner's fold, then the same request's retry pass
+  assert.ok(await store.get(k.campaignResolved('fw', c.id, 1)));
+  assert.equal(await store.get(eventsKey), null);
+  assert.equal(await store.get(foldedKey), null); // the claim was given back
+  // Any later request completes it.
+  await play(store, 5, 'fleet_state', {}, T + 40);
+  assert.equal((await store.get(eventsKey)).length, 1);
+  assert.deepEqual(await store.get(foldedKey), { done: true, at: T + 40 });
+  assert.ok(await store.get(k.play('fw', playId)));
+  // Done rounds aren't folded again.
+  store.writes.length = 0;
+  await play(store, 5, 'fleet_state', {}, T + 50);
+  assert.equal(store.writes.filter((key) => key === eventsKey || key === foldedKey).length, 0);
+});
+
+test('a fold whose request died is taken over once its lease runs out', async () => {
+  const { store, c, T } = await lessonGame();
+  const shot = await play(store, 1, 'fleet_commit', { square: 3, sure: false }, T + 10);
+  await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, T + 20);
+  const foldedKey = k.campaignFolded('fw', c.id, 1);
+  // Someone else claimed round 1's fold and never finished: resolved, claimed, no events.
+  store.data.set(foldedKey, { at: T + 30 });
+  const { ensureResolved: resolve } = await import('../../netlify/functions/_shared/fleet-week-store.mjs');
+  const orig = store.setJSON.bind(store);
+  store.setJSON = async (key, v, o) => (key === foldedKey ? { modified: false } : orig(key, v, o));
+  await teach(store, 'campaign_next', {}, T + 30);
+  store.setJSON = orig;
+  store.data.set(foldedKey, { at: T + 30 });
+  const eventsKey = k.events('fw', fleetPlayId(c, ownerOf(1)), ownerOf(1));
+  await resolve(store, k, c, T + 40);
+  assert.equal(await store.get(eventsKey), null); // still inside the lease
+  await resolve(store, k, c, T + 30 + 60000);
+  assert.equal((await store.get(eventsKey)).length, 1);
+  assert.equal((await store.get(foldedKey)).done, true);
 });
 
 test('the fold runs once per round, from the request that wrote it', async () => {
