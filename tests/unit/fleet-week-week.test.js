@@ -425,6 +425,47 @@ test('campaign_insight: heat map, first try v returning, calibration, confident 
   assert.ok(!/the sea|no idea|mast|Mast|Ivo/.test(text));
 });
 
+// ---------------------------------------------------------------- 5. balance by accuracy
+
+/** Summary rows as rebuildSummary writes them: latest right / answered per student. */
+const summaryWith = (gameId, acc) => ({
+  game_id: gameId, class_id: 'class1',
+  students: Object.fromEntries(Object.entries(acc).map(([sid, [right, answered]]) => [sid, { latest: { right, answered, total: 10 } }]))
+});
+/** Owners as student numbers, team by team, each sorted. */
+const teamsByNumber = (c) => c.pairing.teams.filter((t) => !t.ghost).map((t) => t.owners.map(nOf).sort((a, b) => a - b).join('+')).sort();
+
+test('balance mixed pairs high accuracy with low, from this game’s summary', async () => {
+  const { store } = await fleetLesson();
+  // Students 1…8 got 8, 7, …, 1 of 10 right last time.
+  store.data.set(k.summary('fw', 'class1'), summaryWith('fw', Object.fromEntries(N.map((n) => [`st_0${n}`, [9 - n, 10]]))));
+  await teach(store, 'campaign_open', { mode: 'lesson', balance: 'mixed' });
+  const c = await campaignOf(store);
+  assert.equal(c.balance, 'mixed');
+  assert.deepEqual(teamsByNumber(c), ['1+8', '2+7', '3+6', '4+5']);
+  await rejectsWith(teach(store, 'campaign_open', { mode: 'lesson', balance: 'by_height' }), 'bad_balance');
+});
+
+test('balance mixed falls back to the lesson’s other games when this one has no plays', async () => {
+  const { store } = await fleetLesson();
+  const current = await store.get(k.current);
+  const record = await store.get(k.version(current.version));
+  store.data.set(k.version(current.version), { ...record, order: [...record.order, 'g2', 'g3'] });
+  // Pooled over g2 and g3: student 1 strongest, student 8 weakest; the others in between.
+  store.data.set(k.summary('g2', 'class1'), summaryWith('g2', Object.fromEntries(N.map((n) => [`st_0${n}`, [9 - n, 10]]))));
+  store.data.set(k.summary('g3', 'class1'), summaryWith('g3', { st_01: [5, 5], st_08: [0, 5] }));
+  await teach(store, 'campaign_open', { mode: 'lesson', balance: 'mixed' });
+  assert.deepEqual(teamsByNumber(await campaignOf(store)), ['1+8', '2+7', '3+6', '4+5']);
+});
+
+test('balance random is the default and stays seeded from the secret', async () => {
+  const { store } = await fleetLesson();
+  await teach(store, 'campaign_open', { mode: 'lesson' });
+  const c = await campaignOf(store);
+  assert.equal(c.balance, 'random');
+  assert.equal(c.pairing.teams.length, 4);
+});
+
 // ---------------------------------------------------------------- phone view extras
 
 test('the view lists my team’s fired squares this round and its duds still unknown', async () => {

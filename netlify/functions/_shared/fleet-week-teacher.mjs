@@ -61,6 +61,8 @@ const CUTOFF = /^([01]\d|2[0-3]):[0-5]\d$/;
 async function openCampaign(store, lessonId, body, { k, roster, classId }, now) {
   const mode = body.mode ?? 'lesson';
   if (mode !== 'lesson' && mode !== 'week') reject(400, 'bad_mode', 'Pick week or lesson mode.');
+  const balance = body.balance ?? 'random';
+  if (balance !== 'random' && balance !== 'mixed') reject(400, 'bad_balance', 'Pick random or mixed teams.');
   if (body.cutoff !== undefined && (typeof body.cutoff !== 'string' || !CUTOFF.test(body.cutoff))) reject(400, 'bad_cutoff', 'Give the cut-off as a time, like 20:00.');
   if (!roster.students.length) reject(409, 'need_roster', 'Fleet week needs a class list. Add one first.');
   const { record } = await loadFleetGame(store, k, body.game_id);
@@ -83,6 +85,7 @@ async function openCampaign(store, lessonId, body, { k, roster, classId }, now) 
     version: record.version,
     class_id: classId,
     mode,
+    balance,
     secret,
     created_at: now,
     settings: {
@@ -93,8 +96,10 @@ async function openCampaign(store, lessonId, body, { k, roster, classId }, now) 
       answer_ms: clampInt(settings.answer_s, 20, 120, 60) * 1000,
       ...(mode === 'week' ? { cutoff: body.cutoff ?? (CUTOFF.test(settings.cutoff ?? '') ? settings.cutoff : '20:00'), tz: validZone(roster.cls.time_zone) ?? FLEET_TZ } : {})
     },
-    // Random teams; "mixed by accuracy" balancing arrives with plan 4.
-    pairing: fleet.pairTeams(joined, fleet.rng(seedFor(secret, 'teams'))),
+    // Random teams, or mixed by recent accuracy (§1.2): high paired with low. Seeded from the secret either way.
+    pairing: balance === 'mixed'
+      ? fleet.pairTeamsMixed(joined, await recentAccuracy(store, k, record, body.game_id, classId, roster, ownerFor), fleet.rng(seedFor(secret, 'teams')))
+      : fleet.pairTeams(joined, fleet.rng(seedFor(secret, 'teams'))),
     joined,
     students: Object.fromEntries(roster.students.map((s) => [ownerFor(classId, s.id), s.id])),
     revealed_at: null,
@@ -117,6 +122,36 @@ async function openCampaign(store, lessonId, body, { k, roster, classId }, now) 
     return { campaigns: [...kept, { lesson_id: lessonId, game_id: body.game_id, id, at: now }].slice(-INDEX_KEEP) };
   });
   return campaign;
+}
+
+/**
+ * Each student's recent accuracy for balancing (§1.2), by owner: their latest
+ * play of this game in the class summary (right / answered), or, when nobody
+ * has played this game yet, their latest plays across the lesson's other games
+ * pooled. Students with nothing get null (the balancer counts them as the mean).
+ */
+async function recentAccuracy(store, k, record, gameId, classId, roster, ownerOf) {
+  const latest = (summary) => {
+    const out = {};
+    for (const [sid, row] of Object.entries(obj(summary?.students))) {
+      const l = obj(row?.latest);
+      if (Number.isFinite(l.answered) && l.answered > 0) out[sid] = { right: Number(l.right) || 0, answered: l.answered };
+    }
+    return out;
+  };
+  let tallies = latest(await read(store, k.summary(gameId, classId)));
+  if (!Object.keys(tallies).length) {
+    tallies = {};
+    const others = list(record.order).filter((g) => g !== gameId);
+    const rows = await mapBounded(others, 8, (g) => read(store, k.summary(g, classId)));
+    for (const row of rows) {
+      for (const [sid, t] of Object.entries(latest(row))) {
+        const held = tallies[sid] ?? { right: 0, answered: 0 };
+        tallies[sid] = { right: held.right + t.right, answered: held.answered + t.answered };
+      }
+    }
+  }
+  return Object.fromEntries(roster.students.map((s) => [ownerOf(classId, s.id), tallies[s.id] ? tallies[s.id].right / tallies[s.id].answered : null]));
 }
 
 const flagged = (w) => !!w && (w.pastes > 0 || w.away > 0 || w.jumps > 0);

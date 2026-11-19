@@ -2332,6 +2332,7 @@ __export(rules_exports, {
   hardestSquares: () => hardestSquares,
   matchOf: () => matchOf,
   pairTeams: () => pairTeams,
+  pairTeamsMixed: () => pairTeamsMixed,
   pickVariant: () => pickVariant,
   placementProblem: () => placementProblem,
   resolveRound: () => resolveRound,
@@ -2466,6 +2467,23 @@ function pairTeams(owners, random) {
   for (let i = 0; i < shuffled3.length; i += 2) groups.push(shuffled3.slice(i, i + 2));
   const last = groups[groups.length - 1];
   if (groups.length > 1 && last.length === 1) groups[groups.length - 2].push(...groups.pop());
+  return pairingOf(groups);
+}
+function pairTeamsMixed(owners, accuracy, random) {
+  const known = owners.map((o) => accuracy[o]).filter((a) => typeof a === "number" && Number.isFinite(a));
+  const mean = known.length ? known.reduce((n, a) => n + a, 0) / known.length : 0.5;
+  const score = (o) => {
+    const a = accuracy[o];
+    return typeof a === "number" && Number.isFinite(a) ? a : mean;
+  };
+  const sorted = shuffleWith(owners, random).map((o, k) => ({ o, k, a: score(o) })).sort((x, y) => y.a - x.a || x.k - y.k).map((x) => x.o);
+  const groups = [];
+  for (let lo = 0, hi = sorted.length - 1; lo <= hi; lo++, hi--) groups.push(lo === hi ? [sorted[lo]] : [sorted[lo], sorted[hi]]);
+  const last = groups[groups.length - 1];
+  if (groups.length > 1 && last.length === 1) groups[groups.length - 2].push(...groups.pop());
+  return pairingOf(shuffleWith(groups, random));
+}
+function pairingOf(groups) {
   const teams = groups.map((g, k) => ({ id: `t${k + 1}`, owners: g }));
   if (teams.length % 2 === 1) teams.push({ id: GHOST_ID, owners: [], ghost: true });
   const matches = [];

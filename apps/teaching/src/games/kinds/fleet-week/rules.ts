@@ -205,7 +205,7 @@ export const GHOST_ID = 'ghost';
  * Pair a class into teams and matches (§1.2). Shuffle, cut into twos; an odd
  * last owner joins the previous team as a third. Teams t1…tn are matched in
  * order (m1 = t1 v t2, …); an odd team out plays the ghost fleet.
- * "Mixed by accuracy" balancing is deferred to plan 4.
+ * pairTeamsMixed (below) is the "mixed by accuracy" balance.
  */
 export function pairTeams(owners: string[], random: Rng): Pairing {
   const shuffled = shuffleWith(owners, random);
@@ -213,6 +213,38 @@ export function pairTeams(owners: string[], random: Rng): Pairing {
   for (let i = 0; i < shuffled.length; i += 2) groups.push(shuffled.slice(i, i + 2));
   const last = groups[groups.length - 1];
   if (groups.length > 1 && last.length === 1) groups[groups.length - 2].push(...(groups.pop() as string[]));
+  return pairingOf(groups);
+}
+
+/**
+ * Teams mixed by recent accuracy (§1.2 "mixed by recent accuracy"). Owners are
+ * shuffled (so ties fall at random), sorted by accuracy, highest first, and the
+ * strongest is paired with the weakest, the next with the next, inward. An odd
+ * middle owner joins the last pair as a third. An owner with no accuracy yet
+ * counts as the class's mean (0.5 when nobody has one). The teams are then
+ * shuffled before matching, so a match is not always the top pair against the
+ * next. Seeded: the same owners, accuracies and seed give the same pairing.
+ */
+export function pairTeamsMixed(owners: string[], accuracy: Record<string, number | null | undefined>, random: Rng): Pairing {
+  const known = owners.map((o) => accuracy[o]).filter((a): a is number => typeof a === 'number' && Number.isFinite(a));
+  const mean = known.length ? known.reduce((n, a) => n + a, 0) / known.length : 0.5;
+  const score = (o: string) => {
+    const a = accuracy[o];
+    return typeof a === 'number' && Number.isFinite(a) ? a : mean;
+  };
+  const sorted = shuffleWith(owners, random)
+    .map((o, k) => ({ o, k, a: score(o) }))
+    .sort((x, y) => y.a - x.a || x.k - y.k)
+    .map((x) => x.o);
+  const groups: string[][] = [];
+  for (let lo = 0, hi = sorted.length - 1; lo <= hi; lo++, hi--) groups.push(lo === hi ? [sorted[lo]] : [sorted[lo], sorted[hi]]);
+  const last = groups[groups.length - 1];
+  if (groups.length > 1 && last.length === 1) groups[groups.length - 2].push(...(groups.pop() as string[]));
+  return pairingOf(shuffleWith(groups, random));
+}
+
+/** Teams t1…tn from groups, matched in order, with the ghost fleet for an odd team out (§1.2). */
+function pairingOf(groups: string[][]): Pairing {
   const teams: Team[] = groups.map((g, k) => ({ id: `t${k + 1}`, owners: g }));
   if (teams.length % 2 === 1) teams.push({ id: GHOST_ID, owners: [], ghost: true });
   const matches: Match[] = [];

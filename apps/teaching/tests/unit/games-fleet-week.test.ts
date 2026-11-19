@@ -528,3 +528,39 @@ describe('fleet_week resolveRound: purity', () => {
     expect(() => resolveRound(deepFreeze(emptyState(duel)), deepFreeze(input(duel, 0, { placements: duelPlacements() })))).not.toThrow();
   });
 });
+
+describe('fleet_week plans 2–4 helpers', () => {
+  it('pairTeamsMixed pairs the strongest with the weakest, seeded', async () => {
+    const { pairTeamsMixed, rng } = await import('../../src/games/kinds/fleet-week/rules');
+    const acc = { a: 0.9, b: 0.8, c: 0.7, d: 0.4, e: 0.3, f: 0.1 };
+    const p = pairTeamsMixed(Object.keys(acc), acc, rng('mix'));
+    const teams = p.teams.filter((t) => !t.ghost).map((t) => [...t.owners].sort().join(''));
+    expect(teams.sort()).toEqual(['af', 'be', 'cd']);
+    expect(p.teams.some((t) => t.ghost)).toBe(true);
+    expect(pairTeamsMixed(Object.keys(acc), acc, rng('mix'))).toEqual(p);
+    // Odd class: the middle player joins a pair; unknown accuracy counts as the mean.
+    const odd = pairTeamsMixed(['a', 'b', 'c', 'd', 'e'], { a: 1, b: 0.75, d: 0.25, e: 0 }, rng('odd'));
+    expect(odd.teams.filter((t) => !t.ghost).map((t) => t.owners.length).sort()).toEqual([2, 3]);
+    expect(odd.teams.flatMap((t) => t.owners).sort()).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  it('squareStats, hardestSquares and calibration read the round log', async () => {
+    const { squareStats, hardestSquares, calibration } = await import('../../src/games/kinds/fleet-week/rules');
+    const r = (owner: string, square: number, correct: boolean | null, extra: Record<string, unknown> = {}) => ({
+      seq: 1, owner, square, sure: false, variant: 0, item: 'x', correct, returning: false, outcome: correct ? 'miss' : 'dud', target: 't2', damage: 0, ...extra
+    });
+    const log = [
+      { round: 1, results: [r('a', 0, false, { sure: true }), r('b', 0, true), r('a', 5, null), r('b', 5, true, { outcome: 'void', voided: true })] },
+      { round: 3, results: [r('a', 0, true, { returning: true })] }
+    ] as never;
+    const stats = squareStats({ log });
+    expect(stats).toHaveLength(25);
+    expect(stats[0]).toEqual({ square: 0, answered: 3, right: 2, first: { answered: 2, right: 1 }, returning: { answered: 1, right: 1 } });
+    expect(stats[5]).toMatchObject({ answered: 1, right: 0 });
+    expect(hardestSquares(stats).map((h) => h.square)).toEqual([5, 0]);
+    expect(calibration({ log })).toEqual({
+      a: { sure: { answered: 1, right: 0 }, unsure: { answered: 2, right: 1 } },
+      b: { sure: { answered: 0, right: 0 }, unsure: { answered: 1, right: 1 } }
+    });
+  });
+});
