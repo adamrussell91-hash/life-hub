@@ -32,6 +32,7 @@ import { organiserKey, sendPiecesToBoxOne } from './organiser.mjs';
 import { upgradeOrganiser } from './organiser-model.mjs';
 import { newMarkbookId } from './markbook-schema.mjs';
 import { gameKeys } from './game-store.mjs';
+import { list, obj, updateJSON } from './etag-json.mjs';
 import { FLEET_ACTIONS, fleetStudentAction } from './fleet-week.mjs';
 import { QUIZ_KIND_INFO } from './quiz-core.mjs';
 import { GAME_KIND_INFO, GameLessonSchema } from './game-schema.mjs';
@@ -43,17 +44,8 @@ import {
 export { QuizError as GameError };
 export { gameKeys };
 
-const STRONG = { type: 'json', consistency: 'strong' };
-const list = (v) => (Array.isArray(v) ? v : []);
-const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 const PLAY_ID = /^[a-f0-9]{16}$/;
 const ANON = 'all';
-
-async function readWithEtag(store, key) {
-  if (typeof store.getWithMetadata !== 'function') return { data: await read(store, key), etag: null };
-  const row = await store.getWithMetadata(key, STRONG);
-  return { data: row?.data ?? null, etag: row?.etag ?? null };
-}
 
 // ---------------------------------------------------------------- publish
 
@@ -131,20 +123,16 @@ async function readEvents(store, k, gameId, playId, owner) {
  * batch's move and isn't added again.
  */
 async function appendEvents(store, key, add) {
-  for (let attempt = 0; ; attempt += 1) {
-    const held = await readWithEtag(store, key);
-    const events = list(held.data);
+  const { data } = await updateJSON(store, key, (held) => {
+    const events = list(held);
     const have = new Set(events.map((e) => e.cid).filter(Boolean));
     const fresh = add.filter((e) => !e.cid || !have.has(e.cid));
-    if (!fresh.length) return events;
+    if (!fresh.length) return undefined;
     if (events.length + fresh.length > PLAY_EVENTS_MAX) reject(409, 'too_many', 'This game has had enough answers. Finish and start again.');
     const seq0 = events.length ? Math.max(...events.map((e) => e.seq)) + 1 : 0;
-    const next = [...events, ...fresh.map((e, i) => ({ ...e, seq: seq0 + i }))];
-    const options = held.data ? (held.etag ? { onlyIfMatch: held.etag } : {}) : { onlyIfNew: true };
-    const written = await store.setJSON(key, next, options);
-    if (written?.modified !== false) return next;
-    if (attempt >= 3) reject(409, 'retry', 'Please send it again.');
-  }
+    return [...events, ...fresh.map((e, i) => ({ ...e, seq: seq0 + i }))];
+  }, { attempts: 4, backoff_ms: 0 });
+  return list(data);
 }
 
 const who = (play) => play.student_id ?? play.owner;

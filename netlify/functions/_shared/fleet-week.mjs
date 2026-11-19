@@ -22,13 +22,12 @@ import { gameKeys } from './game-store.mjs';
 import { cleanWritingLog } from './quiz-core.mjs';
 import { checkAnswer, fleet } from './game-rules.mjs';
 import {
-  SHOTS_PER_ROUND, aliasFor, ensureResolved, findCampaign, hashFor, list, loadFleetGame, markClock, obj, reportInputs, roundOpen,
-  roundsOf, updateJSON
+  LATE_GRACE_MS, SHOTS_PER_ROUND, aliasFor, ensureResolved, findCampaign, hashFor, list, loadFleetGame, markClock, obj, reportInputs,
+  roundClosing, roundOpen, roundsOf, touchClock, updateJSON
 } from './fleet-week-store.mjs';
 
 export const FLEET_ACTIONS = ['fleet_state', 'fleet_place', 'fleet_commit', 'fleet_answer', 'fleet_report', 'fleet_recall', 'signals'];
-/** Answers may arrive this long after the deadline (network grace). */
-export const LATE_GRACE_MS = 2000;
+export { LATE_GRACE_MS };
 const TEXT_MAX = 300;
 
 const shotOpen = (s, now) => s.correct === undefined && now <= s.deadline + LATE_GRACE_MS;
@@ -186,18 +185,59 @@ function parseShips(raw) {
   });
 }
 
+/** `done` with this owner marked done from `until`, or null when it already says so (or earlier). */
+function doneFrom(clock, owner, round, until) {
+  const d = obj(clock.done)[owner];
+  return d && d.round === round && d.until <= until ? null : { ...obj(clock.done), [owner]: { round, until } };
+}
+
+/** The same layout, whatever order the ships and squares came in. */
+const sameShips = (a, b) => {
+  const norm = (ships) => JSON.stringify(list(ships).map((s) => ({ id: s.id, squares: [...list(s.squares)].sort((x, y) => x - y) })).sort((x, y) => (x.id < y.id ? -1 : 1)));
+  return norm(a) === norm(b);
+};
+
 async function place(ctx, body) {
-  const { store, k, campaign, clock, owner } = ctx;
+  const { store, k, campaign, clock, owner, now } = ctx;
   if (clock.round !== 0 || !roundOpen(campaign, clock)) reject(409, 'placement_over', 'Placement has closed. The app placed your ships.');
   const { team } = sidesOf(campaign, owner);
   if (!fleet.shipsFor(team, owner).length) reject(409, 'no_ships', 'You have no ships to place this time.');
   const ships = parseShips(body.ships);
-  const partners = await readTeam(store, k, campaign, team.owners.filter((o) => o !== owner), fleetKey);
-  const problem = fleet.placementProblem(ships, owner, team, Object.values(partners).flatMap((b) => list(b)));
-  if (problem) reject(422, 'bad_place', problem);
-  const written = await store.setJSON(fleetKey(campaign, k, owner), ships, { onlyIfNew: true });
-  if (written?.modified === false) reject(409, 'placed', 'Your ships are already at sea.');
-  await markClock(store, k, campaign, 'done', owner, 0);
+  const key = fleetKey(campaign, k, owner);
+  const held = await read(store, key);
+  if (!held) {
+    const partners = await readTeam(store, k, campaign, team.owners.filter((o) => o !== owner), fleetKey);
+    const problem = fleet.placementProblem(ships, owner, team, Object.values(partners).flatMap((b) => list(b)));
+    if (problem) reject(422, 'bad_place', problem);
+  }
+  const written = held ? { modified: false } : await store.setJSON(key, ships, { onlyIfNew: true });
+  // A resend of the same layout is fine (and re-marks done); a different one is not.
+  if (written?.modified === false && !sameShips(held ?? (await read(store, key)), ships)) reject(409, 'placed', 'Your ships are already at sea.');
+  await touchClock(store, k, campaign, 0, (c) => {
+    const done = doneFrom(c, owner, 0, now);
+    return done ? { done } : undefined;
+  });
+}
+
+/**
+ * One clock write per commit: seen and fired (decision 8), the open shot's hold
+ * (the round can't close under it), and done from its deadline when it is the
+ * player's fourth shot.
+ */
+async function holdForShot(ctx, shot, count) {
+  const { store, k, campaign, owner } = ctx;
+  const round = ctx.clock.round;
+  const until = shot.deadline + LATE_GRACE_MS;
+  await touchClock(store, k, campaign, round, (c) => {
+    const patch = {};
+    if (obj(c.seen)[owner] !== round) patch.seen = { ...obj(c.seen), [owner]: round };
+    if (obj(c.fired)[owner] !== round) patch.fired = { ...obj(c.fired), [owner]: round };
+    const hold = obj(c.open)[owner];
+    if (!hold || hold.round !== round || hold.until < until) patch.open = { ...obj(c.open), [owner]: { round, until } };
+    const done = count >= SHOTS_PER_ROUND ? doneFrom(c, owner, round, until) : null;
+    if (done) patch.done = done;
+    return Object.keys(patch).length ? patch : undefined;
+  });
 }
 
 async function commit(ctx, body) {
@@ -216,10 +256,14 @@ async function commit(ctx, body) {
   const back = state.returns.find((r) => r.owner === owner && r.square === square);
 
   let shot = null;
+  let count = 0;
   await updateJSON(store, shotsKey(campaign, k, round, owner), (held) => {
     const shots = list(held);
+    count = shots.length;
     const open = shots.find((s) => shotOpen(s, now));
     if (open) { shot = open; return undefined; }
+    // Past the cap or Next round: shots already open may be answered, but nothing new is fired.
+    if (roundClosing(clock, now)) reject(409, 'not_firing', 'This round is closing. Wait for the next one.');
     if (shots.length >= SHOTS_PER_ROUND) reject(409, 'no_shots', 'You’ve used your four shots this round.');
     const known = obj(state.charts[rival.id])[square];
     if (known) reject(409, 'known', 'Your team already knows that square. Pick another.');
@@ -231,25 +275,32 @@ async function commit(ctx, body) {
       : fleet.pickVariant(square, owner, matchOwners, given, variants.length);
     const seq = Math.max(now, ...shots.map((s) => s.seq + 1));
     shot = { seq, owner, square, sure, variant, item: variants[variant], deadline: now + campaign.settings.answer_ms, returning };
+    count = shots.length + 1;
     // A shot whose time ran out unanswered is a dud (decision 9).
     return [...shots.map((s) => (s.correct === undefined ? { ...s, correct: null } : s)), shot];
   });
-  // Firing makes a player active this round and next (decision 8).
-  await markClock(store, k, campaign, 'fired', owner, round);
-  await markClock(store, k, campaign, 'seen', owner, round);
+  // Also on a resend: a clock write lost after the shot was stored is made good here.
+  await holdForShot(ctx, shot, count);
   return { square: shot.square, sure: shot.sure, question: publicQuestion(keys, shot.item), deadline: shot.deadline };
 }
 
 async function answer(ctx, body) {
   const { store, k, campaign, keys, clock, owner, now } = ctx;
   if (clock.round < 1 || !roundOpen(campaign, clock)) reject(409, 'not_firing', 'That round has closed.');
+  const round = clock.round;
   const text = cleanText(body.answer);
   let late = false;
+  let resend = false;
   let shots = [];
-  await updateJSON(store, shotsKey(campaign, k, clock.round, owner), (held) => {
+  await updateJSON(store, shotsKey(campaign, k, round, owner), (held) => {
     shots = list(held);
     const at = shots.findIndex((s) => s.correct === undefined);
-    if (at < 0) reject(409, 'no_shot', 'Pick a square first.');
+    if (at < 0) {
+      // A resend after a lost reply: every shot is settled, or this answer is already stored.
+      const last = shots[shots.length - 1];
+      if (shots.length >= SHOTS_PER_ROUND || (text && last?.answer === text)) { resend = true; return undefined; }
+      reject(409, 'no_shot', 'Pick a square first.');
+    }
     const s = shots[at];
     if (now > s.deadline + LATE_GRACE_MS) {
       late = true;
@@ -260,11 +311,32 @@ async function answer(ctx, body) {
     }
     return shots;
   });
-  if (shots.length >= SHOTS_PER_ROUND && shots.every((s) => s.correct !== undefined)) await markClock(store, k, campaign, 'done', owner, clock.round);
+  // Release this player's hold, and mark them done after their fourth. Not fatal if it loses:
+  // the hold and `done` both run out at the shot's deadline anyway.
+  const settled = shots.length >= SHOTS_PER_ROUND && shots.every((s) => s.correct !== undefined);
+  try {
+    await touchClock(store, k, campaign, round, (c) => {
+      const patch = {};
+      const hold = obj(c.open)[owner];
+      if (hold && hold.round === round && hold.until > now) patch.open = { ...obj(c.open), [owner]: { round, until: now } };
+      const done = settled ? doneFrom(c, owner, round, now) : null;
+      if (done) patch.done = done;
+      return Object.keys(patch).length ? patch : undefined;
+    });
+  } catch {
+    // ignore: see above
+  }
   if (late) reject(409, 'late', 'Time ran out on that shot.');
+  if (resend) return { ok: true };
+  // Backstop: the round resolved between our read and write, so this answer missed it.
+  if (await read(store, k.campaignResolved(campaign.game_id, campaign.id, round))) reject(409, 'late', 'That round closed before your answer landed.');
   return { ok: true };
 }
 
+/**
+ * A damage report, filed in the shooter's reports blob so the "already filed"
+ * check and a rejection each sit in one etag write (one filing wins).
+ */
 async function report(ctx, body) {
   const { store, k, campaign, state, clock, owner } = ctx;
   const { team } = sidesOf(campaign, owner);
@@ -274,11 +346,10 @@ async function report(ctx, body) {
   if (hit.status !== 'owed') reject(409, 'settled', 'That report’s time has passed.');
   const text = cleanText(body.text);
   if (!text) reject(400, 'bad_text', 'Write one line about why the answer is right.');
-  const reports = await readTeam(store, k, campaign, team.owners, reportsKey);
-  if (Object.values(reports).some((r) => obj(r?.filed)[hit.id])) reject(409, 'filed', 'Your team has filed that report.');
-  await updateJSON(store, reportsKey(campaign, k, owner), (held) => {
+  await updateJSON(store, reportsKey(campaign, k, hit.owner), (held) => {
     const r = obj(held);
-    return { ...r, filed: { ...obj(r.filed), [hit.id]: { round: clock.round, text, writing: cleanWritingLog(body.writing) } } };
+    if (obj(r.filed)[hit.id]) reject(409, 'filed', 'Your team has filed that report.');
+    return { ...r, filed: { ...obj(r.filed), [hit.id]: { round: clock.round, by: owner, text, writing: cleanWritingLog(body.writing) } } };
   });
   return { ok: true };
 }

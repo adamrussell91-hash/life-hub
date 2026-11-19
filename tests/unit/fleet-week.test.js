@@ -38,7 +38,7 @@ test('campaign_open creates config, pairing and clock', async () => {
   assert.ok(c.pairing.teams.every((t) => t.owners.length === 2));
   assert.equal(c.revealed_at, null);
   const clock = await store.get(k.campaignClock('fw', c.id));
-  assert.deepEqual(clock, { round: 0, opened_at: T0, closes_at: T0 + 120000, seen: {}, fired: {}, done: {} });
+  assert.deepEqual(clock, { round: 0, opened_at: T0, closes_at: T0 + 120000, seen: {}, fired: {}, open: {}, done: {} });
 });
 
 test('opening twice for one class returns the existing campaign', async () => {
@@ -229,7 +229,10 @@ test('placement validation messages surface', async () => {
   await rejectsWith(play(store, 1, 'fleet_place', { ships: [] }), 'bad_place', /Place each of your ships/);
   const good = fleet.autoPlace(ids, [], [], fleet.rng('good'));
   await play(store, 1, 'fleet_place', { ships: good });
-  await rejectsWith(play(store, 1, 'fleet_place', { ships: good }), 'placed', /already at sea/);
+  // A resend of the same layout is fine; a different one is refused.
+  assert.equal((await play(store, 1, 'fleet_place', { ships: [...good].reverse() })).me.placed, true);
+  const other = fleet.autoPlace(ids, [], [], fleet.rng('other'));
+  if (JSON.stringify(other) !== JSON.stringify(good)) await rejectsWith(play(store, 1, 'fleet_place', { ships: other }), 'placed', /already at sea/);
 });
 
 test('commit, then commit again: the same question and deadline', async () => {
@@ -541,4 +544,175 @@ test('the teacher route sends campaign actions to Fleet week', async () => {
   const { isFleetTeacherAction } = await import('../../netlify/functions/_shared/fleet-week-teacher.mjs');
   for (const a of ['campaign_open', 'campaign_state', 'campaign_next', 'void_shot', 'reject_report', 'campaign_reveal', 'campaign_close']) assert.ok(isFleetTeacherAction(a), a);
   for (const a of ['results', 'open', 'rooms', 'markbook_push']) assert.ok(!isFleetTeacherAction(a), a);
+});
+
+// ---------------------------------------------------------------- review fixes
+
+import { etagRetry, updateJSON } from '../../netlify/functions/_shared/etag-json.mjs';
+import { prepareGamePublish, storeGameKeys } from '../../netlify/functions/_shared/games.mjs';
+import { ensureResolved as resolveNow } from '../../netlify/functions/_shared/fleet-week-store.mjs';
+
+etagRetry.sleep = async () => {};
+
+test('seeds come from the secret: the ghost fleet can’t be rebuilt from the campaign id', async () => {
+  const { store } = await fleetLesson({ roster: FLEET_ROSTER.slice(0, 6) }); // three teams and the ghost
+  await teach(store, 'campaign_open', { mode: 'lesson' });
+  const c = await campaignOf(store);
+  const n = [1, 2, 3, 4, 5, 6].find((i) => fleet.rivalOf(c.pairing, fleet.teamOf(c.pairing, ownerOf(i)).id) === 'ghost');
+  await play(store, n, 'fleet_state');
+  const view = await play(store, n, 'fleet_state', {}, T0 + 120000);
+  assert.equal(view.phase, 'firing');
+  const truth = (await store.get(k.campaignResolved('fw', c.id, 0))).fleets.ghost;
+  const sq = (ships) => ships.flatMap((s) => s.squares).sort((a, b) => a - b);
+  for (const seed of [`${view.campaign}:0ghost`, `${view.campaign}:0`]) {
+    assert.notDeepEqual(sq(fleet.autoPlace([...fleet.SHIP_IDS], [], [], fleet.rng(seed))), sq(truth));
+  }
+  assert.notDeepEqual(c.pairing, fleet.pairTeams(c.joined, fleet.rng(`${c.id}:teams`)));
+});
+
+test('a shot committed just before the cap can still be answered, and resolves with its answer', async () => {
+  const { store, c } = await startGame();
+  const shot = await play(store, 1, 'fleet_commit', { square: 12, sure: false }, CAP - 10000);
+  // Past the cap: no new shots, but the round waits for this one.
+  await rejectsWith(play(store, 2, 'fleet_commit', { square: 3, sure: false }, CAP + 1000), 'not_firing');
+  assert.equal((await play(store, 2, 'fleet_state', {}, CAP + 2000)).round, 1);
+  assert.deepEqual(await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, CAP + 5000), { ok: true });
+  // Answered: the hold is released and the round closes on the next request.
+  assert.equal((await play(store, 2, 'fleet_state', {}, CAP + 5001)).round, 2);
+  const resolved = await store.get(k.campaignResolved('fw', c.id, 1));
+  const mine = resolved.log[0].results.find((r) => r.owner === ownerOf(1));
+  assert.equal(mine.correct, true);
+  assert.notEqual(mine.outcome, 'dud');
+});
+
+test('an unanswered shot holds the round only until its deadline', async () => {
+  const { store } = await startGame();
+  const shot = await play(store, 1, 'fleet_commit', { square: 12, sure: false }, CAP - 10000);
+  assert.equal((await play(store, 2, 'fleet_state', {}, shot.deadline + 2000)).round, 1);
+  assert.equal((await play(store, 2, 'fleet_state', {}, shot.deadline + 2001)).round, 2);
+});
+
+test('an answer that lands after its round resolved is reported late, not ok', async () => {
+  const { store, c } = await startGame();
+  const shot = await play(store, 1, 'fleet_commit', { square: 12, sure: false }, CAP - 30000);
+  const shotsKey = k.campaignShots('fw', c.id, 1, ownerOf(1));
+  const orig = store.setJSON.bind(store);
+  let once = true;
+  store.setJSON = async (key, v, o) => {
+    if (once && key === shotsKey) { once = false; await resolveNow(store, k, c, shot.deadline + 2001); }
+    return orig(key, v, o);
+  };
+  await rejectsWith(play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, CAP - 1000), 'late');
+});
+
+test('the fourth commit marks done from its deadline; an unanswered last shot doesn’t hold the round to the cap', async () => {
+  const { store, c } = await startGame();
+  let last;
+  for (const n of N) {
+    for (let i = 0; i < 4; i++) {
+      const shot = await play(store, n, 'fleet_commit', { square: i + 10 * (n % 2), sure: false }, T1 + n * 10 + i);
+      if (n === 1 && i === 3) { last = shot; continue; }
+      await play(store, n, 'fleet_answer', { answer: 'nope', writing }, T1 + n * 10 + i);
+    }
+  }
+  const clock = await store.get(k.campaignClock('fw', c.id));
+  assert.deepEqual(clock.done[ownerOf(1)], { round: 1, until: last.deadline + 2000 });
+  assert.equal((await play(store, 2, 'fleet_state', {}, last.deadline + 1000)).round, 1);
+  assert.equal((await play(store, 2, 'fleet_state', {}, last.deadline + 2001)).round, 2);
+  assert.ok(last.deadline + 2001 < CAP);
+});
+
+test('a lost clock write never strands a player: resends are idempotent', async () => {
+  const { store, c } = await startGame();
+  for (let i = 0; i < 4; i++) {
+    await play(store, 1, 'fleet_commit', { square: i, sure: false }, T1 + i * 10);
+    if (i < 3) await play(store, 1, 'fleet_answer', { answer: 'no', writing }, T1 + i * 10 + 1);
+  }
+  const clockKey = k.campaignClock('fw', c.id);
+  const orig = store.setJSON.bind(store);
+  store.setJSON = async (key, v, o) => (key === clockKey && o?.onlyIfMatch ? { modified: false } : orig(key, v, o));
+  // Other phones keep winning the clock: the answer is still stored and acknowledged.
+  assert.deepEqual(await play(store, 1, 'fleet_answer', { answer: 'no', writing }, T1 + 101), { ok: true });
+  store.setJSON = orig;
+  // The resend finds every shot settled, re-marks done, and says ok.
+  assert.deepEqual(await play(store, 1, 'fleet_answer', { answer: 'no', writing }, T1 + 102), { ok: true });
+  const clock = await store.get(clockKey);
+  assert.deepEqual(clock.done[ownerOf(1)], { round: 1, until: T1 + 102 });
+  assert.equal(clock.open[ownerOf(1)].until, T1 + 102);
+  // A resend of the last answer before the fourth shot is fine too.
+  const { store: s2 } = await startGame();
+  await play(s2, 1, 'fleet_commit', { square: 0, sure: false }, T1);
+  await play(s2, 1, 'fleet_answer', { answer: 'mast a0', writing }, T1 + 1);
+  assert.deepEqual(await play(s2, 1, 'fleet_answer', { answer: 'mast a0', writing }, T1 + 2), { ok: true });
+  await rejectsWith(play(s2, 1, 'fleet_answer', { answer: 'something else', writing }, T1 + 3), 'no_shot');
+});
+
+test('updateJSON retries a lost race with jittered pauses, then asks for a resend', async () => {
+  const { store } = await fleetLesson();
+  store.data.set('x', { n: 0 });
+  const pauses = [];
+  const saved = { ...etagRetry };
+  etagRetry.sleep = async (ms) => { pauses.push(ms); };
+  etagRetry.random = () => 0.5;
+  try {
+    const orig = store.setJSON.bind(store);
+    let losses = 5;
+    store.setJSON = async (key, v, o) => (losses-- > 0 ? { modified: false } : orig(key, v, o));
+    const done = await updateJSON(store, 'x', (d) => ({ n: d.n + 1 }));
+    assert.equal(done.written, true);
+    assert.deepEqual(pauses, [8, 15, 30, 60, 120]);
+    losses = 99;
+    await rejects(updateJSON(store, 'x', (d) => ({ n: d.n + 1 })), 'retry');
+  } finally {
+    Object.assign(etagRetry, saved);
+  }
+});
+
+test('a team of three files one report: racing filings, one wins; a rejection is one write', async () => {
+  const { store } = await fleetLesson({ roster: FLEET_ROSTER.slice(0, 7) });
+  await teach(store, 'campaign_open', { mode: 'lesson' });
+  const c = await campaignOf(store);
+  const seven = N.slice(0, 7);
+  for (const n of seven) await play(store, n, 'fleet_state');
+  const state = (await ensureResolved(store, k, c, T0 + 120000)).state;
+  const trio = c.pairing.teams.find((t) => t.owners.length === 3);
+  const [shooter, p1, p2] = trio.owners.map(nOf);
+  const { rival } = sides(c, shooter);
+  const sq = state.fleets[rival.id][0].squares[0];
+  const T = T0 + 120000;
+  const shot = await play(store, shooter, 'fleet_commit', { square: sq, sure: false }, T + 5);
+  await play(store, shooter, 'fleet_answer', { answer: typed(shot.question), writing }, T + 6);
+  await teach(store, 'campaign_next', {}, T + 7);
+  const hit = (await play(store, p1, 'fleet_state', {}, T + 8)).owed[0].hit;
+  assert.equal((await play(store, p2, 'fleet_state', {}, T + 8)).owed[0].hit, hit);
+  const results = await Promise.allSettled([p1, p2].map((n) => play(store, n, 'fleet_report', { hit, text: `Filed by ${n}.`, writing }, T + 9)));
+  assert.deepEqual(results.map((r) => r.status).sort(), ['fulfilled', 'rejected']);
+  assert.equal(results.find((r) => r.status === 'rejected').reason.code, 'filed');
+  const room = await teach(store, 'campaign_state', {}, T + 10);
+  await teach(store, 'reject_report', { hit: room.owed[0].hit }, T + 11);
+  const blob = await store.get(k.campaignReports('fw', c.id, ownerOf(shooter)));
+  assert.deepEqual(blob.filed, {});
+  assert.deepEqual(blob.rejected, { [room.owed[0].hit]: 1 });
+});
+
+test('teacher actions use the campaign’s own keys after a republish', async () => {
+  const { store } = await startGame();
+  const other = { id: 'gl1', title: 'Fleet', pedagogical_mode: 'game', game: { games: [{ ...(await import('./helpers/fleet-fixture.mjs')).fleetGame(), id: 'fw2' }] } };
+  const pub = prepareGamePublish(other);
+  assert.deepEqual(pub.problems, []);
+  await storeGameKeys(store, 'gl1', pub.record);
+  const room = await teach(store, 'campaign_state', {}, T1 + 5);
+  assert.equal(room.round, 1);
+  await teach(store, 'campaign_next', {}, T1 + 6);
+});
+
+test('two opens racing make one campaign and leave no orphan', async () => {
+  const { store } = await fleetLesson();
+  const [a, b] = await Promise.all([teach(store, 'campaign_open', { mode: 'lesson' }), teach(store, 'campaign_open', { mode: 'lesson' })].map((p) => p.catch((e) => e)));
+  const ok = [a, b].filter((r) => r.campaign_id);
+  assert.ok(ok.length >= 1);
+  assert.ok([a, b].every((r) => r.campaign_id || r.code === 'retry'));
+  assert.equal(new Set(ok.map((r) => r.campaign_id)).size, 1);
+  assert.equal(store.writes.filter((key) => /campaigns\/[a-f0-9]{16}$/.test(key)).length, 1);
+  assert.equal(store.writes.filter((key) => /campaigns\/[a-f0-9]{16}\/clock$/.test(key)).length, 1);
 });

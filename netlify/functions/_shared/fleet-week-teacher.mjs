@@ -21,9 +21,12 @@ import { gameKeys } from './game-store.mjs';
 import { fleet } from './game-rules.mjs';
 import { mapBounded } from './blobs-list.mjs';
 import {
-  allReports, ensureResolved, findCampaign, firstClock, list, loadFleetGame, obj, readWithEtag, reportInputs, roundOpen, roundsOf,
-  updateJSON
+  allReports, ensureResolved, findCampaign, firstClock, isDone, list, loadFleetGame, obj, readWithEtag, reportInputs, roundOpen, roundsOf,
+  seedFor, updateJSON
 } from './fleet-week-store.mjs';
+
+/** A pointer whose campaign blob never arrived (its open died half way) is free after this long. */
+const POINTER_STALE_MS = 10000;
 
 export const FLEET_TEACHER_ACTIONS = ['campaign_open', 'campaign_state', 'campaign_next', 'void_shot', 'reject_report', 'campaign_reveal', 'campaign_close'];
 export const isFleetTeacherAction = (action) => typeof action === 'string' && (action.startsWith('campaign_') || action === 'void_shot' || action === 'reject_report');
@@ -53,10 +56,12 @@ async function openCampaign(store, lessonId, body, { k, roster, classId }, now) 
   if (held.data?.id) {
     const existing = await read(store, k.campaign(body.game_id, held.data.id));
     if (existing && !existing.closed_at) return existing;
+    if (!existing && now - (held.data.at ?? 0) < POINTER_STALE_MS) reject(409, 'retry', 'A game is opening. Try again in a moment.');
   }
   const published = await read(store, publishedLessonKey(lessonId));
   const settings = obj(list(published?.game?.games).find((g) => g.id === body.game_id)?.settings);
   const id = randomBytes(8).toString('hex');
+  const secret = randomBytes(16).toString('hex');
   const joined = roster.students.map((s) => ownerFor(classId, s.id));
   const campaign = {
     id,
@@ -65,7 +70,7 @@ async function openCampaign(store, lessonId, body, { k, roster, classId }, now) 
     version: record.version,
     class_id: classId,
     mode: 'lesson',
-    secret: randomBytes(16).toString('hex'),
+    secret,
     created_at: now,
     settings: {
       rounds: clampInt(body.rounds ?? settings.rounds, 2, 8, 5),
@@ -74,21 +79,21 @@ async function openCampaign(store, lessonId, body, { k, roster, classId }, now) 
       answer_ms: clampInt(settings.answer_s, 20, 120, 60) * 1000
     },
     // Random teams; "mixed by accuracy" balancing arrives with plan 4.
-    pairing: fleet.pairTeams(joined, fleet.rng(`${id}:teams`)),
+    pairing: fleet.pairTeams(joined, fleet.rng(seedFor(secret, 'teams'))),
     joined,
     students: Object.fromEntries(roster.students.map((s) => [ownerFor(classId, s.id), s.id])),
     revealed_at: null,
     closed_at: null
   };
-  await store.setJSON(k.campaign(body.game_id, id), campaign, { onlyIfNew: true });
-  await store.setJSON(k.campaignClock(body.game_id, id), firstClock(campaign, now), { onlyIfNew: true });
-  const pointed = await store.setJSON(currentKey, { id }, held.data ? (held.etag ? { onlyIfMatch: held.etag } : {}) : { onlyIfNew: true });
+  // The class pointer first, create-only (or over the closed one we read): a losing open writes nothing.
+  const pointed = await store.setJSON(currentKey, { id, at: now }, held.data ? (held.etag ? { onlyIfMatch: held.etag } : {}) : { onlyIfNew: true });
   if (pointed?.modified === false) {
-    // Another open won the race: use theirs.
     const theirs = await findCampaign(store, k, body.game_id, classId);
-    if (theirs) return theirs;
-    reject(409, 'retry', 'Please try again.');
+    if (theirs && !theirs.closed_at) return theirs;
+    reject(409, 'retry', 'A game is opening. Try again in a moment.');
   }
+  await store.setJSON(k.campaignClock(body.game_id, id), firstClock(campaign, now), { onlyIfNew: true });
+  await store.setJSON(k.campaign(body.game_id, id), campaign, { onlyIfNew: true });
   return campaign;
 }
 
@@ -116,11 +121,11 @@ async function campaignState(store, k, campaign, roster, now) {
     }
   }
   for (const [owner, r] of Object.entries(reports)) {
-    for (const [hit, f] of Object.entries(obj(r.filed))) if (flagged(f.writing)) flags.push({ kind: 'report', owner, name: nameOf(owner), round: f.round, hit, pastes: f.writing.pastes, away: f.writing.away, jumps: f.writing.jumps, writing: f.writing });
+    for (const [hit, f] of Object.entries(obj(r.filed))) if (flagged(f.writing)) flags.push({ kind: 'report', owner: f.by ?? owner, name: nameOf(f.by ?? owner), round: f.round, hit, pastes: f.writing.pastes, away: f.writing.away, jumps: f.writing.jumps, writing: f.writing });
     for (const [ship, line] of Object.entries(obj(r.recall))) if (flagged(line.writing)) flags.push({ kind: 'recall', owner, name: nameOf(owner), round: line.round, ship, pastes: line.writing.pastes, away: line.writing.away, jumps: line.writing.jumps, writing: line.writing });
   }
 
-  const filings = Object.entries(reports).flatMap(([owner, r]) => Object.entries(obj(r.filed)).map(([hit, f]) => ({ hit, owner, ...f })));
+  const filings = Object.entries(reports).flatMap(([owner, r]) => Object.entries(obj(r.filed)).map(([hit, f]) => ({ hit, owner: f.by ?? owner, ...f })));
   const owed = shown.hits.filter((h) => h.status === 'owed').map((h) => {
     const filing = filings.find((f) => f.hit === h.id);
     const times = rejected[h.id] ?? 0;
@@ -131,7 +136,7 @@ async function campaignState(store, k, campaign, roster, now) {
   });
   const member = (owner) => ({
     owner, student_id: campaign.students[owner] ?? null, name: nameOf(owner), initials: byId.get(campaign.students[owner])?.initials ?? '',
-    shots: (shotsBy.get(`${clock.round}:${owner}`) ?? []).length, done: obj(clock.done)[owner] === clock.round, seen: obj(clock.seen)[owner] === clock.round
+    shots: (shotsBy.get(`${clock.round}:${owner}`) ?? []).length, done: isDone(clock, owner, clock.round, now), seen: obj(clock.seen)[owner] === clock.round
   });
   return {
     campaign_id: campaign.id,
@@ -178,21 +183,14 @@ async function rejectReport(store, k, campaign, body, now) {
   const hit = state.hits.find((h) => h.id === body.hit);
   if (!hit) reject(404, 'bad_hit', 'That hit isn’t in this game.');
   if (hit.status !== 'owed') reject(409, 'settled', 'That hit has already been scored.');
-  const reports = await allReports(store, k, campaign);
-  if ((reportInputs(reports).rejected[hit.id] ?? 0) >= 1) reject(409, 'returned_once', 'Already returned once.');
-  const filer = Object.keys(reports).find((o) => obj(reports[o].filed)[hit.id]);
-  if (!filer) reject(409, 'not_filed', 'Nothing has been filed for that hit yet.');
-  const reportsKey = (o) => k.campaignReports(campaign.game_id, campaign.id, o);
-  await updateJSON(store, reportsKey(filer), (held) => {
+  // Filings and their rejections live in the shooter's reports blob: one etag write does both.
+  await updateJSON(store, k.campaignReports(campaign.game_id, campaign.id, hit.owner), (held) => {
     const r = obj(held);
+    if ((obj(r.rejected)[hit.id] ?? 0) >= 1) reject(409, 'returned_once', 'Already returned once.');
+    if (!obj(r.filed)[hit.id]) reject(409, 'not_filed', 'Nothing has been filed for that hit yet.');
     const filed = { ...obj(r.filed) };
     delete filed[hit.id];
-    return { ...r, filed };
-  });
-  // The count lives in the shooter's reports blob (the firing team's), so the deadline moves one round.
-  await updateJSON(store, reportsKey(hit.owner), (held) => {
-    const r = obj(held);
-    return { ...r, rejected: { ...obj(r.rejected), [hit.id]: (obj(r.rejected)[hit.id] ?? 0) + 1 } };
+    return { ...r, filed, rejected: { ...obj(r.rejected), [hit.id]: 1 } };
   });
 }
 
@@ -223,9 +221,10 @@ export async function fleetTeacherAction(store, lessonId, body, { now = Date.now
     const campaign = await openCampaign(store, lessonId, body, ctx, now);
     return campaignState(store, ctx.k, campaign, ctx.roster, now);
   }
-  await loadFleetGame(store, ctx.k, body.game_id);
   let campaign = await findCampaign(store, ctx.k, body.game_id, ctx.classId, body.campaign_id);
   if (!campaign) reject(404, 'no_campaign', 'No Fleet week is running for this class.');
+  // The keys the campaign opened with: a republish never changes a running game.
+  await loadFleetGame(store, ctx.k, campaign.game_id, campaign.version);
   if (action !== 'campaign_state' && campaign.closed_at) reject(409, 'closed', 'This game has finished.');
   if (action === 'campaign_next') await nextRound(store, ctx.k, campaign);
   if (action === 'void_shot') await voidShot(store, ctx.k, campaign, body, now);

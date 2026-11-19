@@ -21,37 +21,22 @@ import { createHmac } from 'node:crypto';
 import { mapBounded } from './blobs-list.mjs';
 import { read, reject } from './question-drop.mjs';
 import { fleet } from './game-rules.mjs';
+import { list, obj, readWithEtag, updateJSON } from './etag-json.mjs';
 
-const STRONG = { type: 'json', consistency: 'strong' };
-export const list = (v) => (Array.isArray(v) ? v : []);
-export const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+export { list, obj, readWithEtag, updateJSON };
 export const SHOTS_PER_ROUND = 4;
-
-export async function readWithEtag(store, key) {
-  if (typeof store.getWithMetadata !== 'function') return { data: await read(store, key), etag: null };
-  const row = await store.getWithMetadata(key, STRONG);
-  return { data: row?.data ?? null, etag: row?.etag ?? null };
-}
-
-/**
- * Read, change, write only if nobody wrote in between; retry up to three times.
- * `change(data)` returns the next value, or undefined to write nothing. It may
- * throw (a QuizError) to refuse. Returns `{ data, written }`.
- */
-export async function updateJSON(store, key, change) {
-  for (let attempt = 0; ; attempt += 1) {
-    const held = await readWithEtag(store, key);
-    const next = change(held.data == null ? null : structuredClone(held.data));
-    if (next === undefined) return { data: held.data, written: false };
-    const options = held.data != null ? (held.etag ? { onlyIfMatch: held.etag } : {}) : { onlyIfNew: true };
-    const result = await store.setJSON(key, next, options);
-    if (result?.modified !== false) return { data: next, written: true };
-    if (attempt >= 3) reject(409, 'retry', 'Please send it again.');
-  }
-}
+/** Answers may arrive this long after a shot's deadline (network grace). */
+export const LATE_GRACE_MS = 2000;
 
 /** The call-sign hash (decision 11): HMAC-SHA256 of the match secret, cut to 32 bits. */
 export const hashFor = (secret) => (s) => createHmac('sha256', secret).update(s).digest().readUInt32BE(0);
+
+/**
+ * A seed only the server can know (decision 10). Every random choice (teams,
+ * auto-placement, the ghost fleet, pings) is seeded from the secret, never from
+ * the campaign id, which students see.
+ */
+export const seedFor = (secret, label) => createHmac('sha256', secret).update(label).digest('hex').slice(0, 32);
 
 /** An opaque per-viewer id for an owner or a hit. Real owners and hit ids never leave the server. */
 export const aliasFor = (campaign, viewer, subject) => hashFor(campaign.secret)(`${viewer}>${subject}`).toString(36);
@@ -62,6 +47,20 @@ export const roundsOf = (campaign) => campaign.settings.rounds;
 /** True while a round (placement or firing) is open on the clock. */
 export const roundOpen = (campaign, clock) => !campaign.revealed_at && !campaign.closed_at && clock.round <= roundsOf(campaign);
 
+/** The cap has run out or the teacher tapped Next round: no new shots, though open ones may still be answered. */
+export const roundClosing = (clock, now) => now >= clock.closes_at || clock.next === clock.round;
+
+/**
+ * Whether an owner is done this round: `done[owner] = { round, until }`. A
+ * player's fourth commit sets `until` to that shot's deadline (plus grace), and
+ * their fourth answer brings it to the answer time, so an unanswered last shot
+ * holds the round only until its time runs out. Done from just after `until`.
+ */
+export const isDone = (clock, owner, round, now) => {
+  const d = obj(clock.done)[owner];
+  return !!d && d.round === round && now > (d.until ?? 0);
+};
+
 /**
  * Who is active in the open round (decision 8): seen since the round opened, or
  * placed (for round 1), or fired in the round before.
@@ -71,34 +70,36 @@ export function activeOwners(campaign, clock) {
   const seen = obj(clock.seen);
   const done = obj(clock.done);
   const fired = obj(clock.fired);
-  return list(campaign.joined).filter((o) => seen[o] === r || (r === 1 ? done[o] === 0 : r > 1 && fired[o] === r - 1));
+  return list(campaign.joined).filter((o) => seen[o] === r || (r === 1 ? done[o]?.round === 0 : r > 1 && fired[o] === r - 1));
 }
 
+/** A committed shot still waiting for its answer holds the round open (`open[owner] = { round, until }`). */
+const heldOpen = (clock, now) => Object.values(obj(clock.open)).some((h) => h?.round === clock.round && now <= h.until);
+
 /**
- * Lesson mode (§1.3): the open round has closed when its cap has run out, the
- * teacher tapped Next round, or everyone needed is done. Placement (round 0)
- * needs every rostered player in the pairing to have placed; a firing round
- * needs every active player (decision 8) to have spent four shots. Nobody
- * active yet means nobody is done.
+ * Lesson mode (§1.3). The open round closes at its cap or on Next round, but
+ * never while a committed shot can still be answered (its deadline plus grace).
+ * It closes early when everyone needed is done: placement (round 0) needs every
+ * rostered player in the pairing to have placed; a firing round needs every
+ * active player (decision 8) to be done. Nobody active yet means nobody is done.
  */
 export function roundClosed(campaign, clock, now) {
   if (!roundOpen(campaign, clock)) return false;
-  if (now >= clock.closes_at) return true;
-  if (clock.next === clock.round) return true;
-  const done = obj(clock.done);
   if (clock.round === 0) {
+    if (roundClosing(clock, now)) return true;
     // Placement waits for the whole class: every rostered player in the pairing (never the ghost) must place.
     const players = campaign.pairing.teams.filter((t) => !t.ghost).flatMap((t) => t.owners);
-    return players.length > 0 && players.every((o) => done[o] === 0);
+    return players.length > 0 && players.every((o) => isDone(clock, o, 0, now));
   }
+  if (roundClosing(clock, now)) return !heldOpen(clock, now);
   const active = activeOwners(campaign, clock);
-  return active.length > 0 && active.every((o) => done[o] === clock.round);
+  return active.length > 0 && active.every((o) => isDone(clock, o, clock.round, now));
 }
 
 export const capFor = (campaign, round) => (round === 0 ? campaign.settings.placement_cap_ms : campaign.settings.round_cap_ms);
 
 /** A fresh clock at placement. */
-export const firstClock = (campaign, now) => ({ round: 0, opened_at: now, closes_at: now + capFor(campaign, 0), seen: {}, fired: {}, done: {} });
+export const firstClock = (campaign, now) => ({ round: 0, opened_at: now, closes_at: now + capFor(campaign, 0), seen: {}, fired: {}, open: {}, done: {} });
 
 /** The state after the last resolved round (the empty state before placement resolves). */
 export async function stateBefore(store, k, campaign, round) {
@@ -142,7 +143,7 @@ export async function roundShots(store, k, campaign, round) {
 }
 
 async function roundInput(store, k, campaign, round) {
-  const base = { pairing: campaign.pairing, round, seed: `${campaign.id}:${round}`, placements: {}, shots: [] };
+  const base = { pairing: campaign.pairing, round, seed: seedFor(campaign.secret, `seed:${round}`), placements: {}, shots: [] };
   const reports = reportInputs(await allReports(store, k, campaign));
   if (round === 0) {
     const owners = list(campaign.joined);
@@ -186,12 +187,30 @@ export async function ensureResolved(store, k, campaign, now) {
   reject(409, 'retry', 'Please send it again.');
 }
 
-/** Record something on the clock at most once per round per owner (`seen`, `fired`, `done`). */
+/**
+ * Change the clock for one owner in one round, in one etag write. `change(clock)`
+ * returns the fields to merge, or undefined when nothing needs writing. Does
+ * nothing once the clock has moved on.
+ */
+export async function touchClock(store, k, campaign, round, change) {
+  return updateJSON(store, k.campaignClock(campaign.game_id, campaign.id), (clock) => {
+    if (!clock || clock.round !== round) return undefined;
+    const patch = change(clock);
+    return patch ? { ...clock, ...patch } : undefined;
+  });
+}
+
+/** Record `seen` or `fired` at most once per round per owner. */
 export async function markClock(store, k, campaign, field, owner, round) {
-  const key = k.campaignClock(campaign.game_id, campaign.id);
-  return updateJSON(store, key, (clock) => {
-    if (!clock || clock.round !== round || obj(clock[field])[owner] === round) return undefined;
-    return { ...clock, [field]: { ...obj(clock[field]), [owner]: round } };
+  return touchClock(store, k, campaign, round, (clock) => (obj(clock[field])[owner] === round ? undefined : { [field]: { ...obj(clock[field]), [owner]: round } }));
+}
+
+/** Set `done[owner] = { round, until }` unless it already says so. */
+export async function markDone(store, k, campaign, owner, round, until) {
+  return touchClock(store, k, campaign, round, (clock) => {
+    const d = obj(clock.done)[owner];
+    if (d && d.round === round && d.until === until) return undefined;
+    return { done: { ...obj(clock.done), [owner]: { round, until } } };
   });
 }
 

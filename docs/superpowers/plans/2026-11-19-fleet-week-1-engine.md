@@ -517,6 +517,30 @@ Server (Tasks 4–6):
 
 **Placement decision (19 Nov):** round 0 closes early only when every rostered player in the pairing (never the ghost) has placed. Otherwise it closes at the placement cap or on **Next round**. Firing rounds keep decision 8 as built.
 
+**Server review fixes (19 Nov):**
+- Every seed comes from the secret, never from the campaign id that students see:
+  - resolution: `seedFor(secret, 'seed:' + round)`
+  - teams: `seedFor(secret, 'teams')`
+- A round never closes while a committed shot is still open, whether at the cap or on **Next round**.
+  - A shot is open while it is unanswered and `now <= deadline + 2 s`. So the round really closes at the later of the cap (or Next) and the last open deadline plus grace.
+  - Once the cap or Next has been reached, no new shots can be committed. A shot already in flight can still be answered.
+  - Early close when everyone is done is unchanged.
+- An answer whose round has resolved before the answer was written gets 409 `late`, not ok.
+- `done` is recorded with the shots:
+  - Each commit makes one clock write (`seen`, `fired`, the shot's hold `open[owner] = { round, until }`). On the fourth commit the same write sets `done[owner] = { round, until: deadline + grace }`.
+  - The fourth answer brings `until` down to the answer time.
+  - A player counts as done once `now > until`, so an unanswered last shot holds the round only until its time runs out.
+- Resends are safe:
+  - `fleet_answer` with every shot settled, or repeating the last stored answer, re-marks the clock and returns ok.
+  - `fleet_place` with the same layout returns ok; a different layout gets 409 `placed`.
+  - A lost clock write after an answer is not fatal.
+- `updateJSON` (now in `_shared/etag-json.mjs`, shared with `games.mjs`) retries up to 6 times with jittered pauses. The random source and sleep are injectable.
+- A damage report is filed in the shooter's reports blob as `filed[hit] = { round, by, text, writing }`, next to `rejected[hit]`:
+  - The "already filed?" check runs inside the etag write, so one filing wins.
+  - A rejection is a single write.
+- Teacher actions load the keys for `campaign.version`.
+- `campaign_open` writes the class pointer create-only first, then the clock, then the campaign. If the pointer write loses, nothing else is written. A pointer with no campaign behind it counts as stale after 10 s.
+
 ## Self-review against the spec
 
 - §1.1 grid and variants → Tasks 1 and 2. §1.2 teams and ghost → Task 2. §1.3 lesson clock → Task 4 (week clock → plan 4). §1.4 outcomes and confidence → Task 3. §1.5 sinking → Task 3 and Task 5 (`fleet_recall`). §1.6 reports → Tasks 3, 5 and 6. §1.7 scoring → Task 3. §1.8 call signs and anonymity → Tasks 2 and 5. §1.9 two-step commit, server timer and writing logs → Task 5. Flags → Task 6.
