@@ -22,6 +22,8 @@ import { classForPlainLesson, mountInitialsToken, type InitialsTokenHandle } fro
 import { setVoiceClass } from '@/blocks/voice-client';
 import { mountLecturePlayer } from '@/lecture/player';
 import { mountTutorialPlayer } from '@/tutorial/player';
+import { mountLabPlayer } from '@/lab/player';
+import { labClient } from '@/lab/api';
 import { tutorialClient } from '@/tutorial/api';
 import { mountSprintPlayer } from '@/sprint/player';
 import { sprintClient } from '@/sprint/api';
@@ -138,9 +140,24 @@ export function renderPublishedLessonHero(
 function renderPublishedLesson(
   content: HTMLElement,
   lesson: PublishedLesson,
-  extras?: { cls?: PublishedClass; quizClassId?: string }
+  extras?: { cls?: PublishedClass; quizClassId?: string; handIn?: () => Promise<boolean> }
 ): { dispose(): void } | null {
   content.replaceChildren();
+  if (lesson.pedagogical_mode === 'lab' && lesson.lab) {
+    // The question and how readers judge are in the snapshot; the round, the texts and the result come from the server, step by step.
+    const classId = extras?.cls?.id ?? extras?.quizClassId;
+    const playerHost = document.createElement('div');
+    content.append(playerHost);
+    return mountLabPlayer(playerHost, {
+      lesson,
+      classId,
+      client: classId ? labClient(lesson.lesson_id, classId) : null,
+      handIn: extras?.handIn,
+      renderHero: (hostEl) => {
+        renderPublishedLessonHero(hostEl, lesson, extras?.cls);
+      }
+    });
+  }
   if (lesson.pedagogical_mode === 'design_sprint' && lesson.sprint) {
     // The brief and phase guides are in the snapshot; the group and submissions come from the server after the claim.
     const classId = extras?.cls?.id ?? extras?.quizClassId;
@@ -371,7 +388,8 @@ export function mountStudentLessonView(
     whyRoute = null;
     // Sections split out of another lesson: bring this device's saved answers with them before the blocks read them.
     carrySplitWork(lesson);
-    lecture = renderPublishedLesson(content, lesson, extras);
+    // A lab hands its Explain answer in through the lesson's work sync, which is mounted just below.
+    lecture = renderPublishedLesson(content, lesson, { ...extras, handIn: () => work?.handInAll() ?? Promise.resolve(true) });
     // Written answers go to the teacher as they're typed, for the class this lesson was opened in.
     const workClass = extras?.cls?.id ?? extras?.quizClassId;
     setVoiceClass(workClass ?? null);

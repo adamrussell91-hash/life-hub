@@ -16,6 +16,12 @@ test('published Teaching student APIs are public', () => {
   assert.equal(isPublicStudentApi('POST', '/api/published/word-help-run'), true);
 });
 
+test('the lab student endpoint is public for POST only, and the board is not', () => {
+  assert.equal(isPublicStudentApi('POST', '/api/published/lab/lesson1'), true);
+  assert.equal(isPublicStudentApi('GET', '/api/published/lab/lesson1'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/lessons/lesson1/lab'), false);
+});
+
 test('the student profile endpoint is public for POST only', () => {
   assert.equal(isPublicStudentApi('POST', '/api/published/profile/class1'), true);
   assert.equal(isPublicStudentApi('GET', '/api/published/profile/class1'), false);

@@ -116,6 +116,9 @@ import { createPublishedTutorialHandler } from '../../../netlify/functions/publi
 import { createTutorialHandler } from '../../../netlify/functions/tutorial.mjs';
 import { createPublishedCaseHandler } from '../../../netlify/functions/published-case.mjs';
 import { createCaseHandler } from '../../../netlify/functions/case.mjs';
+import { createPublishedLabHandler } from '../../../netlify/functions/published-lab.mjs';
+import { createLabHandler } from '../../../netlify/functions/lab.mjs';
+import { prepareLabPublish, storeLabConfig } from '../../../netlify/functions/_shared/lab.mjs';
 import { createPublishedRotationHandler } from '../../../netlify/functions/published-rotation.mjs';
 import { createRotationHandler } from '../../../netlify/functions/rotation.mjs';
 import { createGamesHandler } from '../../../netlify/functions/games.mjs';
@@ -1830,6 +1833,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const games = parsed.data.pedagogical_mode === 'game' ? prepareGamePublish(parsed.data) : null;
     if (games?.problems.length) return errorResponse(400, 'validation_error', games.problems[0]);
     if (games?.record) await storeGameKeys(functionBlobStore(), id, games.record);
+    // A lab keeps its texts, control, pairs and debrief server-side, as the real publish does; only its Explain block plays.
+    const lab = parsed.data.pedagogical_mode === 'lab' ? prepareLabPublish(parsed.data) : null;
+    if (lab?.problems.length) return errorResponse(400, 'validation_error', lab.problems[0]);
+    if (lab?.config) await storeLabConfig(functionBlobStore(), id, lab.config);
     const studentSnapshot = PublishedLessonSchema.parse({
       ...fullSnapshot,
       blocks: quizPublish.blocks,
@@ -1837,7 +1844,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       ...(sprint ? { pedagogical_mode: 'design_sprint', sprint: sprint.snapshot.sprint } : {}),
       ...(caseStudy ? { pedagogical_mode: 'case_study', case: caseStudy.snapshot } : {}),
       ...(rotation ? { pedagogical_mode: 'station_rotation', rotation: rotation.snapshot.rotation } : {}),
-      ...(games?.snapshot ? { pedagogical_mode: 'game', game: games.snapshot } : {})
+      ...(games?.snapshot ? { pedagogical_mode: 'game', game: games.snapshot } : {}),
+      ...(lab?.snapshot ? { pedagogical_mode: 'lab', lab: lab.snapshot, blocks: lab.blocks } : {})
     });
 
     try {
@@ -4325,6 +4333,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? createLectureHandler(deps)
       : path.startsWith('/api/published/lecture/')
         ? createPublishedLectureHandler(deps)
+      : /^\/api\/lessons\/[^/]+\/lab$/.test(path)
+        ? createLabHandler(deps)
+      : path.startsWith('/api/published/lab/')
+        ? createPublishedLabHandler(deps)
       : /^\/api\/lessons\/[^/]+\/tutorial$/.test(path)
         ? createTutorialHandler(deps)
       : path.startsWith('/api/published/tutorial/')
@@ -4506,6 +4518,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/lecture\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/tutorial$/.test(path) ||
       /^\/api\/published\/tutorial\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/lab$/.test(path) ||
+      /^\/api\/published\/lab\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/case$/.test(path) ||
       /^\/api\/published\/case\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/rotation$/.test(path) ||

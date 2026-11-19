@@ -89,6 +89,8 @@ import { tutorialTeacherApi } from '@/tutorial/api';
 import { createTutorialTabs, inTab, movedGroups, type TutorialTab } from '@/tutorial/editor-tabs';
 import { groupSection, isGroupTab } from '@/tutorial/model';
 import { mountLabPlanCard, type LabPlanCardHandle } from '@/lab/plan-card';
+import { mountLabBoard, type LabBoardHandle } from '@/lab/board';
+import { labTeacherApi } from '@/lab/api';
 import { seedLab, withExplainBlock } from '@/lab/schema';
 import { mountKitEditor } from '@/sprint/kit-editor';
 import { createSprintTabs, inSprintTab, type SprintTab } from '@/sprint/editor-tabs';
@@ -1713,6 +1715,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
   const labHost = document.createElement('div');
   labHost.className = 'lesson-page__lab';
   let labCard: LabPlanCardHandle | null = null;
+  let labBoard: LabBoardHandle | null = null;
   function syncLabPanel(): void {
     const isLab = resolvePedagogicalMode(lesson.pedagogical_mode) === 'lab';
     // A new lab starts with its defaults and the Explain block, the one written answer students hand in.
@@ -1729,12 +1732,20 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       });
       labHost.append(labCard.root);
     } else if (!isLab && labCard) {
+      labBoard?.dispose();
+      labBoard = null;
       labCard.dispose();
       labCard = null;
       labHost.replaceChildren();
       canvasHost.hidden = false;
     } else {
       labCard?.sync();
+    }
+    // The board runs a published lab; it appears on the first publish too.
+    if (isLab && labCard && !labBoard && lesson.published_at) {
+      labBoard = mountLabBoard({ api: labTeacherApi(lesson.id), getLesson: () => lesson });
+      labHost.prepend(labBoard.root);
+      void labBoard.refresh();
     }
     // Runs after the other panels, which each reset the canvas for their own type.
     if (isLab) canvasHost.hidden = true;
@@ -2022,6 +2033,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       syncSprintPanel();
       syncCasePanel();
       syncRotationPanel();
+      syncLabPanel();
     },
     revealPublishBlock(blockId: string, errorIds?: string[]) {
       // A publish issue on another tutorial tab: open that tab first.
@@ -2042,6 +2054,8 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
       caseBoard?.dispose();
       caseBoard = null;
       caseEditor?.dispose();
+      labBoard?.dispose();
+      labBoard = null;
       labCard?.dispose();
       labCard = null;
       classExamples.dispose();
