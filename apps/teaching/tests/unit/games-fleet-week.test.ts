@@ -528,3 +528,15 @@ describe('fleet_week resolveRound: purity', () => {
     expect(() => resolveRound(deepFreeze(emptyState(duel)), deepFreeze(input(duel, 0, { placements: duelPlacements() })))).not.toThrow();
   });
 });
+
+describe('fleet_week blank second variants', () => {
+  it('treats a blank variant B as a one-question square, not a publish blocker', () => {
+    const g = fleetGame();
+    if (g.kind !== 'fleet_week') throw new Error('kind');
+    const blank = { ...g.squares[7].variants[1], question: { ...(g.squares[7].variants[1].question as object), prompt: '  ', accepted: [''] } } as typeof g.squares[7].variants[1];
+    g.squares[7].variants = [g.squares[7].variants[0], blank];
+    expect(gameIssues({ game: { games: [g] } })).toEqual([]);
+    expect(gameWarnings({ game: { games: [g] } }).join(' ')).toMatch(/B3 has only one question/);
+    expect(splitGame(g, () => 0.5).keys.live?.fleet?.squares[7]).toEqual(['q7a']);
+  });
+});
