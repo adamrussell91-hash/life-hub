@@ -14,6 +14,7 @@ import {
   type QuestionItem
 } from './core/schema';
 import { checkbox, field, itemEditor, numberInput, pills, questionEditor, tagsCell, textArea, textInput, type ItemEditorContext } from './item-editors';
+import { fleetContent } from './kinds/fleet-week/editor';
 import { SHAPE_LABELS, isListGame, listShapes, maxItems, newGameId, newItem, type ListGame } from './seed';
 
 /**
@@ -489,6 +490,8 @@ export function gameContent(game: Game, ctx: ContentContext): HTMLElement {
       return battlesContent(game, ctx);
     case 'answer_chain':
       return answerChainContent(game, ctx);
+    case 'fleet_week':
+      return fleetContent(game, ctx);
     default:
       return el('div');
   }
