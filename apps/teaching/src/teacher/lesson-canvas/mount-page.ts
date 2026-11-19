@@ -1698,8 +1698,10 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         // Fleet week's Ask Ann to draft: Ann reads the saved draft, so save first; the chat carries her plan and draft.
         startAnn: async (brief) => {
           await options.flushDraft?.();
-          await startAnn(lesson.id, brief);
+          const status = await startAnn(lesson.id, brief);
+          // Busy: the brief was not sent; the open job still shows in the chat.
           options.onAnnStarted?.();
+          return status;
         },
         onTab: () => {
           showGameCanvas();

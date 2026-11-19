@@ -26,7 +26,7 @@ export type GameEditorOptions = {
   api: GameTeacherApi | null;
   onTab?: (tab: GameTab) => void;
   /** Starts Ann on this lesson with a brief; the chat shows her plan and draft. */
-  startAnn?: (brief: string) => Promise<void>;
+  startAnn?: (brief: string) => Promise<'started' | 'busy'>;
 };
 
 export type GameEditorHandle = {

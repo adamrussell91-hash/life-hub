@@ -33,7 +33,7 @@ export type ContentContext = {
   /** The unit's ready-made items, for kinds that run their own Build from this unit (Fleet week). Absent without a server. */
   sources?: () => Promise<UnitSources>;
   /** Starts Ann on this lesson with a brief (Fleet week's Ask Ann to draft). Absent without a server. */
-  startAnn?: (brief: string) => Promise<void>;
+  startAnn?: (brief: string) => Promise<'started' | 'busy'>;
 };
 
 /* ── Settings row ──────────────────────────────────────────────────── */
