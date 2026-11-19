@@ -13,6 +13,7 @@ import { createTask } from '@/api/universal-links';
 import { createLedgerItem } from '@/api/ledger';
 import { createRecordingModel, mountRecordingStrip, type RecordingAttendeeInput } from '@/views/meeting-recording-strip';
 import { mountRecordingCard } from '@/views/meeting-recording-card';
+import { mountRecordingUpload } from '@/views/meeting-recording-upload';
 import { recordingNotesBlockId, withRecordingLines } from '@/views/meeting-page';
 import { activeRecordingMeeting } from '@/lib/meeting-recorder';
 import type { EventRecord, EventTalk, PdGroupRecord } from '@/domain/types';
@@ -300,11 +301,14 @@ export async function renderEventPage(
       recHost.append(bar, strip.below);
     }
     recHost.append(card.el);
+    const upload = mountRecordingUpload({ meetingId: id, kind: 'event', people: () => speakers, room: true, notes: blockText, model });
+    if (data.record.occurrence_state !== 'cancelled') recHost.append(upload.el);
     const gone = new MutationObserver(() => {
       if (canvas.contains(root)) return;
       gone.disconnect();
       strip.destroy();
       card.destroy();
+      upload.destroy();
     });
     gone.observe(canvas, { childList: true });
   }
