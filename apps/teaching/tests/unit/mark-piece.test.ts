@@ -12,6 +12,30 @@ const data: MarkPieceData = {
 };
 
 describe('mark piece', () => {
+  it('a lab’s explanation opens with the student’s lab notes and trial beside it; other pieces have no lab panel', async () => {
+    const act = { save: vi.fn(), returnIt: vi.fn(), takeBack: vi.fn(), move: vi.fn() };
+    const labRecord = vi.fn(async () => ({
+      student_id: 'st_ava', items: [], pair: null, trial: null,
+      lab: { level: 'supplied' as const, judge: 'rate' as const, notes_on: true, steps: ['Question' as const, 'Predict' as const, 'Test' as const, 'Result' as const, 'Explain' as const], options: ['Active', 'Passive'], features: [], trait: '' },
+      record: { pred: 1, reason: '', done: {}, notes: { Predict: 'Because nobody is named.', Question: 'Line 2 hides the company.' } }
+    }));
+    const lab: MarkPieceData = { ...data, column: { ...data.column, piece: { lesson_id: 'lab1', block_id: 'lab_explain' } } };
+    const view = markPieceView(lab, act, { labRecord });
+    document.body.append(view);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(labRecord).toHaveBeenCalledWith('lab1', 'st_ava');
+    const panel = view.querySelector('.mk-side .lab-record')!;
+    expect(panel.textContent).toBe('From the labPredicted: PassiveLab notesQuestionLine 2 hides the company.PredictBecause nobody is named.');
+    // It sits above the rubric, beside the answer.
+    expect(view.querySelector('.mk-side')!.firstElementChild).toBe(panel);
+
+    const other = vi.fn();
+    const plain = markPieceView({ ...data, column: { ...data.column, piece: { lesson_id: 'lesson1', block_id: 'qset1' } } }, act, { labRecord: other });
+    expect(other).not.toHaveBeenCalled();
+    expect(plain.querySelector('.lab-record')).toBeNull();
+    expect(markPieceView(data, act, { labRecord: other }).querySelector('.lab-record')).toBeNull();
+  });
+
   it('arms a code, tags the selected words, places a step, and saves', async () => {
     const save = vi.fn().mockResolvedValue({});
     const view = markPieceView(data, { save, returnIt: vi.fn(), takeBack: vi.fn(), move: vi.fn() });

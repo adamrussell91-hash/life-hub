@@ -274,17 +274,23 @@ function startedRow(t: TodoBoxItem, activities: TodoActivity[], classId: string)
   return row;
 }
 
-function feedbackRow(t: TodoBoxItem, f: NonNullable<TodoBoxItem['feedback']>): HTMLElement {
+/** A quiz answer asked again is rewritten in the quiz, so its link opens the lesson: `q:{lesson}:{question}`. */
+export const askedAnswerLesson = (t: Pick<TodoBoxItem, 'id' | 'feedback'>): string | null =>
+  t.feedback?.state === 'redraft' && t.feedback.kind === 'answer' && t.id.startsWith('q:') ? t.id.split(':')[1] || null : null;
+
+function feedbackRow(t: TodoBoxItem, f: NonNullable<TodoBoxItem['feedback']>, classId: string): HTMLElement {
   if (t.done || f.state === 'read') return item('done', t.title, 'Feedback read today.');
   if (f.state === 'redraft') {
-    return item('redraft', t.title, '', f.kind === 'answer' ? tabLink('Answer again →', 'returned', `Answer ${t.title} again`) : tabLink('Redraft →', 'returned', `Redraft ${t.title}`), ['again', 'Have another go']);
+    const lesson = askedAnswerLesson(t);
+    const go = lesson ? lessonLink(classId, lesson, 'Answer again →', t.title) : f.kind === 'answer' ? tabLink('Answer again →', 'returned', `Answer ${t.title} again`) : tabLink('Redraft →', 'returned', `Redraft ${t.title}`);
+    return item('redraft', t.title, '', go, ['again', 'Have another go']);
   }
   return item('new', t.title, '', tabLink('Open →', 'returned', `Open feedback on ${t.title}`), ['new', 'New']);
 }
 
 function boxRow(t: TodoBoxItem, classId: string): HTMLElement {
   let row: HTMLElement;
-  if (t.feedback) row = feedbackRow(t, t.feedback);
+  if (t.feedback) row = feedbackRow(t, t.feedback, classId);
   else if (t.done) row = item('done', t.title, 'Done today');
   else if (t.started) row = startedRow(t, t.started.activities, classId);
   else row = item('todo', t.title, KIND_NOTE[t.kind] ?? '', lessonLink(classId, t.id, 'Open →', t.title));

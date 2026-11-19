@@ -540,3 +540,16 @@ html.rec-drawer-open { overflow: hidden; }
   .rec-dot, .rec-alarm.is-red, .rec-bar.is-working i { animation: none; }
   .rec-drawer, .rec-meter i, .rec-chip { transition: none; }
 }
+
+/* Upload a recording (a file in place of a live recording) */
+.rec-upload { margin-block: var(--space-3); min-width: 0; }
+.rec-upload__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.rec-upload__title { margin: 0 0 var(--space-3); font-size: var(--text-md); }
+.rec-upload__pick { position: relative; display: inline-flex; cursor: pointer; }
+.rec-upload__pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.rec-upload__pick:focus-within .btn { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rec-upload__file { font-size: var(--text-sm); color: var(--muted); overflow-wrap: anywhere; min-width: 0; }
+.rec-upload .rec-consent__tick { margin-top: var(--space-3); }
+.rec-upload__private { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--text-sm); }
+.rec-upload__bar { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; margin-bottom: var(--space-2); }
+.rec-upload__bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s ease; }

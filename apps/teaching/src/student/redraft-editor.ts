@@ -1,5 +1,6 @@
 /** Where a student rewrites a returned piece: the section their teacher chose, or the whole thing. Saves as they type. */
 import { button, el, errorText } from '@/quiz/dom';
+import './redraft-editor.css';
 
 export type RedraftScope = 'whole' | { part: string; field: string; start: number; end: number };
 export type RedraftLoad = { scope: RedraftScope; text: Record<string, Record<string, string>>; prompts: Record<string, string>; working: Record<string, Record<string, string>> };

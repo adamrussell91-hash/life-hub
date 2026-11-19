@@ -165,7 +165,7 @@ export function mapTree(blocks, fn) {
  * quiz questions. Every other type runs its quiz questions and group sets
  * inline, like a quiz does.
  */
-const PLAYER_MODES = new Set(['lecture', 'design_sprint', 'case_study', 'tutorial', 'game']);
+const PLAYER_MODES = new Set(['lecture', 'design_sprint', 'case_study', 'tutorial', 'game', 'lab']);
 
 /** True when quiz questions in a lesson of this type reach students. */
 export function quizRunsIn(mode) {
@@ -716,7 +716,10 @@ export async function quizAction(store, lessonId, body) {
       const rec = narrow(await recordFor(store, lessonId, a.version, record), who.student?.id);
       const [teacherMarks, aiMarks] = await Promise.all([read(store, k.marks(device, a.n)), read(store, k.aiMarks(device, a.n))]);
       const scored = scoreAttempt(rec, a.result, teacherMarks, aiMarks);
-      const base = { n: a.n, submitted_at: a.result.submitted_at, released };
+      // Answers the teacher sent back for another go show even before marks are shared:
+      // the student rewrites them right here, under the question.
+      const again = scored.rows.filter((r) => r.again).map((r) => ({ id: r.id, question: rec.questions[r.id].question, state: r.again.state, comment: r.again.comment }));
+      const base = { n: a.n, submitted_at: a.result.submitted_at, released, ...(again.length ? { again } : {}) };
       if (!released) return base;
       return {
         ...base,

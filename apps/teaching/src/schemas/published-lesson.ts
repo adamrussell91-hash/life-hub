@@ -10,6 +10,7 @@ import { PublicSprintSchema } from '../sprint/schema';
 import { PublicCaseSchema } from '../case-study/schema';
 import { PublicRotationSchema } from '../rotation/schema';
 import { PublicGameLessonSchema } from '../games/core/schema';
+import { PublicLabSchema } from '../lab/schema';
 
 export const PublishedLessonSchema = z.object({
   lesson_id: z.string().min(1),
@@ -24,12 +25,14 @@ export const PublishedLessonSchema = z.object({
   /** A lesson made by splitting another: the lesson its sections came from, so a device's saved answers can follow them. */
   split_from: z.string().min(1).max(80).optional(),
   /** Quiz lessons: the settings students may see, with the published version. */
-  pedagogical_mode: z.enum(['quiz', 'lecture', 'tutorial', 'design_sprint', 'case_study', 'station_rotation', 'game']).optional(),
+  pedagogical_mode: z.enum(['quiz', 'lecture', 'tutorial', 'design_sprint', 'case_study', 'station_rotation', 'game', 'lab']).optional(),
   sprint: PublicSprintSchema.optional(),
   case: PublicCaseSchema.optional(),
   rotation: PublicRotationSchema.optional(),
   /** Game lessons: the games with no answers (keys stay on the server). */
   game: PublicGameLessonSchema.optional(),
+  /** Lab lessons: the lines students may see. Texts, the control, pairs and debrief notes stay on the server. */
+  lab: PublicLabSchema.optional(),
   /** Lectures, tutorials, sprints and case studies: the classes a plain lesson link can mean. */
   classes: z.array(z.object({ id: z.string(), title: z.string() })).optional(),
   quiz: QuizSettingsSchema.extend({

@@ -10,6 +10,7 @@ import { QuizSettingsSchema } from './_shared/quiz-core.mjs';
 import { createTeachingCollectionHandler, teachingWriteError } from './_shared/teaching-create.mjs';
 import { BlockSchema } from './_shared/teaching-block-schema.mjs';
 import { TutorialSettingsSchema } from './_shared/tutorial-schema.mjs';
+import { LabSettingsSchema } from './_shared/lab-schema.mjs';
 
 /** A new lesson can start with a skeleton (a tutorial's tabs and exit checks). */
 const MAX_START_BLOCKS = 40;
@@ -32,6 +33,14 @@ function tutorialSettings(mode, value) {
   return parsed.data;
 }
 
+/** A lab can start with its Plan card filled in; a bad one is refused rather than dropped. */
+function labSettings(mode, value) {
+  if (mode !== 'lab' || value === undefined) return null;
+  const parsed = LabSettingsSchema.safeParse(value);
+  if (!parsed.success) throw teachingWriteError(400, 'validation_error', 'lab settings are not valid');
+  return parsed.data;
+}
+
 export const config = { path: '/api/lessons' };
 
 export async function createLessonRecord(store, body) {
@@ -46,6 +55,7 @@ export async function createLessonRecord(store, body) {
   }
   const blocks = startBlocks(body.blocks);
   const tutorial = tutorialSettings(pedagogical_mode, body.tutorial);
+  const lab = labSettings(pedagogical_mode, body.lab);
 
   const unit = await getJSON(store, unitKey(unit_id));
   if (!unit) throw teachingWriteError(404, 'not_found', 'Unit not found');
@@ -80,6 +90,7 @@ export async function createLessonRecord(store, body) {
     pedagogical_mode,
     ...(quiz?.success ? { quiz: quiz.data } : {}),
     ...(tutorial ? { tutorial } : {}),
+    ...(lab ? { lab } : {}),
     status: 'active',
     created_at: timestamp,
     updated_at: timestamp,

@@ -31,6 +31,12 @@ describe('the one thing', () => {
     // The lesson the student is on is passed over.
     expect(oneThing({ ...base, boxes: [{ key: 'now', items: [lesson('a'), lesson('d')] }] }, 'a')?.key).toBe('d');
   });
+  it('sends a quiz answer asked again to its quiz, where it is rewritten; a redraft to Returned work', () => {
+    const answer = lesson('q:lesson_q:qb', { title: 'Week 5 check: question 2', feedback: { state: 'redraft', kind: 'answer', date: '2026-11-10' } });
+    expect(oneThing({ ...base, boxes: [{ key: 'now', items: [answer] }] })).toEqual({ key: 'q:lesson_q:qb', what: 'Answer Week 5 check: question 2 again', go: { lesson: 'lesson_q' } });
+    const redraft = lesson('w:lesson_w:b1', { title: 'Essay', feedback: { state: 'redraft', kind: 'written', date: '2026-11-10' } });
+    expect(oneThing({ ...base, boxes: [{ key: 'now', items: [redraft] }] })?.go).toEqual({ tab: 'returned' });
+  });
   it('is nothing when everything is done', () => {
     expect(oneThing({ ...base, boxes: [{ key: 'now', items: [lesson('a', { done: true })] }] })).toBeNull();
     expect(oneThing(undefined)).toBeNull();

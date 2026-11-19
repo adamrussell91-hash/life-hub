@@ -6581,6 +6581,7 @@ function lessonTypeLine(mode) {
   if (mode === "quiz") return "quiz";
   if (mode === "tutorial") return "tutorial (quiz_question only inside a group\u2019s exit check section; follow the tutorial recipe)";
   if (mode === "case_study") return "case_study (no quiz_question; its settings are in lesson.case, which you change with propose_update_case; follow the case study recipe)";
+  if (mode === "lab") return "lab (students test a claim on readers; no quiz_question; its settings are in lesson.lab, which the teacher fills in on the Lab card)";
   return `${mode ?? "lesson"} (not a quiz)`;
 }
 function buildAiLessonContext(input) {
@@ -6839,7 +6840,7 @@ function validateProposalAgainstSearchPack(proposal, pack) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-import { z as z22 } from "zod";
+import { z as z23 } from "zod";
 
 // apps/teaching/src/curriculum/pedagogical-mode.ts
 import { z as z17 } from "zod";
@@ -6881,7 +6882,7 @@ function isPedagogicalMode(value2) {
 function resolvePedagogicalMode(value2) {
   return isPedagogicalMode(value2) ? value2 : DEFAULT_PEDAGOGICAL_MODE;
 }
-var PLAYER_MODES = /* @__PURE__ */ new Set(["lecture", "design_sprint", "case_study", "tutorial", "game"]);
+var PLAYER_MODES = /* @__PURE__ */ new Set(["lecture", "design_sprint", "case_study", "tutorial", "game", "lab"]);
 function quizRunsIn(value2) {
   return !PLAYER_MODES.has(resolvePedagogicalMode(value2));
 }
@@ -7870,11 +7871,104 @@ function gameIssues(lesson) {
   return [...new Set(out)];
 }
 
-// apps/teaching/src/schemas/source.ts
+// apps/teaching/src/lab/schema.ts
 import { z as z21 } from "zod";
-var SourceSchema = z21.object({
-  system: z21.literal("notion"),
-  page_id: z21.string().min(1).max(64),
+var LAB_LEVELS = ["supplied", "students", "pairs"];
+var LAB_JUDGE = ["pick", "rate"];
+var LAB_LANGUAGE_LEVELS = ["Form", "Sentence", "Word"];
+var LabFeatureSchema = z21.object({
+  name: z21.string().min(1).max(60),
+  level: z21.enum(LAB_LANGUAGE_LEVELS)
+});
+var LabPairSchema = z21.object({
+  id: z21.string().regex(/^[a-z0-9_-]{1,40}$/),
+  students: z21.array(z21.string().min(1).max(64)).min(1).max(4)
+});
+var LabSettingsSchema = z21.object({
+  class_id: z21.string().max(64).default(""),
+  level: z21.enum(LAB_LEVELS),
+  question: z21.string().max(200).default(""),
+  why: z21.string().max(400).default(""),
+  /** Pairs design it: the claim the class tests. */
+  claim: z21.string().max(200).optional(),
+  /** The two supplied levels: what stays the same. */
+  same: z21.string().max(300).optional(),
+  /** The two supplied levels: what changes, two to five options. */
+  options: z21.array(z21.string().max(40)).max(5).optional(),
+  /** You supply it: one text per option. */
+  texts: z21.array(z21.string().max(4e3)).max(5).optional(),
+  /** Pairs design it: the text every pair changes. Line breaks are kept. */
+  control: z21.string().max(4e3).optional(),
+  /** Students write it: what to write. */
+  task: z21.string().max(300).optional(),
+  judge: z21.enum(LAB_JUDGE),
+  judge_question: z21.string().max(200).default(""),
+  /** Rate on a line: the two end labels. */
+  ends: z21.tuple([z21.string().max(40), z21.string().max(40)]).optional(),
+  /** Pairs design it: the quality readers rate, as one adjective ("hesitant"). It words predictions and verdicts: "less hesitant". */
+  trait: z21.string().max(40).optional(),
+  /** Counts as a win (pick: choices ahead) or a change (rate: points out of 10). Set before any data. */
+  threshold: z21.number().min(0).max(100),
+  notes_on: z21.boolean(),
+  note_prompts: z21.record(z21.string().max(20), z21.string().max(200)).optional(),
+  features: z21.array(LabFeatureSchema).max(12).optional(),
+  pairs: z21.array(LabPairSchema).max(20).optional(),
+  /** Teacher only. */
+  debrief: z21.string().max(1200).default(""),
+  explain_prompt: z21.string().max(400).default("")
+});
+var PublicLabSchema = z21.object({
+  level: z21.enum(LAB_LEVELS),
+  question: z21.string().max(200),
+  why: z21.string().max(400),
+  claim: z21.string().max(200).optional(),
+  same: z21.string().max(300).optional(),
+  options: z21.array(z21.string().max(40)).max(5).optional(),
+  task: z21.string().max(300).optional(),
+  judge: z21.enum(LAB_JUDGE),
+  judge_question: z21.string().max(200),
+  ends: z21.tuple([z21.string().max(40), z21.string().max(40)]).optional(),
+  trait: z21.string().max(40).optional(),
+  threshold: z21.number().min(0).max(100),
+  notes_on: z21.boolean(),
+  note_prompts: z21.record(z21.string().max(20), z21.string().max(200)).optional(),
+  features: z21.array(LabFeatureSchema).max(12).optional(),
+  explain_prompt: z21.string().max(400)
+});
+var filled3 = (text2) => typeof text2 === "string" && text2.trim().length > 0;
+function labIssues(settings) {
+  const out = [];
+  if (!filled3(settings.class_id)) out.push("Choose the class this lab is for.");
+  if (!filled3(settings.question)) out.push("Write the lab\u2019s question.");
+  if (!filled3(settings.judge_question)) out.push("Write the question readers answer.");
+  if (settings.judge === "rate" && !(settings.ends && filled3(settings.ends[0]) && filled3(settings.ends[1]))) out.push("Label both ends of the line readers rate on.");
+  if (settings.level === "pairs") {
+    if (!filled3(settings.claim)) out.push("Write the claim to test.");
+    if (!filled3(settings.control)) out.push("Paste the control text.");
+    if (!settings.features?.length) out.push("List at least one feature to name.");
+    if (settings.judge !== "rate") out.push("Pairs design it is judged by rating on a line.");
+    if (!settings.pairs?.length) out.push("Make the pairs.");
+  } else {
+    const options = settings.options ?? [];
+    if (options.length < 2 || options.some((o) => !filled3(o))) out.push("Name at least two options under Changed.");
+    else if (new Set(options.map((o) => o.trim().toLowerCase())).size !== options.length) out.push("Give each option under Changed its own name.");
+  }
+  if (settings.level === "supplied") {
+    const texts = settings.texts ?? [];
+    if (texts.length !== (settings.options ?? []).length || texts.some((t) => !filled3(t))) out.push("Paste one text for each option.");
+  }
+  if (settings.level === "students") {
+    if (!filled3(settings.task)) out.push("Say what students write.");
+    if (settings.judge !== "pick") out.push("Students write it is judged by picking one.");
+  }
+  return out;
+}
+
+// apps/teaching/src/schemas/source.ts
+import { z as z22 } from "zod";
+var SourceSchema = z22.object({
+  system: z22.literal("notion"),
+  page_id: z22.string().min(1).max(64),
   imported_at: IsoDateSchema,
   last_edited_at: IsoDateSchema
 });
@@ -8565,22 +8659,22 @@ function ownIssue(block, discernHosts) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-var LessonSchema = z22.object({
+var LessonSchema = z23.object({
   ...CommonFields,
   ...TrashFields,
-  type: z22.literal("lesson"),
-  unit_id: z22.string().min(1),
-  sequence: z22.number().int(),
-  blocks: z22.array(BlockSchema),
+  type: z23.literal("lesson"),
+  unit_id: z23.string().min(1),
+  sequence: z23.number().int(),
+  blocks: z23.array(BlockSchema),
   published_at: IsoDateSchema.optional(),
   cover: CoverSchema.optional(),
-  tags: z22.array(z22.string().min(1).max(40)).max(24).optional(),
-  author_id: z22.string().min(1).optional(),
-  review_status: z22.enum(["needs_review", "none"]).optional(),
-  syllabus_outcomes: z22.array(z22.string().min(1).max(32)).max(24).optional(),
-  outcome_ids: z22.array(z22.string().min(1).max(64)).max(24).optional(),
+  tags: z23.array(z23.string().min(1).max(40)).max(24).optional(),
+  author_id: z23.string().min(1).optional(),
+  review_status: z23.enum(["needs_review", "none"]).optional(),
+  syllabus_outcomes: z23.array(z23.string().min(1).max(32)).max(24).optional(),
+  outcome_ids: z23.array(z23.string().min(1).max(64)).max(24).optional(),
   /** Curriculum network: the subject lines this lesson serves, with depth for train and metro. */
-  line_stops: z22.array(LineStopSchema).max(16).optional(),
+  line_stops: z23.array(LineStopSchema).max(16).optional(),
   /** Lines taken off by hand that the dot points would add; they stay off. */
   line_off: LineOffSchema.optional(),
   /**
@@ -8592,28 +8686,28 @@ var LessonSchema = z22.object({
   route_role: LessonRouteRoleSchema.nullable().optional(),
   skip_rule: LessonSkipRuleSchema.nullable().optional(),
   /** A support, extension or optional lesson: the core lesson it branches off. Null (saves merge) goes back to its place in the order. */
-  branch_from: z22.string().min(1).max(64).nullable().optional(),
+  branch_from: z23.string().min(1).max(64).nullable().optional(),
   /** Taught before the unit officially starts: the unit map's weeks count from the first lesson after. */
-  pre_unit: z22.boolean().nullable().optional(),
+  pre_unit: z23.boolean().nullable().optional(),
   /** Syllabus dot points this lesson teaches ("human:U2"); its outcomes and concepts follow from the alignment. */
-  dot_points: z22.array(DotPointRefSchema).max(20).optional(),
+  dot_points: z23.array(DotPointRefSchema).max(20).optional(),
   /** Knowledge pieces this lesson picks from its ticked U points. Teacher-only: they only decide which chips come first. */
-  focus_pieces: z22.array(PieceIdSchema).max(24).optional(),
+  focus_pieces: z23.array(PieceIdSchema).max(24).optional(),
   /** Skills (`strand.sub`) this lesson picks from its ticked R points. Teacher-only, the same. */
-  focus_skills: z22.array(z22.string().regex(SkillRefPattern)).max(12).optional(),
+  focus_skills: z23.array(z23.string().regex(SkillRefPattern)).max(12).optional(),
   /** What the dot points ask for that this lesson's activities already cover ("outcome:3", "concept:PER2", "process:UND", "skill:analysis"). */
-  plan_covered: z22.array(z22.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
+  plan_covered: z23.array(z23.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */
-  feedback_off: z22.boolean().optional(),
+  feedback_off: z23.boolean().optional(),
   /** Learning conditions the teacher set aside for this lesson (src/conditions). Teacher-only. */
-  conditions_off: z22.array(z22.enum(["activate", "chunks", "check", "worked", "close", "levels"])).max(6).optional(),
+  conditions_off: z23.array(z23.enum(["activate", "chunks", "check", "worked", "close", "levels"])).max(6).optional(),
   /** The two questions after the finish tick: on or off (default by lesson type), questions left out, and the "still unclear" box. */
-  end_questions: z22.object({
-    on: z22.boolean().optional(),
-    skip: z22.array(z22.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
-    unclear: z22.boolean().optional()
+  end_questions: z23.object({
+    on: z23.boolean().optional(),
+    skip: z23.array(z23.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
+    unclear: z23.boolean().optional()
   }).optional(),
   /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
   quiz: QuizSettingsSchema.optional(),
@@ -8627,57 +8721,64 @@ var LessonSchema = z22.object({
   rotation: RotationSettingsSchema.optional(),
   /** Game lessons only: the games, in play order, and when homework closes. */
   game: GameLessonSchema.optional(),
+  /** Lab lessons only: the Plan card's lines (question, level, how readers judge, pairs). */
+  lab: LabSettingsSchema.optional(),
   source: SourceSchema.optional()
 });
 var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   if (lesson.title.trim().length === 0) {
     ctx.addIssue({
-      code: z22.ZodIssueCode.custom,
+      code: z23.ZodIssueCode.custom,
       message: "Title is required to publish",
       path: ["title"]
     });
   }
-  if (lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "design_sprint" || lesson.pedagogical_mode === "case_study" || lesson.pedagogical_mode === "game") {
+  if (lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "design_sprint" || lesson.pedagogical_mode === "case_study" || lesson.pedagogical_mode === "game" || lesson.pedagogical_mode === "lab") {
     let stray = false;
     visitBlocks(lesson.blocks, (block) => {
       if (block.block_type === "quiz_question") stray = true;
     });
     if (stray) {
       ctx.addIssue({
-        code: z22.ZodIssueCode.custom,
-        message: lesson.pedagogical_mode === "game" ? "Quiz questions don\u2019t run in a Game lesson\u2019s blocks. Put them in a game, or remove them." : "Quiz questions don\u2019t run in a Lecture, Design Sprint or Case Study. Change the lesson type or remove them.",
+        code: z23.ZodIssueCode.custom,
+        message: lesson.pedagogical_mode === "game" ? "Quiz questions don\u2019t run in a Game lesson\u2019s blocks. Put them in a game, or remove them." : lesson.pedagogical_mode === "lab" ? "Quiz questions don\u2019t run in a Lab. Change the lesson type or remove them." : "Quiz questions don\u2019t run in a Lecture, Design Sprint or Case Study. Change the lesson type or remove them.",
         path: ["blocks"]
       });
     }
   }
   if (lesson.pedagogical_mode === "tutorial") {
     for (const message of tutorialIssues(lesson)) {
-      ctx.addIssue({ code: z22.ZodIssueCode.custom, message, path: ["blocks"] });
+      ctx.addIssue({ code: z23.ZodIssueCode.custom, message, path: ["blocks"] });
     }
   }
   if (lesson.pedagogical_mode === "design_sprint") {
     for (const message of sprintIssues(lesson)) {
-      ctx.addIssue({ code: z22.ZodIssueCode.custom, message, path: ["sprint"] });
+      ctx.addIssue({ code: z23.ZodIssueCode.custom, message, path: ["sprint"] });
     }
   }
   if (lesson.pedagogical_mode === "case_study") {
     for (const message of caseIssues(lesson)) {
-      ctx.addIssue({ code: z22.ZodIssueCode.custom, message, path: ["case"] });
+      ctx.addIssue({ code: z23.ZodIssueCode.custom, message, path: ["case"] });
     }
   }
   if (lesson.pedagogical_mode === "station_rotation") {
     for (const message of rotationIssues(lesson)) {
-      ctx.addIssue({ code: z22.ZodIssueCode.custom, message, path: ["rotation"] });
+      ctx.addIssue({ code: z23.ZodIssueCode.custom, message, path: ["rotation"] });
+    }
+  }
+  if (lesson.pedagogical_mode === "lab") {
+    for (const message of lesson.lab ? labIssues(lesson.lab) : ["Fill in the Lab card before you publish."]) {
+      ctx.addIssue({ code: z23.ZodIssueCode.custom, message, path: ["lab"] });
     }
   }
   if (lesson.pedagogical_mode === "game") {
     for (const message of gameIssues(lesson)) {
-      ctx.addIssue({ code: z22.ZodIssueCode.custom, message, path: ["game"] });
+      ctx.addIssue({ code: z23.ZodIssueCode.custom, message, path: ["game"] });
     }
   }
   for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "tutorial" })) {
     ctx.addIssue({
-      code: z22.ZodIssueCode.custom,
+      code: z23.ZodIssueCode.custom,
       message: formatPublishBlockIssue(issue),
       path: ["blocks"]
     });
@@ -9124,7 +9225,7 @@ async function runNextStepsFill(input) {
     return fail(error instanceof Error ? error.message : "The model request failed.");
   }
   const flagged = [];
-  const filled3 = boxes.map((b, i) => {
+  const filled4 = boxes.map((b, i) => {
     const next_steps = { ...b.bank };
     for (const c of b.codes) {
       const ladder = c.ladder ?? [];
@@ -9134,14 +9235,14 @@ async function runNextStepsFill(input) {
     }
     return { block_id: b.block_id, index: b.index, question: b.question, skills: b.skills, next_steps };
   });
-  return { status: "done", boxes: filled3, flagged, usage, cost_usd: totalCost(usage) };
+  return { status: "done", boxes: filled4, flagged, usage, cost_usd: totalCost(usage) };
 }
 var sameSkills = (a, b) => [...a].sort().join("|") === [...b].sort().join("|");
-function applyFilledBoxes(lesson, filled3) {
+function applyFilledBoxes(lesson, filled4) {
   const copy = structuredClone(lesson);
   let applied = 0;
   let skipped = 0;
-  for (const f of filled3) {
+  for (const f of filled4) {
     const q = questionAt(copy.blocks, f);
     if (!q || questionText(q) !== f.question || !sameSkills(q.skills ?? [], f.skills)) {
       skipped += 1;
