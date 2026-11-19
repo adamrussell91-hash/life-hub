@@ -32,6 +32,7 @@ import { organiserKey, sendPiecesToBoxOne } from './organiser.mjs';
 import { upgradeOrganiser } from './organiser-model.mjs';
 import { newMarkbookId } from './markbook-schema.mjs';
 import { gameKeys } from './game-store.mjs';
+import { FLEET_ACTIONS, fleetStudentAction } from './fleet-week.mjs';
 import { QUIZ_KIND_INFO } from './quiz-core.mjs';
 import { GAME_KIND_INFO, GameLessonSchema } from './game-schema.mjs';
 import {
@@ -221,7 +222,7 @@ export async function rebuildSummary(store, lessonId, gameId, classId, current) 
 
 // ---------------------------------------------------------------- student actions
 
-const ACTIONS = ['load', 'claim', 'solo_start', 'solo_event', 'solo_finish'];
+const ACTIONS = ['load', 'claim', 'solo_start', 'solo_event', 'solo_finish', ...FLEET_ACTIONS];
 
 function gameOf(record, gameId) {
   const keys = typeof gameId === 'string' ? record.games?.[gameId] : null;
@@ -269,6 +270,12 @@ export async function gameStudentAction(store, lessonId, body, { now = Date.now(
   const owner = whoIs.student ? deviceHash(`student:${whoIs.classId}:${whoIs.student.id}`) : deviceHash(token);
   const classKey = whoIs.classId ?? ANON;
   const me = whoIs.student?.id ?? owner;
+
+  // Fleet week (fleet-week.mjs): a campaign, not a solo play. Teams need a class list.
+  if (FLEET_ACTIONS.includes(action)) {
+    if (!whoIs.student) reject(409, 'need_roster', 'Fleet week needs a class list. Ask your teacher.');
+    return fleetStudentAction(store, lessonId, body, { classId: whoIs.classId, student: whoIs.student, owner, now });
+  }
 
   if (action === 'load' || action === 'claim') {
     const results = {};
