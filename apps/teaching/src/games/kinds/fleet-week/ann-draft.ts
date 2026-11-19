@@ -120,9 +120,11 @@ export function applyFleetGridDraft(
   const labels = (axis: 'columns' | 'rows') =>
     Array.from({ length: FLEET_SIZE }, (_, i) => {
       const have = game[axis][i];
-      if (!isBlankLabel(have)) return have!;
+      const next = draft[axis][i]?.trim() ?? '';
+      // A label the teacher wrote stays; an empty one (left out at partial accept) changes nothing.
+      if (!isBlankLabel(have) || !next) return have ?? '';
       added++;
-      return draft[axis][i]!.trim();
+      return next;
     });
   game = { ...game, columns: labels('columns'), rows: labels('rows') };
   draft.squares.forEach((square, i) => {

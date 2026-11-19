@@ -94,6 +94,30 @@ function listRootBlocks(blocks: Block[], keyPrefix: 'block' | 'child'): PartialA
   return units;
 }
 
+type FleetDraftProposal = Extract<AiProposal, { kind: 'fleet_grid_draft' }>;
+const fleetSquareName = (i: number) => `${'ABCDE'[Math.floor(i / 5)]}${(i % 5) + 1}`;
+
+/** A Fleet week draft accepts per square, plus the labels and the recall lines as one tick each. */
+function fleetUnits(proposal: FleetDraftProposal): PartialAcceptUnit[] {
+  return [
+    { key: 'fleet:labels', label: `Labels: ${truncate([...proposal.columns, ...proposal.rows].join(', '))}` },
+    ...proposal.squares.map((square, i) => ({ key: `fleet:square:${i}`, label: `${fleetSquareName(i)}: ${truncate(square.variants[0]?.prompt ?? '')}` })),
+    { key: 'fleet:recall', label: 'Recall lines' }
+  ];
+}
+
+/** Unticked parts become empty, which Accept treats as nothing to place. */
+function filterFleet(proposal: FleetDraftProposal, keys: Set<string>): FleetDraftProposal {
+  const labels = keys.has('fleet:labels');
+  return {
+    ...proposal,
+    columns: labels ? proposal.columns : proposal.columns.map(() => ''),
+    rows: labels ? proposal.rows : proposal.rows.map(() => ''),
+    squares: proposal.squares.map((square, i) => (keys.has(`fleet:square:${i}`) ? square : { variants: [] })),
+    recall: keys.has('fleet:recall') ? proposal.recall : []
+  };
+}
+
 export function listPartialAcceptUnits(proposal: AiProposal): PartialAcceptUnit[] {
   switch (proposal.kind) {
     case 'review_only':
@@ -120,8 +144,9 @@ export function listPartialAcceptUnits(proposal: AiProposal): PartialAcceptUnit[
       return listRootBlocks(proposal.section.content.blocks as Block[], 'child');
     }
     case 'update_case':
-    case 'fleet_grid_draft':
       return [];
+    case 'fleet_grid_draft':
+      return fleetUnits(proposal);
     case 'delete_blocks':
       return proposal.ids.map((id) => ({ key: `delete:${id}`, label: `Delete ${id}` }));
   }
@@ -285,7 +310,7 @@ export function filterProposal(proposal: AiProposal, selectedKeys: Set<string>):
   }
 
   if (proposal.kind === 'update_case') return { ok: true, proposal };
-  if (proposal.kind === 'fleet_grid_draft') return { ok: true, proposal };
+  if (proposal.kind === 'fleet_grid_draft') return { ok: true, proposal: filterFleet(proposal, selectedKeys) };
 
   if (proposal.kind === 'delete_blocks') {
     const ids = proposal.ids.filter((id) => selectedKeys.has(`delete:${id}`));

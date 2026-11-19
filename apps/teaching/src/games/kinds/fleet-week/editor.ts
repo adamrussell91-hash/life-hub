@@ -148,6 +148,8 @@ export function placeInFleet(game: Fleet, target: FleetTarget, items: readonly Q
 
 /* ── Editor ───────────────────────────────────────────────────────── */
 
+export const ANN_BUSY = 'Ann is busy with another job for this lesson. Try again when it finishes.';
+
 /** A short-answer editor: the prompt, accepted answers and tags. */
 function shortAnswerEditor(item: QuestionItem, label: string, promptHint: string, onChange: (next: QuestionItem) => void): HTMLElement {
   let cur = item;
@@ -499,10 +501,13 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
       annBusy = true;
       paint();
       ctx.startAnn(brief).then(
-        () => {
+        (status) => {
           annBusy = false;
           annOpen = false;
-          note = `Ann is writing her plan (${audText(cost_aud)}) in the chat. Answer it there to get the draft.`;
+          note =
+            status === 'busy'
+              ? ANN_BUSY
+              : `Ann is writing her plan (${audText(cost_aud)}) in the chat. Answer it there to get the draft.`;
           if (root.isConnected) paint();
         },
         (e: unknown) => {

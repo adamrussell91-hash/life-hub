@@ -10,7 +10,9 @@ import { filterProposal, listPartialAcceptUnits } from '@/ai/partial-accept';
 import { FLEET_BRIEF_HEAD, fleetDraftStage } from '@/ai/fleet-grid-draft';
 import { PLAN_MARKER, checkProposalCall, runLessonAiJob, type ModelReply, type ModelRequest } from '@/ai/job-runner';
 import { applyFleetGridDraft, estimateFleetDraft, fleetDraftBrief, fleetDraftPack } from '@/games/kinds/fleet-week/ann-draft';
-import { fleetContent } from '@/games/kinds/fleet-week/editor';
+import { ANN_BUSY, fleetContent } from '@/games/kinds/fleet-week/editor';
+import { startAnn } from '@/evidence/follow-up';
+import { AiJobConflictError } from '@/ai/jobs-client';
 
 // Invented content only: the play "The Lantern Keeper" and its made-up characters.
 
@@ -103,10 +105,28 @@ describe('fleet_grid_draft proposal schema', () => {
     expect(checkProposalCall(TOOL, draft(), other)).toMatch(/not fleet_week/);
   });
 
-  it('is accepted whole (no partial-accept units)', () => {
+  it('lists the labels, each square and the recall lines for partial accept', () => {
     const proposal = parseToolProposal(TOOL, draft()) as AiProposal;
-    expect(listPartialAcceptUnits(proposal)).toEqual([]);
-    expect(filterProposal(proposal, new Set())).toEqual({ ok: true, proposal });
+    const units = listPartialAcceptUnits(proposal);
+    expect(units).toHaveLength(27);
+    expect(units[0]!.key).toBe('fleet:labels');
+    expect(units[1]).toEqual({ key: 'fleet:square:0', label: 'A1: Square 0 A?' });
+    expect(units[25]!.label).toMatch(/^E5: /);
+    expect(units[26]!.key).toBe('fleet:recall');
+  });
+
+  it('accepts only the ticked squares, and never the unticked labels or recall lines', () => {
+    const proposal = parseToolProposal(TOOL, draft()) as AiProposal;
+    const filtered = filterProposal(proposal, new Set(['fleet:square:0', 'fleet:square:24']));
+    expect(filtered.ok).toBe(true);
+    const applied = applyProposalToLesson(fleetLesson(), (filtered as { proposal: AiProposal }).proposal, () => 'b_x');
+    const game = applied.lesson.game!.games[0] as Fleet;
+    const prompts = game.squares.map((sq) => sq.variants.map((v) => (v.question as unknown as { prompt?: string }).prompt ?? '').join('|'));
+    expect(prompts[0]).toBe('Square 0 A?|Square 0 B?');
+    expect(prompts[24]).toBe('Square 24 A?|Square 24 B?');
+    expect(prompts.filter((p) => p.replace('|', '')).length).toBe(2);
+    expect(game.columns.every((c) => c === '')).toBe(true);
+    expect(game.recall.every((r) => !(r.question as unknown as { prompt?: string }).prompt)).toBe(true);
   });
 });
 
@@ -252,7 +272,10 @@ describe('Ask Ann to draft in the editor', () => {
 
   it('shows the price, then starts Ann with the brief only when the teacher asks', async () => {
     const briefs: string[] = [];
-    const root = fleetContent(newGame('fleet_week', 'g_fleet') as Fleet, { onChange: () => {}, sources: async () => sources, startAnn: async (b) => void briefs.push(b) });
+    const root = fleetContent(newGame('fleet_week', 'g_fleet') as Fleet, { onChange: () => {}, sources: async () => sources, startAnn: async (b) => {
+      briefs.push(b);
+      return 'started' as const;
+    } });
     document.body.append(root);
     (root.querySelector('.fw-ann-btn') as HTMLButtonElement).click();
     await flush();
@@ -267,8 +290,35 @@ describe('Ask Ann to draft in the editor', () => {
     root.remove();
   });
 
+  it('says Ann is busy, not writing a plan, when another job holds the lesson', async () => {
+    const root = fleetContent(newGame('fleet_week', 'g_fleet') as Fleet, { onChange: () => {}, sources: async () => sources, startAnn: async () => 'busy' as const });
+    document.body.append(root);
+    (root.querySelector('.fw-ann-btn') as HTMLButtonElement).click();
+    await flush();
+    (root.querySelector('.fw-ann__go') as HTMLButtonElement).click();
+    await flush();
+    expect(root.querySelector('.fw-build-status')?.textContent).toBe(ANN_BUSY);
+    expect(root.querySelector('.fw-build-status')?.textContent).not.toMatch(/writing her plan/);
+    root.remove();
+  });
+
   it('has no Ask Ann button without a server', () => {
     const root = fleetContent(newGame('fleet_week', 'g_fleet') as Fleet, { onChange: () => {} });
     expect(root.querySelector('.fw-ann-btn')).toBeNull();
+  });
+});
+
+describe('starting Ann', () => {
+  it('reports busy when a job already holds the lesson, started otherwise', async () => {
+    const createLesson = async () => ({ id: 'x' });
+    expect(await startAnn('lesson_fw', 'brief', { createLesson, startJob: async () => ({ id: 'j', status: 'working' }) })).toBe('started');
+    expect(
+      await startAnn('lesson_fw', 'brief', {
+        createLesson,
+        startJob: async () => {
+          throw new AiJobConflictError('j_other', 'working');
+        }
+      })
+    ).toBe('busy');
   });
 });
