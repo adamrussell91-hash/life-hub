@@ -42,7 +42,7 @@ const shotsKey = (c, k, round, owner) => k.campaignShots(c.game_id, c.id, round,
 const reportsKey = (c, k, owner) => k.campaignReports(c.game_id, c.id, owner);
 const fleetKey = (c, k, owner) => k.campaignFleet(c.game_id, c.id, owner);
 
-function phaseOf(campaign, clock) {
+export function phaseOf(campaign, clock) {
   if (campaign.closed_at) return 'closed';
   if (campaign.revealed_at) return 'reveal';
   if (clock.round === 0) return 'placement';

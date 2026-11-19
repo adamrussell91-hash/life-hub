@@ -10,7 +10,10 @@
  *   reject_report    { hit } return a filed damage report to the partner, once
  *   campaign_reveal  (any phase) settle every open hit and recall line (resolved/final); students see names and both fleets
  *   campaign_close   end it and free the class for a new campaign
- *   campaign_insight { game_id, class_id } → the Results insight: grid heat map, first-try v returning,
+ *   campaign_list    { game_id, class_id } → { campaigns: [{ id, mode, opened_at, closed_at, revealed_at }] }, newest first
+ *   campaign_state and campaign_insight take an optional campaign_id; otherwise the open campaign, then the
+ *                    class's latest one (kept after close), so Results can be read once a game has ended
+ *   campaign_insight { game_id, class_id, campaign_id? } → the Results insight: grid heat map, first-try v returning,
  *                    calibration by student, confident errors (teacher only), hardest squares
  */
 import { randomBytes } from 'node:crypto';
@@ -20,7 +23,7 @@ import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
 import { loadRoster } from './class-claims.mjs';
 import { deviceHash, read, reject } from './question-drop.mjs';
 import { campaignIndexKey, gameKeys } from './game-store.mjs';
-import { revealBoard } from './fleet-week.mjs';
+import { phaseOf, revealBoard } from './fleet-week.mjs';
 import { fleet } from './game-rules.mjs';
 import { mapBounded } from './blobs-list.mjs';
 import { cleanWritingLog, summariseWriting } from './quiz-core.mjs';
@@ -28,6 +31,9 @@ import {
   FLEET_TZ, allReports, ensureCampaign, ensureResolved, findCampaign, firstClock, revealCampaign, validZone, weekCloses, isDone, list, loadFleetGame, obj, readWithEtag, reportInputs, roundOpen, roundsOf,
   seedFor, updateJSON
 } from './fleet-week-store.mjs';
+
+/** Past campaigns of one game kept per class for campaign_list (the oldest drop off). */
+const HISTORY_KEEP = 50;
 
 /** Campaigns kept in a class's index (the oldest drop off). */
 const INDEX_KEEP = 20;
@@ -38,7 +44,7 @@ const WEEK_ROUNDS = 3;
 /** A pointer whose campaign blob never arrived (its open died half way) is free after this long. */
 const POINTER_STALE_MS = 10000;
 
-export const FLEET_TEACHER_ACTIONS = ['campaign_open', 'campaign_state', 'campaign_next', 'void_shot', 'reject_report', 'campaign_reveal', 'campaign_close', 'campaign_insight'];
+export const FLEET_TEACHER_ACTIONS = ['campaign_open', 'campaign_state', 'campaign_next', 'void_shot', 'reject_report', 'campaign_reveal', 'campaign_close', 'campaign_insight', 'campaign_list'];
 export const isFleetTeacherAction = (action) => typeof action === 'string' && (action.startsWith('campaign_') || action === 'void_shot' || action === 'reject_report');
 
 const clampInt = (v, min, max, fallback) => (Number.isFinite(Number(v)) ? Math.min(max, Math.max(min, Math.round(Number(v)))) : fallback);
@@ -116,6 +122,10 @@ async function openCampaign(store, lessonId, body, { k, roster, classId }, now) 
   }
   await store.setJSON(k.campaignClock(body.game_id, id), firstClock(campaign, now), { onlyIfNew: true });
   await store.setJSON(k.campaign(body.game_id, id), campaign, { onlyIfNew: true });
+  // The class's latest campaign of this game, kept after close so Results can still find it, with its past ones.
+  await updateJSON(store, k.campaignLatest(body.game_id, classId), (held) => ({
+    id, at: now, ids: [...list(obj(held).ids).filter((x) => x !== id), id].slice(-HISTORY_KEEP)
+  }));
   // The class index, so student pages with no lesson id can find this campaign's signals.
   await updateJSON(store, campaignIndexKey(classId), (held) => {
     const kept = list(obj(held).campaigns).filter((e) => e?.id !== id);
@@ -199,6 +209,9 @@ async function campaignState(store, k, opened, roster, now) {
   });
   return {
     campaign_id: campaign.id,
+    // 'closed' once the campaign has ended: read-only from then on.
+    phase: phaseOf(campaign, clock),
+    read_only: !!campaign.closed_at,
     mode: campaign.mode,
     ...(campaign.mode === 'week' ? { cutoff: campaign.settings.cutoff, tz: campaign.settings.tz, schedule: list(campaign.schedule) } : {}),
     round: clock.round,
@@ -364,6 +377,27 @@ async function close(store, k, campaign, now) {
   return data;
 }
 
+/** The class's latest campaign of this game (open or closed), or null. */
+async function latestCampaign(store, k, gameId, classId) {
+  const latest = await read(store, k.campaignLatest(gameId, classId));
+  return latest?.id ? findCampaign(store, k, gameId, classId, latest.id) : null;
+}
+
+/** Every campaign of this game this class has played, newest first, for Results to pick from. */
+async function campaignList(store, k, gameId, classId) {
+  if (typeof gameId !== 'string' || !gameId) reject(400, 'bad_game', 'That game isn’t in this lesson.');
+  const latest = obj(await read(store, k.campaignLatest(gameId, classId)));
+  const current = await read(store, k.campaignCurrent(gameId, classId));
+  const ids = [...new Set([...list(latest.ids), ...(current?.id ? [current.id] : [])])];
+  const rows = await mapBounded(ids, 8, (id) => findCampaign(store, k, gameId, classId, id));
+  return {
+    campaigns: rows
+      .filter((c) => c && c.game_id === gameId)
+      .map((c) => ({ id: c.id, mode: c.mode, opened_at: c.created_at, closed_at: c.closed_at ?? null, revealed_at: c.revealed_at ?? null }))
+      .sort((a, b) => b.opened_at - a.opened_at)
+  };
+}
+
 /** Teacher actions on a Fleet week campaign. */
 export async function fleetTeacherAction(store, lessonId, body, { now = Date.now() } = {}) {
   const ctx = await teacherContext(store, lessonId, body);
@@ -373,11 +407,15 @@ export async function fleetTeacherAction(store, lessonId, body, { now = Date.now
     const campaign = await openCampaign(store, lessonId, body, ctx, now);
     return campaignState(store, ctx.k, campaign, ctx.roster, now);
   }
+  if (action === 'campaign_list') return campaignList(store, ctx.k, body.game_id, ctx.classId);
+  const readOnly = action === 'campaign_state' || action === 'campaign_insight';
   let campaign = await findCampaign(store, ctx.k, body.game_id, ctx.classId, body.campaign_id);
-  if (!campaign) reject(404, 'no_campaign', 'No Fleet week is running for this class.');
+  // Reading Results after a game has ended: the class's latest campaign, kept after close.
+  if (!campaign && readOnly && body.campaign_id === undefined) campaign = await latestCampaign(store, ctx.k, body.game_id, ctx.classId);
+  if (!campaign || campaign.game_id !== body.game_id) reject(404, 'no_campaign', 'No Fleet week is running for this class.');
   // The keys the campaign opened with: a republish never changes a running game.
   await loadFleetGame(store, ctx.k, campaign.game_id, campaign.version);
-  if (action !== 'campaign_state' && campaign.closed_at) reject(409, 'closed', 'This game has finished.');
+  if (!readOnly && campaign.closed_at) reject(409, 'closed', 'This game has finished.');
   if (action === 'campaign_next') await nextRound(store, ctx.k, campaign);
   if (action === 'void_shot') await voidShot(store, ctx.k, campaign, body, now);
   if (action === 'reject_report') await rejectReport(store, ctx.k, campaign, body, now);

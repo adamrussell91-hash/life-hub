@@ -834,6 +834,55 @@ test('the teacher can open the reveal at any phase', async () => {
   await rejectsWith(play(game.store, 1, 'fleet_answer', { answer: 'x', writing }, game.T + 31), 'closed');
 });
 
+// ---------------------------------------------------------------- Results after a game has ended
+
+test('after close, campaign_state and campaign_insight still read the class’s latest campaign, read-only', async () => {
+  const { store, c, T } = await lessonGame();
+  const shot = await play(store, 1, 'fleet_commit', { square: 3, sure: true }, T + 10);
+  await play(store, 1, 'fleet_answer', { answer: 'the sea', writing }, T + 20);
+  await teach(store, 'campaign_next', {}, T + 30);
+  assert.ok(shot.question);
+  const closed = await teach(store, 'campaign_close', {}, T + 40);
+  assert.equal(closed.phase, 'closed');
+  assert.equal(closed.read_only, true);
+  assert.equal(await store.get(k.campaignCurrent('fw', 'class1')), null);
+  assert.equal((await store.get(k.campaignLatest('fw', 'class1'))).id, c.id);
+  // No campaign_id: the latest one.
+  const room = await teach(store, 'campaign_state', {}, T + 50);
+  assert.equal(room.campaign_id, c.id);
+  assert.equal(room.phase, 'closed');
+  const insight = await teach(store, 'campaign_insight', {}, T + 60);
+  assert.equal(insight.campaign_id, c.id);
+  assert.equal(insight.confident_errors.length, 1);
+  // Read-only: nothing else acts on a closed campaign, and Next round can't find one to act on.
+  await rejectsWith(teach(store, 'campaign_next', {}, T + 70), 'no_campaign');
+  await rejectsWith(teach(store, 'campaign_reveal', { campaign_id: c.id }, T + 70), 'closed');
+  await rejectsWith(teach(store, 'void_shot', { campaign_id: c.id, round: 2, owner: ownerOf(1), seq: 1 }, T + 70), 'closed');
+});
+
+test('campaign_list lists the class’s campaigns of this game, newest first; a campaign_id picks one', async () => {
+  const { store, c, T } = await lessonGame();
+  assert.deepEqual((await teach(store, 'campaign_list', {}, T + 5)).campaigns, [{ id: c.id, mode: 'lesson', opened_at: MON_9AM, closed_at: null, revealed_at: null }]);
+  await teach(store, 'campaign_reveal', {}, T + 10);
+  await teach(store, 'campaign_close', {}, T + 20);
+  await teach(store, 'campaign_open', { mode: 'week' }, T + 30);
+  const second = await campaignOf(store);
+  const listed = (await teach(store, 'campaign_list', {}, T + 40)).campaigns;
+  assert.deepEqual(listed, [
+    { id: second.id, mode: 'week', opened_at: T + 30, closed_at: null, revealed_at: null },
+    { id: c.id, mode: 'lesson', opened_at: MON_9AM, closed_at: T + 20, revealed_at: T + 10 }
+  ]);
+  // No campaign_id: the open one; with one: that one, even closed.
+  assert.equal((await teach(store, 'campaign_state', {}, T + 50)).campaign_id, second.id);
+  const old = await teach(store, 'campaign_insight', { campaign_id: c.id }, T + 50);
+  assert.equal(old.campaign_id, c.id);
+  assert.equal((await teach(store, 'campaign_state', { campaign_id: c.id }, T + 50)).phase, 'closed');
+  // An id that isn't this class's campaign is not found, never someone else's.
+  await rejectsWith(teach(store, 'campaign_insight', { campaign_id: 'bbbbbbbbbbbbbbbb' }, T + 60), 'no_campaign');
+  // Another class sees none of these.
+  assert.deepEqual((await teach(store, 'campaign_list', { class_id: 'class0' }, T + 60)).campaigns, []);
+});
+
 // ---------------------------------------------------------------- phone view extras
 
 test('the view lists my team’s fired squares this round and its duds still unknown', async () => {
