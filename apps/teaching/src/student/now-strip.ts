@@ -9,7 +9,7 @@
  * student list. The strip itself stays either way.
  */
 import { el } from '@/quiz/dom';
-import type { TodoBoxItem, TodoPayload } from '@/student/todo-panel';
+import { askedAnswerLesson, type TodoBoxItem, type TodoPayload } from '@/student/todo-panel';
 import './now-strip.css';
 
 /** Where the thing lives: a lesson to open, or a tab on the progress page. */
@@ -29,7 +29,12 @@ function wordsFor(t: TodoBoxItem): string {
 }
 
 const open = (t: TodoBoxItem): boolean => !t.done && t.feedback?.state !== 'read';
-const goFor = (t: TodoBoxItem): NowGo => (t.feedback ? { tab: 'returned' } : { lesson: t.id });
+const goFor = (t: TodoBoxItem): NowGo => {
+  // A quiz answer asked again is rewritten in the quiz itself.
+  const asked = askedAnswerLesson(t);
+  if (asked) return { lesson: asked };
+  return t.feedback ? { tab: 'returned' } : { lesson: t.id };
+};
 
 /**
  * The one thing: the first open row in Do now, then today's organiser cards, then the first open

@@ -9,6 +9,7 @@ import { createLiveClock, shapeEl } from '@/quiz/live-show';
 import { button, deviceToken, el, errorText, formatClock, formatMarks, plural, practiceChip, readJSON, writeJSON } from '@/quiz/dom';
 import { ROW_REVEAL_EVENT } from '@/blocks/quiz-deck';
 import { isTeacherPreview } from '@/quiz/teacher-preview';
+import { redraftEditor } from '@/student/redraft-editor';
 import './quiz.css';
 
 /**
@@ -28,7 +29,9 @@ import './quiz.css';
 
 type Settings = NonNullable<PublishedLesson['quiz']>;
 type ResultRow = { practice?: boolean; id: string; question: PublicQuestion; mark: MarkResult; awarded: number | null; hinted: boolean; response: QuizResponse | null; key: QuestionKey | null; comment?: string };
-type Result = { practice?: { score: number; max: number; pending: number } | null; n: number; submitted_at: string; released: boolean; score?: number; max?: number; pending?: number; same_version?: boolean; keys_shown?: boolean; rows?: ResultRow[] };
+/** An answer the teacher sent back for another go: rewritten here, under its question, then sent. */
+type AgainAsk = { id: string; question: PublicQuestion; state: 'asked' | 'sent'; comment: string };
+type Result = { again?: AgainAsk[]; practice?: { score: number; max: number; pending: number } | null; n: number; submitted_at: string; released: boolean; score?: number; max?: number; pending?: number; same_version?: boolean; keys_shown?: boolean; rows?: ResultRow[] };
 type Current = {
   n: number;
   version: string;
@@ -178,6 +181,54 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
   let resultIndex = -1;
   let submitting = false;
   let receiptAt: Date | null = null;
+  /** One editor per ask, kept across repaints so a student's words and place survive them. */
+  const againEditors = new Map<string, HTMLElement>();
+
+  /** Every open or sent ask, newest go first, with the go it belongs to. */
+  function asks(): Array<{ n: number; ask: AgainAsk }> {
+    return [...(status?.results ?? [])].reverse().flatMap((r) => (r.again ?? []).map((ask) => ({ n: r.n, ask })));
+  }
+  const askFor = (id: string) => asks().find((a) => a.ask.id === id) ?? null;
+  const questionNumber = (id: string): number | null => {
+    const i = questions.findIndex((q) => q.id === id);
+    return i < 0 ? null : i + 1;
+  };
+
+  /** The teacher's ask and a box for the new answer, sent from right here. `withPrompt` when the question isn't already above it. */
+  function againCard(n: number, ask: AgainAsk, withPrompt: boolean): HTMLElement {
+    const card = el('div', `qz-again${ask.state === 'sent' ? ' qz-again--sent' : ''}`);
+    if (withPrompt) {
+      const num = questionNumber(ask.id);
+      card.append(el('p', 'qz-eyebrow block-eyebrow', num ? `Question ${num}` : 'Question'), el('p', 'qz-card__prompt block-title', ask.question.prompt));
+    }
+    if (ask.state === 'sent') {
+      card.append(el('p', 'qz-again__title', 'Your new answer is with your teacher.'));
+      return card;
+    }
+    card.append(el('p', 'qz-again__title', 'Your teacher asked you to have another go at this one.'));
+    if (ask.comment.trim()) {
+      const said = el('p', 'qz-again__comment');
+      said.append(el('strong', '', 'Your teacher: '), document.createTextNode(ask.comment));
+      card.append(said);
+    }
+    const key = `${n}:${ask.id}`;
+    let editor = againEditors.get(key);
+    if (!editor) {
+      const again = <T>(action: string, extra: Record<string, unknown> = {}): Promise<T> =>
+        apiPost<T>(endpoint, { action, question_id: ask.id, ...classFields, ...extra });
+      editor = redraftEditor(
+        { load: () => again('again_load'), save: (part, field, text) => again('again_save', { part, field, text }), send: () => again('again_send') },
+        () => {
+          againEditors.delete(key);
+          void call('status').then(() => paint());
+        },
+        'Send my new answer'
+      );
+      againEditors.set(key, editor);
+    }
+    card.append(editor);
+    return card;
+  }
 
   const showError = (text: string) => {
     alert.textContent = text;
@@ -511,6 +562,25 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
       wrap.append(box);
     }
 
+    const open = asks().filter((a) => a.ask.state === 'asked');
+    if (open.length) {
+      const box = el('div', 'qz-again qz-again--call');
+      const nums = open.map((a) => questionNumber(a.ask.id)).filter((x): x is number => x !== null);
+      box.append(el('p', 'qz-again__title', nums.length ? `Your teacher asked you to have another go at question ${nums.join(', ')}.` : 'Your teacher asked you to have another go at an answer.'));
+      const first = open[0] as { n: number; ask: AgainAsk };
+      const slot = slots?.get(first.ask.id);
+      box.append(
+        button('Have another go', 'primary', () => {
+          if (slot) return revealSlot(slot);
+          resultIndex = s.results.findIndex((r) => r.n === first.n);
+          view = 'result';
+          paint();
+          body.querySelector(`[data-again="${CSS.escape(first.ask.id)}"]`)?.scrollIntoView({ block: 'center' });
+        })
+      );
+      wrap.append(box);
+    }
+
     const left = s.attempts_allowed - s.attempts_used;
     if (!questions.length) wrap.append(panel('There are no questions in this quiz yet.', 'Check back later.'));
     else if (!s.open) wrap.append(panel('This quiz has closed.', ''));
@@ -758,7 +828,8 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
       !!s?.live,
       s?.open ?? null,
       s?.results.length ?? 0,
-      s ? s.attempts_allowed - s.attempts_used : null
+      s ? s.attempts_allowed - s.attempts_used : null,
+      askFor(id)?.ask.state ?? null
     ]);
   }
 
@@ -813,6 +884,12 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
       box.append(el('p', 'qz-card__prompt block-title', q.prompt));
     }
     const s = status;
+    // An answer sent back for another go is rewritten right here, under its question.
+    const mine = !current ? askFor(id) : null;
+    if (mine) {
+      box.append(againCard(mine.n, mine.ask, false));
+      return box;
+    }
     const toBox = (label: string) => button(label, 'secondary', () => root.scrollIntoView({ block: 'center' }));
     if (!s) box.append(el('p', 'qz-note', 'Loading…'));
     else if (current) box.append(el('p', 'qz-note', 'This question isn’t part of your current go.'));
@@ -1011,8 +1088,14 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
       wrap.append(panel('Nothing handed in yet.', ''));
       return wrap;
     }
+    const asked = new Map((r.again ?? []).map((a) => [a.id, a]));
     if (!r.released || r.max === undefined) {
       wrap.append(panel('Handed in.', 'Your teacher will share the marks later. This page updates by itself.'));
+      for (const a of asked.values()) {
+        const card = againCard(r.n, a, true);
+        card.dataset.again = a.id;
+        wrap.append(card);
+      }
     } else {
       const pct = r.max ? Math.round(((r.score ?? 0) / r.max) * 100) : 0;
       const top = el('div', 'qz-score');
@@ -1027,6 +1110,11 @@ export function mountStudentQuiz(lesson: PublishedLesson, options: StudentQuizOp
         const li = el('li');
         if (row.practice) li.append(practiceChip());
         li.append(mountQuestionPlayer({ question: q, number: i + 1, response: row.response, result: { mark: row.mark, key: row.key, hinted: row.hinted, awarded: row.awarded, comment: row.comment } }));
+        const a = asked.get(row.id);
+        if (a) {
+          li.dataset.again = a.id;
+          li.append(againCard(r.n, a, false));
+        }
         list.append(li);
       });
       wrap.append(list);
