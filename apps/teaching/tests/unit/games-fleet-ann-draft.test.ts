@@ -277,34 +277,34 @@ describe('Ask Ann to draft in the editor', () => {
       return 'started' as const;
     } });
     document.body.append(root);
-    (root.querySelector('.fw-ann-btn') as HTMLButtonElement).click();
+    (root.querySelector('.fwe-ann-btn') as HTMLButtonElement).click();
     await flush();
-    expect(root.querySelector('.fw-ann__price')?.textContent).toMatch(/priced about A\$\d+\.\d\d/);
+    expect(root.querySelector('.fwe-ann__price')?.textContent).toMatch(/priced about A\$\d+\.\d\d/);
     expect(briefs).toEqual([]);
-    (root.querySelector('.fw-ann__go') as HTMLButtonElement).click();
+    (root.querySelector('.fwe-ann__go') as HTMLButtonElement).click();
     await flush();
     expect(briefs).toHaveLength(1);
     expect(briefs[0]!.startsWith(FLEET_BRIEF_HEAD)).toBe(true);
     expect(briefs[0]).toContain('Who lights the lamp in act one? → Tomas');
-    expect(root.querySelector('.fw-build-status')?.textContent).toMatch(/plan/);
+    expect(root.querySelector('.fwe-build-status')?.textContent).toMatch(/plan/);
     root.remove();
   });
 
   it('says Ann is busy, not writing a plan, when another job holds the lesson', async () => {
     const root = fleetContent(newGame('fleet_week', 'g_fleet') as Fleet, { onChange: () => {}, sources: async () => sources, startAnn: async () => 'busy' as const });
     document.body.append(root);
-    (root.querySelector('.fw-ann-btn') as HTMLButtonElement).click();
+    (root.querySelector('.fwe-ann-btn') as HTMLButtonElement).click();
     await flush();
-    (root.querySelector('.fw-ann__go') as HTMLButtonElement).click();
+    (root.querySelector('.fwe-ann__go') as HTMLButtonElement).click();
     await flush();
-    expect(root.querySelector('.fw-build-status')?.textContent).toBe(ANN_BUSY);
-    expect(root.querySelector('.fw-build-status')?.textContent).not.toMatch(/writing her plan/);
+    expect(root.querySelector('.fwe-build-status')?.textContent).toBe(ANN_BUSY);
+    expect(root.querySelector('.fwe-build-status')?.textContent).not.toMatch(/writing her plan/);
     root.remove();
   });
 
   it('has no Ask Ann button without a server', () => {
     const root = fleetContent(newGame('fleet_week', 'g_fleet') as Fleet, { onChange: () => {} });
-    expect(root.querySelector('.fw-ann-btn')).toBeNull();
+    expect(root.querySelector('.fwe-ann-btn')).toBeNull();
   });
 });
 

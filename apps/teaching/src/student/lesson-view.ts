@@ -32,6 +32,7 @@ import { caseClient } from '@/case-study/api';
 import { mountRotationPlayer } from '@/rotation/player';
 import { rotationClient } from '@/rotation/api';
 import { mountGameArcade } from '@/games/arcade';
+import { holdClassFleetSignals, type ClassFleetHold } from '@/student/fleet-toasts';
 import { gameClient } from '@/games/api';
 import '@/sprint/forms';
 import { lectureClient } from '@/lecture/api';
@@ -359,6 +360,8 @@ export function mountStudentLessonView(
   let endCard: { dispose(): void } | null = null;
   let whyRoute: { dispose(): void } | null = null;
   let lessonMap: LessonMapHandle | null = null;
+  // Fleet week toasts (§2): the shared class-wide host. This lesson's own games toast from its arcade.
+  let fleetToasts: ClassFleetHold | null = null;
   // Plain lessons only: the players and any live quiz round keep the page to themselves.
   const addEndCard = (content: HTMLElement, lesson: PublishedLesson, classId: string, from: string, before?: Node | null): void => {
     if (lecture || lesson.pedagogical_mode === 'quiz') return;
@@ -386,6 +389,8 @@ export function mountStudentLessonView(
     lessonMap = null;
     whyRoute?.dispose();
     whyRoute = null;
+    fleetToasts?.release();
+    fleetToasts = null;
     // Sections split out of another lesson: bring this device's saved answers with them before the blocks read them.
     carrySplitWork(lesson);
     // A lab hands its Explain answer in through the lesson's work sync, which is mounted just below.
@@ -396,6 +401,7 @@ export function mountStudentLessonView(
     if (workClass) work = mountWorkSync(content, { lessonId: lesson.lesson_id, classId: workClass });
     // The lesson end card, with previous and next under it. Neighbours come from the class's schedule when the lesson was opened from it.
     if (workClass) {
+      fleetToasts = holdClassFleetSignals(workClass, { except: lesson.lesson_id });
       const cls = extras?.cls;
       token = mountInitialsToken({
         classId: workClass,
@@ -563,6 +569,8 @@ export function mountStudentLessonView(
       lessonMap = null;
       whyRoute?.dispose();
       whyRoute = null;
+      fleetToasts?.release();
+      fleetToasts = null;
     }
   };
 }

@@ -3,8 +3,10 @@
  *
  * A full-screen view over one campaign: place my ships, fire (square, then
  * Sure or Unsure, only then the question), file damage reports and recall
- * lines, read the round report and, at the end, the reveal. It polls
- * `fleet_state` every 2 s while the page is visible. Every player is a call
+ * lines, read the round report and, at the end, the reveal. Lesson mode polls
+ * `fleet_state` every 2 s while the page is visible. Week mode loads on open,
+ * on focus, after the player's own actions and once at each known deadline
+ * (the cut-off, then dawn), never on a timer of its own (§3.2). Every player is a call
  * sign from the view; real names appear only in `view.reveal`. After an
  * answer the phone says "Answer sent", never right or wrong.
  */
@@ -33,6 +35,9 @@ export type FleetCampaignOptions = {
 export type FleetCampaign = { close(): void; refresh(): Promise<void> };
 
 const POLL_MS = 2000;
+/** Week mode: after a failed load, try again this much later (no 2 s poll). */
+const WEEK_RETRY_MS = 60_000;
+const MAX_TIMEOUT_MS = 2_147_000_000;
 const ROW_LETTERS = 'ABCDE';
 const sizeOf = (id: ShipId) => SHIP_SIZES[SHIP_IDS.indexOf(id)];
 const promptOf = (q: FleetQuestion) => (q && typeof q.prompt === 'string' && q.prompt.trim() ? q.prompt : 'Answer from memory.');
@@ -788,9 +793,11 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
   async function refresh(): Promise<void> {
     if (closed || inflight) return;
     inflight = true;
+    let failed = false;
     try {
       show(await client.state(game.id));
     } catch (e) {
+      failed = true;
       if (errCode(e) === 'no_campaign') {
         view = null;
         waitingForTeacher = true;
@@ -799,16 +806,41 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
       repaint();
     } finally {
       inflight = false;
+      schedule(failed);
     }
   }
 
-  const pollTimer = window.setInterval(() => {
-    if (document.visibilityState !== 'hidden') void refresh();
-  }, options.pollMs ?? POLL_MS);
+  /**
+   * The next load. Lesson mode (and before the campaign is known): every `pollMs` while visible.
+   * Week mode: once at the next deadline the view names (cut-off or dawn), plus a slow retry after
+   * a failed load. A hidden page waits for visibilitychange or focus.
+   */
+  let pollTimer: number | null = null;
+  function schedule(failed = false): void {
+    if (pollTimer !== null) window.clearTimeout(pollTimer);
+    pollTimer = null;
+    if (closed || document.visibilityState === 'hidden') return;
+    if (view?.mode !== 'week') {
+      pollTimer = window.setTimeout(() => void refresh(), options.pollMs ?? POLL_MS);
+      return;
+    }
+    const t = Date.now();
+    const due = [view.closes_at, view.dawn_at].filter((x): x is number => typeof x === 'number' && x > t);
+    if (failed) due.push(t + WEEK_RETRY_MS);
+    if (!due.length) return;
+    // A second after the deadline, so the server has moved on; setTimeout tops out near 24.8 days.
+    const wait = Math.min(Math.min(...due) - t + 1000, MAX_TIMEOUT_MS);
+    pollTimer = window.setTimeout(() => void refresh(), wait);
+  }
   const onVisible = () => {
     if (document.visibilityState === 'visible') void refresh();
+    else schedule();
+  };
+  const onFocus = () => {
+    if (document.visibilityState !== 'hidden') void refresh();
   };
   document.addEventListener('visibilitychange', onVisible);
+  window.addEventListener('focus', onFocus);
   const onKey = (e: KeyboardEvent) => {
     if (e.key === 'Escape' && !(e.target instanceof HTMLTextAreaElement)) close();
   };
@@ -817,9 +849,11 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
   function close(): void {
     if (closed) return;
     closed = true;
-    window.clearInterval(pollTimer);
+    if (pollTimer !== null) window.clearTimeout(pollTimer);
+    pollTimer = null;
     window.clearInterval(clockTimer);
     document.removeEventListener('visibilitychange', onVisible);
+    window.removeEventListener('focus', onFocus);
     for (const { sea } of seas.values()) sea.destroy();
     seas.clear();
     root.remove();

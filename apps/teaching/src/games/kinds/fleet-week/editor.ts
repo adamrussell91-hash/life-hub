@@ -157,7 +157,7 @@ function shortAnswerEditor(item: QuestionItem, label: string, promptHint: string
     cur = { ...cur, question: { ...cur.question, kind: 'short_answer', marks: 1, ...patch } as QuestionItem['question'] };
     onChange(cur);
   };
-  const box = el('div', 'fw-variant');
+  const box = el('div', 'fwe-variant');
   box.append(el('h5', 'gm-h5', label));
   const prompt = textArea(q(cur).prompt ?? '', QUIZ_PROMPT_MAX, `${label} prompt`, (v) => setQ({ prompt: v }), 2);
   prompt.placeholder = promptHint;
@@ -177,7 +177,7 @@ function shortAnswerEditor(item: QuestionItem, label: string, promptHint: string
 export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
   let cur = normalise(game);
   const emit = () => ctx.onChange(cur);
-  const root = el('div', 'gm-content fw-editor');
+  const root = el('div', 'gm-content fwe-editor');
   let open = -1;
   let buildOpen = false;
   let sources: UnitSources | null = null;
@@ -209,7 +209,7 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
     const head = el('div', 'gm-content__head');
     head.append(el('h4', 'gm-h4', 'The grid'), el('span', 'gm-count', 'Label the columns and rows, then tap a square to write its two questions'));
     if (ctx.sources) {
-      const build = el('button', 'btn btn--secondary gm-build-btn fw-build-btn', 'Build from this unit');
+      const build = el('button', 'btn btn--secondary gm-build-btn fwe-build-btn', 'Build from this unit');
       build.type = 'button';
       build.setAttribute('aria-expanded', String(buildOpen));
       build.addEventListener('click', () => {
@@ -221,7 +221,7 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
       head.append(build);
     }
     if (ctx.sources && ctx.startAnn) {
-      const ask = el('button', 'btn btn--secondary gm-build-btn fw-ann-btn', 'Ask Ann to draft');
+      const ask = el('button', 'btn btn--secondary gm-build-btn fwe-ann-btn', 'Ask Ann to draft');
       ask.type = 'button';
       ask.setAttribute('aria-expanded', String(annOpen));
       ask.addEventListener('click', () => {
@@ -232,13 +232,13 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
       });
       head.append(ask);
     }
-    const status = el('p', 'gm-note fw-build-status', note);
+    const status = el('p', 'gm-note fwe-build-status', note);
     status.setAttribute('role', 'status');
     status.hidden = !note;
-    const grid = el('div', 'fw-grid');
+    const grid = el('div', 'fwe-grid');
     grid.setAttribute('role', 'group');
     grid.setAttribute('aria-label', 'Fleet week grid');
-    grid.append(el('span', 'fw-corner'));
+    grid.append(el('span', 'fwe-corner'));
     const setLabel = (axis: 'columns' | 'rows', i: number, v: string) => {
       const list = [...cur[axis]];
       list[i] = v;
@@ -247,7 +247,7 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
     };
     for (let c = 0; c < FLEET_SIZE; c++) {
       const input = textInput(cur.columns[c] ?? '', GAME_LIMITS.fleetLabel, `Column ${c + 1} label`, (v) => setLabel('columns', c, v), `Col ${c + 1}`);
-      input.classList.add('fw-label', 'fw-label--col');
+      input.classList.add('fwe-label', 'fwe-label--col');
       grid.append(input);
     }
     const cells: HTMLButtonElement[] = [];
@@ -262,14 +262,14 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
     };
     for (let r = 0; r < FLEET_SIZE; r++) {
       const input = textInput(cur.rows[r] ?? '', GAME_LIMITS.fleetLabel, `Row ${ROW_LETTERS[r]} label`, (v) => setLabel('rows', r, v), `Row ${ROW_LETTERS[r]}`);
-      input.classList.add('fw-label', 'fw-label--row');
+      input.classList.add('fwe-label', 'fwe-label--row');
       grid.append(input);
       for (let c = 0; c < FLEET_SIZE; c++) {
         const i = r * FLEET_SIZE + c;
-        const cell = el('button', 'fw-cell');
+        const cell = el('button', 'fwe-cell');
         cell.type = 'button';
         cell.dataset.square = squareName(i);
-        cell.append(el('span', 'fw-cell__name', squareName(i)), el('span', 'fw-cell__dot'));
+        cell.append(el('span', 'fwe-cell__name', squareName(i)), el('span', 'fwe-cell__dot'));
         cell.addEventListener('click', () => openSquare(open === i ? -1 : i));
         cells.push(cell);
         grid.append(cell);
@@ -277,7 +277,7 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
     }
 
     /* The open square's variants */
-    const panel = el('div', 'gm-nest fw-panel');
+    const panel = el('div', 'gm-nest fwe-panel');
     panel.hidden = true;
     function openSquare(i: number): void {
       const was = open;
@@ -287,7 +287,7 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
       panel.hidden = i < 0;
       if (i < 0) return;
       paintCell(i);
-      const where = el('h4', 'gm-h4 fw-panel__head', `Square ${squareName(i)}`);
+      const where = el('h4', 'gm-h4 fwe-panel__head', `Square ${squareName(i)}`);
       const axes = [cur.rows[Math.floor(i / FLEET_SIZE)]?.trim(), cur.columns[i % FLEET_SIZE]?.trim()].filter(Boolean).join(' · ');
       panel.append(where);
       if (axes) panel.append(el('p', 'gm-note', axes));
@@ -306,7 +306,7 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
           })
         );
       });
-      const close = el('button', 'btn btn--ghost fw-panel__close', 'Done with this square');
+      const close = el('button', 'btn btn--ghost fwe-panel__close', 'Done with this square');
       close.type = 'button';
       close.addEventListener('click', () => {
         cells[i]?.focus();
@@ -319,7 +319,7 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
     /* Recall lines */
     const recallHead = el('div', 'gm-content__head');
     recallHead.append(el('h4', 'gm-h4', 'Recall lines'), el('span', 'gm-count', 'The sinking blow for each ship: a key quote or term to complete'));
-    const recall = el('div', 'fw-recall');
+    const recall = el('div', 'fwe-recall');
     SHIP_LINES.forEach((label, si) => {
       const item = cur.recall[si] as QuestionItem;
       const box = shortAnswerEditor(item, label, 'e.g. Complete the quote: “All the world’s a …”', (next) => {
@@ -341,7 +341,7 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
 
   /** The picker: a target (a square, the blank squares, the recall lines), then the unit's lines to tick. */
   function buildPanel(openNow: number): HTMLElement {
-    const box = el('div', 'gm-panel gm-sources fw-build');
+    const box = el('div', 'gm-panel gm-sources fwe-build');
     box.setAttribute('role', 'group');
     box.setAttribute('aria-label', 'Build from this unit');
     const head = el('div', 'gm-panel__head');
@@ -370,7 +370,7 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
     }
 
     /* Where the ticked lines go */
-    const target = el('select', 'gm-input fw-build__target');
+    const target = el('select', 'gm-input fwe-build__target');
     const opt = (value: string, label: string) => {
       const o = el('option', '', label);
       o.value = value;
@@ -458,7 +458,7 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
    * teacher answers it; Accept fills blank slots and nothing publishes.
    */
   function annPanel(): HTMLElement {
-    const box = el('div', 'gm-panel fw-ann');
+    const box = el('div', 'gm-panel fwe-ann');
     box.setAttribute('role', 'group');
     box.setAttribute('aria-label', 'Ask Ann to draft');
     const head = el('div', 'gm-panel__head');
@@ -491,9 +491,9 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
     const counts = [`${pack.organiser.length} organiser`, `${pack.questions.length} quiz`, `${pack.quotes.length} quote`].join(', ');
     box.append(
       el('p', 'gm-note', `Ann drafts the labels, both questions for all 25 squares and the four recall lines from this unit only (${counts} lines).`),
-      el('p', 'gm-note fw-ann__price', `She replies in the chat with a plan priced ${audText(cost_aud)}. Nothing is built until you answer it, and Accept fills blank slots only.`)
+      el('p', 'gm-note fwe-ann__price', `She replies in the chat with a plan priced ${audText(cost_aud)}. Nothing is built until you answer it, and Accept fills blank slots only.`)
     );
-    const go = el('button', 'btn btn--primary fw-ann__go', annBusy ? 'Asking Ann…' : 'Ask Ann for a plan');
+    const go = el('button', 'btn btn--primary fwe-ann__go', annBusy ? 'Asking Ann…' : 'Ask Ann for a plan');
     go.type = 'button';
     go.disabled = annBusy;
     go.addEventListener('click', () => {

@@ -31,7 +31,8 @@ import type { Practise } from '@/student/feedback-card';
 import type { RedraftApi } from '@/student/redraft-editor';
 import { countdownCard, renderTodoPanel, vivaPracticeLine, type TodoPayload } from '@/student/todo-panel';
 import { oneThing, renderNowStrip, showOnList } from '@/student/now-strip';
-import { classSignalSource, createFleetSignals, fleetHref, type FleetSignals } from '@/games/kinds/fleet-week/signals';
+import type { FleetSignals } from '@/games/kinds/fleet-week/signals';
+import { holdClassFleetSignals, type ClassFleetHold } from '@/student/fleet-toasts';
 import '@/progress/progress.css';
 import './profile.css';
 
@@ -536,19 +537,10 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
   const call = <T = ProfilePayload>(action: 'progress' | 'claim' | 'returned' | 'piece' | 'seen' | 'pointer_off' | 'fleet_signals' | 'fleet_signals_seen', extra: Record<string, unknown> = {}): Promise<T> =>
     apiPost<T>(`/api/published/profile/${encodeURIComponent(classId)}`, { action, class_token: deviceToken(`class:${classId}`), ...extra });
 
-  // Fleet week signals (§2), class-wide through this page's own profile client. Read once the
-  // student is known, then on focus. A tap goes to the game's lesson, once the seen is stored.
-  let fleet: FleetSignals | null = null;
-  const startFleet = (): FleetSignals =>
-    (fleet ??= createFleetSignals({
-      source: classSignalSource((action, extra) => call(action, extra)),
-      open: (e, seen) => {
-        const href = studentAnchor(fleetHref(classId, e), '').href;
-        void Promise.race([seen, new Promise((r) => window.setTimeout(r, 1200))]).then(() => {
-          if (!disposed) window.location.assign(href);
-        });
-      }
-    }));
+  // Fleet week signals (§2), class-wide: the one host every student page in this class shares
+  // (student/fleet-toasts.ts). Read once the student is known, then on focus.
+  let fleet: ClassFleetHold | null = null;
+  const startFleet = (): FleetSignals => (fleet ??= holdClassFleetSignals(classId)).signals;
 
   let organiser: OrganiserLoad | null = null;
   let latest: ProfilePayload | null = null;
@@ -639,7 +631,7 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
   return {
     dispose() {
       disposed = true;
-      fleet?.dispose();
+      fleet?.release();
       clearNoIndex();
     }
   };

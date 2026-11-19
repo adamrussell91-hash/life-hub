@@ -6,7 +6,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { gameKeys, gameStudentAction } from '../../netlify/functions/_shared/games.mjs';
-import { weekCloses, zonedInstant } from '../../netlify/functions/_shared/fleet-week-store.mjs';
+import { dawnAfter, weekCloses, zonedInstant } from '../../netlify/functions/_shared/fleet-week-store.mjs';
+import { nextDawn } from '../../netlify/functions/_shared/fleet-week.mjs';
 import { fleetTeacherAction } from '../../netlify/functions/_shared/fleet-week-teacher.mjs';
 import { etagRetry } from '../../netlify/functions/_shared/etag-json.mjs';
 import { fleet } from '../../netlify/functions/_shared/game-rules.mjs';
@@ -117,6 +118,25 @@ test('campaign_open in week mode fixes the schedule at the open', async () => {
   assert.equal(room.mode, 'week');
   assert.deepEqual(room.schedule, c.schedule);
   await rejectsWith(teach(store, 'campaign_open', { mode: 'week', cutoff: '8pm', class_id: 'class1' }), 'bad_cutoff');
+});
+
+test('the student view names its mode and, in week mode, the next dawn (the phone loads then, not by polling)', async () => {
+  const { store } = await fleetLesson();
+  await teach(store, 'campaign_open', { mode: 'week' });
+  const c = await campaignOf(store);
+  const view = await play(store, 1, 'fleet_state', {}, MON_9AM + 1000);
+  assert.equal(view.mode, 'week');
+  assert.equal(view.closes_at, c.schedule[0]);
+  assert.equal(view.dawn_at, dawnAfter(c, 1));
+  // After round 1's dawn, the next one is round 2's; after the last, none.
+  assert.equal(nextDawn(c, dawnAfter(c, 1)), dawnAfter(c, 2));
+  assert.equal(nextDawn(c, dawnAfter(c, c.settings.rounds)), null);
+
+  const lesson = await fleetLesson();
+  await fleetTeacherAction(lesson.store, 'gl1', { action: 'campaign_open', game_id: 'fw', class_id: 'class1' }, { now: MON_9AM });
+  const lv = await gameStudentAction(lesson.store, 'gl1', { action: 'fleet_state', game_id: 'fw', ...whoFleet(1) }, { now: MON_9AM + 1000 });
+  assert.equal(lv.mode, 'lesson');
+  assert.equal('dawn_at' in lv, false);
 });
 
 test('week mode defaults the cut-off to 8 pm', async () => {

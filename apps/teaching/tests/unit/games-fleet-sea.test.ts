@@ -94,6 +94,54 @@ describe('fleet week sea', () => {
     sea.destroy();
   });
 
+  it('stops the frame loop once the canvas is detached, and starts again when it is back', () => {
+    reducedMotion(false);
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => fakeContext() as never);
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', vi.fn((cb: FrameRequestCallback) => (frames.push(cb), frames.length)));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const host = sizedHost();
+    const sea = createSea(host, { seed: 'away', mode: 'rival' });
+    expect(frames.length).toBe(1);
+    frames.shift()!(16);
+    expect(frames.length).toBe(1); // still on the page: the next frame is asked for
+    host.remove();
+    frames.shift()!(32);
+    expect(frames.length).toBe(0); // detached: no further frames
+    document.body.append(host);
+    sea.update({ ships: [], marks: { 3: 'miss' } });
+    expect(frames.length).toBe(1);
+    sea.destroy();
+  });
+
+  it('stops when an IntersectionObserver says it is off screen, and restarts when it is visible', () => {
+    reducedMotion(false);
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => fakeContext() as never);
+    let report: ((entries: Array<{ isIntersecting: boolean }>) => void) | null = null;
+    const disconnect = vi.fn();
+    vi.stubGlobal('IntersectionObserver', class {
+      constructor(cb: (entries: Array<{ isIntersecting: boolean }>) => void) {
+        report = cb;
+      }
+      observe() {}
+      disconnect = disconnect;
+    });
+    const raf = vi.fn(() => 5);
+    const caf = vi.fn();
+    vi.stubGlobal('requestAnimationFrame', raf);
+    vi.stubGlobal('cancelAnimationFrame', caf);
+    const sea = createSea(sizedHost(), { seed: 'scroll', mode: 'own' });
+    expect(raf).toHaveBeenCalledTimes(1);
+    report!([{ isIntersecting: false }]);
+    expect(caf).toHaveBeenCalledWith(5);
+    sea.update({ ships: [], marks: { 1: 'hit' } });
+    expect(raf).toHaveBeenCalledTimes(1); // off screen: an update doesn't start it
+    report!([{ isIntersecting: true }]);
+    expect(raf).toHaveBeenCalledTimes(2);
+    sea.destroy();
+    expect(disconnect).toHaveBeenCalled();
+  });
+
   it('a null context falls back to the CSS look', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     const host = sizedHost();

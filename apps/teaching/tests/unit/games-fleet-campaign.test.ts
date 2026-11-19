@@ -203,6 +203,74 @@ describe('fleet week phone', () => {
   });
 });
 
+describe('fleet week phone: when it loads', () => {
+  it('lesson mode polls every pollMs while visible', async () => {
+    vi.useFakeTimers();
+    try {
+      const client = fakeClient(baseView({ mode: 'lesson' }));
+      open = openFleetCampaign(document.body, { lessonId: 'lesson_fw', classId: 'class_fw', game, client, pollMs: 2000 });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(client.state).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(client.state).toHaveBeenCalledTimes(4);
+    } finally {
+      open?.close();
+      open = null;
+      vi.useRealTimers();
+    }
+  });
+
+  it('week mode loads on open, on focus and visibility, and once at each deadline, never every 2 s', async () => {
+    vi.useFakeTimers();
+    try {
+      const t0 = Date.now();
+      const client = fakeClient(baseView({ mode: 'week', phase: 'firing', round: 1, closes_at: t0 + 60_000, dawn_at: t0 + 120_000 }));
+      open = openFleetCampaign(document.body, { lessonId: 'lesson_fw', classId: 'class_fw', game, client, pollMs: 2000 });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(client.state).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(client.state).toHaveBeenCalledTimes(1);
+      window.dispatchEvent(new Event('focus'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(client.state).toHaveBeenCalledTimes(2);
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(client.state).toHaveBeenCalledTimes(3);
+      // The cut-off (a second after it), then the dawn.
+      await vi.advanceTimersByTimeAsync(31_000);
+      expect(client.state).toHaveBeenCalledTimes(4);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(client.state).toHaveBeenCalledTimes(5);
+      // Both deadlines past: nothing more on a timer.
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(client.state).toHaveBeenCalledTimes(5);
+    } finally {
+      open?.close();
+      open = null;
+      vi.useRealTimers();
+    }
+  });
+
+  it('week mode reloads after the player’s own action', async () => {
+    const client = fakeClient(baseView({ mode: 'week', phase: 'firing', round: 1, closes_at: Date.now() + 3_600_000, shots: { left: 4, returning: [] } }));
+    const root = start(client);
+    await flush();
+    const before = (client.state as ReturnType<typeof vi.fn>).mock.calls.length;
+    cell(root, 7).click();
+    byText(root, 'Sure').click();
+    await flush();
+    expect(client.commit).toHaveBeenCalled();
+    const box = root.querySelector<HTMLTextAreaElement>('textarea')!;
+    box.value = 'The keeper';
+    box.dispatchEvent(new Event('input'));
+    root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    await flush();
+    await flush();
+    expect(client.answer).toHaveBeenCalledTimes(1);
+    expect((client.state as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(before);
+  });
+});
+
 describe('arcade: fleet week card', () => {
   it('offers Open Fleet week and opens the campaign phone', async () => {
     const lesson = { lesson_id: 'lesson_fw', title: 'Fleet', blocks: [], published_at: '2026-11-19T09:00:00.000Z', schema_version: 1, pedagogical_mode: 'game', game: { version: 'v1', games: [game] } } as unknown as PublishedLesson;

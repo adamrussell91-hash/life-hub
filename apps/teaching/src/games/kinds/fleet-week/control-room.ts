@@ -352,7 +352,11 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
     if (typeof next.now === 'number' && Number.isFinite(next.now)) offset = next.now - now();
     state = next;
     paintTop();
-    const key = JSON.stringify(next);
+    // The server clock changes on every read; leave it out so a poll with no
+    // real change keeps focus and any playing replay. The time-left line is
+    // repainted above and by the 1 s tick.
+    const { now: _clock, ...rest } = next;
+    const key = JSON.stringify(rest);
     if (key !== painted) {
       painted = key;
       paintRoom();
@@ -365,8 +369,26 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
     if (pollTimer) clearTimeout(pollTimer);
     pollTimer = null;
     if (disposed || !state || state.closed_at || state.read_only) return;
+    // A hidden tab doesn't poll; visibilitychange or focus fetches straight away.
+    if (typeof document !== 'undefined' && document.hidden) return;
     pollTimer = setTimeout(() => void handle.refresh(), pollMs);
   }
+
+  const onWake = () => {
+    if (disposed || (typeof document !== 'undefined' && document.hidden)) return;
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = null;
+    void handle.refresh();
+  };
+  const onHidden = () => {
+    if (document.hidden && pollTimer) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  };
+  const onVisibility = () => (document.hidden ? onHidden() : onWake());
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('focus', onWake);
 
   // ------------------------------------------------------------ top bar
   function paintTop(): void {
@@ -862,6 +884,9 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
       if (disposed) return;
       disposed = true;
       if (pollTimer) clearTimeout(pollTimer);
+      pollTimer = null;
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onWake);
       clearInterval(tick);
       dropSeas();
       root.remove();

@@ -26,6 +26,10 @@ export type FleetView = {
   round: number;
   rounds: number;
   closes_at: number | null;
+  /** 'week': loaded on open, focus, own actions and at each deadline, not polled (§3.2). Older servers omit it (lesson). */
+  mode?: 'lesson' | 'week';
+  /** Week mode: the next dawn, when a round's report reaches students; null once none is left. */
+  dawn_at?: number | null;
   labels: { columns: string[]; rows: string[] };
   /** `joins_at`: a late joiner's first firing round, while they wait for it. */
   me: { sign: string; ships: ShipId[]; placed: boolean; joins_at?: number };

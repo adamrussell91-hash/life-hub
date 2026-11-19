@@ -224,6 +224,8 @@ export type FleetSignalsOptions = {
   open: (e: FleetSignal, seen: Promise<unknown>) => void;
   /** Read on start (default true). */
   load?: boolean;
+  /** Which waiting events may toast (default all): a page whose own door shows some leaves them out. */
+  toastIf?: (e: FleetSignal) => boolean;
 };
 export type FleetSignals = {
   /** An anchor badge counting waiting events (those `only` lets through). */
@@ -291,7 +293,7 @@ export function createFleetSignals(options: FleetSignalsOptions): FleetSignals {
     if (disposed) return;
     waiting = events;
     paintBadges();
-    showFleetToasts(events, {
+    showFleetToasts(options.toastIf ? events.filter(options.toastIf) : events, {
       open: openOne,
       seen: (ids) => void seen(ids),
       after: (e) => {

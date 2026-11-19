@@ -24,8 +24,12 @@ const pct = (a: number | null): string => (a === null ? '—' : `${Math.round(a 
 const rate = (r: Rate): string => (r.answered ? `${pct(r.accuracy ?? r.right / r.answered)} (${r.right}/${r.answered})` : '—');
 const STEP_TEXT = ['Not answered', '0–19%', '20–39%', '40–59%', '60–79%', '80–100%'];
 
+/**
+ * A table that, below 480px (insight.css), stacks each row as "label: value" lines instead of
+ * scrolling sideways: every cell carries its column's heading in `data-label`.
+ */
 function table(head: string[], rows: Array<Array<string | Node>>, caption: string, cls = ''): HTMLElement {
-  const scroll = el('div', 'gm-table-scroll');
+  const scroll = el('div', 'gm-table-scroll fwi-stack');
   const t = el('table', `gm-table ${cls}`.trim());
   const thead = el('thead');
   const tr = el('tr');
@@ -41,6 +45,7 @@ function table(head: string[], rows: Array<Array<string | Node>>, caption: strin
     r.forEach((c, i) => {
       const td = i === 0 ? el('th') : el('td');
       if (i === 0) (td as HTMLTableCellElement).scope = 'row';
+      td.dataset.label = head[i] ?? '';
       if (typeof c === 'string') td.textContent = c;
       else td.append(c);
       row.append(td);

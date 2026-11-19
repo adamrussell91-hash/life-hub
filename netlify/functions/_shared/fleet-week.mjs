@@ -28,7 +28,7 @@ import { FLEET_ACTIONS, campaignIndexKey, gameKeys } from './game-store.mjs';
 import { cleanWritingLog } from './quiz-core.mjs';
 import { checkAnswer, fleet } from './game-rules.mjs';
 import {
-  LATE_GRACE_MS, SHOTS_PER_ROUND, aliasFor, ensureCampaign, ensureResolved, firesIn, findCampaign, hashFor, visibleState, list, loadFleetGame, markClock, obj, reportInputs,
+  LATE_GRACE_MS, SHOTS_PER_ROUND, aliasFor, dawnAfter, ensureCampaign, ensureResolved, firesIn, findCampaign, hashFor, visibleState, list, loadFleetGame, markClock, obj, reportInputs,
   roundClosing, roundOpen, roundsOf, touchClock, updateJSON
 } from './fleet-week-store.mjs';
 
@@ -89,6 +89,16 @@ function shotOfHit(state, hit) {
  * round log is filtered to this player's side (their team's shots and shots at
  * their team) and never sent raw.
  */
+/** Week mode: the next 06:00 after a cut-off that is still to come, or null. */
+export function nextDawn(campaign, now) {
+  if (campaign.mode !== 'week' || campaign.revealed_at || campaign.closed_at) return null;
+  for (let r = 1; r <= roundsOf(campaign); r += 1) {
+    const at = dawnAfter(campaign, r);
+    if (at > now) return at;
+  }
+  return null;
+}
+
 export async function viewFor(store, k, campaign, keys, state, clock, owner, now) {
   const { team, rival } = sidesOf(campaign, owner);
   const phase = phaseOf(campaign, clock);
@@ -144,6 +154,10 @@ export async function viewFor(store, k, campaign, keys, state, clock, owner, now
     round: clock.round,
     rounds: roundsOf(campaign),
     closes_at: phase === 'placement' || phase === 'firing' ? clock.closes_at : null,
+    // Week mode loads on open and on focus, not by polling (§3.2): the phone also reloads once at
+    // the next cut-off and at the next dawn, when a report reaches it.
+    mode: campaign.mode === 'week' ? 'week' : 'lesson',
+    ...(campaign.mode === 'week' ? { dawn_at: nextDawn(campaign, now) } : {}),
     labels: { columns: keys.live.fleet.columns, rows: keys.live.fleet.rows },
     me: { sign: signs[owner], ships: fleet.shipsFor(team, owner), placed, ...(firesIn(campaign, owner, clock.round) ? {} : { joins_at: obj(campaign.late)[owner] }) },
     team: {

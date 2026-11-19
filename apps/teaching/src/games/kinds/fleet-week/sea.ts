@@ -589,17 +589,19 @@ export function createSea(host: HTMLElement, options: SeaOptions): Sea {
     }
   }
 
-  // ── Loop: runs only when moving is allowed, the tab shows and the host is in the page.
+  // ── Loop: runs only when moving is allowed, the tab shows and the host is in the page and on screen.
+  /** False while an IntersectionObserver says the host is scrolled away (true where there is none). */
+  let onScreen = true;
+  const showing = () => host.isConnected && onScreen && document.visibilityState !== 'hidden';
   function tick(now: number): void {
     raf = 0;
-    if (destroyed || still() || document.visibilityState === 'hidden') return;
+    // Detached, scrolled away or hidden: the loop stops; the observers or update() start it again.
+    if (destroyed || still() || !showing()) return;
     const dt = Math.min(0.05, (now - lastT) / 1000 || 0.016);
     lastT = now;
-    if (host.isConnected) {
-      if (!W) resize();
-      step(dt);
-      draw(now / 1000);
-    }
+    if (!W) resize();
+    step(dt);
+    draw(now / 1000);
     raf = requestAnimationFrame(tick);
   }
   function kick(): void {
@@ -608,7 +610,7 @@ export function createSea(host: HTMLElement, options: SeaOptions): Sea {
       draw(0);
       return;
     }
-    if (!raf && document.visibilityState !== 'hidden' && typeof requestAnimationFrame === 'function') {
+    if (!raf && showing() && typeof requestAnimationFrame === 'function') {
       lastT = performance.now();
       raf = requestAnimationFrame(tick);
     }
@@ -619,8 +621,22 @@ export function createSea(host: HTMLElement, options: SeaOptions): Sea {
   }
   const onVisibility = () => (document.visibilityState === 'hidden' ? stop() : kick());
   document.addEventListener('visibilitychange', onVisibility);
-  const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(() => resize()) : null;
+  // A resize also reports a host put back in the page (its size goes from 0): start again then.
+  const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {
+    resize();
+    kick();
+  }) : null;
   ro?.observe(host);
+  const io = typeof IntersectionObserver === 'function'
+    ? new IntersectionObserver((entries) => {
+        const e = entries[entries.length - 1];
+        if (!e) return;
+        onScreen = e.isIntersecting;
+        if (onScreen) kick();
+        else stop();
+      })
+    : null;
+  io?.observe(host);
   const onResize = () => resize();
   window.addEventListener('resize', onResize);
   resize();
@@ -649,7 +665,7 @@ export function createSea(host: HTMLElement, options: SeaOptions): Sea {
     },
     lift(): Promise<void> {
       if (destroyed) return Promise.resolve();
-      if (still() || document.visibilityState === 'hidden') {
+      if (still() || !showing()) {
         fog = 0;
         shipAlpha = 1;
         draw(0);
@@ -665,6 +681,7 @@ export function createSea(host: HTMLElement, options: SeaOptions): Sea {
       destroyed = true;
       stop();
       ro?.disconnect();
+      io?.disconnect();
       window.removeEventListener('resize', onResize);
       document.removeEventListener('visibilitychange', onVisibility);
       lifting?.done();

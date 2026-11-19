@@ -83,7 +83,7 @@ describe('Fleet week editor', () => {
 
   it('renders 25 squares named A1 to E5 and saves the labels', () => {
     const { host, fleet } = setup({ games: [newGame('fleet_week', 'g_fw')] });
-    const cells = host.querySelectorAll<HTMLButtonElement>('.fw-cell');
+    const cells = host.querySelectorAll<HTMLButtonElement>('.fwe-cell');
     expect(cells).toHaveLength(25);
     expect(cells[0]!.dataset.square).toBe('A1');
     expect(cells[24]!.dataset.square).toBe('E5');
@@ -95,10 +95,10 @@ describe('Fleet week editor', () => {
 
   it('edits a square’s variants from the panel and fills its dot', () => {
     const { host, fleet } = setup({ games: [newGame('fleet_week', 'g_fw')] });
-    const b3 = host.querySelector<HTMLButtonElement>('.fw-cell[data-square="B3"]')!;
+    const b3 = host.querySelector<HTMLButtonElement>('.fwe-cell[data-square="B3"]')!;
     expect(b3.dataset.state).toBe('empty');
     b3.click();
-    expect(host.querySelector('.fw-panel')?.hasAttribute('hidden')).toBe(false);
+    expect(host.querySelector('.fwe-panel')?.hasAttribute('hidden')).toBe(false);
     type(host.querySelector('[aria-label="Variant A prompt"]'), 'Who lights the lamp in act one?');
     type(host.querySelector('[aria-label="Variant A accepted answers"]'), 'Tomas, the keeper');
     const sq = fleet().squares[7]!;
@@ -120,7 +120,7 @@ describe('Fleet week editor', () => {
 
   it('saves the four recall lines', () => {
     const { host, fleet } = setup({ games: [newGame('fleet_week', 'g_fw')] });
-    const ships = host.querySelectorAll<HTMLElement>('.fw-recall .fw-variant');
+    const ships = host.querySelectorAll<HTMLElement>('.fwe-recall .fwe-variant');
     expect([...ships].map((s) => s.querySelector('h5')?.textContent)).toEqual(['Ship of 3', 'Ship of 2', 'Ship of 2', 'Ship of 1']);
     type(ships[3]!.querySelector('textarea'), 'Complete: “A lamp is only a …”');
     type(ships[3]!.querySelectorAll('textarea')[1] as HTMLTextAreaElement, 'promise');
@@ -130,10 +130,24 @@ describe('Fleet week editor', () => {
     expect(fleet().recall).toHaveLength(4);
   });
 
+  it('uses only its own fwe- classes, none shared with the phone’s .fw-* styles (W12)', async () => {
+    const { host } = setup({ games: [newGame('fleet_week', 'g_fw')] });
+    const editor = host.querySelector('.fwe-editor')!;
+    expect(editor).not.toBeNull();
+    const classes = [editor, ...editor.querySelectorAll('*')].flatMap((n) => [...n.classList]);
+    expect(classes.filter((c) => /^fw-/.test(c))).toEqual([]);
+    for (const c of ['fwe-grid', 'fwe-cell', 'fwe-label', 'fwe-corner']) expect(classes).toContain(c);
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const css = readFileSync(resolve(process.cwd(), 'src/games/kinds/fleet-week/editor.css'), 'utf8');
+    expect(css).not.toMatch(/\.fw-/);
+    expect(css).toMatch(/\.fwe-cell/);
+  });
+
   it('pads an older game to the full grid', () => {
     const g = { ...(newGame('fleet_week', 'g_fw') as Fleet), columns: [], rows: [], squares: [], recall: [] };
     const { host, fleet } = setup({ games: [g] });
-    expect(host.querySelectorAll('.fw-cell')).toHaveLength(25);
+    expect(host.querySelectorAll('.fwe-cell')).toHaveLength(25);
     type(host.querySelector('[aria-label="Column 1 label"]'), 'Bay');
     expect(fleet().squares).toHaveLength(25);
     expect(fleet().recall).toHaveLength(4);
@@ -192,13 +206,13 @@ describe('Fleet week: Build from this unit', () => {
 
   it('ticks unit lines into the open square from the editor', async () => {
     const { host, fleet } = setup({ games: [newGame('fleet_week', 'g_fw')] }, SOURCES);
-    host.querySelector<HTMLButtonElement>('.fw-cell[data-square="B3"]')!.click();
+    host.querySelector<HTMLButtonElement>('.fwe-cell[data-square="B3"]')!.click();
     const open = [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Build from this unit')!;
     open.click();
     await flush();
-    const panel = host.querySelector('.fw-build')!;
+    const panel = host.querySelector('.fwe-build')!;
     expect(panel).not.toBeNull();
-    const target = panel.querySelector<HTMLSelectElement>('.fw-build__target')!;
+    const target = panel.querySelector<HTMLSelectElement>('.fwe-build__target')!;
     expect(target.value).toBe('7');
     expect(panel.querySelectorAll('input[type="checkbox"]')).toHaveLength(4);
     for (const id of ['q_a1', 't_l1']) {
@@ -210,9 +224,9 @@ describe('Fleet week: Build from this unit', () => {
     add.click();
     expect(fleet().squares[7]!.variants.map((v) => v.id)).toEqual(['q_a1', 't_l1']);
     expect(fleet().squares[7]!.variants[0]!.pieces).toEqual(['kp_lamp1ab']);
-    expect(host.querySelector('.fw-build')).toBeNull();
-    expect(host.querySelector('.fw-cell[data-square="B3"]')?.getAttribute('data-state')).toBe('full');
-    expect(host.querySelector('.fw-build-status')?.textContent).toBe('Added 2 to square B3.');
+    expect(host.querySelector('.fwe-build')).toBeNull();
+    expect(host.querySelector('.fwe-cell[data-square="B3"]')?.getAttribute('data-state')).toBe('full');
+    expect(host.querySelector('.fwe-build-status')?.textContent).toBe('Added 2 to square B3.');
     // The square stays open with the new lines in its boxes.
     expect(host.querySelector<HTMLTextAreaElement>('[aria-label="Variant A prompt"]')?.value).toBe('Who lights the lamp in act one?');
   });
@@ -222,13 +236,13 @@ describe('Fleet week: Build from this unit', () => {
     const openBuild = () => [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Build from this unit')!.click();
     openBuild();
     await flush();
-    const target = host.querySelector<HTMLSelectElement>('.fw-build__target')!;
+    const target = host.querySelector<HTMLSelectElement>('.fwe-build__target')!;
     expect(target.value).toBe('empty');
     target.value = 'recall';
     const box = host.querySelector<HTMLInputElement>('input[data-item-id="u_b1"]')!;
     box.checked = true;
     box.dispatchEvent(new Event('change'));
-    [...host.querySelectorAll<HTMLButtonElement>('.fw-build button')].find((b) => b.textContent === 'Add 1')!.click();
+    [...host.querySelectorAll<HTMLButtonElement>('.fwe-build button')].find((b) => b.textContent === 'Add 1')!.click();
     expect(fleet().recall[0]!.id).toBe('u_b1');
     expect(accepted(fleet().recall[0])).toEqual(['promises, sir', 'promises, sir.']);
     openBuild();

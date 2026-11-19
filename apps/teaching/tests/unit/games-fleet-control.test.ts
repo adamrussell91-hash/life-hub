@@ -175,6 +175,73 @@ describe('Fleet week control room', () => {
   });
 });
 
+describe('Fleet week control room: polling', () => {
+  it('a poll that only moves the server clock keeps the room (and focus) as it is, but updates the time left', async () => {
+    vi.useFakeTimers();
+    try {
+      let clock = Date.now();
+      const closes = clock + 120000;
+      const api = fakeApi(() => makeState({ now: clock, closes_at: closes }));
+      room = openFleetControlRoom(document.body, { lessonId: 'l1', game: GAME, classes: CLASSES, api });
+      buttonNamed(room.root, 'Open campaign')!.click();
+      await vi.advanceTimersByTimeAsync(0);
+      const main = room.root.querySelector('.fc-main')!;
+      const first = main.firstElementChild;
+      const btn = main.querySelector('button')!;
+      btn.focus();
+      clock += 30000;
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(api.state).toHaveBeenCalledTimes(1);
+      expect(main.firstElementChild).toBe(first);
+      expect(document.activeElement).toBe(btn);
+      expect(room.root.querySelector('.fc-time')!.textContent).toMatch(/left/);
+      // A real change still repaints.
+      api.state.mockImplementation(async () => makeState({ now: clock, closes_at: closes, round: 2 }));
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(main.firstElementChild).not.toBe(first);
+    } finally {
+      room?.dispose();
+      room = null;
+      vi.useRealTimers();
+    }
+  });
+
+  it('pauses while the tab is hidden, fetches at once when it shows again, and stops on close', async () => {
+    vi.useFakeTimers();
+    const hidden = vi.spyOn(document, 'hidden', 'get');
+    try {
+      hidden.mockReturnValue(false);
+      const api = fakeApi(() => makeState());
+      room = openFleetControlRoom(document.body, { lessonId: 'l1', game: GAME, classes: CLASSES, api });
+      buttonNamed(room.root, 'Open campaign')!.click();
+      await vi.advanceTimersByTimeAsync(0);
+      hidden.mockReturnValue(true);
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(10000);
+      expect(api.state).not.toHaveBeenCalled();
+      hidden.mockReturnValue(false);
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(api.state).toHaveBeenCalledTimes(1);
+      window.dispatchEvent(new Event('focus'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(api.state).toHaveBeenCalledTimes(2);
+      room.dispose();
+      room = null;
+      await vi.advanceTimersByTimeAsync(10000);
+      window.dispatchEvent(new Event('focus'));
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(api.state).toHaveBeenCalledTimes(2);
+    } finally {
+      hidden.mockRestore();
+      room?.dispose();
+      room = null;
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe('Fleet week helpers and launcher', () => {
   it('marks charts and ranks the hardest squares', () => {
     const s = makeState({ log: [{ round: 1, results: [
