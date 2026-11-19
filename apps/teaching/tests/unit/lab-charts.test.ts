@@ -12,7 +12,7 @@ describe('reading: every rating is a dot', () => {
     const box = reading({ values, name: 'Your version' });
     const dots = [...box.querySelectorAll('circle')];
     expect(dots.length).toBe(6);
-    expect(box.querySelector('p')?.textContent).toBe('Your version average 5.3, 6 readers');
+    expect(box.querySelector('p')?.textContent).toBe('Your version average 5.3, 6 ratings');
     // The three fives sit at the same place across, one above the other.
     const fives = dots.filter((d) => d.getAttribute('cx') === String(readingX(5)));
     expect(fives.length).toBe(3);
@@ -26,7 +26,7 @@ describe('reading: every rating is a dot', () => {
     expect(readingX(10)).toBe(286);
     expect(Number(mean.getAttribute('x1'))).toBeGreaterThan(readingX(5));
     expect(Number(mean.getAttribute('x1'))).toBeLessThan(readingX(6));
-    expect(box.querySelector('svg')?.getAttribute('aria-label')).toBe('Your version: average 5.3 from 6 readers');
+    expect(box.querySelector('svg')?.getAttribute('aria-label')).toBe('Your version: average 5.3 from 6 ratings');
     expect([...box.querySelectorAll('text')].map((t) => t.textContent)).toEqual(['0', '5', '10']);
   });
 
@@ -43,7 +43,7 @@ describe('reading: every rating is a dot', () => {
     const box = reading({ values: [], name: 'This version' });
     expect(box.querySelectorAll('circle').length).toBe(0);
     expect(box.querySelector('.lab-reading__mean')).toBeNull();
-    expect(box.textContent).toContain('no readers yet');
+    expect(box.textContent).toContain('no ratings yet');
   });
 });
 

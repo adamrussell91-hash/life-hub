@@ -85,13 +85,13 @@ export function reading(input: ReadingInput): HTMLElement {
   const box = el('div', `lab-reading${input.control ? ' is-control' : ''}`);
   const average = mean(values);
   const title = el('p');
-  title.append(el('b', '', name), ' ', el('span', 'lab-muted', values.length ? `average ${average.toFixed(1)}, ${values.length} ${values.length === 1 ? 'reader' : 'readers'}` : 'no readers yet'));
+  title.append(el('b', '', name), ' ', el('span', 'lab-muted', values.length ? `average ${average.toFixed(1)}, ${values.length} ${values.length === 1 ? 'rating' : 'ratings'}` : 'no ratings yet'));
   box.append(title);
   const stacks = new Map<number, number>();
   for (const v of values) stacks.set(v, (stacks.get(v) ?? 0) + 1);
   const height = Math.max(1, ...stacks.values()) * 9 + 30;
   const base = height - 22;
-  const chart = svg('svg', { viewBox: `0 0 300 ${height}`, role: 'img', 'aria-label': values.length ? `${name}: average ${average.toFixed(1)} from ${values.length} ${values.length === 1 ? 'reader' : 'readers'}` : `${name}: no readers yet` });
+  const chart = svg('svg', { viewBox: `0 0 300 ${height}`, role: 'img', 'aria-label': values.length ? `${name}: average ${average.toFixed(1)} from ${values.length} ${values.length === 1 ? 'rating' : 'ratings'}` : `${name}: no ratings yet` });
   const still = reducedMotion();
   const seen = new Map<number, number>();
   values.forEach((v, k) => {
