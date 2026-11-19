@@ -7,6 +7,10 @@
  * see. A `packages/` file tests import (most of them) is not listed.
  */
 
+// A workflow change can alter how CI runs the tests, so it runs whole suites,
+// except deploy-only workflows that run no tests (game-rooms-deploy.yml).
+const WORKFLOWS_THAT_TEST = /^\.github\/workflows\/(?!game-rooms-deploy\.yml$)/;
+
 // Tests read these with fs or vite config rather than imports, so vitest's
 // import graph cannot see them. Touching one runs the whole suite.
 export const TASKS_FULL_SUITE_TRIGGERS = [
@@ -22,7 +26,7 @@ export const TASKS_FULL_SUITE_TRIGGERS = [
   /^packages\/design-kit\/js\/(visual-viewport|calendar\/render-day-dial)\.js$/,
   /^scripts\/pre-pr-check\.mjs$/,
   /^scripts\/lib\/vitest-scope\.mjs$/,
-  /^\.github\/workflows\//
+  WORKFLOWS_THAT_TEST
 ];
 
 // Teaching tests read these with fs or vite config (the text baseline, the
@@ -33,7 +37,7 @@ export const TEACHING_FULL_SUITE_TRIGGERS = [
   /^apps\/teaching\/(package(-lock)?\.json|vite\.config\.ts|tsconfig[^/]*\.json)$/,
   /^scripts\/pre-pr-check\.mjs$/,
   /^scripts\/lib\/vitest-scope\.mjs$/,
-  /^\.github\/workflows\//
+  WORKFLOWS_THAT_TEST
 ];
 
 /**
