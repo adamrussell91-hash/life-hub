@@ -5,6 +5,7 @@ import { CoverSchema } from '@/schemas/cover';
 import { IsoDateSchema } from '@/schemas/common';
 import { countBlocksInTree } from '@/teacher/lesson-canvas/drop';
 import { CaseSettingsSchema } from '@/case-study/schema';
+import { FLEET_GRID_DRAFT_TOOL, ProposeFleetGridDraftSchema, type FleetGridDraft } from '@/ai/fleet-grid-draft';
 
 export const AiScopeSchema = z.enum(['block', 'section', 'lesson']).default('lesson');
 export type AiScope = z.infer<typeof AiScopeSchema>;
@@ -140,6 +141,7 @@ export type AiProposal =
       ordered_ids: string[];
     }
   | { kind: 'update_case'; case: z.infer<typeof ProposeUpdateCaseSchema>['case'] }
+  | ({ kind: 'fleet_grid_draft' } & FleetGridDraft)
   | { kind: 'review_only'; summary: string };
 
 /**
@@ -280,6 +282,7 @@ export const AI_TOOLS = [
       required: ['case']
     }
   },
+  FLEET_GRID_DRAFT_TOOL,
   {
     name: 'review_only',
     description: 'Provide structured feedback without mutating lesson content.',
@@ -364,6 +367,11 @@ export function parseToolProposal(name: string, input: unknown): AiProposal | { 
     const issue = caseIdIssue(parsed.data.case);
     if (issue) return { error: issue };
     return { kind: 'update_case', case: parsed.data.case };
+  }
+  if (name === FLEET_GRID_DRAFT_TOOL.name) {
+    const parsed = ProposeFleetGridDraftSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.message };
+    return { kind: 'fleet_grid_draft', ...parsed.data };
   }
   if (name === 'review_only') {
     const parsed = ReviewOnlySchema.safeParse(input);

@@ -5,6 +5,7 @@ import type { Lesson } from '@/schemas/lesson';
 import { CaseSettingsSchema } from '@/case-study/schema';
 import type { AiProposal } from '@/ai/proposals';
 import { applyInsertBlocks, replaceBlockInTree } from '@/ai/block-tree';
+import { applyFleetGridDraft } from '@/games/kinds/fleet-week/ann-draft';
 import {
   deleteBlocksById,
   reorderSiblings,
@@ -173,6 +174,13 @@ export function applyProposalToLesson(
     return result.ok
       ? { ok: true, lesson: withBlocks(lesson, result.blocks) }
       : { ok: false, message: result.message, lesson };
+  }
+
+  if (proposal.kind === 'fleet_grid_draft') {
+    // Blank slots only; the teacher edits from there and nothing publishes.
+    const { kind: _kind, ...draft } = proposal;
+    const result = applyFleetGridDraft(lesson, draft);
+    return { ok: result.ok, message: result.message, lesson: result.lesson };
   }
 
   const _exhaustive: never = proposal;

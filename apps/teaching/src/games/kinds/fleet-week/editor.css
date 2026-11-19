@@ -42,7 +42,10 @@
 .fw-recall { display: grid; gap: var(--space-4); }
 
 /* Build from this unit: the target picker and the tick rows (R4: 44px rows, 16px select). */
-.fw-build-btn { min-height: 44px; }
+.fw-build-btn, .fw-ann-btn { min-height: 44px; }
+/* Two head buttons: only the first is pushed right, so they sit together and wrap at 390. */
+.gm-content__head .fw-ann-btn { margin-left: 0; }
+.fw-ann .gm-actions .btn { min-height: 44px; }
 .fw-build-status[hidden] { display: none; }
 .fw-build__target.gm-input { font-size: 16px; min-height: 44px; max-width: 24rem; }
 .fw-build .gm-source { min-height: 44px; align-items: center; }
