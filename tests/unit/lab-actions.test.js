@@ -818,3 +818,35 @@ test('the marking view can read a student’s record after the round has ended, 
   const fresh = await teacher(labStore(PAIRS_NOTED), 'student', { student_id: ROSTER[0].id });
   assert.equal(fresh.record, null);
 });
+
+// ---------------------------------------------------------------------------
+// After class
+// ---------------------------------------------------------------------------
+
+test('After class lists everyone who took part with their prediction, their pair and their note count', async () => {
+  const { store, session } = await notedAtDesign();
+  await student(store, 0, 'bench', { edit: EDITS[0] });
+  await student(store, 0, 'ready', { note: 'The hedge is where the doubt sits.' });
+  await next(store, 2);
+  await student(store, 0, 'pair_predict', { pred: -1, note: 'Because the doubt goes with it.' });
+  for (let step = 3; step <= 7; step += 1) await next(store, step);
+  const board = await teacher(store, 'board');
+  assert.equal(board.round.finished, true);
+  const after = await teacher(store, 'after', { session });
+  assert.equal(after.students.length, 17);
+  assert.deepEqual(after.students.map((s) => s.initials), [...after.students.map((s) => s.initials)].sort());
+  const kt = after.students.find((s) => s.student_id === ROSTER[0].id);
+  // The prediction is the pair's, so the partner's row carries it too.
+  assert.deepEqual(kt, { student_id: ROSTER[0].id, initials: 'KT', pred: -1, pair: 1, notes: 2, handed_in_at: null, explanation: '' });
+  assert.deepEqual([after.students.find((s) => s.student_id === ROSTER[1].id).pred, after.students.find((s) => s.student_id === ROSTER[1].id).notes], [-1, 0]);
+  assert.equal(after.students.find((s) => s.student_id === ROSTER[16].id).pair, 8);
+  // A long answer is cut to its opening for the list; marking shows it whole.
+  store.data.set(`work_handins/lab1/lab_explain/${ROSTER[0].id}`, { class_id: 'class1', student_id: ROSTER[0].id, text: { answers: { lab_explain_q: 'word '.repeat(100) } }, handed_in_at: '2026-11-19T02:00:00.000Z' });
+  const long = (await teacher(store, 'after', { session })).students.find((s) => s.student_id === ROSTER[0].id);
+  assert.equal(long.handed_in_at, '2026-11-19T02:00:00.000Z');
+  assert.ok(long.explanation.length <= 281 && long.explanation.endsWith('…'));
+  // It is the teacher's page: a round that has gone, or another round's board, gets nothing.
+  await code(teacher(store, 'after', { session: 'f'.repeat(32) }), 'new_session');
+  await teacher(store, 'end', { session });
+  await code(teacher(store, 'after', { session }), 'no_round');
+});

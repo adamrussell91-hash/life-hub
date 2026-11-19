@@ -9,12 +9,15 @@
  * leaving (predict, write, put a change on the bench, rate or choose, name
  * the feature), writing a short lab note as they go. In Pairs design it the
  * walkers' partners leave the bench, the prediction and the feature to the
- * walker, and pair 8 keeps the original so it has no trial.
+ * walker, and pair 8 keeps the original so it has no trial. At Explain half
+ * the class writes a short explanation and hands it in, so After class has
+ * answers to mark.
  *
  * Everything here is invented: the students, the stanza, the news paragraph
  * and the storm writing.
  */
 import { labAction } from '../../../netlify/functions/_shared/lab.mjs';
+import { workAction } from '../../../netlify/functions/_shared/lesson-work.mjs';
 
 export const LAB_CLASS_ID = 'class_2026_12lab';
 const NAMES = [
@@ -104,6 +107,24 @@ const NOTES: Record<string, string[]> = {
   Test: ['The one with no question at the end sounded most sure.', 'One had "I think" taken out and it read much flatter.', 'A version with an extra break sounded slower.'],
   Result: ['The dots sit lower than the control and hardly overlap.', 'Ours overlap the control a lot, so the change is small.', 'The spread is wide, so readers did not agree.'],
   'Name it': ['It lets the speaker back away from what they are saying.', 'It makes the reader wait for the end of the thought.', 'It turns a statement into something the speaker is unsure of.']
+};
+/** Invented explanations, a few per lab. */
+const EXPLANATIONS: Record<LabWalkId, string[]> = {
+  lesson_lab_passive: [
+    'With the company as the subject of every sentence there is nowhere else to look, so readers put the blame on it.',
+    'The passive makes it sound like weather, something that just happened, so the company slips out of the sentence.',
+    'I did not notice the company was missing until we saw both versions side by side.'
+  ],
+  lesson_lab_storm: [
+    'You can close your eyes to a storm but the noise still gets in, so sound is the sense a reader cannot escape.',
+    'Sight tells you what it looks like. Sound tells you how big it is, and that is what felt real.',
+    'You hear a storm from inside the house, which is where the reader is standing.'
+  ],
+  lesson_lab_hesitant: [
+    'Removing "I think," left the speaker sounding sure of where the words were, which suggests the hedge carries more of the hesitation than the line breaks do.',
+    'Once the question became a statement the stanza closed, so the hesitation is carried by the sentence type as much as the form.',
+    'The extra break after "settled" slowed the line, which supports the claim, although the shift was smaller than the hedge made.'
+  ]
 };
 const noteFor = (step: string, i: number): string => {
   const list = NOTES[step] ?? [];
@@ -221,6 +242,17 @@ export async function labClassAct(store: Store, lessonId: LabWalkId): Promise<vo
   }
   if (step === 'Explain') {
     // Half the class has handed in by the time the teacher finishes.
-    for (const i of classmates().filter((n) => n % 2 === 0)) await attempt(() => call(store, lessonId, i, 'explain'));
+    for (const i of classmates().filter((n) => n % 2 === 0)) {
+      const who = { class_id: LAB_CLASS_ID, class_token: token(i) };
+      const words = EXPLANATIONS[lessonId][i % EXPLANATIONS[lessonId].length]!;
+      // Saved and handed in as a student's device does. Hand-in opens once the class's markbook has the lab's column.
+      try {
+        await workAction(store, lessonId, { ...who, action: 'save', block_id: 'lab_explain', part: 'answers', fields: { lab_explain_q: words } });
+        await workAction(store, lessonId, { ...who, action: 'handin', block_id: 'lab_explain' });
+      } catch {
+        // No column yet: the explanation stays saved and the step still counts as done.
+      }
+      await attempt(() => call(store, lessonId, i, 'explain'));
+    }
   }
 }

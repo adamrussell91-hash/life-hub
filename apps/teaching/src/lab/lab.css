@@ -149,6 +149,19 @@ button.lab-find:hover, .lab-find.is-on { background: color-mix(in srgb, var(--la
 .lab-rounds { display: grid; gap: var(--space-2); }
 .lab-rounds__row { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); align-items: center; justify-content: space-between; padding: var(--space-2) 0; border-top: 1px solid var(--line); }
 
+/* After class: what the lab found, and the explanations to mark. */
+.lab-after .lab-row dd { gap: var(--space-3); }
+.lab-after__list { list-style: none; margin: 0; padding: 0; display: grid; }
+.lab-after__row { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); align-items: flex-start; padding: var(--space-3) 0; border-top: 1px solid var(--line); }
+.lab-after__who { display: grid; gap: 2px; flex: 0 0 13rem; min-width: 0; font-size: var(--text-sm); }
+.lab-after__who strong { font-size: var(--text-base); }
+.lab-after__words { flex: 1 1 16rem; min-width: 0; overflow-wrap: anywhere; }
+.lab-after__mark { min-height: 44px; display: inline-flex; align-items: center; }
+/* Beside an explanation in marking: the student's notes, prediction and trial. */
+.lab-record { display: grid; gap: var(--space-2); margin-bottom: var(--space-4); --lab-mono: ui-monospace, 'SF Mono', Menlo, monospace; --lab-lilac: var(--pastel-lilac); --lab-lilac-ink: var(--pastel-lilac-ink); }
+.lab-record:empty { display: none; }
+.lab-record p { margin: 0; overflow-wrap: anywhere; }
+
 /* Held for the teacher: flagged work, with Release and Remove. */
 .lab-held__row { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: space-between; align-items: flex-start; padding-top: var(--space-3); border-top: 1px solid var(--line); }
 .lab-held__words { display: grid; gap: var(--space-2); flex: 1 1 16rem; min-width: 0; }
@@ -190,6 +203,7 @@ button.lab-find:hover, .lab-find.is-on { background: color-mix(in srgb, var(--la
   .lab-board .lab-piece { font-size: var(--text-md); }
   .lab-ctrl { margin: 20px -16px 0; padding: 12px 16px; }
   .lab-row { grid-template-columns: 1fr; gap: 2px; }
+  .lab-after__who { flex-basis: 100%; }
   .lab-bar { grid-template-columns: 4.5rem 1fr 2.5rem; }
   .lab-levels .lab-bar, .lab-board .lab-levels .lab-bar { grid-template-columns: minmax(0, 7.5rem) 1fr 2.5rem; }
   .lab-plan__feature { grid-template-columns: 1fr; }

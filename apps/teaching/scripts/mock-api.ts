@@ -1025,6 +1025,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
    * teacher starts a lab and finish each step when the teacher presses Next. All invented.
    * Walk: teacher `/lessons/lesson_lab_passive`, `/lessons/lesson_lab_storm`, `/lessons/lesson_lab_hesitant`;
    * student `/s/classes/class_2026_12lab/lessons/<lesson id>` as KT (pair 1) or JM (pair 2).
+   * The class writes its lab notes, names its features and hands in explanations, so the walk runs on to After
+   * class, To mark (`/to-mark`) and marking with the lab record beside the answer.
    */
   function seedLabLessons(): void {
     if (process.env.VITEST) return;

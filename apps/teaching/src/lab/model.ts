@@ -409,7 +409,7 @@ export function findingEnds(trait?: string | null): [string, string] {
 /** "The sentence level moved readers most", once a named trial has moved them. */
 export function levelHeadline(groups: LevelGroup[]): string {
   const [top, second] = groups;
-  if (!top || top.trials === 0 || top.meanAbsShift === 0) return groups.some((g) => g.trials > 0) ? 'No level moved readers yet' : 'The pairs are naming what they changed';
+  if (!top || top.trials === 0 || top.meanAbsShift === 0) return groups.some((g) => g.trials > 0) ? 'Too close to call between the levels' : 'The pairs are naming what they changed';
   if (second && second.trials > 0 && second.meanAbsShift === top.meanAbsShift) return `The ${top.level.toLowerCase()} and ${second.level.toLowerCase()} levels moved readers the same`;
   return `The ${top.level.toLowerCase()} level moved readers most`;
 }

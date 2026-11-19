@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { LAB_CLASS_ID, LAB_ROSTER, LAB_WALKS, labClassAct, labClassJoin, type LabWalkId } from '../../scripts/mock-lab-class';
 import { labAction, labTeacherAction, prepareLabPublish } from '../../../../netlify/functions/_shared/lab.mjs';
 import { labKeys } from '../../../../netlify/functions/_shared/lab-keys.mjs';
+import { markbookAction } from '../../../../netlify/functions/_shared/markbook.mjs';
+import { toMarkQueue } from '../../../../netlify/functions/_shared/to-mark.mjs';
+import { labColumn } from '@/lab/after';
 import { classKey, draftLessonKey, publishedLessonKey } from '../../../../netlify/functions/_shared/teaching-blobs.mjs';
 import { memoryStore } from '../../../../tests/unit/helpers/lab-store.js';
 
@@ -28,6 +31,8 @@ const walker = (store: unknown, lessonId: string, action: string, extra: Record<
 /** Start the lab, then press Next through every step as the mock API does: the class finishes the step first. */
 async function run(lessonId: LabWalkId, atStep: (name: string, store: ReturnType<typeof memoryStore>) => Promise<void> = async () => undefined) {
   const store = storeFor(lessonId);
+  // The board saves the explanations' column before it starts the round.
+  await markbookAction(store, LAB_CLASS_ID, { action: 'save_column', column: labColumn({ id: lessonId, title: LAB_WALKS[lessonId].title }, 'labcolumn001', '2026-11-19') });
   let board: Board = await labTeacherAction(store, lessonId, { action: 'start' });
   await labClassJoin(store, lessonId);
   await walker(store, lessonId, 'claim', { initials: 'KT' });
@@ -97,5 +102,22 @@ describe('the dev preview’s invented lab class', () => {
     expect(mine.round.finished).toBe(true);
     expect(mine.findings.mine).toBeNull();
     expect(mine.findings.trials.length).toBe(5);
+  });
+
+  it('every level ends with explanations handed in: After class lists them and they wait in To mark', async () => {
+    for (const lessonId of Object.keys(LAB_WALKS) as LabWalkId[]) {
+      const { store, board } = await run(lessonId);
+      expect(board.explained).toBe(7);
+      const after = await labTeacherAction(store, lessonId, { action: 'after', session: board.round.session });
+      const handed = after.students.filter((s: { handed_in_at: string | null }) => s.handed_in_at);
+      expect(handed.length).toBe(7);
+      expect(handed.every((s: { explanation: string; initials: string }) => s.explanation.length > 20 && s.initials.length === 2)).toBe(true);
+      const queue = await toMarkQueue(store, { now: () => Date.now() });
+      expect(queue.tasks.map((t: { column_id: string; waiting: number }) => [t.column_id, t.waiting])).toEqual([['labcolumn001', 7]]);
+      // Marking one of them: the record the marking view reads has the student's notes when the lab keeps them.
+      const record = await labTeacherAction(store, lessonId, { action: 'student', student_id: handed[0].student_id });
+      expect(record.lab.level).toBe(LAB_WALKS[lessonId].lab.level);
+      if (lessonId === 'lesson_lab_hesitant') expect(Object.keys(record.record.notes)).toEqual(expect.arrayContaining(['Question', 'Test', 'Result']));
+    }
   });
 });

@@ -38,8 +38,12 @@ export type WorkSyncHandle = {
   flush(): Promise<void>;
   /** For the lesson footer: answers written on this device, and the marked blocks with writing to hand in. */
   progress(): { written: number; toHandIn: number };
-  /** Sends everything, then hands in every marked block with writing. True when all went through. */
-  handInAll(): Promise<boolean>;
+  /**
+   * Sends everything, then hands in every marked block with writing. True when all went through.
+   * `fresh` asks the server again which blocks are marked: a lab's hand-in opens when the teacher starts the round,
+   * which can be after this page was opened.
+   */
+  handInAll(fresh?: boolean): Promise<boolean>;
 };
 
 /** Players that ask for the same class initials themselves; one box on the page is enough. */
@@ -381,9 +385,9 @@ export function mountWorkSync(host: HTMLElement, options: WorkSyncOptions): Work
       const counts = writtenByBlock();
       return { written: [...counts.values()].reduce((a, b) => a + b, 0), toHandIn: marked.filter((id) => !redrafts[id] && !returned[id] && (counts.get(id) ?? 0) > 0).length };
     },
-    async handInAll() {
+    async handInAll(fresh = false) {
       // Initials may have just been claimed by the footer or the quiz: look again before giving up.
-      if (state !== 'ready') await check();
+      if (state !== 'ready' || fresh) await check();
       if (state !== 'ready') return state === 'off';
       await flush();
       if (pending.size) return false;

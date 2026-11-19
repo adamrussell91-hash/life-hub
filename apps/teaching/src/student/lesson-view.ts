@@ -389,7 +389,7 @@ export function mountStudentLessonView(
     // Sections split out of another lesson: bring this device's saved answers with them before the blocks read them.
     carrySplitWork(lesson);
     // A lab hands its Explain answer in through the lesson's work sync, which is mounted just below.
-    lecture = renderPublishedLesson(content, lesson, { ...extras, handIn: () => work?.handInAll() ?? Promise.resolve(true) });
+    lecture = renderPublishedLesson(content, lesson, { ...extras, handIn: () => work?.handInAll(true) ?? Promise.resolve(true) });
     // Written answers go to the teacher as they're typed, for the class this lesson was opened in.
     const workClass = extras?.cls?.id ?? extras?.quizClassId;
     setVoiceClass(workClass ?? null);

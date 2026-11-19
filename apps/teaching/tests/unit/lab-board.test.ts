@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mountLabBoard } from '@/lab/board';
-import type { LabBoard, LabTeacherApi } from '@/lab/api';
+import type { LabAfter, LabBoard, LabTeacherApi } from '@/lab/api';
+import type { LabMarkbook } from '@/lab/after';
 import { setResult } from '@/lab/model';
 import { seedLab, type LabSettings } from '@/lab/schema';
 import type { Lesson } from '@/schemas/lesson';
@@ -18,6 +19,16 @@ const at = (step: number, over: Partial<LabBoard> = {}, revealed = false): LabBo
   level: 'supplied', judge: 'rate', counts: { here: 16, done: 0, total: 17 }, predictions: null, results: null, texts: null, debrief: null, ...over
 });
 const flush = async () => { for (let i = 0; i < 4; i += 1) await new Promise((r) => setTimeout(r, 0)); };
+/** The class's markbook, already holding the lab's column. */
+const COLUMN = { id: 'labcolumn001', kind: 'assessment', title: 'Lab: Explanation', date: '2026-11-19', weight: 0, criteria: [], piece: { lesson_id: 'lab1', block_id: 'lab_explain' } };
+const MARKBOOK = { load: vi.fn(async () => ({ markbook: { columns: [COLUMN] } })), saveColumn: vi.fn() } as unknown as LabMarkbook;
+const AFTER: LabAfter = {
+  session: SESSION, class_id: 'class1',
+  students: [
+    { student_id: 'st_01', initials: 'KT', pred: 0, pair: null, notes: 0, handed_in_at: '2026-11-19T02:00:00.000Z', explanation: 'With the company as the subject there is nowhere else to look.' },
+    { student_id: 'st_02', initials: 'RV', pred: 1, pair: null, notes: 0, handed_in_at: null, explanation: '' }
+  ]
+};
 
 function mount(first: LabBoard) {
   let current = first;
@@ -33,10 +44,11 @@ function mount(first: LabBoard) {
     resume: vi.fn(() => reply(at(1))),
     release: vi.fn(() => Promise.resolve(current)),
     remove: vi.fn(() => Promise.resolve(current)),
-    student: vi.fn(async () => ({ student_id: 'st_01', record: null, items: [] }))
+    student: vi.fn(async () => ({ student_id: 'st_01', record: null, items: [] })),
+    after: vi.fn(async () => AFTER)
   };
-  const lesson = { id: 'lab1', lab: SETTINGS, blocks: [] } as unknown as Lesson;
-  const board = mountLabBoard({ api, getLesson: () => lesson, pollMs: 60_000 });
+  const lesson = { id: 'lab1', title: 'Passive voice lab', lab: SETTINGS, blocks: [] } as unknown as Lesson;
+  const board = mountLabBoard({ api, getLesson: () => lesson, markbook: MARKBOOK, pollMs: 60_000 });
   document.body.append(board.root);
   const act = (name: string) => (board.root.querySelector(`[data-act="${name}"]`) as HTMLButtonElement);
   return { board, api, act, text: () => board.root.textContent ?? '', set: (next: LabBoard) => { current = next; } };
@@ -131,9 +143,12 @@ describe('the lab board', () => {
   it('a finished lab shows the finding and Run it again', async () => {
     const { board, api, act, text } = mount(at(5, { results: RESULT, explained: 12, debrief: 'Ask who is missing.' }));
     await board.refresh();
+    await flush();
+    expect(board.root.querySelector('.lab-strip b')?.textContent).toBe('After class');
     expect(text()).toContain('What the lab found');
     expect(text()).toContain('The active version scored highest.');
-    expect(text()).toContain('12 of 16 explanations handed in.');
+    expect(text()).toContain('1 of 2 handed in.');
+    expect(api.after).toHaveBeenCalledWith(SESSION);
     act('again').click();
     await flush();
     expect(api.start).toHaveBeenCalledTimes(1);
@@ -177,7 +192,7 @@ describe('the lab board, students write it', () => {
   function mountStorm(first: LabBoard) {
     const mounted = mount(first);
     const lesson = { id: 'lab1', lab: STORM, blocks: [] } as unknown as Lesson;
-    const board = mountLabBoard({ api: mounted.api, getLesson: () => lesson, pollMs: 60_000 });
+    const board = mountLabBoard({ api: mounted.api, getLesson: () => lesson, markbook: MARKBOOK, pollMs: 60_000 });
     document.body.replaceChildren(board.root);
     return { ...mounted, board, act: (name: string) => board.root.querySelector(`[data-act="${name}"]`) as HTMLButtonElement, text: () => board.root.textContent ?? '' };
   }
@@ -249,7 +264,7 @@ describe('the lab board, pairs design it', () => {
   function mountPairs(first: LabBoard) {
     const mounted = mount(first);
     const lesson = { id: 'lab1', lab: HESITANT, blocks: [] } as unknown as Lesson;
-    const board = mountLabBoard({ api: mounted.api, getLesson: () => lesson, pollMs: 60_000 });
+    const board = mountLabBoard({ api: mounted.api, getLesson: () => lesson, markbook: MARKBOOK, pollMs: 60_000 });
     document.body.replaceChildren(board.root);
     return { ...mounted, board, act: (name: string) => board.root.querySelector(`[data-act="${name}"]`) as HTMLButtonElement, text: () => board.root.textContent ?? '' };
   }
@@ -270,7 +285,7 @@ describe('the lab board, pairs design it', () => {
   it('a trait words the board’s predictions and the findings chart’s ends', async () => {
     const lesson = { id: 'lab1', lab: { ...HESITANT, trait: 'hesitant' }, blocks: [] } as unknown as Lesson;
     const mounted = mount(pairsAt(2, { predictions: [3, 1, 2] }, true));
-    const board = mountLabBoard({ api: mounted.api, getLesson: () => lesson, pollMs: 60_000 });
+    const board = mountLabBoard({ api: mounted.api, getLesson: () => lesson, markbook: MARKBOOK, pollMs: 60_000 });
     document.body.replaceChildren(board.root);
     await board.refresh();
     expect([...board.root.querySelectorAll('.lab-bar span:first-child')].map((n) => n.textContent)).toEqual(['Less hesitant', 'More hesitant', 'About as hesitant']);

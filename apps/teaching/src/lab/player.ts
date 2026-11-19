@@ -55,10 +55,10 @@ export const WAITING = 'Waiting for your teacher.';
 export const waiting = (): HTMLElement => el('p', 'lab__note', WAITING);
 
 /** Where the lab is up to: "Predict · 2 of 5" over a row of dots. */
-export function stepStrip(round: Pick<LabRound, 'step' | 'steps' | 'finished'>): HTMLElement {
+export function stepStrip(round: Pick<LabRound, 'step' | 'steps' | 'finished'>, finishedLabel = 'Lab finished'): HTMLElement {
   const strip = el('div', 'lab-strip');
   const line = el('p');
-  if (round.finished) line.append(el('b', '', 'Lab finished'));
+  if (round.finished) line.append(el('b', '', finishedLabel));
   else line.append(el('b', '', round.steps[round.step] ?? ''), ` · ${round.step + 1} of ${round.steps.length}`);
   const dots = el('div', 'lab-dots');
   dots.setAttribute('aria-hidden', 'true');

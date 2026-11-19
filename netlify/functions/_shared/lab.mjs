@@ -45,6 +45,7 @@ import { QuizError, deviceHash, read, reject, validToken } from './question-drop
 import { identify } from './quiz.mjs';
 import { flagText } from './peer-feedback-filter.mjs';
 import { bringBackRound, listRounds, roundExpiry, saveRound, validSession } from './activity-rounds.mjs';
+import { handinKey } from './lesson-work.mjs';
 
 export { QuizError as LabError };
 
@@ -603,7 +604,9 @@ export async function labAction(store, lessonId, body) {
 
 /** A held piece's owner: a student's record key, or `pair.{pairId}` for a pair's version. */
 const HELD_OWNER = /^(?:[a-f0-9]{24}|pair\.[a-z0-9_-]{1,40})$/;
-const TEACHER_ACTIONS = ['board', 'start', 'next', 'reveal', 'rounds', 'resume', 'end', 'release', 'remove', 'student'];
+const TEACHER_ACTIONS = ['board', 'start', 'next', 'reveal', 'rounds', 'resume', 'end', 'release', 'remove', 'student', 'after'];
+/** How much of an explanation the After class list shows; the whole answer opens in marking. */
+const EXPLANATION_PREVIEW = 280;
 
 /** Flagged work waiting for the teacher: who (initials, for the teacher only) and the words. */
 async function heldWork(store, k, config, round, roster, records) {
@@ -765,6 +768,28 @@ export async function labTeacherAction(store, lessonId, body) {
   if (action === 'reveal') {
     active = { ...active, revealed: body.on !== false };
     await saveRound(store, k.base, active);
+  }
+  if (action === 'after') {
+    // After class: everyone who took part, with what they predicted and the start of their explanation. Teacher only.
+    const roster = config.class_id ? await loadRoster(store, config.class_id) : null;
+    const initials = new Map(list(roster?.students).map((s) => [s.id, s.initials ?? '']));
+    const [records, pairs] = await Promise.all([allRecords(store, k, active.session), config.level === 'pairs' ? allPairs(store, k, config, active.session) : new Map()]);
+    const students = await mapBounded(records, 8, async ([, record]) => {
+      const pair = config.level === 'pairs' ? pairOfStudent(config, record.student_id) : null;
+      const pairPred = pair ? pairs.get(pair.id)?.pred : null;
+      const handin = await read(store, handinKey(lessonId, LAB_EXPLAIN_BLOCK_ID, record.student_id));
+      const words = Object.values(handin?.text?.answers ?? {}).filter((t) => typeof t === 'string').join(' ').trim();
+      return {
+        student_id: record.student_id,
+        initials: initials.get(record.student_id) ?? '',
+        pred: config.level === 'pairs' ? ([-1, 0, 1].includes(pairPred) ? pairPred : null) : Number.isInteger(record.pred) ? record.pred : null,
+        pair: pair ? list(config.pairs).findIndex((p) => p.id === pair.id) + 1 : null,
+        notes: Object.values(record.notes ?? {}).filter((t) => typeof t === 'string' && t.trim()).length,
+        handed_in_at: handin?.handed_in_at ?? null,
+        explanation: words.length > EXPLANATION_PREVIEW ? `${words.slice(0, EXPLANATION_PREVIEW).trimEnd()}…` : words
+      };
+    });
+    return { session: active.session, class_id: config.class_id ?? '', students: students.sort((a, b) => a.initials.localeCompare(b.initials) || a.student_id.localeCompare(b.student_id)) };
   }
   if (action === 'release' || action === 'remove') {
     // Flagged work held for the teacher: released, it joins the reading when the teacher moves to Test; removed, it stays out.

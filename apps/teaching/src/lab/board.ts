@@ -3,18 +3,21 @@ import { ApiClientError } from '@/api/client';
 import { confirmBringBack, pastRounds } from '@/blocks/past-rounds';
 import { button, el, errorText } from '@/quiz/dom';
 import { bars, meter } from './charts';
-import { biggestShift, explainQuestion, formatShift, setEvidence, setHeadline } from './model';
+import { explainQuestion, setEvidence, setHeadline } from './model';
+import { afterClass, ensureLabColumn, type LabMarkbook } from './after';
 import { stepStrip } from './player';
 import { registerPairsBoard } from './board-pairs';
 import { factsBlock, predictQuestion } from './steps-set';
 import { publicLab, type LabSettings, type LabStep, type PublicLab } from './schema';
-import type { LabBoard, LabTeacherApi } from './api';
+import type { LabAfter, LabBoard, LabTeacherApi } from './api';
 import './lab.css';
 
 export type LabBoardHandle = { root: HTMLElement; refresh(): Promise<void>; dispose(): void };
 export type LabBoardOptions = {
   api: LabTeacherApi;
   getLesson: () => Lesson;
+  /** The class's markbook, where the explanations' column lives. Test seam. */
+  markbook?: LabMarkbook;
   /** Test seam. */
   pollMs?: number;
 };
@@ -211,6 +214,37 @@ export function mountLabBoard(o: LabBoardOptions): LabBoardHandle {
   let disposed = false;
   let busy = false;
   let timer = 0;
+  /** The markbook column the explanations are handed in to; made when a round starts. */
+  let columnId: string | null = null;
+  let columnProblem = '';
+  /** After class: who took part and what they handed in, for the round it was loaded for. */
+  let after: LabAfter | null = null;
+  let afterFor = '';
+
+  /** Makes sure the class's markbook has the column students hand their explanation in to. Never throws. */
+  async function ensureColumn(): Promise<void> {
+    try {
+      columnId = await ensureLabColumn(o.getLesson(), o.markbook);
+      columnProblem = '';
+    } catch (e) {
+      columnProblem = `The markbook column for the explanations didn’t save, so hand-in is closed for now. ${errorText(e, '')}`.trim();
+    }
+  }
+  /** A fresh round: the column first, so hand-in is open by the time students reach Explain. */
+  async function startRound(): Promise<void> {
+    await ensureColumn();
+    await run(o.api.start());
+  }
+  async function loadAfter(session: string): Promise<void> {
+    await ensureColumn();
+    try {
+      const got = await o.api.after(session);
+      if (afterFor === session) after = got;
+    } catch (e) {
+      if (afterFor === session) error.textContent = errorText(e, 'The explanations didn’t load.');
+    }
+    if (!disposed) paint(true);
+  }
 
   async function run(call: Promise<LabBoard>): Promise<void> {
     if (busy) return;
@@ -230,11 +264,11 @@ export function mountLabBoard(o: LabBoardOptions): LabBoardHandle {
   }
 
   const rounds = (): HTMLElement =>
-    pastRounds(o.api.endpoint, (session) => (confirmBringBack(!!board?.round) ? run(o.api.resume(session)) : undefined));
+    pastRounds(o.api.endpoint, (session) => (confirmBringBack(!!board?.round) ? ensureColumn().then(() => run(o.api.resume(session))) : undefined));
 
   function idle(): void {
     const card = el('div', 'lab-card');
-    const start = button('Start the lab', 'primary', () => void run(o.api.start()));
+    const start = button('Start the lab', 'primary', () => void startRound());
     start.dataset.act = 'start';
     const row = el('div', 'lab-board__start');
     row.append(start);
@@ -242,30 +276,16 @@ export function mountLabBoard(o: LabBoardOptions): LabBoardHandle {
     root.replaceChildren(card, error);
   }
 
+  /** After class: what the lab found and the explanations to mark. The list loads once for the round. */
   function finished(lab: PublicLab, b: LabBoard): void {
-    // Task 6 builds the After class page here: predictions held, the explanations to mark, the markbook column.
-    const card = el('div', 'lab-card');
-    card.append(el('h2', '', 'What the lab found'));
-    if (b.results && lab.level !== 'pairs') {
-      card.append(
-        el('p', '', `${setHeadline({ options: lab.options ?? [], judge: lab.judge, result: b.results })} ${setEvidence({ options: lab.options ?? [], judge: lab.judge, result: b.results })}`),
-        muted(`${b.explained ?? 0} of ${b.counts.here} explanations handed in.`)
-      );
+    const session = b.round!.session;
+    if (afterFor !== session) {
+      afterFor = session;
+      after = null;
+      void loadAfter(session);
     }
-    if (b.findings && lab.level === 'pairs') {
-      const top = biggestShift(b.findings.trials);
-      const held = b.findings.trials.filter((t) => t.held).length;
-      if (lab.claim) card.append(el('p', '', `Claim tested: ${lab.claim}`));
-      if (top) card.append(el('p', '', `Biggest shift: ${top.desc.join(', ')}, ${formatShift(top.shift)}.`));
-      card.append(muted(`${held} of ${b.findings.trials.length} ${b.findings.trials.length === 1 ? 'pair' : 'pairs'} predicted their result. ${b.explained ?? 0} of ${b.counts.here} explanations handed in.`));
-    }
-    if (b.debrief) card.append(muted(`Your notes: ${b.debrief}`));
-    const again = button('Run it again', 'secondary', () => void run(o.api.start()));
-    again.dataset.act = 'again';
-    const row = el('div', 'lab-board__start');
-    row.append(again);
-    card.append(row, rounds());
-    root.replaceChildren(stepStrip(b.round!), card, error);
+    const cards = afterClass({ lab, board: b, after, columnId, columnProblem, onAgain: () => void startRound(), rounds: rounds() });
+    root.replaceChildren(stepStrip(b.round!, 'After class'), ...cards, error);
   }
 
   function paint(force = false): void {
@@ -279,6 +299,7 @@ export function mountLabBoard(o: LabBoardOptions): LabBoardHandle {
     if (!round) return idle();
     const lab = publicLab(settings);
     if (round.finished) return finished(lab, board);
+    afterFor = '';
     const at = `${round.session}:${round.step}`;
     if (at !== openFor) {
       openFor = at;

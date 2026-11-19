@@ -174,6 +174,10 @@ export type LabStudentRecord = {
   trial?: Omit<LabBoardTrial, 'initials'> | null;
 };
 
+/** After class: one student who took part. `pred` is an option index, or for Pairs design it the pair's −1, 0 or 1. */
+export type LabAfterStudent = { student_id: string; initials: string; pred: number | null; pair: number | null; notes: number; handed_in_at: string | null; explanation: string };
+export type LabAfter = { session: string; class_id: string; students: LabAfterStudent[] };
+
 export type LabTeacherApi = {
   endpoint: string;
   board(): Promise<LabBoard>;
@@ -187,6 +191,8 @@ export type LabTeacherApi = {
   release(owner: string): Promise<LabBoard>;
   remove(owner: string): Promise<LabBoard>;
   student(studentId: string): Promise<LabStudentRecord>;
+  /** Everyone who took part, with the start of each explanation, for the After class page. */
+  after(session: string): Promise<LabAfter>;
 };
 
 export function labTeacherApi(lessonId: string): LabTeacherApi {
@@ -203,6 +209,7 @@ export function labTeacherApi(lessonId: string): LabTeacherApi {
     resume: (session) => call('resume', { session }),
     release: (owner) => call('release', { owner }),
     remove: (owner) => call('remove', { owner }),
-    student: (student_id) => call('student', { student_id })
+    student: (student_id) => call('student', { student_id }),
+    after: (session) => call('after', { session })
   };
 }
