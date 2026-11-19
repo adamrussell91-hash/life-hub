@@ -1695,6 +1695,12 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
         emitLesson,
         classes: options.flowClasses ?? [],
         api: gameTeacherApi(lesson.id),
+        // Fleet week's Ask Ann to draft: Ann reads the saved draft, so save first; the chat carries her plan and draft.
+        startAnn: async (brief) => {
+          await options.flushDraft?.();
+          await startAnn(lesson.id, brief);
+          options.onAnnStarted?.();
+        },
         onTab: () => {
           showGameCanvas();
           canvas.clearSelection();

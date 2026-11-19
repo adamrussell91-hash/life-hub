@@ -4,6 +4,7 @@ import { field, tagsCell, textArea, textInput } from '../../item-editors';
 import { newShortAnswer } from '../../seed';
 import type { ContentContext } from '../../content-editor';
 import type { UnitSources } from '../../api';
+import { audText, fleetDraftBrief, fleetDraftPack, isPackEmpty } from './ann-draft';
 import './editor.css';
 
 /**
@@ -59,10 +60,10 @@ export type FleetTarget = number | 'empty' | 'recall';
 /** A unit line the grid can use, already shaped as a one-mark short answer. */
 export type FleetCandidate = { group: string; label: string; sub: string; item: QuestionItem };
 
-type Tags = { pieces: string[]; outcomes: string[]; skills: string[]; tech: string[] };
+export type Tags = { pieces: string[]; outcomes: string[]; skills: string[]; tech: string[] };
 const tagsOf = (t: Partial<Tags>): Tags => ({ pieces: [...(t.pieces ?? [])], outcomes: [...(t.outcomes ?? [])], skills: [...(t.skills ?? [])], tech: [...(t.tech ?? [])] });
 
-function shortAnswer(id: string, prompt: string, accepted: string[], tags: Tags): QuestionItem {
+export function shortAnswer(id: string, prompt: string, accepted: string[], tags: Tags): QuestionItem {
   const answers = [...new Set(accepted.map((a) => a.trim().slice(0, QUIZ_ANSWER_MAX)).filter(Boolean))].slice(0, 10);
   const question = { id, kind: 'short_answer', prompt: prompt.slice(0, QUIZ_PROMPT_MAX), marks: 1, accepted: answers };
   return { id, shape: 'question', question: question as unknown as QuestionItem['question'], ...tags };
@@ -180,6 +181,22 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
   let sources: UnitSources | null = null;
   let sourcesError = '';
   let note = '';
+  let annOpen = false;
+  let annBusy = false;
+
+  /** Loads the unit once, then repaints whichever panel asked for it. */
+  function loadSources(): void {
+    ctx.sources?.().then(
+      (s) => {
+        sources = s;
+        if ((buildOpen || annOpen) && root.isConnected) paint();
+      },
+      (e: unknown) => {
+        sourcesError = e instanceof Error && e.message ? e.message : 'The unit didn’t load. Try again.';
+        if ((buildOpen || annOpen) && root.isConnected) paint();
+      }
+    );
+  }
 
   function paint(): void {
     const keepOpen = open;
@@ -195,10 +212,23 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
       build.setAttribute('aria-expanded', String(buildOpen));
       build.addEventListener('click', () => {
         buildOpen = !buildOpen;
+        annOpen = false;
         note = '';
         paint();
       });
       head.append(build);
+    }
+    if (ctx.sources && ctx.startAnn) {
+      const ask = el('button', 'btn btn--secondary gm-build-btn fw-ann-btn', 'Ask Ann to draft');
+      ask.type = 'button';
+      ask.setAttribute('aria-expanded', String(annOpen));
+      ask.addEventListener('click', () => {
+        annOpen = !annOpen;
+        buildOpen = false;
+        note = '';
+        paint();
+      });
+      head.append(ask);
     }
     const status = el('p', 'gm-note fw-build-status', note);
     status.setAttribute('role', 'status');
@@ -302,6 +332,7 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
 
     root.append(head, status);
     if (buildOpen) root.append(buildPanel(keepOpen));
+    if (annOpen) root.append(annPanel());
     root.append(grid, panel, recallHead, recall);
     if (keepOpen >= 0) openSquare(keepOpen);
   }
@@ -327,16 +358,7 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
     }
     if (!sources) {
       box.append(el('p', 'gm-note', 'Loading the unit’s questions, organiser and quotes…'));
-      ctx.sources?.().then(
-        (s) => {
-          sources = s;
-          if (buildOpen && root.isConnected) paint();
-        },
-        (e: unknown) => {
-          sourcesError = e instanceof Error && e.message ? e.message : 'The unit didn’t load. Try again.';
-          if (buildOpen && root.isConnected) paint();
-        }
-      );
+      loadSources();
       return box;
     }
     const candidates = fleetCandidates(sources);
@@ -425,6 +447,74 @@ export function fleetContent(game: Fleet, ctx: ContentContext): HTMLElement {
     });
     actions.append(cancel, addBtn);
     box.append(listWrap, actions);
+    return box;
+  }
+
+  /**
+   * Ask Ann to draft: the price first, then a brief built from the unit only.
+   * Ann answers in the chat with a priced plan and drafts only once the
+   * teacher answers it; Accept fills blank slots and nothing publishes.
+   */
+  function annPanel(): HTMLElement {
+    const box = el('div', 'gm-panel fw-ann');
+    box.setAttribute('role', 'group');
+    box.setAttribute('aria-label', 'Ask Ann to draft');
+    const head = el('div', 'gm-panel__head');
+    head.append(el('h3', 'gm-h3', 'Ask Ann to draft'));
+    box.append(head);
+    const cancel = el('button', 'btn btn--secondary', 'Cancel');
+    cancel.type = 'button';
+    cancel.addEventListener('click', () => {
+      annOpen = false;
+      paint();
+    });
+    if (sourcesError) {
+      box.append(el('p', 'gm-err', sourcesError));
+      return box;
+    }
+    if (!sources) {
+      box.append(el('p', 'gm-note', 'Loading the unit’s questions, organiser and quotes…'));
+      loadSources();
+      return box;
+    }
+    const pack = fleetDraftPack(sources);
+    if (isPackEmpty(pack)) {
+      box.append(el('p', 'gm-note', sources.unit_id ? 'This unit has nothing for Ann to draft from yet. Add organiser vocabulary, short-answer quiz questions or quote blocks first.' : 'This lesson isn’t in a unit yet.'));
+      const actions = el('div', 'gm-actions');
+      actions.append(cancel);
+      box.append(actions);
+      return box;
+    }
+    const { brief, cost_aud } = fleetDraftBrief({ gameId: cur.id, gameTitle: cur.title, pack, lessonChars: JSON.stringify(cur).length + 4000 });
+    const counts = [`${pack.organiser.length} organiser`, `${pack.questions.length} quiz`, `${pack.quotes.length} quote`].join(', ');
+    box.append(
+      el('p', 'gm-note', `Ann drafts the labels, both questions for all 25 squares and the four recall lines from this unit only (${counts} lines).`),
+      el('p', 'gm-note fw-ann__price', `She replies in the chat with a plan priced ${audText(cost_aud)}. Nothing is built until you answer it, and Accept fills blank slots only.`)
+    );
+    const go = el('button', 'btn btn--primary fw-ann__go', annBusy ? 'Asking Ann…' : 'Ask Ann for a plan');
+    go.type = 'button';
+    go.disabled = annBusy;
+    go.addEventListener('click', () => {
+      if (annBusy || !ctx.startAnn) return;
+      annBusy = true;
+      paint();
+      ctx.startAnn(brief).then(
+        () => {
+          annBusy = false;
+          annOpen = false;
+          note = `Ann is writing her plan (${audText(cost_aud)}) in the chat. Answer it there to get the draft.`;
+          if (root.isConnected) paint();
+        },
+        (e: unknown) => {
+          annBusy = false;
+          note = e instanceof Error && e.message ? e.message : 'Ann didn’t start. Try again.';
+          if (root.isConnected) paint();
+        }
+      );
+    });
+    const actions = el('div', 'gm-actions');
+    actions.append(cancel, go);
+    box.append(actions);
     return box;
   }
 

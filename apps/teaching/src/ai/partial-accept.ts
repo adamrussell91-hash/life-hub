@@ -120,6 +120,7 @@ export function listPartialAcceptUnits(proposal: AiProposal): PartialAcceptUnit[
       return listRootBlocks(proposal.section.content.blocks as Block[], 'child');
     }
     case 'update_case':
+    case 'fleet_grid_draft':
       return [];
     case 'delete_blocks':
       return proposal.ids.map((id) => ({ key: `delete:${id}`, label: `Delete ${id}` }));
@@ -284,6 +285,7 @@ export function filterProposal(proposal: AiProposal, selectedKeys: Set<string>):
   }
 
   if (proposal.kind === 'update_case') return { ok: true, proposal };
+  if (proposal.kind === 'fleet_grid_draft') return { ok: true, proposal };
 
   if (proposal.kind === 'delete_blocks') {
     const ids = proposal.ids.filter((id) => selectedKeys.has(`delete:${id}`));

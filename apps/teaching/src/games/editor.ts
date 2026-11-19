@@ -25,6 +25,8 @@ export type GameEditorOptions = {
   /** Teacher API (results, markbook, Build from this unit). Null in previews without a server. */
   api: GameTeacherApi | null;
   onTab?: (tab: GameTab) => void;
+  /** Starts Ann on this lesson with a brief; the chat shows her plan and draft. */
+  startAnn?: (brief: string) => Promise<void>;
 };
 
 export type GameEditorHandle = {
@@ -340,7 +342,8 @@ export function mountGameEditor(o: GameEditorOptions): GameEditorHandle {
       onChange: (next: Game) => putGame(game.id, keepGridFields(next, current().games.find((g) => g.id === game.id))),
       ...(isListGame(game) ? { openBuild: () => { buildOpen = true; paintMain(); } } : {}),
       // Fleet week runs its own picker (squares and recall lines); the unit loads once per editor.
-      ...(game.kind === 'fleet_week' && api ? { sources: () => (sources ? Promise.resolve(sources) : api.sources().then((s) => (sources = s))) } : {})
+      ...(game.kind === 'fleet_week' && api ? { sources: () => (sources ? Promise.resolve(sources) : api.sources().then((s) => (sources = s))) } : {}),
+      ...(game.kind === 'fleet_week' && api && o.startAnn ? { startAnn: o.startAnn } : {})
     };
     issuesHost = el('div', 'gm-issues-host');
     main.append(head, flashNode, settingsRow(game, ctx), issuesHost);
