@@ -69,8 +69,8 @@ const SETTINGS: Record<Game['kind'], SettingField[]> = {
   battles: [{ key: 'write_minutes', label: 'Writing minutes', type: 'num', min: 2, max: 8 }],
   answer_chain: [
     { key: 'links', label: 'Links per chain', type: 'pills', options: [[4, '4'], [6, '6'], [8, '8'], [10, '10'], [12, '12']] },
-    { key: 'question_seconds', label: 'Seconds to write a question', type: 'num', min: 10, max: 60 },
-    { key: 'answer_seconds', label: 'Seconds to answer', type: 'num', min: 5, max: 30 },
+    { key: 'question_seconds', label: 'Seconds to write a question', type: 'num', min: 10, max: 90 },
+    { key: 'answer_seconds', label: 'Seconds to answer', type: 'num', min: 15, max: 45 },
     { key: 'review_seconds', label: 'Review seconds', type: 'num', min: 30, max: 180 }
   ],
   fleet_week: [

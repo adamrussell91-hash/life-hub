@@ -1004,8 +1004,8 @@ var AnswerChainSchema = z3.object({
   settings: z3.object({
     /** Links per chain: question, answer, question… always even, so a chain ends on an answer. */
     links: z3.number().int().min(4).max(12).default(6),
-    question_seconds: z3.number().int().min(10).max(60).default(20),
-    answer_seconds: z3.number().int().min(5).max(30).default(10),
+    question_seconds: z3.number().int().min(10).max(90).default(30),
+    answer_seconds: z3.number().int().min(5).max(45).default(20),
     review_seconds: z3.number().int().min(30).max(180).default(90)
   }).prefault({}),
   ...ItemTagsShape

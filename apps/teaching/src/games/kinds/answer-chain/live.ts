@@ -26,6 +26,28 @@ const JOB_NAME: Record<Job, string> = { write: 'WRITE', shadow: 'SHADOW', steal:
 const JOB_SHORT: Record<Job, string> = { write: 'WRITE', shadow: 'SHADOW', steal: 'STEAL', predict: 'WARM' };
 const errText = (e: unknown) => (e instanceof Error ? e.message : 'That didn’t go through.');
 
+/**
+ * How to play, before round 1 (class trial 20 Nov: nobody knew what to do).
+ * The board shows the worked example; phones show the same step in short.
+ * The example chain is invented and drifts on purpose (Romeo → Hamlet).
+ */
+const EX = { start: 'Romeo', q: 'Who is the hero of a famous Shakespeare tragedy?', a: 'Hamlet' };
+const HOWTO_PHONE: Array<{ title: string; body: string }> = [
+  { title: 'Your team builds a chain', body: 'Answer → question → answer → question… one link each, taking turns. You only see the link just before yours.' },
+  { title: 'Question rounds', body: 'If this is the answer… what is the question? Write a question that leads to it.' },
+  { title: 'Answer rounds', body: 'If this is the question… what is the answer? One word or a short name.' },
+  { title: 'One job each round', body: 'WRITE your team’s next link. SHADOW: answer secretly and match your writer. STEAL: guess another team’s answer.' },
+  { title: 'Points', body: 'Your link counts +5. Shadow match +3 × your bet. Capture +10. At the end the class checks every link: wrong answers lose their points.' },
+  { title: 'Ready?', body: 'Your jobs for every round are along the top of this screen. Your first one shows when the round starts.' }
+];
+/** What each job means, said in full (phone and board). */
+const JOB_HOW: Record<Job, string> = {
+  write: 'Add your team’s next link. If time runs out, what you’ve typed goes in.',
+  shadow: 'A teammate is answering. Answer the same question secretly. Same word as them scores.',
+  steal: 'See another team’s question and how many letters their answer has. Guess the word to capture it.',
+  predict: 'Nothing to steal yet. Guess the word your chain will end on.'
+};
+
 /* ── Shared: the capture takeover ────────────────────────────────── */
 
 function boom(host: HTMLElement, opts: { kind: 'captured' | 'stolen'; title: string; word: string; line: string; sub?: string; colour: string; calm: boolean; big: boolean }): void {
@@ -67,6 +89,73 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
       })
       .join('');
 
+  const card = (label: string, text: string, answer = false, extra = '') => `<div class="ac-card${extra}"><span class="ac-card__w">${label}</span><span class="ac-card__t${answer ? ' is-a' : ''}">${esc(text)}</span></div>`;
+  const ask = (lead: string, thing: string, tail: string, answer: boolean) => `<p class="ac-ask"><span>${lead}</span> <b class="${answer ? 'is-a' : 'is-q'}">${esc(thing)}</b> <span>${tail}</span></p>`;
+
+  function howto(v: ChainBoardView) {
+    const h = v.howto!;
+    const key = `howto:${h.step}`;
+    if (mode === key) return;
+    mode = key;
+    ring.stop();
+    root.className = 'ac-board ac-board--howto';
+    root.style.removeProperty('--ac-c');
+    const eyebrow = `<span class="gl-eyebrow">How to play · ${h.step + 1} of ${h.of}</span>`;
+    const q = '<div class="ac-card ac-card--blank"><span class="ac-card__w">Question</span><span class="ac-card__t">?</span></div>';
+    const a = '<div class="ac-card ac-card--blank"><span class="ac-card__w">Answer</span><span class="ac-card__t is-a">?</span></div>';
+    const arrow = '<span class="ac-arrow">→</span>';
+    let body = '';
+    switch (h.step) {
+      case 0:
+        body = `<h2 class="ac-huge">Your team builds a chain</h2>
+          <div class="ac-demo">${card('Start', v.start, true, ' ac-card--start')}${arrow}${q}${arrow}${a}${arrow}${q}${arrow}${a}</div>
+          <p class="ac-lead">Answer → question → answer → question… one link each, taking turns. Every team starts from <b>“${esc(v.start)}”</b>. You only ever see the link just before yours.</p>`;
+        break;
+      case 1:
+        body = `<h2 class="ac-huge">Question rounds</h2>
+          ${ask('If', EX.start, 'is the answer… what is the question?', true)}
+          <div class="ac-demo">${card('Example · the answer', EX.start, true, ' ac-card--start')}${arrow}${card('You write', EX.q, false, ' is-new')}</div>
+          <p class="ac-lead">Write a question that leads to that answer. Your teammate sees only your question, never the answer.</p>`;
+        break;
+      case 2:
+        body = `<h2 class="ac-huge">Answer rounds</h2>
+          ${ask('If', EX.q, 'is the question… what is the answer?', false)}
+          <div class="ac-demo">${card('Example · the question', EX.q)}${arrow}${card('You write', EX.a, true, ' is-new')}</div>
+          <p class="ac-lead">One word or a short name. This question fits more than one play, so the chain drifted from Romeo to Hamlet. <b>A clear question keeps your chain on track.</b></p>`;
+        break;
+      case 3:
+        body = `<h2 class="ac-huge">Your phone gives you one job each round</h2>
+          <div class="ac-jobcards">${(['write', 'shadow', 'steal'] as Job[]).map((j) => `<div class="ac-jobcard ac-job--${j}"><b>${JOB_NAME[j]}</b><span>${JOB_HOW[j]}</span></div>`).join('')}</div>
+          <p class="ac-lead">First two rounds, if you’re not writing: <b>WARM UP</b>. Guess the word your chain will end on.</p>`;
+        break;
+      case 4:
+        body = `<h2 class="ac-huge">Points</h2>
+          <div class="ac-points">
+            <div><b>+5</b><span>your link goes in the chain</span></div>
+            <div><b>+3 × bet</b><span>your shadow matches the writer (no match: lose your bet)</span></div>
+            <div><b>+10</b><span>you capture another team’s answer (+5 to whoever wrote their clear question)</span></div>
+            <div><b>+5</b><span>each writer, if your chain ends back on the start word</span></div>
+          </div>
+          <p class="ac-lead">At the end, everyone checks the chains anonymously. <b>Junk or wrong answers get crossed out and lose their points.</b></p>`;
+        break;
+      default:
+        body = `<h2 class="ac-huge">Ready?</h2><p class="ac-lead ac-lead--big">Look at your phone. Your jobs for every round are along the top, and your first job shows when round 1 starts.</p>`;
+    }
+    root.innerHTML = `${eyebrow}${body}`;
+    if (!api.calm()) void animate(root, [{ opacity: 0, transform: 'translateY(0.6em)' }, { opacity: 1, transform: 'none' }], { duration: 320 });
+  }
+
+  /** What to do this round, in words, for every job that has someone doing it. */
+  function steps(v: ChainBoardView, r: number): string {
+    const q = r % 2 === 0;
+    const rows: string[] = [];
+    if (v.jobs.write) rows.push(`<div class="ac-step ac-job--write"><b>WRITE</b><span>${q ? 'If the word on your phone is the answer… <em>what is the question?</em>' : 'If the question on your phone is the question… <em>what is the answer?</em> One word.'}</span></div>`);
+    if (v.jobs.shadow) rows.push(`<div class="ac-step ac-job--shadow"><b>SHADOW</b><span>Answer the same question secretly. Same word as your writer scores.</span></div>`);
+    if (v.jobs.steal) rows.push(`<div class="ac-step ac-job--steal"><b>STEAL</b><span>Guess another team’s answer from their question and its letters.</span></div>`);
+    if (v.jobs.predict) rows.push(`<div class="ac-step ac-job--predict"><b>WARM UP</b><span>Guess the word your chain will end on.</span></div>`);
+    return rows.join('');
+  }
+
   function rounds(view: RoomView, v: ChainBoardView) {
     const gap = v.phase === 'gap';
     const key = `rounds:${v.round}:${gap}`;
@@ -74,9 +163,11 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     const type = r % 2 === 0 ? 'Question' : 'Answer';
     if (mode !== key) {
       mode = key;
-      root.className = 'ac-board';
-      root.innerHTML = `<div class="ac-head"><div><span class="gl-eyebrow">${gap ? 'Next up' : `Link ${r + 1} of ${v.links}`}${v.theme ? ` · ${esc(v.theme)}` : ''}</span><h2 class="ac-title">${gap ? `${type} round` : `${type} round · every chain starts at “${esc(v.start)}”`}</h2></div></div>
-        <div class="ac-lanes"></div>
+      root.className = 'ac-board ac-board--rounds';
+      root.style.removeProperty('--ac-c');
+      root.innerHTML = `<div class="ac-head"><div><span class="gl-eyebrow">${gap ? 'Next up' : `Link ${r + 1} of ${v.links}`}${v.theme ? ` · ${esc(v.theme)}` : ''}</span><h2 class="ac-title">${gap ? `${type} round next` : `${type} round · every chain starts at “${esc(v.start)}”`}</h2></div></div>
+        <div class="ac-lanes" style="--ac-n:${v.chains.length}"></div>
+        <div class="ac-steps"></div>
         <div class="ac-jobs"></div>`;
       if (!gap) {
         root.querySelector('.ac-head')!.append(ring.root);
@@ -85,6 +176,7 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     }
     if (!gap && view.ends_at) ring.run(view.ends_at, (r % 2 === 0 ? v.seconds.question : v.seconds.answer) * 1000, api.serverNow);
     root.querySelector('.ac-lanes')!.innerHTML = lanes(v);
+    root.querySelector('.ac-steps')!.innerHTML = gap ? '' : steps(v, r);
     const j = v.jobs;
     root.querySelector('.ac-jobs')!.innerHTML = `<span><b>${j.write}</b> writing</span>${j.shadow ? `<span><b>${j.shadow}</b> shadowing</span>` : ''}${j.steal ? `<span><b>${j.steal}</b> stealing</span>` : ''}${j.predict ? `<span><b>${j.predict}</b> predicting</span>` : ''}`;
   }
@@ -99,16 +191,23 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
       ring.stop();
       root.className = 'ac-board ac-board--reveal';
       root.style.setProperty('--ac-c', teamColour(rv.team));
-      root.innerHTML = `<div class="ac-head"><div><span class="gl-eyebrow">Chain ${v.chains.indexOf(chain) + 1} of ${rv.of}</span><h2 class="ac-title">${esc(teamName(rv.team))}</h2></div></div><div class="ac-cards"><div class="ac-card ac-card--start"><span class="ac-card__w">Start</span><span class="ac-card__t is-a">${esc(v.start)}</span></div></div><div class="ac-revfoot"></div>`;
+      // One row per question → answer pair, full width, so whole questions and answers show (20 Nov: the boxes were too small).
+      root.innerHTML = `<div class="ac-head"><div><span class="gl-eyebrow">Chain ${v.chains.indexOf(chain) + 1} of ${rv.of}</span><h2 class="ac-title">${esc(teamName(rv.team))}</h2></div></div><div class="ac-ladder"><div class="ac-rung ac-rung--start"><span class="ac-rung__n">Start</span><div class="ac-card ac-card--start"><span class="ac-card__t is-a">${esc(v.start)}</span></div></div></div><div class="ac-revfoot"></div>`;
       api.sfx.reveal();
     }
-    const cards = root.querySelector('.ac-cards')!;
-    const have = cards.querySelectorAll('.ac-card').length - 1;
+    const ladder = root.querySelector('.ac-ladder')!;
+    const have = ladder.querySelectorAll('.ac-card').length - 1;
     for (let i = have; i <= rv.i; i++) {
       const l = chain.links[i];
       if (!l) continue;
-      cards.append(el('span', 'ac-arrow', '→'));
-      const c = el('div', `ac-card${l.captured !== undefined ? ' is-cap' : ''}${l.backup ? ' is-backup' : ''}`);
+      let rung = ladder.querySelector<HTMLElement>(`[data-pair="${Math.floor(i / 2)}"]`);
+      if (!rung) {
+        rung = el('div', 'ac-rung');
+        rung.dataset.pair = String(Math.floor(i / 2));
+        rung.append(el('span', 'ac-rung__n', String(Math.floor(i / 2) + 1)));
+        ladder.append(rung);
+      } else rung.append(el('span', 'ac-arrow', '→'));
+      const c = el('div', `ac-card${l.type === 'A' ? ' ac-card--a' : ' ac-card--q'}${l.captured !== undefined ? ' is-cap' : ''}${l.backup ? ' is-backup' : ''}`);
       const who = el('span', 'ac-card__w');
       if (l.initials) who.append(avatar(l.initials));
       who.append(` ${l.type}${i + 1}`);
@@ -119,10 +218,21 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
       }
       const t = el('span', `ac-card__t${l.type === 'A' ? ' is-a' : ''}`, l.text ?? '');
       c.append(who, t);
-      cards.append(c);
+      rung.append(c);
+      fitLadder(ladder as HTMLElement);
       if (!api.calm()) void animate(c, [{ opacity: 0, transform: 'translateY(0.8em) scale(0.92)' }, { opacity: 1, transform: 'none' }], { duration: 420 });
     }
     root.querySelector('.ac-revfoot')!.innerHTML = rv.i === v.links - 1 && chain.home ? '<span class="ac-home ac-home--big">★ Back where it started · +5 to every writer</span>' : '';
+  }
+
+  /** Shrinks the chain's text until every link fits on the projector (no scrolling on a board). */
+  function fitLadder(ladder: HTMLElement) {
+    let size = 1.1;
+    ladder.style.fontSize = `${size}em`;
+    while (ladder.scrollHeight > ladder.clientHeight + 1 && size > 0.55) {
+      size -= 0.05;
+      ladder.style.fontSize = `${size.toFixed(2)}em`;
+    }
   }
 
   function review(view: RoomView, v: ChainBoardView) {
@@ -214,7 +324,8 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
     update(view) {
       const v = view.kind_view as ChainBoardView | undefined;
       if (!v || v.who !== 'board') return;
-      if (v.phase === 'rounds' || v.phase === 'gap') rounds(view, v);
+      if (v.phase === 'howto' && v.howto) howto(v);
+      else if (v.phase === 'rounds' || v.phase === 'gap') rounds(view, v);
       else if (v.phase === 'reveal' && v.reveal) reveal(v);
       else if (v.phase === 'review') review(view, v);
       else if (v.phase === 'check' && v.check) check(v);
@@ -225,6 +336,11 @@ function mountBoard(host: HTMLElement, api: KindViewApi): KindView {
       const v = view.kind_view as ChainBoardView | undefined;
       if (!v || v.who !== 'board' || view.phase !== 'playing') return [];
       switch (v.phase) {
+        case 'howto': {
+          const h = v.howto ?? { step: 0, of: 1 };
+          const last = h.step >= h.of - 1;
+          return [...(h.step > 0 ? [{ label: 'Back', name: 'prev' }] : []), ...(!last ? [{ label: 'Skip to round 1', name: 'skip_howto' }] : []), { label: last ? 'Start round 1' : 'Next', name: 'next', primary: true }];
+        }
         case 'rounds':
           return [{ label: 'End round now', name: 'next' }];
         case 'gap':
@@ -257,6 +373,9 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
   let seen = -1;
   let wager = 1;
   let lockTimer: ReturnType<typeof setTimeout> | null = null;
+  let draftTimer: ReturnType<typeof setTimeout> | null = null;
+  /** What the student has typed this round, so a repaint never wipes it. */
+  const typed: Record<string, string> = {};
   const draft = { fix: {} as Record<string, string>, unclear: new Set<string>(), star: '' };
 
   const btn = (label: string, cls: string, on: () => void, disabled = false) => {
@@ -298,10 +417,31 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
       }
     });
 
+  /** Keeps what's typed across repaints, and sends it to the room as they type, so it counts if time runs out. */
+  function keep(f: HTMLInputElement, key: string, extra: () => Record<string, unknown> = () => ({})) {
+    f.value = typed[key] ?? '';
+    const push = () => void send({ act: 'draft', text: f.value, ...extra() }).catch(() => undefined);
+    f.addEventListener('input', () => {
+      typed[key] = f.value;
+      if (draftTimer) clearTimeout(draftTimer);
+      draftTimer = setTimeout(push, 500);
+    });
+    return push;
+  }
+
   function writeScreen(v: ChainPhoneView) {
     const q = v.type === 'Q';
-    shell(v, `${banner('write', q ? 'Write a question for this answer.' : 'One-word answer to this question.')}<div class="ac-prompt">${q ? '<span class="ac-hint">The answer is</span>' : ''}<div class="${q ? 'ac-big' : 'ac-q'}">${esc(v.prompt ?? '')}</div></div><p class="ac-hint">${q ? 'The next teammate only sees your question.' : 'Out of time and a shadow answer takes your place.'}</p>`);
-    const f = field('ac-write', q ? 'Your question' : 'One word', q ? 140 : 30, q);
+    const prompt = esc(v.prompt ?? '');
+    shell(
+      v,
+      `${banner('write', q ? 'Your turn: write a <b>question</b> for your team.' : 'Your turn: write an <b>answer</b> for your team.')}<div class="ac-prompt">${
+        q
+          ? `<span class="ac-lead-in">If this is the answer…</span><div class="ac-big">${prompt}</div><span class="ac-ask">…what is the question?</span>`
+          : `<span class="ac-lead-in">If this is the question…</span><div class="ac-q">${prompt}</div><span class="ac-ask">…what is the answer?</span>`
+      }</div><p class="ac-hint">${q ? `Write a question whose answer is “${prompt}”. Your teammate sees only your question and has to answer it.` : 'One word or a short name. If time runs out, what you’ve typed goes in.'}</p>`
+    );
+    const f = field('ac-write', q ? 'Who…? What…? Which…? Why…?' : 'One word', q ? 140 : 30, q);
+    keep(f, `w${v.round}`);
     root.querySelector('.ac-pbody')!.append(f);
     const go = () => {
       if (!f.value.trim()) return;
@@ -314,7 +454,11 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
   }
 
   function shadowScreen(v: ChainPhoneView) {
-    shell(v, `${banner('shadow', `${esc(v.writer ?? 'A teammate')} is answering for your team. Answer it too, secretly.`)}<div class="ac-prompt"><div class="ac-q">${esc(v.prompt ?? '')}</div></div><p class="ac-hint">Same word as ${esc(v.writer ?? 'them')} scores. How sure are you?</p>`);
+    const who = esc(v.writer ?? 'your teammate');
+    shell(
+      v,
+      `${banner('shadow', `<b>${who}</b> is answering this for your team. Answer it too, secretly. Don’t tell them.`)}<div class="ac-prompt"><span class="ac-lead-in">If this is the question…</span><div class="ac-q">${esc(v.prompt ?? '')}</div><span class="ac-ask">…what is the answer?</span></div><p class="ac-hint">Write the word you think ${who} will write. Same word: +3 × your bet. Different word: you lose your bet. How sure are you?</p>`
+    );
     const pills = el('div', 'ac-pills');
     pills.setAttribute('role', 'group');
     pills.setAttribute('aria-label', 'Wager');
@@ -325,10 +469,12 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
       b.addEventListener('click', () => {
         wager = w;
         pills.querySelectorAll('button').forEach((x, i) => x.setAttribute('aria-pressed', String(i + 1 === w)));
+        if (f.value.trim()) pushShadow();
       });
       pills.append(b);
     }
     const f = field('ac-shadow', 'One word', 30);
+    const pushShadow = keep(f, `s${v.round}`, () => ({ wager }));
     root.querySelector('.ac-pbody')!.append(pills, f);
     const go = () => {
       if (!f.value.trim()) return;
@@ -340,8 +486,11 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
   }
 
   function predictScreen(v: ChainPhoneView) {
-    shell(v, `${banner('predict', 'Nothing to steal yet. Guess where your chain will end up. +5 if you’re right.')}<div class="ac-prompt"><span class="ac-hint">It starts at</span><div class="ac-big">${esc(v.start)}</div></div>${v.predicted ? `<p class="ac-hint">Locked: <b>${esc(v.predicted)}</b>. You can change it this round.</p>` : ''}`);
-    const f = field('ac-predict', 'Where will it land?', 30);
+    shell(
+      v,
+      `${banner('predict', 'Your team is writing. While you wait: guess where your chain will end.')}<div class="ac-prompt"><span class="ac-lead-in">Your chain starts at…</span><div class="ac-big">${esc(v.start)}</div><span class="ac-ask">…what word will it end on after ${v.links} links?</span></div><p class="ac-hint">+5 if you’re right.${v.predicted ? ` Locked: <b>${esc(v.predicted)}</b>. You can change it this round.` : ''}</p>`
+    );
+    const f = field('ac-predict', 'One word', 30);
     root.querySelector('.ac-pbody')!.append(f);
     const go = () => {
       if (!f.value.trim()) return;
@@ -355,7 +504,7 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
     const s = v.steal;
     const extra = v.steals ? ` <small>${v.steals.now} of ${v.steals.of}</small>` : '';
     if (!s) {
-      shell(v, `${banner('steal', 'Crack another team’s answer.', extra)}<div class="ac-wait"><b>Nothing to steal yet</b><p class="ac-hint">Targets appear as soon as another team has an answer.</p></div>`);
+      shell(v, `${banner('steal', 'Guess another team’s answer.', extra)}<div class="ac-wait"><b>Nothing to steal right now</b><p class="ac-hint">A new target appears as soon as another team has a new answer.</p></div>`);
       api.setActions?.([]);
       return;
     }
@@ -365,9 +514,9 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
         s.result === 'captured'
           ? `<b class="ac-res" style="color:${colour}">It’s yours.</b><p>“${esc(s.word ?? '')}” now carries your team’s colour on the board.</p>`
           : s.result === 'gone'
-            ? `<b class="ac-res">Too slow!</b><p>${esc(s.by ?? 'Someone')} captured it first. It was “${esc(s.word ?? '')}”.</p>`
+            ? `<b class="ac-res">Cracked it!</b><p>${esc(s.by ?? 'Someone')} captured “${esc(s.word ?? '')}” first, but you got it too. +5</p>`
             : `<b class="ac-res">Safe… this time</b><p>Out of guesses. It was “${esc(s.word ?? '')}”.</p>`;
-      shell(v, `${banner('steal', 'Crack another team’s answer.', extra)}<div class="ac-wait">${msg}</div>`);
+      shell(v, `${banner('steal', 'Guess another team’s answer.', extra)}<div class="ac-wait">${msg}</div>`);
       api.setActions?.([btn('Steal another', 'btn--primary', () => void api.control('next_target').catch((e) => api.toast(errText(e), 'bad')))]);
       return;
     }
@@ -375,14 +524,17 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
     const left = Math.max(0, s.lock - api.serverNow());
     shell(
       v,
-      `${banner('steal', 'Crack another team’s answer.', extra)}<div class="ac-prompt ac-target" style="--ac-c:${colour}"><span class="ac-hint" style="color:${colour}">${esc(teamName(s.team))} asked</span><div class="ac-q">${esc(s.question)}</div><span class="ac-hint">${esc(teamName(s.team))} answered</span><div class="ac-blanks" aria-label="${s.letters.join(', ')} letters">${blanks}</div><span class="ac-hint">${s.letters.join(' + ')} letters</span></div><div class="ac-row"><span class="ac-hint">Guess their word to capture it</span><span class="ac-tries" aria-label="${s.tries_max - s.tries} guesses left">${Array.from({ length: s.tries_max }, (_, i) => `<i class="${i < s.tries ? 'is-used' : ''}"></i>`).join('')}</span></div>`
+      `${banner('steal', 'Guess another team’s answer. Right word: you capture it, +10.', extra)}<div class="ac-prompt ac-target" style="--ac-c:${colour}"><span class="ac-lead-in" style="color:${colour}">${esc(teamName(s.team))} were asked…</span><div class="ac-q">${esc(s.question)}</div><span class="ac-ask">…what did they answer?</span><div class="ac-blanks" aria-label="${s.letters.join(', ')} letters">${blanks}</div><span class="ac-hint">${s.letters.length > 1 ? `${s.letters.length} words: ` : ''}${s.letters.join(' + ')} letters</span></div><div class="ac-row"><span class="ac-hint">Type a real guess that fits the letters. ${s.tries_max} guesses.</span><span class="ac-tries" aria-label="${s.tries_max - s.tries} guesses left">${Array.from({ length: s.tries_max }, (_, i) => `<i class="${i < s.tries ? 'is-used' : ''}"></i>`).join('')}</span></div>`
     );
     root.style.setProperty('--ac-tint', colour);
     const f = field('ac-steal', 'Their answer', 30);
+    const stealKey = `g${v.round}:${s.team}:${s.question}`;
+    keep(f, stealKey);
     f.disabled = left > 0;
     root.querySelector('.ac-pbody')!.append(f);
     const go = () => {
       if (!f.value.trim() || f.disabled) return;
+      typed[stealKey] = '';
       void send({ text: f.value }, 'guess')
         .then((r) => {
           if (r.correct === false) {
@@ -518,9 +670,11 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
       seen = top;
       return;
     }
+    // A full-screen takeover never covers someone mid-answer (20 Nov: it stopped writers finishing).
+    const busy = v.phase === 'rounds' && (v.job === 'write' || v.job === 'shadow') && !v.done;
     for (const n of list as Notice[]) {
       if (n.seq <= seen) continue;
-      if (n.kind === 'flash') api.toast(`${n.title} ${n.body}`, n.tone);
+      if (n.kind === 'flash' || busy) api.toast(n.kind === 'flash' ? `${n.title} ${n.body}` : `${n.title} “${n.word ?? ''}” ${n.body}`, n.tone);
       else {
         boom(host, {
           kind: n.kind,
@@ -541,7 +695,7 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
 
   function render(v: ChainPhoneView) {
     const s = v.steal;
-    const key = [v.phase, v.round, v.job, v.done, v.predicted, s ? `${s.team}:${s.question}:${s.tries}:${s.result}:${s.lock > api.serverNow()}` : '-', v.review?.sent, v.review?.pairs.length, !!v.feedback].join('|');
+    const key = [v.phase, v.howto?.step ?? '', v.round, v.job, v.done, v.predicted, s ? `${s.team}:${s.question}:${s.tries}:${s.result}:${s.lock > api.serverNow()}` : '-', v.review?.sent, v.review?.pairs.length, !!v.feedback].join('|');
     if (key === mode) return;
     mode = key;
     if (lockTimer) {
@@ -559,10 +713,19 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
       else stealScreen(v);
       return;
     }
+    if (v.phase === 'howto' && v.howto) {
+      const h = HOWTO_PHONE[v.howto.step] ?? HOWTO_PHONE[0]!;
+      const last = v.howto.step >= v.howto.of - 1;
+      const jobs = last
+        ? `<div class="ac-myjobs">${[...new Set(v.plan)].map((j) => `<div class="ac-jobcard ac-job--${j}"><b>${JOB_NAME[j]}</b><span>${JOB_HOW[j]}</span></div>`).join('')}</div>`
+        : '';
+      shell(v, `<div class="ac-wait ac-wait--top"><span class="gl-eyebrow">How to play · ${v.howto.step + 1} of ${v.howto.of}</span><b>${esc(h.title)}</b><p class="ac-hint ac-hint--big">${esc(h.body)}</p><p class="ac-hint">Watch the board for the example.</p></div>${jobs}`);
+      api.setActions?.([]);
+      return;
+    }
     if (v.phase === 'gap') {
       const next = v.plan[v.round + 1] ?? 'steal';
-      const line = { write: 'Your turn in your team’s chain.', shadow: 'A teammate answers. You answer too, secretly.', steal: 'Crack another team’s answer.', predict: 'Guess where your chain will land.' }[next];
-      shell(v, `<div class="ac-wait ac-job--${next}"><span class="gl-eyebrow">Next round, your job</span><div class="ac-next">${JOB_NAME[next]}</div><p class="ac-hint">${line}</p></div>`);
+      shell(v, `<div class="ac-wait ac-job--${next}"><span class="gl-eyebrow">Next round, your job</span><div class="ac-next">${JOB_NAME[next]}</div><p class="ac-hint ac-hint--big">${JOB_HOW[next]}</p></div>`);
       api.setActions?.([]);
       return;
     }
@@ -590,6 +753,7 @@ function mountPhone(host: HTMLElement, api: KindViewApi): KindView {
     },
     dispose() {
       if (lockTimer) clearTimeout(lockTimer);
+      if (draftTimer) clearTimeout(draftTimer);
       root.remove();
     }
   };

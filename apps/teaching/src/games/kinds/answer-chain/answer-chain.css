@@ -58,6 +58,49 @@
 .ac-crow__pair span { color: var(--stage-muted); overflow-wrap: anywhere; }
 .ac-crow__acts { display: flex; gap: 0.4em; }
 
+/* Rounds: the lanes fill the projector (20 Nov: the board sat small in one corner), with what to do underneath. */
+.ac-board--rounds { grid-template-rows: auto minmax(0, 1fr) auto auto; align-content: stretch; }
+.ac-board--rounds .ac-lanes { grid-auto-rows: minmax(0, 4.6em); align-content: center; min-height: 0; font-size: 1.15em; }
+.ac-board--rounds .ac-lane { grid-template-columns: 7em minmax(0, 1fr) auto; }
+.ac-board--rounds .ac-bead { width: 2.1em; height: 2.1em; font-size: 0.8em; }
+.ac-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13em), 1fr)); gap: 0.6em; }
+.ac-step { display: grid; gap: 0.2em; align-content: start; padding: 0.55em 0.8em; border-radius: 0.8em; background: var(--stage-card); border-left: 0.3em solid var(--ac-job); }
+.ac-step b { color: var(--ac-job); letter-spacing: 0.06em; font-size: 0.85em; }
+.ac-step span { font-size: 1em; line-height: 1.25; }
+.ac-step em { font-style: normal; font-weight: 800; color: var(--stage-ink); }
+
+/* How to play, before round 1. */
+.ac-board--howto { align-content: center; justify-items: center; text-align: center; gap: 1em; }
+.ac-board--howto .ac-huge { font-size: 2.4em; }
+.ac-demo { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.6em; font-size: 1.15em; }
+.ac-demo .ac-card { max-width: 18em; text-align: left; }
+.ac-card--blank { border-style: dashed; opacity: 0.55; }
+.ac-card.is-new { border-color: var(--game-gold); box-shadow: 0 0 0 0.12em var(--game-gold), var(--stage-glow); }
+.ac-ask { margin: 0; max-width: 34em; font-size: 1.6em; font-weight: 600; line-height: 1.25; text-wrap: balance; }
+.ac-ask b.is-a { color: var(--game-gold); }
+.ac-ask b.is-q { font-style: italic; }
+.ac-board .ac-lead { max-width: 42em; text-wrap: balance; }
+.ac-lead--big { font-size: 1.5em; color: var(--stage-ink); }
+.ac-jobcards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.8em; width: min(100%, 52em); text-align: left; }
+.ac-board .ac-jobcard { display: grid; gap: 0.35em; align-content: start; padding: 0.8em 1em; border-radius: 1em; background: var(--stage-card); border-top: 0.3em solid var(--ac-job); box-shadow: var(--stage-glow); }
+.ac-board .ac-jobcard b { font-size: 1.6em; font-weight: 900; color: var(--ac-job); }
+.ac-points { display: grid; gap: 0.5em; width: min(100%, 40em); text-align: left; font-size: 1.1em; }
+.ac-points div { display: grid; grid-template-columns: 5.5em minmax(0, 1fr); gap: 0.8em; align-items: baseline; padding: 0.45em 0.8em; border-radius: 0.8em; background: var(--stage-card); }
+.ac-points b { color: var(--game-gold); font-size: 1.2em; font-variant-numeric: tabular-nums; }
+
+/* Reveal: one row per question → answer, full width, so every word shows. */
+.ac-board--reveal { grid-template-rows: auto minmax(0, 1fr) auto; }
+/* live.ts shrinks the ladder's font until the whole chain fits; it never scrolls. */
+.ac-ladder { display: grid; grid-auto-rows: auto; gap: 0.45em; align-content: start; min-height: 0; overflow: hidden; font-size: 1.1em; }
+.ac-ladder .ac-card { padding: 0.45em 0.75em; }
+.ac-rung { display: grid; grid-template-columns: 2.6em minmax(0, 1.7fr) auto minmax(0, 1fr); align-items: stretch; gap: 0.6em; min-width: 0; }
+.ac-rung--start { grid-template-columns: 2.6em auto; justify-content: start; }
+.ac-rung__n { align-self: center; justify-self: center; font-weight: 800; color: var(--stage-muted); font-size: 0.8em; }
+.ac-rung .ac-arrow { align-self: center; }
+.ac-ladder .ac-card { max-width: none; align-content: center; }
+.ac-ladder .ac-card__t { font-size: 1.05em; }
+.ac-ladder .ac-card__t.is-a { font-size: 1.45em; }
+
 /* The capture takeover (board and phone). */
 .ac-boom { position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1em; overflow: hidden; pointer-events: none; background: var(--ac-c); color: #10122a; border-radius: inherit; animation: acBoomBg 3.2s forwards; }
 .ac-boom--board { background: radial-gradient(circle, color-mix(in srgb, var(--ac-c) 85%, #000) 0%, #090b1d 78%); color: #fff; }
@@ -93,6 +136,12 @@
 .ac-big { font-size: 28px; font-weight: 800; line-height: 1.05; color: var(--navy, #17375e); overflow-wrap: anywhere; }
 .ac-q { font-size: 20px; font-weight: 700; line-height: 1.25; color: var(--navy, #17375e); overflow-wrap: anywhere; }
 .ac-hint { margin: 0; font-size: 13px; color: var(--muted, #6b7788); }
+.ac-phone .ac-hint--big { font-size: 15px; line-height: 1.35; color: var(--navy, #17375e); }
+.ac-phone .ac-lead-in { font-size: 13px; font-weight: 700; color: var(--muted, #6b7788); }
+.ac-phone .ac-ask { font-size: 17px; font-weight: 800; color: var(--navy, #17375e); }
+.ac-myjobs { display: grid; gap: 8px; }
+.ac-phone .ac-jobcard { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; border-left: 4px solid var(--ac-job); background: color-mix(in srgb, var(--ac-job) 10%, transparent); font-size: 14px; color: var(--navy, #17375e); }
+.ac-phone .ac-jobcard b { font-size: 16px; font-weight: 900; color: color-mix(in srgb, var(--ac-job) 80%, #10122a); }
 .ac-in { font-size: 17px; }
 .ac-ta { min-height: 92px; resize: none; }
 .ac-pills { display: flex; flex-wrap: wrap; gap: 8px; }

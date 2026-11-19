@@ -14,13 +14,15 @@ var CHAIN_ITEM = "chain";
 var GAP_MS = 3e3;
 var REVEAL_STEP_MS = 1800;
 var CHECK_MS = 2e4;
+var ALL_IN_MS = 5e3;
+var HOWTO_STEPS = 6;
 var LOCK_MS = 3e3;
 var TRIES = 3;
 var REVIEW_SHOW = 12;
 var REVIEW_FLAGS = 3;
 var Q_MAX = 140;
 var A_MAX = 30;
-var POINTS = { link: 5, shadow: 3, capture: 10, captured_writer: 5, steal_link: 3, same_answer: 5, home: 5, predict: 5, fix_match: 3, fix_spot: 1, unclear: 2, star_match: 2, best_pair: 5 };
+var POINTS = { link: 5, shadow: 3, capture: 10, captured_writer: 5, same_answer: 5, also_cracked: 5, home: 5, predict: 5, fix_match: 3, fix_spot: 1, unclear: 2, star_match: 2, best_pair: 5 };
 var err = (code, message) => ({ error: { code, message } });
 function chainContent(keys) {
   const c = keys.live?.chain;
@@ -31,7 +33,7 @@ function chainSettings(settings) {
   const num = (v, lo, hi, d) => typeof v === "number" && Number.isFinite(v) ? Math.round(Math.min(hi, Math.max(lo, v))) : d;
   let links = num(s.links, 4, 12, 6);
   if (links % 2) links += 1;
-  return { links, question_seconds: num(s.question_seconds, 10, 60, 20), answer_seconds: num(s.answer_seconds, 5, 30, 10), review_seconds: num(s.review_seconds, 30, 180, 90) };
+  return { links, question_seconds: num(s.question_seconds, 10, 90, 30), answer_seconds: num(s.answer_seconds, 15, 45, 20), review_seconds: num(s.review_seconds, 30, 180, 90) };
 }
 var SYN = { sugar: "glucose", sugars: "glucose", co2: "carbon dioxide", leaves: "leaf", sun: "sunlight" };
 function norm(s) {
@@ -121,7 +123,7 @@ function stealable(k, owner, team) {
   for (const c of Object.values(k.chains)) {
     if (c.team === team) continue;
     c.links.forEach((l, i) => {
-      if (l.type !== "A" || i >= k.round || l.status === "x" || l.captured || tried.has(`${c.team}:${i}`)) return;
+      if (l.type !== "A" || i >= k.round || l.status === "x" || l.captured || l.backup || l.standin || tried.has(`${c.team}:${i}`)) return;
       if (!c.links[i - 1] || c.links[i - 1].status === "x") return;
       out.push({ team: c.team, i });
     });
@@ -157,7 +159,8 @@ function capture(ctx, k, owner, team, i) {
       team: thiefTeam
     });
   }
-  for (const [o, card] of Object.entries(k.steal)) if (o !== owner && card && card.team === team && card.i === i && !card.result) card.result = "gone";
+  for (const [o, card] of Object.entries(k.steal))
+    if (o !== owner && card && card.team === team && card.i === i && !card.result) notify(k, o, { kind: "flash", title: `${ctx.seat(owner)?.initials ?? "Someone"} got it first.`, body: `Finish your guess: right still scores +${POINTS.also_cracked}.`, tone: "plain" });
   ctx.record(owner, { item: CHAIN_ITEM, move: "guess", response: { text: link.text }, correct: null, extra: { act: "capture", team, link: i } });
 }
 function startRound(ctx, k, round) {
@@ -169,27 +172,97 @@ function startRound(ctx, k, round) {
     if (jobOf(k, ctx, seat.owner, round) === "steal") deal(ctx, k, seat.owner);
     else k.steal[seat.owner] = null;
   }
-  ctx.setTimer(ctx.now + (typeOf(round) === "Q" ? s.question_seconds : s.answer_seconds) * 1e3);
+  k.ends = ctx.now + (typeOf(round) === "Q" ? s.question_seconds : s.answer_seconds) * 1e3;
+  ctx.setTimer(k.ends);
+}
+function begin(ctx, k) {
+  for (const t of ctx.teams()) {
+    const members = ctx.members(t);
+    const had = k.chains[t];
+    if (!members.length) delete k.chains[t];
+    else if (!had || had.order.length !== members.length || had.order.some((o) => !members.includes(o))) k.chains[t] = plan(ctx, t, k.links);
+  }
+  startRound(ctx, k, 0);
+}
+function allIn(ctx, k) {
+  const r = k.round;
+  for (const chain of Object.values(k.chains)) {
+    if (!chain.links[r]) return false;
+    for (const o of chain.shadows[r] ?? []) if (ctx.seat(o)?.connected && k.done[o] !== r) return false;
+  }
+  return true;
+}
+function maybeCloseEarly(ctx, k) {
+  if (k.phase !== "rounds" || !allIn(ctx, k)) return;
+  const soon = ctx.now + ALL_IN_MS;
+  if (soon < k.ends) {
+    k.ends = soon;
+    ctx.setTimer(soon);
+  }
+}
+function cleanLink(type, text) {
+  let clean = text.trim().replace(/\s+/g, " ");
+  if (!clean) return err("empty", type === "Q" ? "Write your question." : "Write your answer.");
+  if (type === "Q") {
+    if (clean.length > Q_MAX) return err("too_long", `Keep it under ${Q_MAX} characters.`);
+    if (!/[?]$/.test(clean)) clean += "?";
+  } else {
+    if (clean.length > A_MAX) return err("too_long", "One word (or a short name).");
+    clean = clean.split(" ").slice(0, 3).join(" ");
+  }
+  return { text: clean };
 }
 function backupQuestion(prev) {
   return prev ? `What links to \u201C${prev}\u201D?` : "What is this topic about?";
 }
+function flushDrafts(ctx, k) {
+  const r = k.round;
+  for (const [owner, d] of Object.entries(k.drafts)) {
+    if (d.round !== r || !d.text.trim() || k.done[owner] === r) continue;
+    const job = jobOf(k, ctx, owner, r);
+    const team = teamOf(ctx, owner);
+    if (job === "shadow" && team !== void 0 && k.chains[team]) {
+      (k.pending[String(team)] ??= []).push({ owner, text: d.text.trim().slice(0, A_MAX), wager: d.wager ?? 1 });
+      k.done[owner] = r;
+    } else if (job === "steal") {
+      const card = k.steal[owner];
+      const target = card && !card.result ? k.chains[card.team]?.links[card.i] : void 0;
+      if (card && target && sameAnswer(d.text, target.text)) {
+        (k.tried[owner] ??= []).push(`${card.team}:${card.i}`);
+        if (target.captured) {
+          award(ctx, owner, POINTS.also_cracked);
+          notify(k, owner, { kind: "flash", title: "Cracked it!", body: `Your last guess \u201C${target.text}\u201D was right. +${POINTS.also_cracked}`, tone: "good" });
+        } else capture(ctx, k, owner, card.team, card.i);
+        card.result = "captured";
+      }
+    }
+  }
+  for (const o of Object.keys(k.drafts)) if (k.drafts[o].round <= r && jobOf(k, ctx, o, r) !== "write") delete k.drafts[o];
+}
 function endRound(ctx, k) {
   const r = k.round;
   const type = typeOf(r);
+  flushDrafts(ctx, k);
   for (const chain of Object.values(k.chains)) {
     let link = chain.links[r];
+    const writer = writerOf(chain, r) ?? "";
+    const draft = k.drafts[writer];
+    const typed = !link && draft && draft.round === r ? cleanLink(type, draft.text.slice(0, type === "Q" ? Q_MAX : A_MAX)) : void 0;
+    if (!link && typed && !("error" in typed)) {
+      link = { type, text: typed.text, author: writer, at: ctx.now, status: "ok", shadows: [] };
+      chain.links[r] = link;
+      ctx.record(writer, { item: CHAIN_ITEM, move: "answer", response: { text: typed.text }, correct: null, extra: { act: "write", type, link: r, timed_out: true } });
+      notify(k, writer, { kind: "flash", title: "Time\u2019s up.", body: `What you\u2019d typed went in: \u201C${typed.text}\u201D.`, tone: "plain" });
+    }
     if (!link) {
       const prev = chain.links[r - 1]?.text ?? k.start;
       const first = type === "A" ? k.pending[String(chain.team)]?.[0] : void 0;
       if (type === "A" && first) {
         k.pending[String(chain.team)] = (k.pending[String(chain.team)] ?? []).slice(1);
-        link = { type, text: first.text, author: first.owner, at: ctx.now, status: "ok", stolen: true, shadows: [] };
-        award(ctx, first.owner, POINTS.steal_link);
-        notify(k, first.owner, { kind: "flash", title: "Your shadow went in", body: `The writer ran out of time, so \u201C${first.text}\u201D is in the chain. +${POINTS.steal_link}`, tone: "good" });
+        link = { type, text: first.text, author: first.owner, at: ctx.now, status: "ok", standin: true, shadows: [] };
+        notify(k, first.owner, { kind: "flash", title: "Stand-in", body: `${ctx.seat(writer)?.initials ?? "Your writer"} didn\u2019t write anything, so your answer \u201C${first.text}\u201D keeps the chain going.`, tone: "plain" });
       } else {
-        const author = writerOf(chain, r) ?? "";
-        link = { type, text: type === "Q" ? backupQuestion(prev) : chain.links[r - 2]?.text ?? k.start, author, at: ctx.now, status: "ok", backup: true, shadows: [] };
+        link = { type, text: type === "Q" ? backupQuestion(prev) : chain.links[r - 2]?.text ?? k.start, author: writer, at: ctx.now, status: "ok", backup: true, shadows: [] };
       }
       chain.links[r] = link;
     }
@@ -203,10 +276,10 @@ function endRound(ctx, k) {
         notify(k, sh.owner, sh.match ? { kind: "flash", title: "Shadow match!", body: `You and ${ctx.seat(link.author)?.initials ?? "your writer"} both said \u201C${link.text}\u201D. +${POINTS.shadow * sh.wager}`, tone: "good" } : { kind: "flash", title: "No match", body: `They wrote \u201C${link.text}\u201D. \u2212${sh.wager}`, tone: "bad" });
         ctx.record(sh.owner, { item: CHAIN_ITEM, move: "answer", response: { text: sh.text }, correct: null, extra: { act: "shadow", wager: sh.wager, match: !!sh.match, link: r } });
       }
-      if (!link.backup && !link.stolen && link.shadows.length >= 2 && hits / link.shadows.length < 0.5) link.status = "held";
-      if (!link.backup && !link.stolen && link.shadows.length) notify(k, link.author, { kind: "flash", title: "Answer in", body: `${hits} of ${link.shadows.length} teammates matched you.`, tone: hits ? "good" : "plain" });
+      if (!link.backup && !link.standin && link.shadows.length >= 2 && hits / link.shadows.length < 0.5) link.status = "held";
+      if (!link.backup && !link.standin && link.shadows.length) notify(k, link.author, { kind: "flash", title: "Answer in", body: `${hits} of ${link.shadows.length} teammates matched you.`, tone: hits ? "good" : "plain" });
     }
-    if (!link.backup && !link.stolen && link.status === "ok" && !link.paid) {
+    if (!link.backup && !link.standin && link.status === "ok" && !link.paid) {
       link.paid = true;
       award(ctx, link.author, POINTS.link);
     }
@@ -369,12 +442,15 @@ var answerChainRules = {
   init(ctx) {
     const s = chainSettings(ctx.game.settings);
     return {
-      phase: "rounds",
+      phase: "howto",
+      howto: 0,
       round: -1,
+      ends: 0,
       links: s.links,
       start: chainContent(ctx.keys).start,
       chains: {},
       done: {},
+      drafts: {},
       predict: {},
       pending: {},
       steal: {},
@@ -391,7 +467,9 @@ var answerChainRules = {
     k.links = chainSettings(ctx.game.settings).links;
     k.start = chainContent(ctx.keys).start || "photosynthesis";
     for (const t of ctx.teams()) if (ctx.members(t).length) k.chains[t] = plan(ctx, t, k.links);
-    startRound(ctx, k, 0);
+    k.phase = "howto";
+    k.howto = 0;
+    ctx.setTimer(void 0);
   },
   move(ctx, k, owner, e) {
     const r = e.response ?? {};
@@ -427,15 +505,25 @@ var answerChainRules = {
       if (ctx.now < card.lock) return err("locked", "Wait a moment, then guess again.");
       const target = k.chains[card.team]?.links[card.i];
       if (!target) return err("no_target", "That link has gone.");
-      if (target.captured) {
-        card.result = "gone";
-        return { ...ok, correct: false };
-      }
       if (!text) return err("empty", "Type your guess.");
+      const hit = sameAnswer(text, target.text);
+      const want = letterCounts(target.text);
+      const got = letterCounts(text.replace(/[^A-Za-z0-9 ]/g, ""));
+      const total = (l) => l.reduce((a, b) => a + b, 0);
+      if (!hit && (got.length !== want.length || Math.abs(total(got) - total(want)) > 1))
+        return err("wrong_shape", want.length > 1 ? `Their answer is ${want.length} words: ${want.join(" + ")} letters.` : `Their answer has ${want[0]} letters.`);
       const tried = k.tried[owner] ??= [];
-      if (sameAnswer(text, target.text)) {
-        card.result = "captured";
+      if (hit) {
         tried.push(`${card.team}:${card.i}`);
+        delete k.drafts[owner];
+        if (target.captured) {
+          card.result = "gone";
+          award(ctx, owner, POINTS.also_cracked);
+          notify(k, owner, { kind: "flash", title: "Cracked it!", body: `\u201C${target.text}\u201D was right. +${POINTS.also_cracked}`, tone: "good" });
+          ctx.record(owner, { item: CHAIN_ITEM, move: "guess", response: { text }, correct: null, extra: { act: "steal", team: card.team, link: card.i, hit: true, second: true } });
+          return { ...ok, correct: true };
+        }
+        card.result = "captured";
         capture(ctx, k, owner, card.team, card.i);
         return { ...ok, correct: true };
       }
@@ -457,20 +545,21 @@ var answerChainRules = {
     if (!chain) return err("no_team", "You\u2019re not on a team yet.");
     if (k.done[owner] === k.round) return err("done", "You\u2019re locked in for this round.");
     const type = typeOf(k.round);
+    if (r.act === "draft") {
+      if (job === "predict") return err("not_now", "Nothing to keep.");
+      const wager = r.wager === 2 || r.wager === 3 ? r.wager : 1;
+      k.drafts[owner] = { round: k.round, text: text.slice(0, Q_MAX), ...job === "shadow" ? { wager } : {} };
+      return ok;
+    }
     if (r.act === "write") {
       if (job !== "write") return err("not_write", "It\u2019s not your turn to write.");
-      if (!text) return err("empty", type === "Q" ? "Write your question." : "Write your answer.");
-      let clean = text.replace(/\s+/g, " ");
-      if (type === "Q") {
-        if (clean.length > Q_MAX) return err("too_long", `Keep it under ${Q_MAX} characters.`);
-        if (!/[?]$/.test(clean)) clean += "?";
-      } else {
-        if (clean.length > A_MAX) return err("too_long", "One word (or a short name).");
-        clean = clean.split(" ").slice(0, 3).join(" ");
-      }
-      chain.links[k.round] = { type, text: clean, author: owner, at: ctx.now, status: "ok", shadows: [] };
+      const c = cleanLink(type, text);
+      if ("error" in c) return c;
+      chain.links[k.round] = { type, text: c.text, author: owner, at: ctx.now, status: "ok", shadows: [] };
       k.done[owner] = k.round;
-      ctx.record(owner, { item: CHAIN_ITEM, move: "answer", response: { text: clean }, correct: null, extra: { act: "write", type, link: k.round } });
+      delete k.drafts[owner];
+      ctx.record(owner, { item: CHAIN_ITEM, move: "answer", response: { text: c.text }, correct: null, extra: { act: "write", type, link: k.round } });
+      maybeCloseEarly(ctx, k);
       return ok;
     }
     if (r.act === "shadow") {
@@ -479,6 +568,7 @@ var answerChainRules = {
       const wager = r.wager === 2 || r.wager === 3 ? r.wager : 1;
       (k.pending[String(chain.team)] ??= []).push({ owner, text: text.slice(0, A_MAX), wager });
       k.done[owner] = k.round;
+      maybeCloseEarly(ctx, k);
       return ok;
     }
     return err("bad_move", "That move isn\u2019t part of Answer chain.");
@@ -495,8 +585,19 @@ var answerChainRules = {
       return err("not_allowed", "Only the teacher can do that.");
     }
     switch (op.name) {
+      case "prev":
+        if (k.phase !== "howto") return err("not_now", "Not in the walkthrough.");
+        k.howto = Math.max(0, k.howto - 1);
+        return;
+      case "skip_howto":
+        if (k.phase !== "howto") return err("not_now", "Not in the walkthrough.");
+        begin(ctx, k);
+        return;
       case "next":
-        if (k.phase === "rounds") endRound(ctx, k);
+        if (k.phase === "howto") {
+          if (k.howto < HOWTO_STEPS - 1) k.howto++;
+          else begin(ctx, k);
+        } else if (k.phase === "rounds") endRound(ctx, k);
         else if (k.phase === "gap") startRound(ctx, k, k.round + 1);
         else if (k.phase === "reveal") revealNext(ctx, k);
         else if (k.phase === "review") endReview(ctx, k);
@@ -605,6 +706,7 @@ function boardView(ctx, k, role) {
     captures: k.captures.slice(-6),
     matches: k.matches
   };
+  if (k.phase === "howto") view2.howto = { step: k.howto, of: HOWTO_STEPS };
   if (revealing) view2.reveal = { team: teamOrder(k)[k.reveal.t] ?? 0, i: k.reveal.i, of: teamOrder(k).length };
   if (k.phase === "review") {
     const asked = ctx.seats().filter((x) => (k.review.shown[x.owner]?.length ?? 0) > 0);
@@ -638,6 +740,7 @@ function phoneView(ctx, k, owner) {
     done: k.done[owner] === k.round,
     notices: (k.notices[owner] ?? []).slice(-3)
   };
+  if (k.phase === "howto") return { ...base3, howto: { step: k.howto, of: HOWTO_STEPS } };
   if (k.phase === "gap") return { ...base3, job: plan2[round] };
   if (k.phase === "rounds") {
     const job = plan2[k.round] ?? "steal";
@@ -3104,8 +3207,8 @@ var AnswerChainSchema = z3.object({
   settings: z3.object({
     /** Links per chain: question, answer, question… always even, so a chain ends on an answer. */
     links: z3.number().int().min(4).max(12).default(6),
-    question_seconds: z3.number().int().min(10).max(60).default(20),
-    answer_seconds: z3.number().int().min(5).max(30).default(10),
+    question_seconds: z3.number().int().min(10).max(90).default(30),
+    answer_seconds: z3.number().int().min(5).max(45).default(20),
     review_seconds: z3.number().int().min(30).max(180).default(90)
   }).prefault({}),
   ...ItemTagsShape
