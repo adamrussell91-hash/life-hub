@@ -391,3 +391,123 @@ test('leak sweep: no answer, secret, name, id, owner or rival fleet reaches a st
     assert.equal(views[n].rival.signs.length, rival.owners.length);
   }
 });
+
+// ---------------------------------------------------------------- Task 6: teacher actions
+
+test('teacher state has names; students’ state does not', async () => {
+  const { store } = await startGame();
+  const room = await teach(store, 'campaign_state', {}, T1 + 5);
+  const names = room.teams.flatMap((t) => t.members.map((m) => m.name)).sort();
+  assert.deepEqual(names, FLEET_ROSTER.map((s) => s.name).sort());
+  assert.equal(room.round, 1);
+  assert.ok(room.teams.every((t) => t.fleet.length === 4));
+  const view = await play(store, 2, 'fleet_state', {}, T1 + 5);
+  const text = JSON.stringify(view);
+  for (const s of FLEET_ROSTER) assert.ok(!text.includes(s.name.split(' ')[0]));
+});
+
+test('campaign_next closes the round on the next request', async () => {
+  const { store } = await startGame();
+  const shot = await play(store, 1, 'fleet_commit', { square: 0, sure: false }, T1 + 5);
+  await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, T1 + 6);
+  const room = await teach(store, 'campaign_state', {}, T1 + 7);
+  assert.equal(room.teams.flatMap((t) => t.members).find((m) => m.owner === ownerOf(1)).shots, 1);
+  await teach(store, 'campaign_next', {}, T1 + 10);
+  const view = await play(store, 2, 'fleet_state', {}, T1 + 11);
+  assert.equal(view.round, 2);
+  assert.equal(view.closes_at, T1 + 10 + 240000);
+});
+
+test('void turns a would-be hit into void', async () => {
+  const { store, c, state } = await startGame();
+  const { sq } = await hitOnce(store, c, state, 1, T1 + 5);
+  const [stored] = await store.get(k.campaignShots('fw', c.id, 1, ownerOf(1)));
+  assert.equal(stored.correct, true);
+  await teach(store, 'void_shot', { round: 1, owner: ownerOf(1), seq: stored.seq }, T1 + 6);
+  await teach(store, 'campaign_next', {}, T1 + 7);
+  const view = await play(store, 1, 'fleet_state', {}, T1 + 8);
+  assert.equal(view.report.lines[0].outcome, 'void');
+  assert.equal(view.rival.chart[sq], undefined);
+  assert.deepEqual(view.shots.returning, []);
+  await rejectsWith(teach(store, 'void_shot', { round: 1, owner: ownerOf(1), seq: stored.seq }, T1 + 9), 'too_late');
+});
+
+test('reject once: the report is owed again and its deadline moves a round; twice is refused', async () => {
+  const { store, c, state } = await startGame();
+  const partner = sides(c, 1).partners[0];
+  await hitOnce(store, c, state, 1, T1 + 5);
+  await teach(store, 'campaign_next', {}, T1 + 6);
+  let owed = (await play(store, partner, 'fleet_state', {}, T1 + 7)).owed;
+  assert.equal(owed[0].due, 2);
+  await play(store, partner, 'fleet_report', { hit: owed[0].hit, text: 'Because.', writing }, T1 + 8);
+  let room = await teach(store, 'campaign_state', {}, T1 + 9);
+  assert.equal(room.owed[0].filed.text, 'Because.');
+  const hitId = room.owed[0].hit;
+  await rejectsWith(teach(store, 'reject_report', { hit: 'h9-x-1' }, T1 + 9), 'bad_hit');
+  await teach(store, 'reject_report', { hit: hitId }, T1 + 10);
+  owed = (await play(store, partner, 'fleet_state', {}, T1 + 11)).owed;
+  assert.equal(owed.length, 1);
+  assert.equal(owed[0].due, 3);
+  // Round 2 closes with nothing filed: the hit is still owed, not halved.
+  await teach(store, 'campaign_next', {}, T1 + 12);
+  room = await teach(store, 'campaign_state', {}, T1 + 13);
+  assert.equal(room.round, 3);
+  assert.equal(room.owed.length, 1);
+  assert.equal(room.owed[0].rejected, 1);
+  await play(store, partner, 'fleet_report', { hit: owed[0].hit, text: 'It matches the clue word.', writing }, T1 + 14);
+  await rejectsWith(teach(store, 'reject_report', { hit: hitId }, T1 + 15), 'returned_once', /Already returned once/);
+  // Filed in time after the return: it counts in full when round 3 closes.
+  await teach(store, 'campaign_next', {}, T1 + 16);
+  const final = await store.get(k.campaignResolved('fw', c.id, 3));
+  assert.equal(final.hits[0].status, 'full');
+});
+
+test('reveal settles owed hits at half and fills in names', async () => {
+  const { store, c, state } = await startGame();
+  const { team } = sides(c, 1);
+  await hitOnce(store, c, state, 1, T1 + 5, true);
+  await teach(store, 'campaign_next', {}, T1 + 6);
+  const before = await play(store, 1, 'fleet_state', {}, T1 + 7);
+  assert.equal(before.reveal, undefined);
+  const room = await teach(store, 'campaign_reveal', {}, T1 + 8);
+  assert.equal(room.revealed_at, T1 + 8);
+  const final = await store.get(k.campaignResolved('fw', c.id, 'final'));
+  assert.equal(final.hits[0].status, 'half');
+  assert.equal(final.damage[team.id], 2); // a sure hit is 4; half is 2
+  const view = await play(store, 1, 'fleet_state', {}, T1 + 9);
+  assert.equal(view.phase, 'reveal');
+  assert.equal(view.score.us, 2);
+  assert.equal(view.reveal.names[view.me.sign], 'Ivo P.');
+  assert.equal(Object.keys(view.reveal.names).length, 4);
+  assert.equal(view.reveal.fleets.them.length, 4);
+  assert.deepEqual(view.reveal.calibration, { right: 1, total: 1 });
+  assert.ok(view.reveal.standings.teams.some((t) => t.side === 'us'));
+  await rejectsWith(play(store, 1, 'fleet_commit', { square: 1, sure: false }, T1 + 10), 'closed');
+});
+
+test('close stops new commits and frees the class', async () => {
+  const { store, c } = await startGame();
+  await teach(store, 'campaign_close', {}, T1 + 5);
+  await rejectsWith(play(store, 1, 'fleet_commit', { square: 1, sure: false, campaign_id: c.id }, T1 + 6), 'closed');
+  assert.equal((await play(store, 1, 'fleet_state', { campaign_id: c.id }, T1 + 6)).phase, 'closed');
+  await rejectsWith(play(store, 1, 'fleet_commit', { square: 1, sure: false }, T1 + 6), 'no_campaign');
+  const again = await teach(store, 'campaign_open', { mode: 'lesson' }, T1 + 7);
+  assert.notEqual(again.campaign_id, c.id);
+});
+
+test('the control room flags pasted answers with their writing log', async () => {
+  const { store } = await startGame();
+  const shot = await play(store, 3, 'fleet_commit', { square: 4, sure: false }, T1 + 5);
+  await play(store, 3, 'fleet_answer', { answer: typed(shot.question), writing: { ...writing, pastes: 2 } }, T1 + 6);
+  const room = await teach(store, 'campaign_state', {}, T1 + 7);
+  assert.equal(room.flags.length, 1);
+  assert.equal(room.flags[0].name, FLEET_ROSTER[2].name);
+  assert.equal(room.flags[0].pastes, 2);
+  assert.ok(Array.isArray(room.flags[0].writing.steps));
+});
+
+test('the teacher route sends campaign actions to Fleet week', async () => {
+  const { isFleetTeacherAction } = await import('../../netlify/functions/_shared/fleet-week-teacher.mjs');
+  for (const a of ['campaign_open', 'campaign_state', 'campaign_next', 'void_shot', 'reject_report', 'campaign_reveal', 'campaign_close']) assert.ok(isFleetTeacherAction(a), a);
+  for (const a of ['results', 'open', 'rooms', 'markbook_push']) assert.ok(!isFleetTeacherAction(a), a);
+});

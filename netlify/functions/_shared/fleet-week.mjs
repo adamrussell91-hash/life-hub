@@ -22,8 +22,8 @@ import { gameKeys } from './game-store.mjs';
 import { cleanWritingLog } from './quiz-core.mjs';
 import { checkAnswer, fleet } from './game-rules.mjs';
 import {
-  SHOTS_PER_ROUND, aliasFor, ensureResolved, findCampaign, hashFor, list, loadFleetGame, markClock, obj, roundOpen, roundsOf,
-  updateJSON
+  SHOTS_PER_ROUND, aliasFor, ensureResolved, findCampaign, hashFor, list, loadFleetGame, markClock, obj, reportInputs, roundOpen,
+  roundsOf, updateJSON
 } from './fleet-week-store.mjs';
 
 export const FLEET_ACTIONS = ['fleet_state', 'fleet_place', 'fleet_commit', 'fleet_answer', 'fleet_report', 'fleet_recall', 'signals'];
@@ -110,11 +110,13 @@ export async function viewFor(store, k, campaign, keys, state, clock, owner, now
   const open = myShots.find((s) => shotOpen(s, now));
   const returning = shown.returns.filter((r) => r.owner === owner && r.due <= clock.round).map((r) => r.square);
 
+  // A rejected report comes back with one more round to file it (decision 6).
+  const { rejected } = reportInputs(reports);
   const owed = [];
   for (const hit of owedHits(shown, team, owner, reports)) {
     const shot = shotOfHit(shown, hit);
     const stored = shot ? list(await read(store, shotsKey(campaign, k, hit.round, hit.owner))).find((s) => s.seq === shot.seq) : null;
-    owed.push({ hit: teamAlias(campaign, team.id, hit.id), square: hit.square, due: hit.due, question: shot ? publicQuestion(keys, shot.item) : null, answer: stored?.answer ?? '', by: signs[hit.owner] });
+    owed.push({ hit: teamAlias(campaign, team.id, hit.id), square: hit.square, due: hit.round + 1 + Math.min(rejected[hit.id] ?? 0, 1), question: shot ? publicQuestion(keys, shot.item) : null, answer: stored?.answer ?? '', by: signs[hit.owner] });
   }
 
   const recallDue = shown.sinks.find((s) => s.by === owner && s.recall === 'pending' && !obj(mine.recall)[`${s.target}:${s.ship}`]);

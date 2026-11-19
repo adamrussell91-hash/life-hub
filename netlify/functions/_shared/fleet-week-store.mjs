@@ -113,7 +113,7 @@ export function reportInputs(reports) {
   const filed = {};
   const rejected = {};
   const recalls = {};
-  for (const r of Object.values(reports)) {
+  for (const r of Object.values(reports).map(obj)) {
     for (const [hit, f] of Object.entries(obj(r.filed))) filed[hit] = f.round;
     for (const [hit, n] of Object.entries(obj(r.rejected))) rejected[hit] = Math.max(rejected[hit] ?? 0, n);
     for (const [key, line] of Object.entries(obj(r.recall))) recalls[key] = line.correct === true;
