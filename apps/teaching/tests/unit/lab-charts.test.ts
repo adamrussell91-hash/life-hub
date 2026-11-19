@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { findings, reading, readingX } from '@/lab/charts';
+import { findings, levelBars, reading, readingX } from '@/lab/charts';
+import { levelGroups } from '@/lab/model';
+import { LAB_DEFAULT_FEATURES } from '@/lab/schema';
 import { findingRows } from '@/lab/steps-pairs';
 
 afterEach(() => { document.body.replaceChildren(); vi.unstubAllGlobals(); });
@@ -85,5 +87,27 @@ describe('findings: one row per trial against a centre line', () => {
     expect(rows[3]!.classList.contains('is-on')).toBe(true);
     rows[0]!.click();
     expect(onOpen).toHaveBeenCalledWith(3);
+  });
+});
+
+describe('level bars: the trials regrouped by level of language', () => {
+  it('draws one bar per level, biggest average shift first, with its trial count, and leaves a thin trial out', () => {
+    // Two sentence-level trials, one form, and a word-level trial with three readers.
+    const groups = levelGroups([
+      { feature: 1, shift: -1.8, readers: 6 }, { feature: 2, shift: -2.4, readers: 5 }, { feature: 0, shift: 0.6, readers: 5 }, { feature: 5, shift: 2.7, readers: 3 }
+    ], LAB_DEFAULT_FEATURES);
+    const chart = levelBars(groups);
+    const rows = [...chart.querySelectorAll('.lab-bar')] as HTMLElement[];
+    expect(rows.map((r) => r.dataset.level)).toEqual(['Sentence', 'Form', 'Word']);
+    expect(rows.map((r) => r.textContent)).toEqual(['Sentence 2 trials2.1', 'Form 1 trial0.6', 'Word 0 trials0.0']);
+    expect(rows.map((r) => r.classList.contains('is-top'))).toEqual([true, false, false]);
+    // A full bar stands for a shift of 3 points.
+    expect(rows.map((r) => Number((r.querySelector('i') as HTMLElement).dataset.w))).toEqual([70, 20, 0]);
+  });
+
+  it('draws no leader before a named trial has moved readers', () => {
+    const chart = levelBars(levelGroups([], LAB_DEFAULT_FEATURES));
+    expect(chart.querySelectorAll('.lab-bar.is-top').length).toBe(0);
+    expect(chart.querySelectorAll('.lab-bar').length).toBe(3);
   });
 });

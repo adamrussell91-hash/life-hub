@@ -35,7 +35,7 @@ describe('the Lab card', () => {
     expect(rows()).not.toContain('One text per option');
     expect(lesson().lab).toMatchObject({ level: 'students', judge: 'pick', threshold: 8, notes_on: false });
     press('level-pairs');
-    expect(rows()).toEqual(['Class', 'Question', 'Claim to test', 'Why we are doing this', 'Control text', 'Who decides the change', 'What readers rate', 'Lab notes', 'Features to name', 'Pairs', 'Counts as a change', 'Explain prompt', 'My debrief notes']);
+    expect(rows()).toEqual(['Class', 'Question', 'Claim to test', 'Why we are doing this', 'Control text', 'Who decides the change', 'What readers rate', 'The quality readers rate', 'Lab notes', 'Features to name', 'Pairs', 'Counts as a change', 'Explain prompt', 'My debrief notes']);
     expect(lesson().lab).toMatchObject({ level: 'pairs', judge: 'rate', threshold: 1, notes_on: true });
     expect(lesson().lab?.features).toHaveLength(6);
   });
@@ -108,5 +108,39 @@ describe('pairs and levels', () => {
     const next = switchLevel(lab, 'students');
     expect(next).toMatchObject({ question: 'A question', debrief: 'Notes', judge: 'pick', threshold: 8 });
     expect(switchLevel(next, 'supplied').texts).toHaveLength(2);
+  });
+
+  it('Pairs design it takes the quality readers rate, which words the predictions', () => {
+    const { card, lesson, press } = mount();
+    press('level-pairs');
+    const trait = card.root.querySelector('[aria-label="The quality readers rate"]') as HTMLInputElement;
+    expect(trait.placeholder).toBe('hesitant');
+    trait.value = 'hesitant';
+    trait.dispatchEvent(new Event('input'));
+    expect(lesson().lab?.trait).toBe('hesitant');
+    // The other levels have no such line.
+    press('level-supplied');
+    expect(card.root.querySelector('[aria-label="The quality readers rate"]')).toBeNull();
+  });
+
+  it('note prompts are folded under Lab notes, one per step of the level, and each can be rewritten', () => {
+    const { card, lesson, press } = mount();
+    // Off for a supplied lab: no prompts to edit.
+    expect(card.root.querySelector('.lab-plan__prompts')).toBeNull();
+    press('notes-on');
+    const prompts = () => [...card.root.querySelectorAll('.lab-plan__prompts input')] as HTMLInputElement[];
+    expect(card.root.querySelector('.lab-plan__prompts summary')?.textContent).toBe('Note prompts');
+    expect((card.root.querySelector('.lab-plan__prompts') as HTMLDetailsElement).open).toBe(false);
+    expect(prompts().map((i) => i.dataset.prompt)).toEqual(['Question', 'Predict', 'Test', 'Result']);
+    expect(prompts()[0]!.value).toBe('Where do you hear it? Quote it.');
+    prompts()[0]!.value = 'Who is missing from the sentence?';
+    prompts()[0]!.dispatchEvent(new Event('input'));
+    expect(lesson().lab?.note_prompts?.Question).toBe('Who is missing from the sentence?');
+    expect(lesson().lab?.note_prompts?.Result).toBe('What do the dots show? Look at the spread and the overlap.');
+    press('level-pairs');
+    expect(prompts().map((i) => i.dataset.prompt)).toEqual(['Question', 'Design', 'Predict', 'Test', 'Result', 'Name it']);
+    press('level-students');
+    press('notes-on');
+    expect(prompts().map((i) => i.dataset.prompt)).toEqual(['Question', 'Predict', 'Make', 'Test', 'Result']);
   });
 });

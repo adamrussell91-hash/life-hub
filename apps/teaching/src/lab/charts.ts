@@ -1,10 +1,10 @@
 import { el } from '@/quiz/dom';
 
-import { formatShift, mean } from './model';
+import { formatShift, mean, type LevelGroup } from './model';
 
 /**
- * The lab's charts: bars, the dot readings and the findings chart. The level
- * bars (Task 5) join them.
+ * The lab's charts: bars, the dot readings, the findings chart and the level
+ * bars.
  */
 
 /** Grows every `[data-w]` bar under `root` to its width. Bars start at zero so the growth shows; reduced motion drops the transition in CSS. */
@@ -170,6 +170,29 @@ export function findings(input: FindingsInput): HTMLElement {
     track.append(fill);
     node.append(label, track, el('span', 'lab-find__value', formatShift(row.shift)));
     box.append(node);
+  }
+  growBars(box);
+  return box;
+}
+
+/**
+ * The level-of-language comparison: one bar per level (Form, Sentence, Word),
+ * biggest average shift first, each with how many trials stand behind it.
+ * The leading level is drawn in full lilac once a trial has moved readers.
+ */
+export function levelBars(groups: LevelGroup[]): HTMLElement {
+  const box = el('div', 'lab-bars lab-levels');
+  const lead = groups[0] && groups[0].trials > 0 && groups[0].meanAbsShift > 0 ? groups[0].level : null;
+  for (const group of groups) {
+    const row = el('div', `lab-bar${group.level === lead ? ' is-top' : ''}`);
+    row.dataset.level = group.level;
+    const label = el('span', '', group.level);
+    label.append(' ', el('small', 'lab-muted', `${group.trials} ${group.trials === 1 ? 'trial' : 'trials'}`));
+    const fill = el('i');
+    fill.dataset.w = String(Math.max(0, Math.min(100, (group.meanAbsShift / FULL_SHIFT) * 100)));
+    fill.style.width = '0';
+    row.append(label, fill, el('span', '', group.meanAbsShift.toFixed(1)));
+    box.append(row);
   }
   growBars(box);
   return box;

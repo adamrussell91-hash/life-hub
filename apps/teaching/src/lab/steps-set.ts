@@ -3,7 +3,7 @@ import { renderBlock } from '@/blocks/render';
 import { button, el } from '@/quiz/dom';
 import { bars } from './charts';
 import { explainQuestion, setEvidence, setHeadline } from './model';
-import { noteAllows, noteBox, notedLine, notesPanel } from './notes';
+import { noteAllows, noteBox, noteOrWait, noteText, notedLine, notesOn, notesPanel } from './notes';
 import { LAB_EXPLAIN_BLOCK_ID, type LabLevel, type LabStep, type PublicLab } from './schema';
 import type { LabStepContext, LabStepView } from './player';
 
@@ -52,8 +52,7 @@ const question: LabStepView = (ctx) => {
       : lab.judge === 'pick' ? 'You will read every version and choose one.'
         : 'You will read one version and rate it.'
   ));
-  const note = noteBox('Question', ctx.notes);
-  nodes.push(...(note ? [note] : [wait()]));
+  nodes.push(...noteOrWait('Question', ctx.notes, wait()));
   return nodes;
 };
 
@@ -72,9 +71,9 @@ const predict: LabStepView = (ctx) => {
   chips.setAttribute('role', 'group');
   chips.setAttribute('aria-label', 'Your prediction');
   const lock = button('Lock it in', 'primary', () => {
-    if (typeof draft.pred !== 'number') return;
+    if (typeof draft.pred !== 'number' || !noteAllows('Predict', ctx.notes)) return;
     lock.disabled = true;
-    void ctx.act(() => ctx.client.predict(draft.pred as number, String(draft.reason ?? '')));
+    void ctx.act(() => ctx.client.predict(draft.pred as number, String(draft.reason ?? ''), noteText('Predict', ctx.notes)));
   });
   lock.disabled = chosen === null;
   options(lab).forEach((option, i) => {
@@ -98,7 +97,8 @@ const predict: LabStepView = (ctx) => {
   reason.setAttribute('aria-label', 'Why you predict this');
   reason.value = String(draft.reason ?? '');
   reason.addEventListener('input', () => { draft.reason = reason.value; });
-  return [el('h2', '', predictQuestion(lab)), muted(`Readers will answer: ${lab.judge_question}`), chips, reason, lock];
+  // With lab notes on, the Predict note ("Because…") is the reason.
+  return [el('h2', '', predictQuestion(lab)), muted(`Readers will answer: ${lab.judge_question}`), chips, notesOn(lab) ? noteBox('Predict', ctx.notes)! : reason, lock];
 };
 
 /** The line a reader rates on, 0 to 10, with the lab's two end labels. What is set waits in `draft.rating` until it is sent. */
@@ -162,7 +162,7 @@ const make: LabStepView = (ctx) => {
     go.disabled = true;
     // The next box opens once this one is saved; a save that fails leaves the student here with their words.
     void ctx.act(async () => {
-      const next = await ctx.client.write(at, text);
+      const next = await ctx.client.write(at, text, last ? noteText('Make', ctx.notes) : undefined);
       draft.at = at + 1;
       return next;
     });
@@ -183,10 +183,7 @@ const test: LabStepView = (ctx) => {
   const writers = lab.level === 'students';
   if (!reading) return [el('h2', '', lab.judge_question), ...(writers && status.round?.step_name === 'Test' ? [muted('There is no writing to read yet.')] : []), wait()];
   if (!reading.item) {
-    const nodes: HTMLElement[] = [el('h2', '', writers ? `${count(reading.total, 'writer', 'writers')} read` : lab.judge === 'pick' ? 'Choice sent' : 'Rating sent')];
-    const note = noteBox('Test', ctx.notes);
-    nodes.push(...(note ? [note] : [wait()]));
-    return nodes;
+    return [el('h2', '', writers ? `${count(reading.total, 'writer', 'writers')} read` : lab.judge === 'pick' ? 'Choice sent' : 'Rating sent'), ...noteOrWait('Test', ctx.notes, wait())];
   }
   const item = reading.item;
   if (item.kind === 'text') {
@@ -250,8 +247,7 @@ const result: LabStepView = (ctx) => {
     const rest = own.chosen.map((n, i) => ({ n, i })).filter((x) => x.i !== best).map((x) => `${labels[x.i]} ${x.n}`);
     if (rest.length) nodes.push(muted(`Your other versions: ${rest.join(', ')}.`));
   }
-  const note = noteBox('Result', ctx.notes);
-  if (note) nodes.push(note);
+  nodes.push(...noteOrWait('Result', ctx.notes, null));
   return nodes;
 };
 

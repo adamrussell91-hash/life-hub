@@ -34,6 +34,8 @@ var LabSettingsSchema = z.object({
   judge_question: z.string().max(200).default(""),
   /** Rate on a line: the two end labels. */
   ends: z.tuple([z.string().max(40), z.string().max(40)]).optional(),
+  /** Pairs design it: the quality readers rate, as one adjective ("hesitant"). It words predictions and verdicts: "less hesitant". */
+  trait: z.string().max(40).optional(),
   /** Counts as a win (pick: choices ahead) or a change (rate: points out of 10). Set before any data. */
   threshold: z.number().min(0).max(100),
   notes_on: z.boolean(),
@@ -55,6 +57,7 @@ var PublicLabSchema = z.object({
   judge: z.enum(LAB_JUDGE),
   judge_question: z.string().max(200),
   ends: z.tuple([z.string().max(40), z.string().max(40)]).optional(),
+  trait: z.string().max(40).optional(),
   threshold: z.number().min(0).max(100),
   notes_on: z.boolean(),
   note_prompts: z.record(z.string().max(20), z.string().max(200)).optional(),
@@ -307,7 +310,29 @@ function sanitiseEdit(tokens, raw) {
   };
 }
 var PREDICTION_WORDS = { "-1": "lower", "0": "about the same", "1": "higher" };
-var predictionWord = (value) => PREDICTION_WORDS[String(value)] ?? "";
+var TRAIT_WORDS = { "-1": "less", "0": "about as", "1": "more" };
+var traitOf = (trait) => typeof trait === "string" ? trait.trim() : "";
+function predictionWord(value, trait) {
+  const t = traitOf(trait);
+  if (!t) return PREDICTION_WORDS[String(value)] ?? "";
+  const word = TRAIT_WORDS[String(value)];
+  return word ? `${word} ${t}` : "";
+}
+var predictionStem = (trait) => traitOf(trait) ? "the speaker will sound\u2026" : "readers will rate it\u2026";
+function changeVerdict(value, trait) {
+  if (traitOf(trait)) return `Your change made the speaker sound ${predictionWord(value, trait)}.`;
+  return value === 0 ? "Your change made no clear difference." : `Your change moved the rating ${predictionWord(value)}.`;
+}
+function findingEnds(trait) {
+  const t = traitOf(trait);
+  return t ? [`Less ${t}`, "More"] : ["Rated lower", "Rated higher"];
+}
+function levelHeadline(groups) {
+  const [top, second] = groups;
+  if (!top || top.trials === 0 || top.meanAbsShift === 0) return groups.some((g) => g.trials > 0) ? "No level moved readers yet" : "The pairs are naming what they changed";
+  if (second && second.trials > 0 && second.meanAbsShift === top.meanAbsShift) return `The ${top.level.toLowerCase()} and ${second.level.toLowerCase()} levels moved readers the same`;
+  return `The ${top.level.toLowerCase()} level moved readers most`;
+}
 function formatShift(value) {
   return `${value > 0 ? "+" : value < 0 ? "\u2212" : ""}${Math.abs(value).toFixed(1)}`;
 }
@@ -345,17 +370,21 @@ export {
   applyEdits,
   biggestShift,
   changeLabel,
+  changeVerdict,
   deal,
   dealLate,
   describeEdits,
   explainQuestion,
+  findingEnds,
   formatShift,
   hasChange,
   levelGroups,
+  levelHeadline,
   markEdits,
   mean,
   pairFindings,
   pickResult,
+  predictionStem,
   predictionWord,
   sanitiseEdit,
   seededRandom,

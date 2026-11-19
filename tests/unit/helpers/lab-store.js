@@ -31,7 +31,7 @@ export const STUDENTS = {
 export const PAIRS_LAB = {
   class_id: 'class1', level: 'pairs', question: 'What makes this speaker sound hesitant?', claim: 'The line breaks create the hesitation.', why: '',
   control: 'I meant to tell you\nbut the words, I think,\nwere somewhere else.', judge: 'rate', judge_question: 'How hesitant does the speaker sound?',
-  ends: ['Not at all', 'Completely'], threshold: 1, notes_on: true, features: [{ name: 'Line break (enjambment)', level: 'Form' }], pairs: PAIRS, debrief: '', explain_prompt: ''
+  ends: ['Not at all', 'Completely'], threshold: 1, notes_on: false, features: [{ name: 'Line break (enjambment)', level: 'Form' }, { name: 'Hedging (modality)', level: 'Sentence' }, { name: 'Word choice (connotation)', level: 'Word' }], pairs: PAIRS, debrief: '', explain_prompt: ''
 };
 
 export function memoryStore(entries = []) {
@@ -74,3 +74,5 @@ export function labStore(settings = SUPPLIED, lessonId = 'lab1') {
 
 /** What student `i`'s device sends with every call. */
 export const device = (i, classId = 'class1') => ({ class_id: classId, class_token: (i + 1).toString(16).padStart(2, '0').repeat(24) });
+/** The pairs lab with lab notes on, as a new Pairs design it lab starts, and a trait to word predictions with. */
+export const PAIRS_NOTED = { ...PAIRS_LAB, notes_on: true, trait: 'hesitant' };

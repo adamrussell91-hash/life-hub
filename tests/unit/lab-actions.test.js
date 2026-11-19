@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { labAction, labTeacherAction } from '../../netlify/functions/_shared/lab.mjs';
 import { labKeys } from '../../netlify/functions/_shared/lab-keys.mjs';
 import { isPublicStudentApi } from '../../netlify/functions/_shared/public-student-routes.mjs';
-import { PAIRS, PAIRS_LAB, ROSTER, STUDENTS, SUPPLIED, device, labStore } from './helpers/lab-store.js';
+import { PAIRS, PAIRS_LAB, PAIRS_NOTED, ROSTER, STUDENTS, SUPPLIED, device, labStore } from './helpers/lab-store.js';
 
 const teacher = (store, action, extra = {}) => labTeacherAction(store, 'lab1', { action, ...extra });
 const student = (store, i, action, extra = {}) => labAction(store, 'lab1', { ...device(i), action, ...extra });
@@ -475,7 +475,7 @@ test('Design: either partner saves the pair’s edit, the last save wins, and th
   assert.equal(status.pair.ready, true);
   await code(student(store, 1, 'bench', { edit: {} }), 'locked');
   const board = await teacher(store, 'board');
-  assert.deepEqual(board.pairs, { total: 8, changed: 1, ready: 1, predicted: 0 });
+  assert.deepEqual(board.pairs, { total: 8, changed: 1, ready: 1, predicted: 0, named: 0 });
   status = await student(store, 1, 'ready', { on: false });
   assert.equal(status.pair.ready, false);
   await student(store, 1, 'bench', { edit: { cut: [5] } });
@@ -644,4 +644,177 @@ test('a small class: fewer than four other versions means all of them plus two c
   }
   const board = await next(store, 4);
   assert.deepEqual(board.findings.trials.map((t) => [t.pair, t.n, t.thin]), [['p1', 2, true], ['p2', 2, true]]);
+});
+
+// ---------------------------------------------------------------------------
+// Lab notes and Name it
+// ---------------------------------------------------------------------------
+
+/** A pairs round with lab notes on, at Design, all 17 joined. */
+async function notedAtDesign() {
+  const { store, session } = await started(17, PAIRS_NOTED);
+  await next(store, 1);
+  return { store, session };
+}
+
+test('lab notes on: a pair’s completing action waits for the sender’s note, which can ride with the action', async () => {
+  const { store } = await notedAtDesign();
+  await student(store, 0, 'bench', { edit: EDITS[0] });
+  await code(student(store, 0, 'ready'), 'need_note');
+  await code(student(store, 0, 'ready', { note: '   ' }), 'need_note');
+  assert.equal((await student(store, 0, 'status')).pair.ready, false);
+  let status = await student(store, 0, 'ready', { note: 'The hedge is where the doubt sits.' });
+  assert.equal(status.pair.ready, true);
+  assert.equal(status.me.notes.Design, 'The hedge is where the doubt sits.');
+  // The partner's note is their own: saved by itself, and an empty one is refused.
+  await code(student(store, 1, 'note', { step: 'Design', text: '' }), 'need_note');
+  status = await student(store, 1, 'note', { step: 'Design', text: 'It slows the line.' });
+  assert.equal(status.me.notes.Design, 'It slows the line.');
+  // A note saved first lets the action through with no note attached.
+  await student(store, 2, 'bench', { edit: EDITS[1] });
+  await student(store, 2, 'note', { step: 'Design', text: 'The break holds the thought back.' });
+  assert.equal((await student(store, 2, 'ready')).pair.ready, true);
+
+  await next(store, 2);
+  await code(student(store, 0, 'pair_predict', { pred: -1 }), 'need_note');
+  assert.equal((await student(store, 0, 'status')).pair.pred, null);
+  status = await student(store, 0, 'pair_predict', { pred: -1, note: 'Because the doubt goes with the words.' });
+  assert.equal(status.pair.pred, -1);
+  assert.equal(status.me.notes.Predict, 'Because the doubt goes with the words.');
+});
+
+test('lab notes on: at Question, Test and Result the note is what finishes the step', async () => {
+  const { store } = await started(2, PAIRS_NOTED);
+  await code(student(store, 0, 'note', { step: 'Question', text: ' ' }), 'need_note');
+  let status = await student(store, 0, 'note', { step: 'Question', text: '"I think," in line 2.' });
+  assert.equal(status.me.done.Question, true);
+  await next(store, 1);
+  await student(store, 0, 'bench', { edit: EDITS[0] });
+  await next(store, 2);
+  await next(store, 3);
+  status = await student(store, 1, 'status');
+  for (let item = 0; item < status.reading.total; item += 1) status = await student(store, 1, 'rate', { item, value: 5 });
+  // Every text is rated, and the step is still open until the note is in.
+  assert.equal(status.reading.item, null);
+  assert.equal(status.me.done.Test, undefined);
+  assert.equal((await teacher(store, 'board')).counts.done, 0);
+  status = await student(store, 1, 'note', { step: 'Test', text: 'One version had no hedge.' });
+  assert.equal(status.me.done.Test, true);
+  assert.equal((await teacher(store, 'board')).counts.done, 1);
+  await next(store, 4);
+  status = await student(store, 1, 'note', { step: 'Result', text: 'The dots sit lower.' });
+  assert.equal(status.me.done.Result, true);
+});
+
+test('lab notes on, the supplied levels: a prediction and the last version wait for their notes', async () => {
+  const noted = await started(2, { ...SUPPLIED, notes_on: true });
+  await next(noted.store, 1);
+  await code(student(noted.store, 0, 'predict', { pred: 0 }), 'need_note');
+  const locked = await student(noted.store, 0, 'predict', { pred: 0, note: 'Because the doer is named.' });
+  assert.equal(locked.me.pred, 0);
+  assert.equal(locked.me.notes.Predict, 'Because the doer is named.');
+
+  const writing = await started(2, { ...STUDENTS, notes_on: true });
+  await next(writing.store, 1);
+  await next(writing.store, 2);
+  // The first versions save as they are written; the one that finishes the set is the completing action.
+  await student(writing.store, 0, 'write', { option: 0, text: piece(0, 0) });
+  await student(writing.store, 0, 'write', { option: 1, text: piece(0, 1) });
+  await code(student(writing.store, 0, 'write', { option: 2, text: piece(0, 2) }), 'need_note');
+  assert.deepEqual((await student(writing.store, 0, 'status')).me.writing[2], '');
+  const done = await student(writing.store, 0, 'write', { option: 2, text: piece(0, 2), note: 'Touch took the longest.' });
+  assert.equal(done.me.done.Make, true);
+  assert.equal(done.me.notes.Make, 'Touch took the longest.');
+});
+
+test('lab notes off: every completing action goes through with no note', async () => {
+  const { store } = await atDesign();
+  assert.equal((await student(store, 0, 'note', { step: 'Question', text: '' })).me.notes.Question, '');
+  await student(store, 0, 'bench', { edit: EDITS[0] });
+  assert.equal((await student(store, 0, 'ready')).pair.ready, true);
+  await next(store, 2);
+  assert.equal((await student(store, 0, 'pair_predict', { pred: -1 })).pair.pred, -1);
+  await next(store, 3);
+  await next(store, 4);
+  await next(store, 5);
+  assert.equal((await student(store, 0, 'feature', { feature: 1 })).pair.feature, 1);
+});
+
+test('Name it: the pair names its feature from the list, and the board regroups the trials by level of language', async () => {
+  const { store, session } = await notedAtDesign();
+  for (let p = 0; p < 7; p += 1) {
+    await student(store, first(p), 'bench', { edit: EDITS[p] });
+    await student(store, first(p), 'ready', { note: 'Why this change.' });
+  }
+  await next(store, 2);
+  await next(store, 3);
+  const lists = dealOf(store, session).lists;
+  // Every reader gives the control 6, pair 1's version 3, pair 2's 5 and every other version 6.
+  const value = (item) => (item.kind !== 'version' ? 6 : item.pair === 'p1' ? 3 : item.pair === 'p2' ? 5 : 6);
+  for (let i = 0; i < 17; i += 1) {
+    const items = lists[ROSTER[i].id];
+    for (let item = 0; item < items.length; item += 1) await student(store, i, 'rate', { item, value: value(items[item]) });
+  }
+  let board = await next(store, 4);
+  assert.equal(board.levels, null, 'no level comparison before Name it');
+  await code(student(store, 0, 'feature', { feature: 1 }), 'wrong_step');
+  board = await next(store, 5);
+  assert.equal(board.round.step_name, 'Name it');
+  assert.deepEqual(board.levels.map((g) => [g.level, g.trials]), [['Form', 0], ['Sentence', 0], ['Word', 0]]);
+
+  await code(student(store, 0, 'feature', { feature: 9, note: 'x' }), 'bad_feature');
+  await code(student(store, 0, 'feature', { feature: 1 }), 'need_note');
+  // Pair 8 kept the original: it has no trial to name.
+  await code(student(store, 14, 'feature', { feature: 0, note: 'x' }), 'no_trial');
+  let status = await student(store, 0, 'feature', { feature: 1, note: 'The hedge lets the speaker back away.' });
+  assert.equal(status.pair.feature, 1);
+  assert.equal(status.me.notes['Name it'], 'The hedge lets the speaker back away.');
+  // The partner sees the pair's feature, and still owes their own note.
+  status = await student(store, 1, 'status');
+  assert.equal(status.pair.feature, 1);
+  assert.equal(status.me.notes['Name it'], undefined);
+  await student(store, 2, 'feature', { feature: 0, note: 'The break makes the reader wait.' });
+
+  board = await teacher(store, 'board');
+  assert.equal(board.pairs.named, 2);
+  // Hedging is a sentence-level feature (shift −3); the line break is form (shift −1). Unnamed trials are left out.
+  assert.deepEqual(board.levels, [{ level: 'Sentence', trials: 1, meanAbsShift: 3 }, { level: 'Form', trials: 1, meanAbsShift: 1 }, { level: 'Word', trials: 0, meanAbsShift: 0 }]);
+  assert.equal(board.findings.trials.find((t) => t.pair === 'p1').feature, 1);
+  // A student is sent the feature as their own pair's choice, never anyone else's.
+  const sent = await student(store, 4, 'status');
+  assert.equal(sent.pair.feature, null);
+  assert.equal(JSON.stringify(sent.findings).includes('feature'), false);
+});
+
+test('a trial with fewer than four readers is left out of the level comparison', async () => {
+  const { store } = await started(4, PAIRS_LAB);
+  await next(store, 1);
+  await student(store, 0, 'bench', { edit: EDITS[0] });
+  await student(store, 2, 'bench', { edit: EDITS[1] });
+  await next(store, 2);
+  await next(store, 3);
+  for (let i = 0; i < 4; i += 1) for (let item = 0; item < 3; item += 1) await student(store, i, 'rate', { item, value: item === 0 ? 2 : 7 });
+  await next(store, 4);
+  await next(store, 5);
+  await student(store, 0, 'feature', { feature: 1 });
+  await student(store, 2, 'feature', { feature: 0 });
+  const board = await teacher(store, 'board');
+  assert.equal(board.pairs.named, 2);
+  assert.deepEqual(board.findings.trials.map((t) => t.thin), [true, true]);
+  assert.deepEqual(board.levels.map((g) => g.trials), [0, 0, 0]);
+});
+
+test('the marking view can read a student’s record after the round has ended, with what it needs to word it', async () => {
+  const { store, session } = await notedAtDesign();
+  await student(store, 0, 'bench', { edit: EDITS[0] });
+  await student(store, 0, 'ready', { note: 'The hedge is where the doubt sits.' });
+  await teacher(store, 'end', { session });
+  assert.equal((await teacher(store, 'board')).round, null);
+  const one = await teacher(store, 'student', { student_id: ROSTER[0].id });
+  assert.equal(one.record.notes.Design, 'The hedge is where the doubt sits.');
+  assert.deepEqual(one.pair.change, ['cut "I think,"']);
+  assert.deepEqual({ level: one.lab.level, notes_on: one.lab.notes_on, trait: one.lab.trait, steps: one.lab.steps.length }, { level: 'pairs', notes_on: true, trait: 'hesitant', steps: 7 });
+  // A lab that has never run has nothing to show.
+  const fresh = await teacher(labStore(PAIRS_NOTED), 'student', { student_id: ROSTER[0].id });
+  assert.equal(fresh.record, null);
 });

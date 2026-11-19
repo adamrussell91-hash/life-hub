@@ -3,7 +3,7 @@ import { ApiClientError } from '@/api/client';
 import { el, errorText } from '@/quiz/dom';
 import type { LabLevel, LabStep, PublicLab } from './schema';
 import type { LabClient, LabMe, LabRound, LabStatus } from './api';
-import type { LabNotesContext } from './notes';
+import { factsStrip, type LabNotesContext } from './notes';
 import { registerSetSteps } from './steps-set';
 import { registerPairsSteps } from './steps-pairs';
 import './lab.css';
@@ -72,7 +72,7 @@ function viewKey(status: LabStatus | null): string {
   if (!status) return '';
   return JSON.stringify([
     status.identity, status.anonymous, status.not_for_you, status.round && [status.round.session, status.round.step, status.round.finished],
-    status.me && [status.me.pred, status.me.done, status.me.read, status.me.own], status.reading && [status.reading.index, status.reading.total], status.results,
+    status.me && [status.me.pred, status.me.done, status.me.read, status.me.own, status.me.notes], status.reading && [status.reading.index, status.reading.total], status.results,
     // A partner's save changes the pair's bench on this device too.
     status.pair, status.control, status.findings
   ]);
@@ -171,7 +171,7 @@ export function mountLabPlayer(host: HTMLElement, options: LabPlayerOptions): { 
       return root.replaceChildren(card(el('h2', '', lab.question), el('p', 'lab__note', 'Your teacher will start the lab soon. This page will open it for you.')));
     }
     if (round.finished) {
-      return root.replaceChildren(stepStrip(round), card(el('h2', '', 'Lab finished'), el('p', 'lab__note', 'Your prediction and your explanation are with your teacher.')));
+      return root.replaceChildren(stepStrip(round), card(el('h2', '', 'Lab finished'), el('p', 'lab__note', lab.notes_on ? 'Your prediction, your lab notes and your explanation are with your teacher.' : 'Your prediction and your explanation are with your teacher.')));
     }
     const step = round.steps[round.step]!;
     const at = `${round.session}:${round.step}`;
@@ -183,12 +183,13 @@ export function mountLabPlayer(host: HTMLElement, options: LabPlayerOptions): { 
     }
     const ctx: LabStepContext = {
       lesson, lab, classId: options.classId, round, me, status, client, act, draft,
-      notes: { lab, me, save: (s, text) => act(() => client.note(s, text)) },
+      notes: { lab, me, draft, save: (s, text) => act(() => client.note(s, text)) },
       handIn: async () => (options.handIn ? options.handIn() : true),
       repaint: () => paint(true)
     };
     const nodes = labStepView(lab.level, step)?.(ctx) ?? [el('h2', '', step), el('p', 'lab__note', 'This step is not built yet.'), waiting()];
-    root.replaceChildren(stepStrip(round), card(...nodes, problem ? errorLine() : null));
+    const facts = factsStrip(lab, status);
+    root.replaceChildren(stepStrip(round), ...(facts ? [facts] : []), card(...nodes, problem ? errorLine() : null));
   }
 
   async function refresh(force = false): Promise<void> {

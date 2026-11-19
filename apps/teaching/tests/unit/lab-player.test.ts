@@ -39,6 +39,7 @@ function mount(first: LabStatus, settings: LabSettings = SETTINGS) {
     bench: vi.fn(() => Promise.resolve(current)),
     ready: vi.fn(() => Promise.resolve(current)),
     pairPredict: vi.fn(() => Promise.resolve(current)),
+    feature: vi.fn(() => Promise.resolve(current)),
     rate: vi.fn(() => reply(at(2, { reading: { index: 1, total: 1, item: null } }, { done: { Test: true } }))),
     pick: vi.fn(() => reply(at(2, { reading: { index: 1, total: 1, item: null } }, { done: { Test: true } }))),
     explain: vi.fn(() => reply(at(4, { results: RESULT }, { pred: 1, done: { Explain: true } })))
@@ -104,7 +105,7 @@ describe('the lab player', () => {
     reason.dispatchEvent(new Event('input'));
     lock.click();
     await flush();
-    expect(client.predict).toHaveBeenCalledWith(1, 'nobody is named');
+    expect(client.predict).toHaveBeenCalledWith(1, 'nobody is named', '');
     expect(host.querySelector('h2')?.textContent).toBe('Locked in: passive');
     expect(text()).toContain('Because nobody is named');
     expect(text()).toContain('Waiting for your teacher.');
@@ -192,15 +193,7 @@ describe('the lab player', () => {
     expect((host.querySelector('.lab-explain textarea') as HTMLTextAreaElement).value).toBe('With the company as the subject there is nowhere else to look.');
   });
 
-  it('a step that is not built yet shows a plain card, and the finish shows the end', async () => {
-    const pairs = { ...seedLab('class1', 'pairs'), question: 'What makes this speaker sound hesitant?', claim: 'The line breaks create the hesitation.', control: 'One line\nand another', judge_question: 'How hesitant does the speaker sound?' };
-    const steps = ['Question', 'Design', 'Predict', 'Test', 'Result', 'Name it', 'Explain'] as const;
-    const status = at(5);
-    status.round = { ...status.round!, steps: [...steps], step_name: 'Name it', finished: false };
-    const naming = mount(status, pairs);
-    await flush();
-    expect(naming.host.querySelector('h2')?.textContent).toBe('Name it');
-    expect(naming.text()).toContain('This step is not built yet.');
+  it('the finish shows the end', async () => {
     const done = mount(at(5));
     await flush();
     expect(done.host.querySelector('h2')?.textContent).toBe('Lab finished');
@@ -255,7 +248,7 @@ describe('the lab player, students write it', () => {
     type('The sky goes the colour of a bruise.');
     click('Next: sound');
     await flush();
-    expect(client.write).toHaveBeenLastCalledWith(0, 'The sky goes the colour of a bruise.');
+    expect(client.write).toHaveBeenLastCalledWith(0, 'The sky goes the colour of a bruise.', undefined);
     expect(host.querySelector('h2')?.textContent).toBe('The storm hits the house. Lean on sound.');
     expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('');
     type('The gutters choke and spit.');
@@ -265,7 +258,7 @@ describe('the lab player, students write it', () => {
     type('The air presses on my skin.');
     click('Finish');
     await flush();
-    expect(client.write).toHaveBeenLastCalledWith(2, 'The air presses on my skin.');
+    expect(client.write).toHaveBeenLastCalledWith(2, 'The air presses on my skin.', '');
     expect(host.querySelector('h2')?.textContent).toBe('Three versions written');
     expect(text()).toContain('Waiting for your teacher.');
     // A version can still be changed while Make is open.
@@ -376,7 +369,7 @@ describe('the lab player, pairs design it', () => {
     expect(host.querySelector('.lab-tok.is-sel')?.textContent).toBe('think,');
     ready().click();
     await flush();
-    expect(client.ready).toHaveBeenCalledWith(true);
+    expect(client.ready).toHaveBeenCalledWith(true, '');
     expect(host.querySelector('h2')?.textContent).toBe('On the bench');
     expect(host.querySelector('.lab-pane.is-live .is-cut')?.textContent).toBe('think,');
     expect(text()).toContain('Your change: cut "think,".');
@@ -407,7 +400,7 @@ describe('the lab player, pairs design it', () => {
     click('Lower');
     lock.click();
     await flush();
-    expect(client.pairPredict).toHaveBeenCalledWith(-1);
+    expect(client.pairPredict).toHaveBeenCalledWith(-1, '');
     expect(host.querySelector('h2')?.textContent).toBe('Locked in: lower');
   });
 

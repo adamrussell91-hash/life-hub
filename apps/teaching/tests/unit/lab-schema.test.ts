@@ -5,6 +5,7 @@ import {
   explainBlockCurrent,
   labDefaults,
   labIssues,
+  notePrompt,
   publicLab,
   seedLab,
   withExplainBlock,
@@ -39,7 +40,7 @@ describe('Lab settings', () => {
     expect(labDefaults('supplied')).toMatchObject({ judge: 'rate', threshold: 1, notes_on: false });
     expect(labDefaults('pairs')).toMatchObject({ judge: 'rate', threshold: 1, notes_on: true });
     expect(labDefaults('pairs').features).toHaveLength(6);
-    expect(Object.keys(labDefaults('pairs').note_prompts ?? {})).toEqual(['Question', 'Design', 'Predict', 'Test', 'Result', 'Name it']);
+    expect(Object.keys(labDefaults('pairs').note_prompts ?? {})).toEqual(['Question', 'Design', 'Predict', 'Make', 'Test', 'Result', 'Name it']);
   });
 
   it('a new lab saves before it is filled in, and says what is missing', () => {
@@ -83,6 +84,16 @@ describe('Lab settings', () => {
     expect(JSON.stringify(publicLab(supplied()))).not.toContain('dumped');
     expect(publicLab(pairs()).features).toHaveLength(6);
     expect(publicLab(supplied()).features).toBeUndefined();
+  });
+
+  it('the trait reaches students for a pairs lab only, and a note prompt falls back to the usual one', () => {
+    expect(publicLab({ ...pairs(), trait: ' hesitant ' }).trait).toBe('hesitant');
+    expect('trait' in publicLab({ ...pairs(), trait: '  ' })).toBe(false);
+    expect('trait' in publicLab({ ...supplied(), trait: 'hesitant' })).toBe(false);
+    expect(LabSettingsSchema.safeParse({ ...pairs(), trait: 'x'.repeat(41) }).success).toBe(false);
+    expect(notePrompt({ note_prompts: { Question: 'Which line?', Design: ' ' } }, 'Question')).toBe('Which line?');
+    expect(notePrompt({ note_prompts: { Question: 'Which line?', Design: ' ' } }, 'Design')).toBe('Why this change? What is it doing in the original?');
+    expect(notePrompt({}, 'Make')).toBe('Which version was hardest to write? Why?');
   });
 
   it('the Explain block is a valid written question, seeded once and kept current', () => {

@@ -139,14 +139,15 @@ describe('the lab board', () => {
     expect(api.start).toHaveBeenCalledTimes(1);
   });
 
-  it('a step that is not built yet still lets the teacher move on', async () => {
-    const steps = ['Question', 'Design', 'Predict', 'Test', 'Result', 'Name it', 'Explain'] as const;
-    const b = at(5, { level: 'pairs', judge: 'rate' });
-    b.round = { ...b.round!, steps: [...steps], step_name: 'Name it', finished: false };
+  it('a step with no stage of its own still lets the teacher move on', async () => {
+    // Make belongs to Students write it; a supplied lab has no stage for it.
+    const steps = ['Question', 'Predict', 'Make', 'Test', 'Result', 'Explain'] as const;
+    const b = at(2);
+    b.round = { ...b.round!, steps: [...steps], step_name: 'Make', finished: false };
     const { board, act, text } = mount(b);
     await board.refresh();
     expect(text()).toContain('This step is not built yet.');
-    expect(act('next').textContent).toBe('Next: Explain');
+    expect(act('next').textContent).toBe('Next: Test');
   });
 
   it('a poll with nothing new leaves the stage as it is', async () => {
@@ -252,6 +253,31 @@ describe('the lab board, pairs design it', () => {
     document.body.replaceChildren(board.root);
     return { ...mounted, board, act: (name: string) => board.root.querySelector(`[data-act="${name}"]`) as HTMLButtonElement, text: () => board.root.textContent ?? '' };
   }
+
+  it('Name it regroups the trials by level of language under a headline, and counts the pairs that have named', async () => {
+    const levels = [{ level: 'Sentence' as const, trials: 3, meanAbsShift: 1.9 }, { level: 'Form' as const, trials: 2, meanAbsShift: 0.7 }, { level: 'Word' as const, trials: 0, meanAbsShift: 0 }];
+    const { board, text, act } = mountPairs(pairsAt(5, { findings: FOUND, levels, pairs: { ...COUNTS, named: 5 } }));
+    await board.refresh();
+    expect(board.root.querySelector('.lab-board__inner h2')?.textContent).toBe('The sentence level moved readers most');
+    expect([...board.root.querySelectorAll('.lab-levels .lab-bar')].map((r) => r.textContent)).toEqual(['Sentence 3 trials1.9', 'Form 2 trials0.7', 'Word 0 trials0.0']);
+    expect(text()).toContain('A trial with fewer than four readers is left out.');
+    expect(text()).toContain('5 of 7 pairs named');
+    expect(act('next').textContent).toBe('Next: Explain');
+    // Nothing a classmate could trace: the level bars carry no initials.
+    expect(board.root.querySelector('.lab-levels')?.textContent).not.toContain('KT');
+  });
+
+  it('a trait words the board’s predictions and the findings chart’s ends', async () => {
+    const lesson = { id: 'lab1', lab: { ...HESITANT, trait: 'hesitant' }, blocks: [] } as unknown as Lesson;
+    const mounted = mount(pairsAt(2, { predictions: [3, 1, 2] }, true));
+    const board = mountLabBoard({ api: mounted.api, getLesson: () => lesson, pollMs: 60_000 });
+    document.body.replaceChildren(board.root);
+    await board.refresh();
+    expect([...board.root.querySelectorAll('.lab-bar span:first-child')].map((n) => n.textContent)).toEqual(['Less hesitant', 'More hesitant', 'About as hesitant']);
+    mounted.api.board = vi.fn(() => Promise.resolve(pairsAt(4, { findings: FOUND, predictions: [1, 1, 1] })));
+    await board.refresh();
+    expect([...board.root.querySelectorAll('.lab-finds__axis div span')].map((n) => n.textContent)).toEqual(['Less hesitant', 'More']);
+  });
 
   it('Question and Design show the control, and Design counts the pairs on the bench', async () => {
     const question = mountPairs(pairsAt(0));

@@ -1,8 +1,8 @@
 import { button, el } from '@/quiz/dom';
 import { markedPoem, pane, poem } from './bench';
-import { bars, findings as findingsChart, meter, reading } from './charts';
-import { applyEdits, biggestShift, explainQuestion, markEdits, predictionWord, tokenise } from './model';
-import { FINDING_ENDS, findingRows } from './steps-pairs';
+import { bars, findings as findingsChart, levelBars, meter, reading } from './charts';
+import { applyEdits, biggestShift, explainQuestion, findingEnds, levelHeadline, markEdits, predictionStem, predictionWord, tokenise } from './model';
+import { findingRows } from './steps-pairs';
 import type { LabStep, PublicLab } from './schema';
 import type { LabBoardContext, LabBoardView } from './board';
 
@@ -10,7 +10,8 @@ import type { LabBoardContext, LabBoardView } from './board';
  * Pairs design it, on the teacher's board: the control at Question and
  * Design, the pairs' predictions, progress while readers rate, and the
  * findings chart, where a row opens that pair's marked version beside its
- * dots and the control's. Name it (the level comparison) is Task 5's.
+ * dots and the control's. At Name it the trials are regrouped by level of
+ * language.
  */
 
 const muted = (text: string): HTMLElement => el('p', 'lab-muted', text);
@@ -53,8 +54,8 @@ const predict: LabBoardView = (ctx) => {
   const pairs = pairCounts(ctx);
   const shown = round.revealed && board.predictions;
   const inner = shown
-    ? [el('h2', '', 'What the pairs predict'), bars({ labels: [-1, 0, 1].map((v) => upper(predictionWord(v))), values: board.predictions!, top: board.predictions!.indexOf(Math.max(...board.predictions!)) })]
-    : [el('h2', '', 'Readers will rate it…'), muted('Each pair predicts what its own change will do. Predictions stay hidden until you reveal them.'), meter(pairs.predicted, pairs.changed)];
+    ? [el('h2', '', 'What the pairs predict'), bars({ labels: [-1, 0, 1].map((v) => upper(predictionWord(v, ctx.lab.trait))), values: board.predictions!, top: board.predictions!.indexOf(Math.max(...board.predictions!)) })]
+    : [el('h2', '', upper(predictionStem(ctx.lab.trait))), muted('Each pair predicts what its own change will do. Predictions stay hidden until you reveal them.'), meter(pairs.predicted, pairs.changed)];
   const toggle = button(round.revealed ? 'Hide predictions' : 'Reveal predictions', 'secondary', () => void ctx.run(ctx.api.reveal(round.session, !round.revealed)));
   toggle.dataset.act = 'reveal';
   return { inner, status: `${pairs.predicted} of ${pairsWord(pairs.changed)} locked in`, extra: [toggle] };
@@ -78,7 +79,7 @@ function findingsBlock(ctx: LabBoardContext): HTMLElement[] {
   const open = typeof ctx.open.row === 'number' ? ctx.open.row : -1;
   const nodes: HTMLElement[] = [
     findingsChart({
-      rows: findingRows(found.trials), ends: FINDING_ENDS, open,
+      rows: findingRows(found.trials), ends: findingEnds(ctx.lab.trait), open,
       onOpen: (index) => {
         ctx.open.row = open === index ? -1 : index;
         ctx.repaint();
@@ -107,6 +108,22 @@ const result: LabBoardView = (ctx) => {
   };
 };
 
+/** The level comparison: every named trial regrouped as Form, Sentence or Word, with the level that moved readers most as the headline. */
+export function levelBlock(ctx: Pick<LabBoardContext, 'board'>): HTMLElement[] {
+  const groups = ctx.board.levels ?? [];
+  if (!groups.length) return [];
+  return [el('h2', '', levelHeadline(groups)), muted('Average shift for each level of language, from the pairs’ trials. A trial with fewer than four readers is left out.'), levelBars(groups)];
+}
+
+const nameIt: LabBoardView = (ctx) => {
+  const pairs = pairCounts(ctx);
+  const inner = levelBlock(ctx);
+  return {
+    inner: inner.length ? inner : [el('h2', '', 'Name what you changed'), muted('Each pair picks the feature it changed from the list.')],
+    status: `${pairs.named ?? 0} of ${pairsWord(pairs.changed)} named`
+  };
+};
+
 const explain: LabBoardView = (ctx) => {
   const { lab, board } = ctx;
   const inner: HTMLElement[] = [el('h2', '', explainQuestion({ level: 'pairs', judge: lab.judge, prompt: lab.explain_prompt }))];
@@ -116,12 +133,13 @@ const explain: LabBoardView = (ctx) => {
   return { inner, status: `${board.explained ?? 0} of ${board.counts.here} handed in` };
 };
 
-/** Called once by the board: puts this level's stages in its registry. Name it stays out until Task 5 builds it. */
+/** Called once by the board: puts this level's stages in its registry. */
 export function registerPairsBoard(register: (level: PublicLab['level'], step: LabStep, view: LabBoardView) => void): void {
   register('pairs', 'Question', question);
   register('pairs', 'Design', design);
   register('pairs', 'Predict', predict);
   register('pairs', 'Test', test);
   register('pairs', 'Result', result);
+  register('pairs', 'Name it', nameIt);
   register('pairs', 'Explain', explain);
 }

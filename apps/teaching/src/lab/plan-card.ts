@@ -1,9 +1,12 @@
 import type { Lesson } from '@/schemas/lesson';
 import { button, el, select, textArea, textInput } from '@/quiz/dom';
+import { stepsFor } from './model';
 import {
+  LAB_DEFAULT_NOTE_PROMPTS,
   LAB_LANGUAGE_LEVELS,
   LAB_LEVELS,
   LAB_LEVEL_LABELS,
+  LAB_NOTE_STEPS,
   explainBlockCurrent,
   labDefaults,
   seedLab,
@@ -180,6 +183,23 @@ export function mountLabPlanCard(o: LabPlanCardOptions): LabPlanCardHandle {
     return box;
   }
 
+  /** The prompt in each step's note box, folded away: the defaults suit most labs. */
+  function promptsEditor(lab: LabSettings): HTMLElement {
+    const box = el('details', 'lab-plan__prompts');
+    box.append(el('summary', '', 'Note prompts'));
+    const steps = stepsFor(lab.level).filter((step) => (LAB_NOTE_STEPS as readonly string[]).includes(step));
+    for (const step of steps) {
+      const wrap = el('label', 'lab-plan__prompt');
+      const fallback = LAB_DEFAULT_NOTE_PROMPTS[step] ?? '';
+      const input = line(lab.note_prompts?.[step] ?? fallback, 200, `Note prompt for ${step}`, (v) => put((d) => { d.note_prompts = { ...(d.note_prompts ?? {}), [step]: v }; }), fallback);
+      input.dataset.prompt = step;
+      wrap.append(el('span', 'lab-label', step), input);
+      box.append(wrap);
+    }
+    box.append(el('small', '', 'Students see each prompt in that step’s note box. An empty prompt goes back to the usual one.'));
+    return box;
+  }
+
   function pairsEditor(lab: LabSettings): HTMLElement {
     const box = el('div');
     box.style.display = 'grid';
@@ -345,13 +365,22 @@ export function mountLabPlanCard(o: LabPlanCardOptions): LabPlanCardHandle {
         : pairsLevel ? 'Each student rates 6 versions with the changes unmarked. The control is mixed in.' : 'Each student reads one version and places it on the line.'
     );
     rows.append(row(pairsLevel ? 'What readers rate' : 'How readers judge', ...judgeBits));
+    if (pairsLevel) {
+      rows.append(row(
+        'The quality readers rate',
+        line(lab.trait ?? '', 40, 'The quality readers rate', (v) => put((d) => { d.trait = v; }), 'hesitant'),
+        'One word, such as hesitant. Predictions and results use it: less hesitant, about as hesitant, more hesitant. Leave it blank for lower, about the same, higher.'
+      ));
+    }
 
     const notes = el('div', 'lab-chips');
     notes.append(
       chip('Required at each step', lab.notes_on, () => put((d) => { d.notes_on = true; }, true), 'notes-on'),
       chip('Off', !lab.notes_on, () => put((d) => { d.notes_on = false; }, true), 'notes-off')
     );
-    rows.append(row('Lab notes', notes, 'One short note per step: what they noticed, why this change, what the result shows. The notes sit beside the answer when they write.'));
+    const noteBits: Array<HTMLElement | string> = [notes, 'One short note per step: what they noticed, why this change, what the result shows. The notes sit beside the answer when they write.'];
+    if (lab.notes_on) noteBits.push(promptsEditor(lab));
+    rows.append(row('Lab notes', ...noteBits));
 
     if (pairsLevel) {
       rows.append(row('Features to name', featuresEditor(lab), 'After the result, each pair names the feature they changed. The board then compares form, sentence and word.'));

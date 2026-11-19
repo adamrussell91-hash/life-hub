@@ -377,7 +377,42 @@ export function sanitiseEdit(tokens: Token[], raw: unknown): Edit {
 /** What a pair predicts its change will do to the rating: -1 lower, 0 about the same, 1 higher. */
 export type PairPrediction = -1 | 0 | 1;
 const PREDICTION_WORDS: Record<string, string> = { '-1': 'lower', '0': 'about the same', '1': 'higher' };
-export const predictionWord = (value: number): string => PREDICTION_WORDS[String(value)] ?? '';
+const TRAIT_WORDS: Record<string, string> = { '-1': 'less', '0': 'about as', '1': 'more' };
+const traitOf = (trait: string | undefined | null): string => (typeof trait === 'string' ? trait.trim() : '');
+/**
+ * A prediction or a verdict in words. With the lab's trait ("hesitant") it is
+ * "less hesitant", "about as hesitant", "more hesitant"; with none it is
+ * "lower", "about the same", "higher".
+ */
+export function predictionWord(value: number, trait?: string | null): string {
+  const t = traitOf(trait);
+  if (!t) return PREDICTION_WORDS[String(value)] ?? '';
+  const word = TRAIT_WORDS[String(value)];
+  return word ? `${word} ${t}` : '';
+}
+
+/** The stem a pair's prediction finishes: "the speaker will sound…" with a trait, "readers will rate it…" with none. */
+export const predictionStem = (trait?: string | null): string => (traitOf(trait) ? 'the speaker will sound…' : 'readers will rate it…');
+
+/** "Your change made the speaker sound less hesitant." */
+export function changeVerdict(value: number, trait?: string | null): string {
+  if (traitOf(trait)) return `Your change made the speaker sound ${predictionWord(value, trait)}.`;
+  return value === 0 ? 'Your change made no clear difference.' : `Your change moved the rating ${predictionWord(value)}.`;
+}
+
+/** What a bar to the left of the findings chart's centre line and a bar to the right mean. */
+export function findingEnds(trait?: string | null): [string, string] {
+  const t = traitOf(trait);
+  return t ? [`Less ${t}`, 'More'] : ['Rated lower', 'Rated higher'];
+}
+
+/** "The sentence level moved readers most", once a named trial has moved them. */
+export function levelHeadline(groups: LevelGroup[]): string {
+  const [top, second] = groups;
+  if (!top || top.trials === 0 || top.meanAbsShift === 0) return groups.some((g) => g.trials > 0) ? 'No level moved readers yet' : 'The pairs are naming what they changed';
+  if (second && second.trials > 0 && second.meanAbsShift === top.meanAbsShift) return `The ${top.level.toLowerCase()} and ${second.level.toLowerCase()} levels moved readers the same`;
+  return `The ${top.level.toLowerCase()} level moved readers most`;
+}
 
 /** "+1.2", "−0.8", "0.0". */
 export function formatShift(value: number): string {

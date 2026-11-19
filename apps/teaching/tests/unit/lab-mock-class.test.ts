@@ -77,7 +77,7 @@ describe('the dev preview’s invented lab class', () => {
 
   it('Pairs design it: five pairs run trials, the walker’s pairs and pair 8 have none, and the findings come back', async () => {
     const { seen, store } = await run('lesson_lab_hesitant');
-    expect(seen.Design!.pairs).toEqual({ total: 8, changed: 5, ready: 5, predicted: 0 });
+    expect(seen.Design!.pairs).toEqual({ total: 8, changed: 5, ready: 5, predicted: 0, named: 0 });
     expect(seen.Predict!.pairs.predicted).toBe(5);
     expect(seen.Test!.findings).toBeNull();
     const found = seen['at Result']!.findings;
@@ -89,6 +89,9 @@ describe('the dev preview’s invented lab class', () => {
     expect(shift.p3).toBeLessThan(-1);
     expect(shift.p5).toBeLessThan(-1);
     expect(shift.p7).toBeGreaterThan(0);
+    // The class writes its lab notes as it goes, so every gated step went through; then each pair names its feature.
+    expect(seen['Name it']!.pairs.named).toBe(5);
+    expect(seen['Name it']!.levels.map((g: { level: string; trials: number }) => [g.level, g.trials])).toEqual([['Sentence', 3], ['Form', 2], ['Word', 0]]);
     // The walker, in pair 1 with nothing on the bench, gets the class findings.
     const mine = await walker(store, 'lesson_lab_hesitant', 'status');
     expect(mine.round.finished).toBe(true);

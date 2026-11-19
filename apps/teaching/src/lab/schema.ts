@@ -59,6 +59,8 @@ export const LabSettingsSchema = z.object({
   judge_question: z.string().max(200).default(''),
   /** Rate on a line: the two end labels. */
   ends: z.tuple([z.string().max(40), z.string().max(40)]).optional(),
+  /** Pairs design it: the quality readers rate, as one adjective ("hesitant"). It words predictions and verdicts: "less hesitant". */
+  trait: z.string().max(40).optional(),
   /** Counts as a win (pick: choices ahead) or a change (rate: points out of 10). Set before any data. */
   threshold: z.number().min(0).max(100),
   notes_on: z.boolean(),
@@ -87,6 +89,7 @@ export const PublicLabSchema = z.object({
   judge: z.enum(LAB_JUDGE),
   judge_question: z.string().max(200),
   ends: z.tuple([z.string().max(40), z.string().max(40)]).optional(),
+  trait: z.string().max(40).optional(),
   threshold: z.number().min(0).max(100),
   notes_on: z.boolean(),
   note_prompts: z.record(z.string().max(20), z.string().max(200)).optional(),
@@ -104,14 +107,24 @@ export const LAB_DEFAULT_FEATURES: LabFeature[] = [
   { name: 'Word choice (connotation)', level: 'Word' }
 ];
 
+/** The steps that ask for a lab note, in the order a lab can run them. Explain is the written answer itself. */
+export const LAB_NOTE_STEPS = ['Question', 'Design', 'Predict', 'Make', 'Test', 'Result', 'Name it'] as const satisfies readonly LabStep[];
+
 export const LAB_DEFAULT_NOTE_PROMPTS: Record<string, string> = {
   Question: 'Where do you hear it? Quote it.',
   Design: 'Why this change? What is it doing in the original?',
   Predict: 'Because…',
+  Make: 'Which version was hardest to write? Why?',
   Test: 'Which version sounded most different? What had changed in it?',
   Result: 'What do the dots show? Look at the spread and the overlap.',
   'Name it': 'What does this feature do to the voice of the speaker?'
 };
+
+/** The prompt in a step's note box: the teacher's wording, else the default. */
+export function notePrompt(lab: { note_prompts?: Record<string, string> }, step: string): string {
+  const own = lab.note_prompts?.[step];
+  return typeof own === 'string' && own.trim() ? own.trim() : LAB_DEFAULT_NOTE_PROMPTS[step] ?? '';
+}
 
 /** What a level starts with: how readers judge, the threshold, lab notes on for pairs only, the feature list. */
 export function labDefaults(level: LabLevel): Pick<LabSettings, 'level' | 'judge' | 'threshold' | 'notes_on' | 'note_prompts'> & Partial<LabSettings> {
@@ -213,6 +226,7 @@ export function publicLab(settings: LabSettings): PublicLab {
     judge: settings.judge,
     judge_question: settings.judge_question,
     ...(settings.judge === 'rate' && settings.ends ? { ends: settings.ends } : {}),
+    ...(settings.level === 'pairs' && filled(settings.trait) ? { trait: settings.trait!.trim() } : {}),
     threshold: settings.threshold,
     notes_on: settings.notes_on,
     ...(settings.notes_on && settings.note_prompts ? { note_prompts: settings.note_prompts } : {}),

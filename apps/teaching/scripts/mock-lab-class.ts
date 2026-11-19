@@ -6,9 +6,10 @@
  * The walker plays KT (pair 1) and JM (pair 2) on student pages. Everyone
  * else is played here: they join when the teacher starts the lab, and each
  * time the teacher presses Next they first finish the step the class is
- * leaving (predict, write, put a change on the bench, rate or choose). In
- * Pairs design it the walkers' partners leave the bench and the prediction
- * to the walker, and pair 8 keeps the original so it has no trial.
+ * leaving (predict, write, put a change on the bench, rate or choose, name
+ * the feature), writing a short lab note as they go. In Pairs design it the
+ * walkers' partners leave the bench, the prediction and the feature to the
+ * walker, and pair 8 keeps the original so it has no trial.
  *
  * Everything here is invented: the students, the stanza, the news paragraph
  * and the storm writing.
@@ -59,7 +60,7 @@ export const LAB_WALKS = {
     lab: {
       class_id: LAB_CLASS_ID, level: 'pairs', question: 'What makes this speaker sound hesitant?', claim: 'The line breaks create the hesitation.',
       why: 'Your essay will claim that form creates meaning. Today you find out how much of this hesitation the line breaks really carry, so that claim rests on evidence.',
-      control: STANZA, judge: 'rate', judge_question: 'How hesitant does the speaker sound?', ends: ['Not at all', 'Completely'], threshold: 1, notes_on: true,
+      control: STANZA, judge: 'rate', judge_question: 'How hesitant does the speaker sound?', ends: ['Not at all', 'Completely'], trait: 'hesitant', threshold: 1, notes_on: true,
       features: [
         { name: 'Line break (enjambment)', level: 'Form' }, { name: 'Hedging (modality)', level: 'Sentence' }, { name: 'Sentence type', level: 'Sentence' },
         { name: 'Punctuation (caesura)', level: 'Sentence' }, { name: 'Repetition', level: 'Sentence' }, { name: 'Word choice (connotation)', level: 'Word' }
@@ -86,13 +87,28 @@ const STORMS = [
  * each predicts. By word: 5 is the dash, 10 the second "once", 14 "settled",
  * 21 and 22 "I think,", 26 "Perhaps", 28 to 30 the closing question.
  */
-const TRIALS: Array<{ edit: Record<string, unknown>; pred: -1 | 0 | 1 }> = [
-  { edit: { cut: [21, 22] }, pred: -1 },
-  { edit: { join: [26] }, pred: -1 },
-  { edit: { rep: { 28: 'Tomorrow', 29: 'would', 30: 'do.' } }, pred: -1 },
-  { edit: { cut: [5] }, pred: 0 },
-  { edit: { brk: [14] }, pred: 1 }
+const TRIALS: Array<{ edit: Record<string, unknown>; pred: -1 | 0 | 1; feature: number }> = [
+  { edit: { cut: [21, 22] }, pred: -1, feature: 1 },
+  { edit: { join: [26] }, pred: -1, feature: 0 },
+  { edit: { rep: { 28: 'Tomorrow', 29: 'would', 30: 'do.' } }, pred: -1, feature: 2 },
+  { edit: { cut: [5] }, pred: 0, feature: 3 },
+  { edit: { brk: [14] }, pred: 1, feature: 0 }
 ];
+
+/** Invented lab notes, a few per step. A classmate's note rides with the action that completes the step. */
+const NOTES: Record<string, string[]> = {
+  Question: ['"but the words, I think," sounds unsure of itself.', 'The last line asks a question and waits.', 'The dash in line 1 stops the speaker straight away.'],
+  Design: ['It slows the line down in the original, so taking it out should speed the speaker up.', 'This is where the speaker doubts themselves most.', 'The original leaves the thought hanging here.'],
+  Predict: ['Because it takes away a pause.', 'Because the doubt is in that word.', 'Because a longer line sounds more sure.'],
+  Make: ['Touch was hardest: I had to think about where the cold would land.', 'Sound came quickest. Sight took three goes.'],
+  Test: ['The one with no question at the end sounded most sure.', 'One had "I think" taken out and it read much flatter.', 'A version with an extra break sounded slower.'],
+  Result: ['The dots sit lower than the control and hardly overlap.', 'Ours overlap the control a lot, so the change is small.', 'The spread is wide, so readers did not agree.'],
+  'Name it': ['It lets the speaker back away from what they are saying.', 'It makes the reader wait for the end of the thought.', 'It turns a statement into something the speaker is unsure of.']
+};
+const noteFor = (step: string, i: number): string => {
+  const list = NOTES[step] ?? [];
+  return list[i % Math.max(1, list.length)] ?? '';
+};
 
 type Store = unknown;
 type Status = {
@@ -155,15 +171,20 @@ export async function labClassAct(store: Store, lessonId: LabWalkId): Promise<vo
   const now = await attempt(() => call(store, lessonId, first, 'status'));
   const step = now?.round && !now.round.finished ? now.round.step_name : null;
   if (!step) return;
+  // A short lab note from everyone at each step, as the lab asks when notes are on.
+  const noteAll = async (): Promise<void> => {
+    for (const i of classmates()) await attempt(() => call(store, lessonId, i, 'note', { step, text: noteFor(step, i) }));
+  };
+  if (step === 'Question' || step === 'Result') await noteAll();
   if (step === 'Predict' && lab.level !== 'pairs') {
     const options = 'options' in lab ? lab.options.length : 0;
     // Most of the class backs the first option, so the result can overturn it.
-    for (const i of classmates()) await attempt(() => call(store, lessonId, i, 'predict', { pred: i % 3 === 0 ? i % options : 0, reason: '' }));
+    for (const i of classmates()) await attempt(() => call(store, lessonId, i, 'predict', { pred: i % 3 === 0 ? i % options : 0, reason: '', note: noteFor('Predict', i) }));
   }
   if (step === 'Make') {
     for (const i of classmates()) {
       const writing = STORMS[i % STORMS.length]!;
-      for (let option = 0; option < writing.length; option += 1) await attempt(() => call(store, lessonId, i, 'write', { option, text: writing[option] }));
+      for (let option = 0; option < writing.length; option += 1) await attempt(() => call(store, lessonId, i, 'write', { option, text: writing[option], note: noteFor('Make', i) }));
     }
   }
   if (step === 'Design' || (step === 'Predict' && lab.level === 'pairs')) {
@@ -173,10 +194,17 @@ export async function labClassAct(store: Store, lessonId: LabWalkId): Promise<vo
       const trial = TRIALS[p - 2]!;
       if (step === 'Design') {
         await attempt(() => call(store, lessonId, member, 'bench', { edit: trial.edit }));
-        await attempt(() => call(store, lessonId, member, 'ready'));
+        await attempt(() => call(store, lessonId, member, 'ready', { note: noteFor('Design', p) }));
       } else {
-        await attempt(() => call(store, lessonId, member, 'pair_predict', { pred: trial.pred }));
+        await attempt(() => call(store, lessonId, member, 'pair_predict', { pred: trial.pred, note: noteFor('Predict', p) }));
       }
+    }
+  }
+  if (step === 'Name it') {
+    // Each of pairs 3 to 7 names the feature it changed; the walker names pair 1's and pair 2's.
+    for (let p = 2; p < 7; p += 1) {
+      const member = LAB_ROSTER.findIndex((s) => s.id === LAB_PAIRS[p]!.students[0]);
+      await attempt(() => call(store, lessonId, member, 'feature', { feature: TRIALS[p - 2]!.feature, note: noteFor('Name it', p) }));
     }
   }
   if (step === 'Test') {
@@ -189,6 +217,7 @@ export async function labClassAct(store: Store, lessonId: LabWalkId): Promise<vo
           : await attempt(() => call(store, lessonId, i, 'rate', { item: index, value: rate(lessonId, item, i, index) }));
       }
     }
+    await noteAll();
   }
   if (step === 'Explain') {
     // Half the class has handed in by the time the teacher finishes.

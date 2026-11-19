@@ -7905,6 +7905,8 @@ var LabSettingsSchema = z21.object({
   judge_question: z21.string().max(200).default(""),
   /** Rate on a line: the two end labels. */
   ends: z21.tuple([z21.string().max(40), z21.string().max(40)]).optional(),
+  /** Pairs design it: the quality readers rate, as one adjective ("hesitant"). It words predictions and verdicts: "less hesitant". */
+  trait: z21.string().max(40).optional(),
   /** Counts as a win (pick: choices ahead) or a change (rate: points out of 10). Set before any data. */
   threshold: z21.number().min(0).max(100),
   notes_on: z21.boolean(),
@@ -7926,6 +7928,7 @@ var PublicLabSchema = z21.object({
   judge: z21.enum(LAB_JUDGE),
   judge_question: z21.string().max(200),
   ends: z21.tuple([z21.string().max(40), z21.string().max(40)]).optional(),
+  trait: z21.string().max(40).optional(),
   threshold: z21.number().min(0).max(100),
   notes_on: z21.boolean(),
   note_prompts: z21.record(z21.string().max(20), z21.string().max(200)).optional(),

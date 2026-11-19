@@ -42,6 +42,8 @@ var LabSettingsSchema = z.object({
   judge_question: z.string().max(200).default(""),
   /** Rate on a line: the two end labels. */
   ends: z.tuple([z.string().max(40), z.string().max(40)]).optional(),
+  /** Pairs design it: the quality readers rate, as one adjective ("hesitant"). It words predictions and verdicts: "less hesitant". */
+  trait: z.string().max(40).optional(),
   /** Counts as a win (pick: choices ahead) or a change (rate: points out of 10). Set before any data. */
   threshold: z.number().min(0).max(100),
   notes_on: z.boolean(),
@@ -63,6 +65,7 @@ var PublicLabSchema = z.object({
   judge: z.enum(LAB_JUDGE),
   judge_question: z.string().max(200),
   ends: z.tuple([z.string().max(40), z.string().max(40)]).optional(),
+  trait: z.string().max(40).optional(),
   threshold: z.number().min(0).max(100),
   notes_on: z.boolean(),
   note_prompts: z.record(z.string().max(20), z.string().max(200)).optional(),
@@ -77,14 +80,20 @@ var LAB_DEFAULT_FEATURES = [
   { name: "Repetition", level: "Sentence" },
   { name: "Word choice (connotation)", level: "Word" }
 ];
+var LAB_NOTE_STEPS = ["Question", "Design", "Predict", "Make", "Test", "Result", "Name it"];
 var LAB_DEFAULT_NOTE_PROMPTS = {
   Question: "Where do you hear it? Quote it.",
   Design: "Why this change? What is it doing in the original?",
   Predict: "Because\u2026",
+  Make: "Which version was hardest to write? Why?",
   Test: "Which version sounded most different? What had changed in it?",
   Result: "What do the dots show? Look at the spread and the overlap.",
   "Name it": "What does this feature do to the voice of the speaker?"
 };
+function notePrompt(lab, step) {
+  const own = lab.note_prompts?.[step];
+  return typeof own === "string" && own.trim() ? own.trim() : LAB_DEFAULT_NOTE_PROMPTS[step] ?? "";
+}
 function labDefaults(level) {
   const judge = level === "students" ? "pick" : "rate";
   return {
@@ -167,6 +176,7 @@ function publicLab(settings) {
     judge: settings.judge,
     judge_question: settings.judge_question,
     ...settings.judge === "rate" && settings.ends ? { ends: settings.ends } : {},
+    ...settings.level === "pairs" && filled(settings.trait) ? { trait: settings.trait.trim() } : {},
     threshold: settings.threshold,
     notes_on: settings.notes_on,
     ...settings.notes_on && settings.note_prompts ? { note_prompts: settings.note_prompts } : {},
@@ -183,6 +193,7 @@ export {
   LAB_LANGUAGE_LEVELS,
   LAB_LEVELS,
   LAB_LEVEL_LABELS,
+  LAB_NOTE_STEPS,
   LAB_STEPS,
   LabFeatureSchema,
   LabPairSchema,
@@ -193,6 +204,7 @@ export {
   labDefaults,
   labExplainBlock,
   labIssues,
+  notePrompt,
   publicLab,
   seedLab,
   withExplainBlock

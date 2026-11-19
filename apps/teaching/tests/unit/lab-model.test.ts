@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applyEdits, biggestShift, changeLabel, deal, dealLate, describeEdits, formatShift, hasChange, levelGroups, markEdits, pairFindings, pickResult, predictionWord, sanitiseEdit, setHeadline, setResult, shift, stepsFor, tokenise, verdict,
+  applyEdits, biggestShift, changeLabel, changeVerdict, deal, dealLate, describeEdits, findingEnds, formatShift, hasChange, levelGroups, levelHeadline, markEdits, pairFindings, pickResult, predictionStem, predictionWord, sanitiseEdit, setHeadline, setResult, shift, stepsFor, tokenise, verdict,
   type Deal, type ReadingItem
 } from '@/lab/model';
 import { LAB_DEFAULT_FEATURES } from '@/lab/schema';
@@ -238,5 +238,24 @@ describe('pairs design it: a saved edit and the class findings', () => {
     expect([formatShift(1.2), formatShift(-0.8), formatShift(0)]).toEqual(['+1.2', '−0.8', '0.0']);
     expect([-1, 0, 1].map(predictionWord)).toEqual(['lower', 'about the same', 'higher']);
     expect(changeLabel(['cut "I think,"', 'joined lines 1 and 2'])).toBe('Cut "I think,", joined lines 1 and 2');
+  });
+
+  it('a trait words the prediction, the verdict and the chart’s ends; with none the wording stays general', () => {
+    expect([-1, 0, 1].map((v) => predictionWord(v, 'hesitant'))).toEqual(['less hesitant', 'about as hesitant', 'more hesitant']);
+    expect([-1, 0, 1].map((v) => predictionWord(v, '  '))).toEqual(['lower', 'about the same', 'higher']);
+    expect([predictionStem('hesitant'), predictionStem(undefined)]).toEqual(['the speaker will sound…', 'readers will rate it…']);
+    expect(changeVerdict(-1, 'hesitant')).toBe('Your change made the speaker sound less hesitant.');
+    expect(changeVerdict(0, 'hesitant')).toBe('Your change made the speaker sound about as hesitant.');
+    expect([changeVerdict(1), changeVerdict(0)]).toEqual(['Your change moved the rating higher.', 'Your change made no clear difference.']);
+    expect(findingEnds('hesitant')).toEqual(['Less hesitant', 'More']);
+    expect(findingEnds('')).toEqual(['Rated lower', 'Rated higher']);
+  });
+
+  it('the level comparison’s headline names the level that moved readers most', () => {
+    const groups = levelGroups([{ feature: 1, shift: -1.8, readers: 6 }, { feature: 0, shift: 0.6, readers: 5 }, { feature: 5, shift: 2.4, readers: 3 }], LAB_DEFAULT_FEATURES);
+    expect(groups.map((g) => [g.level, g.trials, g.meanAbsShift])).toEqual([['Sentence', 1, 1.8], ['Form', 1, 0.6], ['Word', 0, 0]]);
+    expect(levelHeadline(groups)).toBe('The sentence level moved readers most');
+    expect(levelHeadline(levelGroups([], LAB_DEFAULT_FEATURES))).toBe('The pairs are naming what they changed');
+    expect(levelHeadline(levelGroups([{ feature: 1, shift: 1, readers: 5 }, { feature: 0, shift: -1, readers: 5 }], LAB_DEFAULT_FEATURES))).toBe('The form and sentence levels moved readers the same');
   });
 });
