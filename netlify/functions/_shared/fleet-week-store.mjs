@@ -100,22 +100,38 @@ export function validZone(tz) {
   }
 }
 
+/** Day of the week of a calendar day (0 Sunday … 6 Saturday); the date is already in the class's zone. */
+const weekdayOf = (day) => new Date(Date.UTC(day.y, day.m - 1, day.d)).getUTCDay();
+/** Placement days: Monday to Thursday, so at least one firing day follows in the same school week. */
+const PLACEMENT_DAYS = new Set([1, 2, 3, 4]);
+/** Firing days: the school week, Monday to Friday. */
+const SCHOOL_DAYS = new Set([1, 2, 3, 4, 5]);
+
 /**
- * Week mode's clock (§1.3): when each round closes, `[placement, firing 1, …, firing rounds]`.
- * Placement runs from the open until the first cut-off: today's when the
- * campaign opens before it, else tomorrow's. Each firing round then closes at
- * the cut-off on the following days, in the class's time zone, so a round on
- * a day the clocks change still closes at the cut-off on the wall clock.
+ * Week mode's clock (§1.3), following the school week: when each round
+ * closes, `[placement, firing 1, …, firing rounds]`. Placement runs from the
+ * open to a cut-off on a Monday to Thursday: today's when the campaign opens
+ * before it on one of those days, else the next such day's. So a campaign
+ * opened on a Friday or over the weekend places until Monday's cut-off. Each
+ * firing round then closes at the cut-off on the next school day, skipping
+ * Saturday and Sunday. Days and weekdays are the class's time zone's (Sydney),
+ * so a round on a day the clocks change still closes at the wall-clock cut-off.
  * Pure: the same open time, cut-off, rounds and zone always give the same times.
  */
 export function weekCloses(openedAt, cutoff, rounds, tz = FLEET_TZ) {
   const [hh, mm] = String(cutoff).split(':').map(Number);
-  const today = dayAfter(tz, openedAt, 0);
-  const start = zonedInstant(tz, today.y, today.m, today.d, hh, mm) > openedAt ? 0 : 1;
-  return Array.from({ length: rounds + 1 }, (_, r) => {
-    const day = dayAfter(tz, openedAt, start + r);
-    return zonedInstant(tz, day.y, day.m, day.d, hh, mm);
-  });
+  const closeOn = (n) => {
+    const day = dayAfter(tz, openedAt, n);
+    return { day, at: zonedInstant(tz, day.y, day.m, day.d, hh, mm) };
+  };
+  let n = 0;
+  while (!PLACEMENT_DAYS.has(weekdayOf(closeOn(n).day)) || closeOn(n).at <= openedAt) n += 1;
+  const closes = [closeOn(n).at];
+  while (closes.length < rounds + 1) {
+    n += 1;
+    if (SCHOOL_DAYS.has(weekdayOf(closeOn(n).day))) closes.push(closeOn(n).at);
+  }
+  return closes;
 }
 
 /** The last firing round. */
@@ -254,6 +270,51 @@ async function roundInput(store, k, campaign, round) {
   return { input: { ...base, ...reports, absent: await absentOwners(store, campaign) }, stored };
 }
 
+/** A fold that started this long ago and never finished (its request died) may be taken over. */
+export const FOLD_LEASE_MS = 60000;
+
+/**
+ * Fold round `r` into the learning data at most once at a time (§4). The
+ * `folded/{r}` marker is claimed create-only (or taken over once its lease
+ * has run out), the fold runs, and the marker becomes `{ done: true }`. A fold
+ * that throws gives its claim back, so the next request tries again. Never
+ * throws: a failed fold never stops play. True when this call folded the round.
+ */
+export async function foldOnce(store, k, campaign, state, r, stored, now) {
+  const key = k.campaignFolded(campaign.game_id, campaign.id, r);
+  const held = await readWithEtag(store, key);
+  if (held.data?.done || (held.data && now - (held.data.at ?? 0) < FOLD_LEASE_MS)) return false;
+  const claimed = await store.setJSON(key, { at: now }, held.data ? (held.etag ? { onlyIfMatch: held.etag } : {}) : { onlyIfNew: true });
+  if (claimed?.modified === false) return false;
+  try {
+    await foldRound(store, k, campaign, state, r, stored, { now });
+    await store.setJSON(key, { done: true, at: now });
+    return true;
+  } catch (e) {
+    console.error('fleet week: fold failed', campaign.id, r, e?.message);
+    try {
+      await store.delete(key);
+    } catch {
+      // The lease runs out on its own.
+    }
+    return false;
+  }
+}
+
+/** Retry: fold every resolved firing round that has no `{ done }` marker, in order. One small read per round otherwise. */
+export async function ensureFolded(store, k, campaign, clock, now) {
+  const last = Math.min(clock.round - 1, roundsOf(campaign));
+  if (last < 1) return;
+  const rounds = Array.from({ length: last }, (_, i) => i + 1);
+  const marks = await mapBounded(rounds, 8, (r) => read(store, k.campaignFolded(campaign.game_id, campaign.id, r)));
+  for (const [i, r] of rounds.entries()) {
+    if (marks[i]?.done) continue;
+    const state = await read(store, k.campaignResolved(campaign.game_id, campaign.id, r));
+    if (!state) continue;
+    await foldOnce(store, k, campaign, state, r, await roundShots(store, k, campaign, r), now);
+  }
+}
+
 /**
  * Resolve every closed round, one at a time and in order (resolveRound refuses
  * to skip). Each resolved state is written create-only; a racing request that
@@ -266,7 +327,11 @@ export async function ensureResolved(store, k, campaign, now) {
     const held = await readWithEtag(store, clockKey);
     const clock = held.data;
     if (!clock) throw new Error('Fleet week: clock missing');
-    if (!roundClosed(campaign, clock, now)) return { state: await stateBefore(store, k, campaign, clock.round), clock };
+    if (!roundClosed(campaign, clock, now)) {
+      // Any resolved round whose fold failed or never ran is folded now.
+      await ensureFolded(store, k, campaign, clock, now);
+      return { state: await stateBefore(store, k, campaign, clock.round), clock };
+    }
     const r = clock.round;
     const resolvedKey = k.campaignResolved(campaign.game_id, campaign.id, r);
     let state = await read(store, resolvedKey);
@@ -278,14 +343,8 @@ export async function ensureResolved(store, k, campaign, now) {
         state = await read(store, resolvedKey);
       } else {
         state = next;
-        // Only the request that wrote the round folds it into the learning data (§4). A failed fold never stops play.
-        if (r >= 1) {
-          try {
-            await foldRound(store, k, campaign, next, r, stored, { now });
-          } catch (e) {
-            console.error('fleet week: fold failed', campaign.id, r, e?.message);
-          }
-        }
+        // The request that wrote the round folds it into the learning data straight away (§4).
+        if (r >= 1) await foldOnce(store, k, campaign, next, r, stored, now);
       }
     }
     const round = r + 1;

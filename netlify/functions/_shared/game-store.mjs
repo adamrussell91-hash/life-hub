@@ -26,7 +26,9 @@ export const gameKeys = (lesson) => ({
   campaignShots: (game, id, round, owner) => `games/${lesson}/${game}/campaigns/${id}/shots/${round}/${owner}`,
   campaignResolved: (game, id, round) => `games/${lesson}/${game}/campaigns/${id}/resolved/${round}`,
   campaignReports: (game, id, owner) => `games/${lesson}/${game}/campaigns/${id}/reports/${owner}`,
-  campaignSeen: (game, id, owner) => `games/${lesson}/${game}/campaigns/${id}/seen/${owner}`
+  campaignSeen: (game, id, owner) => `games/${lesson}/${game}/campaigns/${id}/seen/${owner}`,
+  /** The learning-data fold of a resolved round: { at } while one request folds it, { done: true, at } after. */
+  campaignFolded: (game, id, round) => `games/${lesson}/${game}/campaigns/${id}/folded/${round}`
 });
 
 /**
