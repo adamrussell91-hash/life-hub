@@ -440,6 +440,26 @@ describe('meeting page', () => {
     expect(linkedMeetingTitle('Catch-up', 'Jo Teacher', 'reflecting')).toBe('Jo Teacher · observation reflecting');
   });
 
+  it('header: what and when beside Share and Edit, then the phase row with the state buttons', async () => {
+    const canvas = await render();
+    const head = canvas.querySelector('.meeting-page__head')!;
+    expect([...head.children].map((node) => node.className)).toEqual([
+      'meeting-page__meta', 'meeting-page__head-actions', 'meeting-page__phase-row', 'meeting-form__status'
+    ]);
+    expect([...head.querySelectorAll('.meeting-page__head-actions button')].map((b) => (b as HTMLElement).dataset.part)).toEqual(['share-sheet', 'edit-details']);
+    const row = head.querySelector('.meeting-page__phase-row')!;
+    expect(row.querySelector('.comm-page__phase')).not.toBeNull();
+    expect(row.querySelectorAll('[data-state-action]').length).toBe(3);
+  });
+
+  it('Classroom observation button carries NESA wording', async () => {
+    const canvas = await render();
+    const button = canvas.querySelector<HTMLButtonElement>('[data-part="observation-start"]')!;
+    expect(button.querySelector('.meeting-page__nesa-tag')?.textContent).toBe('NESA');
+    expect(button.textContent).toContain('Classroom observation');
+    expect(button.textContent).toContain('Proficient Teacher');
+  });
+
   it('End completes the meeting and opens the wrap-up', async () => {
     const canvas = await render();
     canvas.querySelector<HTMLButtonElement>('[data-part="end-meeting"]')!.click();

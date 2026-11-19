@@ -13,7 +13,7 @@ import { mountPlanning } from './planning';
 import { mountReflecting } from './reflecting';
 import { mountSeries } from './series';
 import type { Observation, ObservationPhase } from './types';
-import { h, type ObsCtx, type ObsView } from './ui';
+import { h, NESA, type ObsCtx, type ObsView } from './ui';
 
 export interface ObservationWorkspaceOptions {
   document: Document;
@@ -112,6 +112,16 @@ export function mountObservationWorkspace(host: HTMLElement, opts: ObservationWo
     refreshNotes: () => readNotes(true)
   };
 
+  /** NESA's names for the report and this phase, so the workspace reads as the accreditation form. */
+  function nesaHead(): HTMLElement {
+    const phase = NESA.phases[opts.phase];
+    return h(doc, 'header', { class: 'obs-nesa-head', 'data-part': 'obs-nesa-head' },
+      h(doc, 'span', { class: 'obs-nesa-head__tag' }, 'NESA'),
+      h(doc, 'div', { class: 'obs-nesa-head__words' },
+        h(doc, 'b', {}, `Proficient Teacher · ${NESA.title}`),
+        h(doc, 'span', {}, `${phase.name}. ${phase.about}`)));
+  }
+
   function clearViews(): void {
     while (views.length) views.pop()!.destroy();
   }
@@ -141,7 +151,7 @@ export function mountObservationWorkspace(host: HTMLElement, opts: ObservationWo
     const mount = opts.phase === 'planning' ? mountPlanning : opts.phase === 'observing' ? mountObserving : mountReflecting;
     const view = mount(ctx);
     views.push(view);
-    root.replaceChildren(series.el, view.el);
+    root.replaceChildren(nesaHead(), series.el, view.el);
   }
 
   async function load(): Promise<void> {
