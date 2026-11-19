@@ -7,7 +7,7 @@
  *   {session}/pairs/{pairId}      one pair's record (Pairs design it)
  *   {session}/deal                the reading lists, written once when the teacher moves to Test
  *   {session}/late/{owner}        the list of a reader who joined after the deal
- *   {session}/held/{owner}        the teacher's release or remove of flagged writing
+ *   {session}/held/{owner}        the teacher's release or remove of flagged writing; a pair's is held/pair.{pairId}
  */
 export function labKeys(lesson) {
   const base = `lab/${lesson}`;
@@ -22,6 +22,7 @@ export function labKeys(lesson) {
     deal: (session) => `${base}/${session}/deal`,
     lates: (session) => `${base}/${session}/late/`,
     late: (session, owner) => `${base}/${session}/late/${owner}`,
+    helds: (session) => `${base}/${session}/held/`,
     held: (session, owner) => `${base}/${session}/held/${owner}`
   };
 }

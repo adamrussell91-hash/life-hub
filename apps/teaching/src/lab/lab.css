@@ -56,6 +56,7 @@ button.lab-piece:hover { border-color: var(--lab-lilac-ink); }
 .lab-scale { display: grid; gap: var(--space-1); }
 .lab-scale input { width: 100%; min-height: 44px; accent-color: var(--lab-lilac-ink); }
 .lab-ends { display: flex; justify-content: space-between; font-size: var(--text-sm); color: var(--muted); }
+.lab-reason.lab-prose { font-family: Georgia, 'Times New Roman', serif; font-size: var(--text-md); line-height: 1.6; }
 .lab-reason { width: 100%; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface, #fff); font: inherit; line-height: 1.55; resize: vertical; }
 
 /* Lab notes: monospace in a dashed lilac box. */
@@ -83,6 +84,14 @@ button.lab-piece:hover { border-color: var(--lab-lilac-ink); }
 .lab-board__start { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .lab-rounds { display: grid; gap: var(--space-2); }
 .lab-rounds__row { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); align-items: center; justify-content: space-between; padding: var(--space-2) 0; border-top: 1px solid var(--line); }
+
+/* Held for the teacher: flagged work, with Release and Remove. */
+.lab-held__row { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: space-between; align-items: flex-start; padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.lab-held__words { display: grid; gap: var(--space-2); flex: 1 1 16rem; min-width: 0; }
+.lab-held__words p { overflow-wrap: anywhere; }
+.lab-held__words p.is-flagged { border-left: 3px solid var(--danger); padding-left: 10px; }
+.lab-held__buttons { display: flex; gap: var(--space-2); }
+.lab-held__buttons .btn { min-height: 44px; }
 
 /* Plan card: one row per line of the lab. */
 .lab-plan { margin-bottom: var(--space-4); }

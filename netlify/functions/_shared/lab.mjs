@@ -11,7 +11,10 @@
  *
  *   round    { session, step, revealed, started_at, expires }   step is an index into stepsFor(level);
  *                                                                one past the last step means the lab is finished
- *   student  { student_id, pred, reason, notes: { [step]: text }, ratings?, picks?, done: { [step]: true } }
+ *   student  { student_id, pred, reason, notes: { [step]: text }, ratings?, picks?, done: { [step]: true },
+ *              writing?: [text per option], flagged?: [bool per option], written_at? }      Students write it
+ *   held     { status: 'released' | 'removed', at }   the teacher's call on flagged writing; it stands
+ *                                                      until the writer changes the writing again
  *
  * Students are known by the class list (class_token + initials claim), as in
  * a tutorial. Results are worked out on read from the students' records with
@@ -31,6 +34,7 @@ import { loadRoster } from './class-claims.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { QuizError, deviceHash, read, reject, validToken } from './question-drop.mjs';
 import { identify } from './quiz.mjs';
+import { flagText } from './peer-feedback-filter.mjs';
 import { bringBackRound, listRounds, roundExpiry, saveRound, validSession } from './activity-rounds.mjs';
 
 export { QuizError as LabError };
@@ -69,6 +73,9 @@ export { LAB_EXPLAIN_BLOCK_ID };
 
 const MAX_NOTE = 600;
 const MAX_REASON = 300;
+const MAX_WRITING = 2000;
+/** Pick one, Students write it: how many writers each reader gets. */
+const WRITERS_EACH = 6;
 const clean = (text, max) => (typeof text === 'string' ? text.trim().slice(0, max) : '');
 const list = (value) => (Array.isArray(value) ? value : []);
 const ownerOf = (classId, studentId) => deviceHash(`student:${classId}:${studentId}`);
@@ -103,15 +110,69 @@ async function allRecords(store, k, session) {
   return rows.filter(([, record]) => record && typeof record.student_id === 'string');
 }
 
+// ---------------------------------------------------------------------------
+// Students write it: whose writing readers get
+// ---------------------------------------------------------------------------
+
+const optionCount = (config) => list(config.options).length;
+const writingOf = (config, record) => Array.from({ length: optionCount(config) }, (_, i) => (typeof record?.writing?.[i] === 'string' ? record.writing[i] : ''));
+const writingComplete = (config, record) => optionCount(config) > 0 && writingOf(config, record).every((text) => text.trim());
+
+/** The teacher's calls on held work in this round, by owner. */
+async function heldDecisions(store, k, session) {
+  const prefix = k.helds(session);
+  const keys = await listBlobKeys(store, prefix);
+  const rows = await mapBounded(keys, 8, async (key) => [key.slice(prefix.length), await read(store, key)]);
+  return new Map(rows.filter(([, d]) => d && (d.status === 'released' || d.status === 'removed')));
+}
+
+/** The teacher's call on this work, while it still applies: changing the work after the call sets it aside. */
+const decisionFor = (decisions, owner, changedAt) => {
+  const d = decisions.get(owner);
+  return d && (!changedAt || String(d.at) >= String(changedAt)) ? d.status : null;
+};
+
+/** 'in' the reading, 'held' for the teacher, 'removed' by the teacher, or 'unfinished'. */
+function writerState(config, record, decision) {
+  if (!writingComplete(config, record)) return 'unfinished';
+  if (decision === 'removed') return 'removed';
+  if (list(record.flagged).some(Boolean) && decision !== 'released') return 'held';
+  return 'in';
+}
+
+/** Per writer: how often each of their versions was chosen, and by how many readers. */
+function writerTallies(config, records, lists) {
+  const tallies = new Map();
+  for (const [, record] of records) {
+    list(lists[record.student_id]).forEach((item, i) => {
+      const pick = record.picks?.[i];
+      if (item.kind !== 'writer' || !Number.isInteger(pick) || pick < 0 || pick >= optionCount(config)) return;
+      const t = tallies.get(item.writer) ?? { chosen: Array.from({ length: optionCount(config) }, () => 0), readers: 0 };
+      t.chosen[pick] += 1;
+      t.readers += 1;
+      tallies.set(item.writer, t);
+    });
+  }
+  return tallies;
+}
+
+// ---------------------------------------------------------------------------
+// Who reads what
+// ---------------------------------------------------------------------------
+
 /**
- * What the deal is made from, for this lab. Null when the level has no deal
- * yet: Students write it (Task 3: writers with released writing) and Pairs
- * design it (Task 4: pairs with a change on the bench) add their cases here.
+ * What the deal is made from, without the readers. Students write it deals
+ * the writers whose every version is written and is not held; Pairs design it
+ * (Task 4: pairs with a change on the bench) adds its case here.
  */
-function dealInput(config, studentIds) {
+async function dealPool(store, k, config, session) {
   if (config.level === 'supplied') {
-    const options = list(config.options).length;
-    return config.judge === 'rate' ? { kind: 'split', students: studentIds, versions: options } : { kind: 'set', students: studentIds, options };
+    return config.judge === 'rate' ? { kind: 'split', versions: optionCount(config) } : { kind: 'set', options: optionCount(config) };
+  }
+  if (config.level === 'students') {
+    const [records, decisions] = await Promise.all([allRecords(store, k, session), heldDecisions(store, k, session)]);
+    const writers = records.filter(([owner, r]) => writerState(config, r, decisionFor(decisions, owner, r.written_at)) === 'in').map(([, r]) => r.student_id).sort();
+    return { kind: 'writers', writers, options: optionCount(config), per: WRITERS_EACH };
   }
   return null;
 }
@@ -120,9 +181,10 @@ function dealInput(config, studentIds) {
 async function writeDeal(store, k, config, round) {
   const records = await allRecords(store, k, round.session);
   const students = records.map(([, r]) => r.student_id).sort();
-  const input = dealInput(config, students);
-  if (!input) return;
-  await store.setJSON(k.deal(round.session), { seed: round.session, students, lists: deal(input, round.session), at: new Date().toISOString() }, { onlyIfNew: true });
+  const pool = await dealPool(store, k, config, round.session);
+  if (!pool) return;
+  // The pool is kept with the deal, so a reader who joins later is dealt from the same writing.
+  await store.setJSON(k.deal(round.session), { seed: round.session, students, pool, lists: deal({ ...pool, students }, round.session), at: new Date().toISOString() }, { onlyIfNew: true });
 }
 
 /** Every reader's list: the deal, then anyone who joined after it. */
@@ -142,18 +204,23 @@ async function listFor(store, k, config, round, studentId, owner) {
   const { dealt, lists } = await allLists(store, k, round.session);
   if (lists[studentId]) return lists[studentId];
   if (!dealt) return null;
-  const input = dealInput(config, list(dealt.students));
-  if (!input) return null;
-  const items = dealLate(input, lists, studentId, dealt.seed ?? round.session);
+  const pool = dealt.pool ?? (await dealPool(store, k, config, round.session));
+  if (!pool) return null;
+  const items = dealLate({ ...pool, students: list(dealt.students) }, lists, studentId, dealt.seed ?? round.session);
   const written = await store.setJSON(k.late(round.session, owner), { student_id: studentId, items, at: new Date().toISOString() }, { onlyIfNew: true });
   if (written?.modified === false) return (await read(store, k.late(round.session, owner)))?.items ?? items;
   return items;
 }
 
-/** A reading item as a reader may see it: the words, never which option they are. */
-function itemView(config, item) {
+/** A reading item as a reader may see it: the words, never which option they are or who wrote them. */
+async function itemView(store, k, config, session, item) {
   if (item.kind === 'text') return { kind: 'text', text: list(config.texts)[item.version] ?? '' };
   if (item.kind === 'set') return { kind: 'set', pieces: list(item.order).map((i) => list(config.texts)[i] ?? '') };
+  if (item.kind === 'writer') {
+    const writer = await read(store, k.student(session, ownerOf(config.class_id, item.writer)));
+    const writing = writingOf(config, writer);
+    return { kind: 'set', pieces: list(item.order).map((i) => writing[i] ?? '') };
+  }
   return null;
 }
 
@@ -165,7 +232,7 @@ const answered = (record, item, i) => Number.isFinite(isRated(item) ? record.rat
 async function classResult(store, k, config, round) {
   const records = await allRecords(store, k, round.session);
   const { lists } = await allLists(store, k, round.session);
-  const options = list(config.options).length;
+  const options = optionCount(config);
   const picks = Array.from({ length: options }, () => 0);
   const ratings = Array.from({ length: options }, () => []);
   const predictions = Array.from({ length: options }, () => 0);
@@ -196,7 +263,7 @@ const resultsFor = async (store, k, config, steps, round) =>
 // Student side
 // ---------------------------------------------------------------------------
 
-const STUDENT_ACTIONS = ['status', 'claim', 'predict', 'note', 'rate', 'pick', 'explain'];
+const STUDENT_ACTIONS = ['status', 'claim', 'predict', 'note', 'write', 'rate', 'pick', 'explain'];
 
 export async function labAction(store, lessonId, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'bad_request', 'Invalid request.');
@@ -253,6 +320,9 @@ export async function labAction(store, lessonId, body) {
   const during = (name) => {
     if (round.finished || !stepAt(steps, round, name)) wrongStep();
   };
+  const only = (level) => {
+    if (config.level !== level) reject(400, 'bad_action', 'Unknown action.');
+  };
 
   if (action === 'predict') {
     // Pairs design it predicts as a pair (Task 4: pair_predict).
@@ -260,13 +330,27 @@ export async function labAction(store, lessonId, body) {
     during('Predict');
     if (record.pred !== null && record.pred !== undefined) reject(409, 'locked', 'Your prediction is locked in.');
     const pred = Number(body.pred);
-    if (!Number.isInteger(pred) || pred < 0 || pred >= list(config.options).length) reject(400, 'bad_pred', 'Choose one of the options.');
+    if (!Number.isInteger(pred) || pred < 0 || pred >= optionCount(config)) reject(400, 'bad_pred', 'Choose one of the options.');
     await save({ pred, reason: clean(body.reason, MAX_REASON), done: { ...record.done, Predict: true } });
   }
   if (action === 'note') {
     const at = steps.indexOf(body.step);
     if (at < 0 || round.finished || at > round.step) wrongStep();
     await save({ notes: { ...record.notes, [body.step]: clean(body.text, MAX_NOTE) } });
+  }
+  if (action === 'write') {
+    // One version per option, written or written over until the teacher closes Make.
+    only('students');
+    during('Make');
+    const option = Number(body.option);
+    if (!Number.isInteger(option) || option < 0 || option >= optionCount(config)) reject(400, 'bad_option', 'That option isn’t in this lab.');
+    const text = clean(body.text, MAX_WRITING);
+    if (!text) reject(400, 'empty', 'Write your version first.');
+    const writing = writingOf(config, record);
+    writing[option] = text;
+    const now = new Date().toISOString();
+    // Flagged writing still saves; it waits for the teacher before any reader gets it.
+    await save({ writing, flagged: writing.map((t) => flagText(t)), written_at: now, done: { ...record.done, Make: writing.every((t) => t.trim()) } });
   }
   if (action === 'rate' || action === 'pick') {
     during('Test');
@@ -300,17 +384,24 @@ export async function labAction(store, lessonId, body) {
 
   // What this student may see now.
   const me = { pred: record.pred ?? null, reason: record.reason ?? '', notes: record.notes ?? {}, done: record.done ?? {} };
+  if (config.level === 'students') me.writing = writingOf(config, record);
   let reading = null;
   if (reached(steps, round, 'Test')) {
     const items = (await listFor(store, k, config, round, who.student.id, owner)) ?? [];
     const next = items.findIndex((item, i) => !answered(record, item, i));
     if (!round.finished && stepAt(steps, round, 'Test') && items.length) {
-      reading = { index: next < 0 ? items.length : next, total: items.length, item: next < 0 ? null : itemView(config, items[next]) };
+      reading = { index: next < 0 ? items.length : next, total: items.length, item: next < 0 ? null : await itemView(store, k, config, round.session, items[next]) };
     }
     if (reached(steps, round, 'Result')) {
       // Once the result is out a reader may know which version they had.
       me.read = items.flatMap((item, i) => (item.kind === 'text' && Number.isFinite(record.ratings?.[i]) ? [{ version: item.version, value: record.ratings[i] }]
         : item.kind === 'set' && Number.isInteger(record.picks?.[i]) ? [{ version: record.picks[i], value: null }] : []));
+      if (config.level === 'students') {
+        // How the student's own writing went: how often readers chose each of their versions.
+        const [records, { lists }] = await Promise.all([allRecords(store, k, round.session), allLists(store, k, round.session)]);
+        const mine = writerTallies(config, records, lists).get(who.student.id);
+        if (mine) me.own = mine;
+      }
     }
   }
   return { identity, round, me, pair: null, reading, results: await resultsFor(store, k, config, steps, round) };
@@ -320,20 +411,51 @@ export async function labAction(store, lessonId, body) {
 // Teacher side: the board
 // ---------------------------------------------------------------------------
 
+/** A held piece's owner: a student's record key, or `pair.{pairId}` for a pair's version. */
+const HELD_OWNER = /^(?:[a-f0-9]{24}|pair\.[a-z0-9_-]{1,40})$/;
 const TEACHER_ACTIONS = ['board', 'start', 'next', 'reveal', 'rounds', 'resume', 'end', 'release', 'remove', 'student'];
+
+/** Flagged work waiting for the teacher: who (initials, for the teacher only) and the words. */
+async function heldWork(store, k, config, round, roster, records) {
+  if (config.level !== 'students') return [];
+  const decisions = await heldDecisions(store, k, round.session);
+  const initials = new Map(list(roster?.students).map((s) => [s.id, s.initials ?? '']));
+  return records
+    .filter(([owner, r]) => writerState(config, r, decisionFor(decisions, owner, r.written_at)) === 'held')
+    .map(([owner, r]) => ({
+      owner,
+      initials: initials.get(r.student_id) ?? '',
+      pieces: writingOf(config, r).map((text, i) => ({ label: list(config.options)[i] ?? '', text, flagged: r.flagged?.[i] === true }))
+    }))
+    .sort((a, b) => a.initials.localeCompare(b.initials));
+}
+
+/** The one piece readers chose most, with no name on it. Null until a choice is in. */
+function mostChosen(config, records, lists) {
+  let best = null;
+  for (const [writer, t] of [...writerTallies(config, records, lists)].sort(([a], [b]) => a.localeCompare(b))) {
+    t.chosen.forEach((chosen, option) => {
+      if (chosen > 0 && (!best || chosen > best.chosen || (chosen === best.chosen && t.readers < best.readers))) best = { writer, option, chosen, readers: t.readers };
+    });
+  }
+  if (!best) return null;
+  const record = records.find(([, r]) => r.student_id === best.writer)?.[1];
+  return { text: writingOf(config, record)[best.option] ?? '', option: best.option, chosen: best.chosen, readers: best.readers };
+}
 
 async function board(store, k, config, steps, active) {
   const round = roundView(active, steps);
   const roster = config.class_id ? await loadRoster(store, config.class_id) : null;
   const total = list(roster?.students).length;
-  const base = { round, level: config.level, judge: config.judge, counts: { here: 0, done: 0, total }, predictions: null, results: null, texts: null, debrief: null };
+  const base = { round, level: config.level, judge: config.judge, counts: { here: 0, done: 0, total }, predictions: null, results: null, texts: null, debrief: null, held: [], best: null };
   if (!round) return base;
-  const records = (await allRecords(store, k, round.session)).map(([, r]) => r);
+  const owned = await allRecords(store, k, round.session);
+  const records = owned.map(([, r]) => r);
   const name = round.step_name;
   const done = name === 'Predict' ? records.filter((r) => r.pred !== null && r.pred !== undefined).length
     : name === 'Question' || name === 'Result' || !name ? records.length
       : records.filter((r) => r.done?.[name]).length;
-  const options = list(config.options).length;
+  const options = optionCount(config);
   const showPredictions = config.level !== 'pairs' && ((name === 'Predict' && round.revealed) || reached(steps, round, 'Result'));
   const results = await resultsFor(store, k, config, steps, round);
   return {
@@ -344,7 +466,9 @@ async function board(store, k, config, steps, active) {
     // The versions side by side, once nobody is still reading one blind.
     texts: config.level === 'supplied' && results ? list(config.texts) : null,
     explained: records.filter((r) => r.done?.Explain).length,
-    debrief: round.finished || round.step === steps.length - 1 ? config.debrief ?? '' : null
+    debrief: round.finished || round.step === steps.length - 1 ? config.debrief ?? '' : null,
+    held: await heldWork(store, k, config, round, roster, owned),
+    best: config.level === 'students' && results ? mostChosen(config, owned, (await allLists(store, k, round.session)).lists) : null
   };
 }
 
@@ -392,8 +516,8 @@ export async function labTeacherAction(store, lessonId, body) {
     await saveRound(store, k.base, active);
   }
   if (action === 'release' || action === 'remove') {
-    // Flagged writing held for the teacher (Students write it, Task 3 reads this).
-    if (!/^[a-f0-9]{24}$/.test(body.owner ?? '')) reject(400, 'bad_id', 'That piece wasn’t found.');
+    // Flagged work held for the teacher: released, it joins the reading when the teacher moves to Test; removed, it stays out.
+    if (!HELD_OWNER.test(body.owner ?? '')) reject(400, 'bad_id', 'That piece wasn’t found.');
     await store.setJSON(k.held(active.session, body.owner), { status: action === 'release' ? 'released' : 'removed', at: new Date().toISOString() });
   }
   if (action === 'student') {

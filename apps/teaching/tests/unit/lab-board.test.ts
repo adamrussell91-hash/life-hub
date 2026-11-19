@@ -140,13 +140,13 @@ describe('the lab board', () => {
   });
 
   it('a step that is not built yet still lets the teacher move on', async () => {
-    const steps = ['Question', 'Predict', 'Make', 'Test', 'Result', 'Explain'] as const;
-    const b = at(2, { level: 'students', judge: 'pick' });
-    b.round = { ...b.round!, steps: [...steps], step_name: 'Make' };
+    const steps = ['Question', 'Design', 'Predict', 'Test', 'Result', 'Name it', 'Explain'] as const;
+    const b = at(5, { level: 'pairs', judge: 'rate' });
+    b.round = { ...b.round!, steps: [...steps], step_name: 'Name it', finished: false };
     const { board, act, text } = mount(b);
     await board.refresh();
     expect(text()).toContain('This step is not built yet.');
-    expect(act('next').textContent).toBe('Next: Test');
+    expect(act('next').textContent).toBe('Next: Explain');
   });
 
   it('a poll with nothing new leaves the stage as it is', async () => {
@@ -157,3 +157,67 @@ describe('the lab board', () => {
     expect(board.root.querySelector('.lab-card--stage')).toBe(stage);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Students write it
+// ---------------------------------------------------------------------------
+
+describe('the lab board, students write it', () => {
+  const STORM: LabSettings = {
+    ...seedLab('class1', 'students'), question: 'Which sense makes a storm feel most real?', same: 'The moment the storm hits the house.',
+    options: ['Sight', 'Sound', 'Touch'], task: 'Write the moment the storm hits the house', judge_question: 'Which one feels most real?'
+  };
+  const STORM_STEPS = ['Question', 'Predict', 'Make', 'Test', 'Result', 'Explain'] as const;
+  const storm = (step: number, over: Partial<LabBoard> = {}): LabBoard => ({
+    ...at(step), round: { session: SESSION, step, step_name: STORM_STEPS[step] ?? null, steps: [...STORM_STEPS], revealed: false, finished: false },
+    level: 'students', judge: 'pick', held: [], best: null, ...over
+  });
+  const HELD = [{ owner: 'a'.repeat(24), initials: 'JM', pieces: [{ label: 'Sight', text: 'The sky goes dark.', flagged: false }, { label: 'Sound', text: 'A rude line.', flagged: true }] }];
+  function mountStorm(first: LabBoard) {
+    const mounted = mount(first);
+    const lesson = { id: 'lab1', lab: STORM, blocks: [] } as unknown as Lesson;
+    const board = mountLabBoard({ api: mounted.api, getLesson: () => lesson, pollMs: 60_000 });
+    document.body.replaceChildren(board.root);
+    return { ...mounted, board, act: (name: string) => board.root.querySelector(`[data-act="${name}"]`) as HTMLButtonElement, text: () => board.root.textContent ?? '' };
+  }
+
+  it('Make shows the task, the options and how many have finished', async () => {
+    const { board, text } = mountStorm(storm(2, { counts: { here: 16, done: 5, total: 17 } }));
+    await board.refresh();
+    expect(board.root.querySelector('h2')?.textContent).toBe('Write the moment the storm hits the house');
+    expect([...board.root.querySelectorAll('.lab-board__inner .lab-chip')].map((c) => c.textContent)).toEqual(['Sight', 'Sound', 'Touch']);
+    expect(text()).toContain('5 of 16 finished');
+  });
+
+  it('lists held writing with initials, and Release and Remove send the owner', async () => {
+    const { board, api, act, text } = mountStorm(storm(2, { held: HELD }));
+    (api.release as ReturnType<typeof vi.fn>).mockImplementation(() => Promise.resolve(storm(2)));
+    await board.refresh();
+    expect(board.root.querySelector('.lab-held h2')?.textContent).toBe('1 piece held for you');
+    expect(text()).toContain('JM');
+    expect(board.root.querySelector('.lab-held .is-flagged')?.textContent).toBe('Sound · flaggedA rude line.');
+    act('release').click();
+    await flush();
+    expect(api.release).toHaveBeenCalledWith('a'.repeat(24));
+    expect(board.root.querySelector('.lab-held')).toBeNull();
+    const again = mountStorm(storm(2, { held: HELD }));
+    await again.board.refresh();
+    again.act('remove').click();
+    await flush();
+    expect(again.api.remove).toHaveBeenCalledWith('a'.repeat(24));
+  });
+
+  it('Result shows the bars, then the most chosen piece with no name on it', async () => {
+    const results = setResult({ judge: 'pick', options: 3, picks: [20, 46, 30], ratings: [], predictions: [9, 5, 3], readers: 16, threshold: 8 });
+    const best = { text: 'The gutters choke and spit.', option: 1, chosen: 6, readers: 6 };
+    const { board, act, text } = mountStorm(storm(4, { results, predictions: [9, 5, 3], best }));
+    await board.refresh();
+    expect(board.root.querySelector('h2')?.textContent).toBe('Sound won. Most of us predicted sight.');
+    expect(text()).not.toContain('The gutters choke and spit.');
+    expect(act('best').textContent).toBe('Show the most chosen piece');
+    act('best').click();
+    expect(board.root.querySelector('.lab-board__inner .lab-piece')?.textContent).toBe('Most chosen: 6 of 6 readersThe gutters choke and spit.');
+    expect(act('best').textContent).toBe('Hide');
+  });
+});
+

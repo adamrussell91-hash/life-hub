@@ -35,6 +35,7 @@ function mount(first: LabStatus, settings: LabSettings = SETTINGS) {
     claim: vi.fn(() => reply(at(0))),
     predict: vi.fn((pred: number, reason: string) => reply(at(1, {}, { pred, reason, done: { Predict: true } }))),
     note: vi.fn(() => Promise.resolve(current)),
+    write: vi.fn(() => Promise.resolve(current)),
     rate: vi.fn(() => reply(at(2, { reading: { index: 1, total: 1, item: null } }, { done: { Test: true } }))),
     pick: vi.fn(() => reply(at(2, { reading: { index: 1, total: 1, item: null } }, { done: { Test: true } }))),
     explain: vi.fn(() => reply(at(4, { results: RESULT }, { pred: 1, done: { Explain: true } })))
@@ -189,14 +190,14 @@ describe('the lab player', () => {
   });
 
   it('a step that is not built yet shows a plain card, and the finish shows the end', async () => {
-    const students = { ...seedLab('class1', 'students'), question: 'Which sense makes a storm feel most real?', options: ['Sight', 'Sound'], task: 'Two sentences.', judge_question: 'Which feels most real?' };
-    const steps = ['Question', 'Predict', 'Make', 'Test', 'Result', 'Explain'] as const;
-    const status = at(2);
-    status.round = { ...status.round!, steps: [...steps], step_name: 'Make' };
-    const make = mount(status, students);
+    const pairs = { ...seedLab('class1', 'pairs'), question: 'What makes this speaker sound hesitant?', claim: 'The line breaks create the hesitation.', control: 'One line\nand another', judge_question: 'How hesitant does the speaker sound?' };
+    const steps = ['Question', 'Design', 'Predict', 'Test', 'Result', 'Name it', 'Explain'] as const;
+    const status = at(5);
+    status.round = { ...status.round!, steps: [...steps], step_name: 'Name it', finished: false };
+    const naming = mount(status, pairs);
     await flush();
-    expect(make.host.querySelector('h2')?.textContent).toBe('Make');
-    expect(make.text()).toContain('This step is not built yet.');
+    expect(naming.host.querySelector('h2')?.textContent).toBe('Name it');
+    expect(naming.text()).toContain('This step is not built yet.');
     const done = mount(at(5));
     await flush();
     expect(done.host.querySelector('h2')?.textContent).toBe('Lab finished');
@@ -211,3 +212,108 @@ describe('the lab player', () => {
     expect(host.querySelector('h2')?.textContent).toBe('Which version will score highest?');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Students write it
+// ---------------------------------------------------------------------------
+
+const STORM: LabSettings = {
+  ...seedLab('class1', 'students'), question: 'Which sense makes a storm feel most real?', same: 'The moment the storm hits the house.',
+  options: ['Sight', 'Sound', 'Touch'], task: 'The storm hits the house.', judge_question: 'Which one feels most real?'
+};
+const STORM_STEPS = ['Question', 'Predict', 'Make', 'Test', 'Result', 'Explain'] as const;
+const storm = (step: number, over: Partial<LabStatus> = {}, me: Partial<NonNullable<LabStatus['me']>> = {}): LabStatus => {
+  const status = at(step, over, { writing: ['', '', ''], ...me });
+  status.round = { ...status.round!, steps: [...STORM_STEPS], step_name: STORM_STEPS[step] ?? null, finished: step >= STORM_STEPS.length };
+  return status;
+};
+
+describe('the lab player, students write it', () => {
+  it('Make moves through the options one box at a time and saves each version', async () => {
+    const { host, client, click, text } = mount(storm(2), STORM);
+    const saved = ['', '', ''];
+    (client.write as ReturnType<typeof vi.fn>).mockImplementation((option: number, words: string) => {
+      saved[option] = words;
+      return Promise.resolve(storm(2, {}, { writing: [...saved], done: { Make: saved.every(Boolean) } }));
+    });
+    await flush();
+    expect(host.querySelector('h2')?.textContent).toBe('The storm hits the house. Lean on sight.');
+    expect(host.querySelector('h2 .lab-var')?.textContent).toBe('sight');
+    expect(text()).toContain('Version 1 of 3.');
+    // An empty box stays put.
+    click('Next: sound');
+    await flush();
+    expect(client.write).not.toHaveBeenCalled();
+    const type = (words: string) => {
+      const box = host.querySelector('textarea') as HTMLTextAreaElement;
+      box.value = words;
+      box.dispatchEvent(new Event('input'));
+    };
+    type('The sky goes the colour of a bruise.');
+    click('Next: sound');
+    await flush();
+    expect(client.write).toHaveBeenLastCalledWith(0, 'The sky goes the colour of a bruise.');
+    expect(host.querySelector('h2')?.textContent).toBe('The storm hits the house. Lean on sound.');
+    expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('');
+    type('The gutters choke and spit.');
+    click('Next: touch');
+    await flush();
+    expect(text()).toContain('Version 3 of 3.');
+    type('The air presses on my skin.');
+    click('Finish');
+    await flush();
+    expect(client.write).toHaveBeenLastCalledWith(2, 'The air presses on my skin.');
+    expect(host.querySelector('h2')?.textContent).toBe('Three versions written');
+    expect(text()).toContain('Waiting for your teacher.');
+    // A version can still be changed while Make is open.
+    click('Change a version');
+    expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('The sky goes the colour of a bruise.');
+  });
+
+  it('Make keeps the words and the box when a save fails', async () => {
+    const { host, client, click, text } = mount(storm(2), STORM);
+    (client.write as ReturnType<typeof vi.fn>).mockImplementation(() => Promise.reject(new Error('The save didn’t go through.')));
+    await flush();
+    const box = host.querySelector('textarea') as HTMLTextAreaElement;
+    box.value = 'Rain comes sideways.';
+    box.dispatchEvent(new Event('input'));
+    click('Next: sound');
+    await flush();
+    expect(text()).toContain('Version 1 of 3.');
+    expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('Rain comes sideways.');
+    expect(host.querySelector('.lab-err')?.textContent).not.toBe('');
+  });
+
+  it('Test shows one writer’s versions unlabelled, and a pick advances to the next writer', async () => {
+    const first = { kind: 'set' as const, pieces: ['A crack splits the afternoon.', 'The door handle is cold and slick.', 'Lightning turns the kitchen white.'] };
+    const second = { kind: 'set' as const, pieces: ['Leaves spin past the window.', 'Rain drums the tin.', 'The wall leans into my shoulder.'] };
+    const { host, client, text } = mount(storm(3, { reading: { index: 0, total: 6, item: first } }), STORM);
+    (client.pick as ReturnType<typeof vi.fn>).mockImplementation(() => Promise.resolve(storm(3, { reading: { index: 1, total: 6, item: second } })));
+    await flush();
+    expect(host.querySelector('h2')?.textContent).toBe('Which one feels most real?');
+    expect(text()).toContain('Writer 1 of 6. Tap one.');
+    for (const label of ['Sight', 'Sound', 'Touch']) expect(text()).not.toContain(label);
+    const pieces = [...host.querySelectorAll('button.lab-piece')] as HTMLButtonElement[];
+    expect(pieces.map((p) => p.textContent?.charAt(0))).toEqual(['A', 'B', 'C']);
+    pieces[2]!.click();
+    await flush();
+    expect(client.pick).toHaveBeenCalledWith(0, 2);
+    expect(text()).toContain('Writer 2 of 6. Tap one.');
+    expect(host.querySelector('button.lab-piece')?.textContent).toBe('ALeaves spin past the window.');
+  });
+
+  it('Test ends with the writers read, and Result says how the student’s own writing went', async () => {
+    const read = mount(storm(3, { reading: { index: 6, total: 6, item: null } }), STORM);
+    await flush();
+    expect(read.host.querySelector('h2')?.textContent).toBe('Six writers read');
+    const results = setResult({ judge: 'pick', options: 3, picks: [20, 46, 30], ratings: [], predictions: [9, 5, 3], readers: 16, threshold: 8 });
+    const { host, text } = mount(storm(4, { results }, { pred: 0, own: { chosen: [1, 1, 4], readers: 6 } }), STORM);
+    await flush();
+    expect(host.querySelector('h2')?.textContent).toBe('Sound won. You predicted sight.');
+    expect([...host.querySelectorAll('.lab-bar')].map((r) => r.textContent)).toEqual(['Sound46', 'Touch30', 'Sight20']);
+    expect(text()).toContain('96 choices from 16 readers.');
+    expect(text()).toContain('Your writing: 4 of your 6 readers chose your touch version.');
+    expect(text()).toContain('Your other versions: Sight 1, Sound 1.');
+  });
+});
+

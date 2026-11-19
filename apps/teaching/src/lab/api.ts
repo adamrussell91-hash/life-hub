@@ -19,6 +19,10 @@ export type LabMe = {
   done: Record<string, boolean>;
   /** From the Result step: which version(s) this reader had, and the rating they gave (null for a choice). */
   read?: Array<{ version: number; value: number | null }>;
+  /** Students write it: this student's own versions, one per option. */
+  writing?: string[];
+  /** Students write it, from the Result step: how often readers chose each of this student's versions. */
+  own?: { chosen: number[]; readers: number };
 };
 export type LabStatus = {
   identity: { need: 'class' | 'initials' | null; initials: string | null };
@@ -40,6 +44,8 @@ export type LabClient = {
   claim(initials: string): Promise<LabStatus>;
   predict(pred: number, reason: string): Promise<LabStatus>;
   note(step: LabStep, text: string): Promise<LabStatus>;
+  /** Students write it: saves this student's version for one option. */
+  write(option: number, text: string): Promise<LabStatus>;
   rate(item: number, value: number): Promise<LabStatus>;
   /** `choice` is the position tapped; the server knows which option sat there. */
   pick(item: number, choice: number): Promise<LabStatus>;
@@ -64,6 +70,7 @@ export function labClient(lessonId: string, classId: string): LabClient {
     claim: (initials) => look('claim', { initials }),
     predict: (pred, reason) => act('predict', { pred, reason }),
     note: (step, text) => act('note', { step, text }),
+    write: (option, text) => act('write', { option, text }),
     rate: (item, value) => act('rate', { item, value }),
     pick: (item, choice) => act('pick', { item, choice }),
     explain: () => act('explain')
@@ -74,6 +81,11 @@ export function labClient(lessonId: string, classId: string): LabClient {
 // Teacher side: POST /api/lessons/:id/lab (operator). Shapes match
 // labTeacherAction in netlify/functions/_shared/lab.mjs.
 // ---------------------------------------------------------------------------
+
+/** Flagged work waiting for the teacher. `owner` is what Release and Remove send back. */
+export type LabHeld = { owner: string; initials: string; pieces: Array<{ label: string; text: string; flagged: boolean }> };
+/** Students write it: the one piece readers chose most, with no name on it. */
+export type LabBestPiece = { text: string; option: number; chosen: number; readers: number };
 
 export type LabBoard = {
   round: LabRound | null;
@@ -88,6 +100,10 @@ export type LabBoard = {
   /** You supply it: the versions side by side, from Result on. */
   texts: string[] | null;
   explained?: number;
+  /** Flagged writing (or a pair's flagged word) the teacher has not released or removed yet. */
+  held?: LabHeld[];
+  /** Students write it, from Result on. */
+  best?: LabBestPiece | null;
   /** The teacher's debrief notes, at the last step and after. */
   debrief: string | null;
 };

@@ -342,3 +342,90 @@ export function explainQuestion(o: { level: LabLevel; judge: LabJudge; options?:
   if (o.result?.win && o.options?.[o.result.top]) return o.judge === 'pick' ? `Why did ${lower(o.options[o.result.top]!)} win?` : `Why did the ${lower(o.options[o.result.top]!)} version score highest?`;
   return 'What explains the result?';
 }
+
+// ---------------------------------------------------------------------------
+// Pairs design it: an edit as it is saved, and what the class's trials found
+// ---------------------------------------------------------------------------
+
+const MAX_REPLACEMENT = 40;
+
+/** An edit as the server keeps it: indexes inside the control, in order, each word of a replacement trimmed. Anything else is dropped. */
+export function sanitiseEdit(tokens: Token[], raw: unknown): Edit {
+  const src = (raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>;
+  const inside = (i: unknown): i is number => typeof i === 'number' && Number.isInteger(i) && i >= 0 && i < tokens.length;
+  const indexes = (value: unknown, keep: (i: number) => boolean): number[] =>
+    [...new Set(Array.isArray(value) ? value.filter(inside) : [])].filter(keep).sort((a, b) => a - b);
+  const cut = indexes(src.cut, () => true);
+  const join = indexes(src.join, (i) => tokens[i]!.br);
+  const brk = indexes(src.brk, (i) => !tokens[i]!.br && i < tokens.length - 1);
+  const rep: Record<number, string> = {};
+  if (src.rep && typeof src.rep === 'object' && !Array.isArray(src.rep)) {
+    for (const [key, value] of Object.entries(src.rep as Record<string, unknown>)) {
+      const i = Number(key);
+      const word = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, MAX_REPLACEMENT) : '';
+      if (inside(i) && word && word !== tokens[i]!.w) rep[i] = word;
+    }
+  }
+  return {
+    ...(cut.length ? { cut } : {}),
+    ...(Object.keys(rep).length ? { rep } : {}),
+    ...(join.length ? { join } : {}),
+    ...(brk.length ? { brk } : {})
+  };
+}
+
+/** What a pair predicts its change will do to the rating: -1 lower, 0 about the same, 1 higher. */
+export type PairPrediction = -1 | 0 | 1;
+const PREDICTION_WORDS: Record<string, string> = { '-1': 'lower', '0': 'about the same', '1': 'higher' };
+export const predictionWord = (value: number): string => PREDICTION_WORDS[String(value)] ?? '';
+
+/** "+1.2", "−0.8", "0.0". */
+export function formatShift(value: number): string {
+  return `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value).toFixed(1)}`;
+}
+
+/** A change in a sentence of its own: 'Cut "I think,"'. */
+export function changeLabel(desc: string[]): string {
+  const text = desc.join(', ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+export type FindingInput = { id: string; edit: Edit; ratings: number[]; pred: PairPrediction | null; feature: number | null };
+/** One pair's trial once the readings are in. */
+export type Finding = {
+  id: string;
+  /** The change in words, from `describeEdits`. */
+  desc: string[];
+  mean: number;
+  /** How many ratings the version got. */
+  n: number;
+  shift: number;
+  verdict: -1 | 0 | 1;
+  pred: PairPrediction | null;
+  /** The pair's prediction matched what readers did. */
+  held: boolean;
+  /** Fewer than four readers: drawn pale and left out of the level comparison. */
+  thin: boolean;
+  feature: number | null;
+};
+
+/** Every pair's trial against the control's ratings. */
+export function pairFindings(o: { tokens: Token[]; threshold: number; control: number[]; trials: FindingInput[] }): { control: { mean: number; n: number }; trials: Finding[] } {
+  return {
+    control: { mean: mean(o.control), n: o.control.length },
+    trials: o.trials.map((t) => {
+      const moved = t.ratings.length && o.control.length ? shift(o.control, t.ratings) : 0;
+      const v = verdict(moved, o.threshold);
+      return {
+        id: t.id, desc: describeEdits(o.tokens, t.edit), mean: mean(t.ratings), n: t.ratings.length, shift: moved, verdict: v,
+        pred: t.pred, held: t.pred !== null && t.ratings.length > 0 && v === t.pred, thin: t.ratings.length < MIN_READERS, feature: t.feature
+      };
+    })
+  };
+}
+
+/** The trial that moved readers most. Trials with enough readers come first. Null when there are none. */
+export function biggestShift<T extends { shift: number; thin: boolean }>(trials: T[]): T | null {
+  const by = (list: T[]): T | null => list.reduce<T | null>((best, t) => (best === null || Math.abs(t.shift) > Math.abs(best.shift) ? t : best), null);
+  return by(trials.filter((t) => !t.thin)) ?? by(trials);
+}

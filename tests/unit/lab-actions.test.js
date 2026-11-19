@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { labAction, labTeacherAction } from '../../netlify/functions/_shared/lab.mjs';
 import { labKeys } from '../../netlify/functions/_shared/lab-keys.mjs';
 import { isPublicStudentApi } from '../../netlify/functions/_shared/public-student-routes.mjs';
-import { ROSTER, SUPPLIED, device, labStore } from './helpers/lab-store.js';
+import { ROSTER, STUDENTS, SUPPLIED, device, labStore } from './helpers/lab-store.js';
 
 const teacher = (store, action, extra = {}) => labTeacherAction(store, 'lab1', { action, ...extra });
 const student = (store, i, action, extra = {}) => labAction(store, 'lab1', { ...device(i), action, ...extra });
@@ -283,4 +283,150 @@ test('the other two levels list their steps and move through them', async () => 
     assert.equal((await teacher(store, 'board')).round.finished, true);
     assert.equal((await student(store, 0, 'status')).round.finished, true);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Students write it
+// ---------------------------------------------------------------------------
+
+const SENSES = ['sight', 'sound', 'touch'];
+/** Invented writing: each version says whose it is and which sense, so a test can tell them apart. */
+const piece = (i, option) => `${ROSTER[i].initials} storm by ${SENSES[option]}`;
+const writeAll = async (store, i, rude = -1) => {
+  for (let option = 0; option < 3; option += 1) await student(store, i, 'write', { option, text: option === rude ? `${piece(i, option)}, you idiot` : piece(i, option) });
+};
+/** A round at Make with `n` students joined and predicted. */
+async function atMake(n = 17) {
+  const { store, session } = await started(n, STUDENTS);
+  await next(store, 1);
+  await next(store, 2);
+  return { store, session };
+}
+const dealOf = (store, session) => store.data.get(labKeys('lab1').deal(session));
+
+test('Make: a student writes one version per option, can write over it, and is done when every option has words', async () => {
+  const { store } = await atMake(2);
+  await code(student(store, 0, 'write', { option: 3, text: 'x' }), 'bad_option');
+  await code(student(store, 0, 'write', { option: 0, text: '   ' }), 'empty');
+  let status = await student(store, 0, 'write', { option: 0, text: 'First go' });
+  assert.deepEqual(status.me.writing, ['First go', '', '']);
+  assert.equal(status.me.done.Make, false);
+  status = await student(store, 0, 'write', { option: 0, text: piece(0, 0) });
+  await student(store, 0, 'write', { option: 1, text: piece(0, 1) });
+  status = await student(store, 0, 'write', { option: 2, text: piece(0, 2) });
+  assert.deepEqual(status.me.writing, [0, 1, 2].map((o) => piece(0, o)));
+  assert.equal(status.me.done.Make, true);
+  assert.equal((await teacher(store, 'board')).counts.done, 1);
+  // Writing closes with the step, and belongs to this level only.
+  await next(store, 3);
+  await code(student(store, 0, 'write', { option: 0, text: 'late' }), 'wrong_step');
+  const supplied = await started(1);
+  await code(student(supplied.store, 0, 'write', { option: 0, text: 'x' }), 'bad_action');
+});
+
+test('Test, pick one: six writers each, never the reader’s own, a writer’s versions together and unlabelled', async () => {
+  const { store, session } = await atMake(17);
+  for (let i = 0; i < 17; i += 1) await writeAll(store, i);
+  await next(store, 3);
+  const lists = dealOf(store, session).lists;
+  const read = new Map();
+  for (const s of ROSTER) {
+    const items = lists[s.id];
+    assert.equal(items.length, 6);
+    assert.ok(items.every((item) => item.kind === 'writer' && item.writer !== s.id), 'never their own writing');
+    assert.equal(new Set(items.map((item) => item.writer)).size, 6);
+    for (const item of items) {
+      assert.deepEqual([...item.order].sort(), [0, 1, 2]);
+      read.set(item.writer, (read.get(item.writer) ?? 0) + 1);
+    }
+  }
+  const counts = ROSTER.map((s) => read.get(s.id) ?? 0);
+  assert.ok(Math.max(...counts) - Math.min(...counts) <= 1, `readers per writer: ${counts}`);
+
+  // A reader sees one writer's three versions together, in the dealt order, with no option names and no writer.
+  const status = await student(store, 0, 'status');
+  const first = lists[ROSTER[0].id][0];
+  const writer = ROSTER.findIndex((s) => s.id === first.writer);
+  assert.equal(status.reading.total, 6);
+  assert.deepEqual(status.reading.item, { kind: 'set', pieces: first.order.map((o) => piece(writer, o)) });
+  const sent = JSON.stringify({ ...status, me: null });
+  for (const label of STUDENTS.options) assert.equal(sent.includes(label), false, `no option name: ${label}`);
+  assert.equal(sent.includes(first.writer), false, 'no writer id');
+  assert.equal(status.results, null);
+
+  // Tapping a position stores the option that sat there.
+  const after = await student(store, 0, 'pick', { item: 0, choice: 2 });
+  assert.equal(after.reading.index, 1);
+  const record = store.data.get(labKeys('lab1').student(session, Object.keys(Object.fromEntries([...store.data].filter(([key, v]) => key.includes('/students/') && v.student_id === ROSTER[0].id).map(([key]) => [key.split('/').pop(), 1])))[0]));
+  assert.equal(record.picks[0], first.order[2]);
+});
+
+test('flagged writing is held: out of the deal until the teacher releases it, and listed on the board with initials', async () => {
+  const { store, session } = await atMake(8);
+  for (let i = 0; i < 8; i += 1) await writeAll(store, i, i === 2 || i === 3 ? 1 : -1);
+  // The writer is not told; their writing saved and their step is done.
+  assert.equal((await student(store, 2, 'status')).me.done.Make, true);
+  let board = await teacher(store, 'board');
+  assert.deepEqual(board.held.map((h) => h.initials), ['AS', 'JM']);
+  const held = Object.fromEntries(board.held.map((h) => [h.initials, h]));
+  assert.deepEqual(held.JM.pieces.map((p) => [p.label, p.flagged]), [['Sight', false], ['Sound', true], ['Touch', false]]);
+  assert.match(held.JM.pieces[1].text, /idiot/);
+  await code(teacher(store, 'release', { session, owner: 'nope' }), 'bad_id');
+  // JM is released; AS is removed.
+  board = await teacher(store, 'release', { session, owner: held.JM.owner });
+  assert.deepEqual(board.held.map((h) => h.initials), ['AS']);
+  board = await teacher(store, 'remove', { session, owner: held.AS.owner });
+  assert.deepEqual(board.held, []);
+  await next(store, 3);
+  const dealt = dealOf(store, session);
+  assert.equal(dealt.pool.writers.includes(ROSTER[2].id), true, 'released writing is read');
+  assert.equal(dealt.pool.writers.includes(ROSTER[3].id), false, 'removed writing is left out');
+  assert.equal(Object.values(dealt.lists).flat().some((item) => item.writer === ROSTER[3].id), false);
+  // The removed writer still reads: all six other writers, as nobody's own is among them.
+  assert.equal(dealt.lists[ROSTER[3].id].length, 6);
+});
+
+test('writing still held when the teacher moves on is left out, and so is unfinished writing', async () => {
+  const { store, session } = await atMake(6);
+  for (let i = 0; i < 4; i += 1) await writeAll(store, i, i === 1 ? 0 : -1);
+  await student(store, 4, 'write', { option: 0, text: piece(4, 0) });
+  await next(store, 3);
+  assert.deepEqual(dealOf(store, session).pool.writers, [ROSTER[0].id, ROSTER[2].id, ROSTER[3].id]);
+  // A release changes the writing only when the writer changes it: writing over flagged words asks the teacher again.
+  const again = await atMake(2);
+  await writeAll(again.store, 0, 1);
+  const first = (await teacher(again.store, 'board')).held[0];
+  await teacher(again.store, 'release', { session: again.session, owner: first.owner });
+  await new Promise((r) => setTimeout(r, 5));
+  await student(again.store, 0, 'write', { option: 2, text: 'A new line, you loser' });
+  assert.equal((await teacher(again.store, 'board')).held.length, 1);
+});
+
+test('Result, students write it: choices by option, each writer’s own counts, and the most chosen piece with no name', async () => {
+  const { store, session } = await atMake(8);
+  for (let i = 0; i < 8; i += 1) await student(store, i, 'status');
+  for (let i = 0; i < 8; i += 1) await writeAll(store, i);
+  await next(store, 3);
+  const lists = dealOf(store, session).lists;
+  // Every reader chooses the sound version (option 1) of every writer.
+  for (let i = 0; i < 8; i += 1) {
+    const items = lists[ROSTER[i].id];
+    for (let item = 0; item < items.length; item += 1) {
+      const before = await teacher(store, 'board');
+      assert.equal(before.results, null);
+      assert.equal(before.best, null);
+      await student(store, i, 'pick', { item, choice: items[item].order.indexOf(1) });
+    }
+  }
+  assert.equal((await student(store, 0, 'status')).me.own, undefined, 'own counts wait for Result');
+  const board = await next(store, 4);
+  assert.deepEqual(board.results.values, [0, 48, 0]);
+  assert.equal(board.results.win, true);
+  assert.equal(board.best.option, 1);
+  assert.equal(board.best.chosen, board.best.readers);
+  assert.match(board.best.text, /storm by sound$/);
+  assert.deepEqual(Object.keys(board.best).sort(), ['chosen', 'option', 'readers', 'text']);
+  const mine = await student(store, 0, 'status');
+  assert.deepEqual(mine.me.own, { chosen: [0, 6, 0], readers: 6 });
+  assert.deepEqual(mine.results.values, [0, 48, 0]);
 });

@@ -283,18 +283,81 @@ function explainQuestion(o) {
   if (o.result?.win && o.options?.[o.result.top]) return o.judge === "pick" ? `Why did ${lower(o.options[o.result.top])} win?` : `Why did the ${lower(o.options[o.result.top])} version score highest?`;
   return "What explains the result?";
 }
+var MAX_REPLACEMENT = 40;
+function sanitiseEdit(tokens, raw) {
+  const src = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const inside = (i) => typeof i === "number" && Number.isInteger(i) && i >= 0 && i < tokens.length;
+  const indexes = (value, keep) => [...new Set(Array.isArray(value) ? value.filter(inside) : [])].filter(keep).sort((a, b) => a - b);
+  const cut = indexes(src.cut, () => true);
+  const join = indexes(src.join, (i) => tokens[i].br);
+  const brk = indexes(src.brk, (i) => !tokens[i].br && i < tokens.length - 1);
+  const rep = {};
+  if (src.rep && typeof src.rep === "object" && !Array.isArray(src.rep)) {
+    for (const [key, value] of Object.entries(src.rep)) {
+      const i = Number(key);
+      const word = typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, MAX_REPLACEMENT) : "";
+      if (inside(i) && word && word !== tokens[i].w) rep[i] = word;
+    }
+  }
+  return {
+    ...cut.length ? { cut } : {},
+    ...Object.keys(rep).length ? { rep } : {},
+    ...join.length ? { join } : {},
+    ...brk.length ? { brk } : {}
+  };
+}
+var PREDICTION_WORDS = { "-1": "lower", "0": "about the same", "1": "higher" };
+var predictionWord = (value) => PREDICTION_WORDS[String(value)] ?? "";
+function formatShift(value) {
+  return `${value > 0 ? "+" : value < 0 ? "\u2212" : ""}${Math.abs(value).toFixed(1)}`;
+}
+function changeLabel(desc) {
+  const text = desc.join(", ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+function pairFindings(o) {
+  return {
+    control: { mean: mean(o.control), n: o.control.length },
+    trials: o.trials.map((t) => {
+      const moved = t.ratings.length && o.control.length ? shift(o.control, t.ratings) : 0;
+      const v = verdict(moved, o.threshold);
+      return {
+        id: t.id,
+        desc: describeEdits(o.tokens, t.edit),
+        mean: mean(t.ratings),
+        n: t.ratings.length,
+        shift: moved,
+        verdict: v,
+        pred: t.pred,
+        held: t.pred !== null && t.ratings.length > 0 && v === t.pred,
+        thin: t.ratings.length < MIN_READERS,
+        feature: t.feature
+      };
+    })
+  };
+}
+function biggestShift(trials) {
+  const by = (list) => list.reduce((best, t) => best === null || Math.abs(t.shift) > Math.abs(best.shift) ? t : best, null);
+  return by(trials.filter((t) => !t.thin)) ?? by(trials);
+}
 export {
   MIN_READERS,
   applyEdits,
+  biggestShift,
+  changeLabel,
   deal,
   dealLate,
   describeEdits,
   explainQuestion,
+  formatShift,
   hasChange,
   levelGroups,
   markEdits,
   mean,
+  pairFindings,
   pickResult,
+  predictionWord,
+  sanitiseEdit,
   seededRandom,
   setEvidence,
   setHeadline,

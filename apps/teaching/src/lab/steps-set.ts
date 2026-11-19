@@ -3,15 +3,14 @@ import { renderBlock } from '@/blocks/render';
 import { button, el } from '@/quiz/dom';
 import { bars } from './charts';
 import { explainQuestion, setEvidence, setHeadline } from './model';
-import { noteBox, notedLine, notesPanel } from './notes';
+import { noteAllows, noteBox, notedLine, notesPanel } from './notes';
 import { LAB_EXPLAIN_BLOCK_ID, type LabLevel, type LabStep, type PublicLab } from './schema';
 import type { LabStepContext, LabStepView } from './player';
 
 /**
  * The two supplied levels' screens: Question, Predict, Test, Result and
- * Explain. "You supply it" runs all five; "Students write it" shares
- * Question, Predict, Result and Explain, and Task 3 adds its Make and its
- * pick-one Test here.
+ * Explain. "You supply it" runs all five; "Students write it" shares them
+ * and adds Make, where each student writes one version per option.
  */
 
 const WAIT = 'Waiting for your teacher.';
@@ -102,11 +101,75 @@ const predict: LabStepView = (ctx) => {
   return [el('h2', '', predictQuestion(lab)), muted(`Readers will answer: ${lab.judge_question}`), chips, reason, lock];
 };
 
+const NUMBER_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+const count = (n: number, one: string, many: string): string => `${NUMBER_WORDS[n] ?? String(n)} ${n === 1 ? one : many}`;
+
+/** Students write it: one box per option, one at a time. Each version saves as the student moves on. */
+const make: LabStepView = (ctx) => {
+  const { lab, me, draft } = ctx;
+  const labels = options(lab);
+  const written = me.writing ?? [];
+  const firstEmpty = labels.findIndex((_, i) => !(written[i] ?? '').trim());
+  const at = typeof draft.at === 'number' ? draft.at : firstEmpty;
+  if (at < 0 || at >= labels.length) {
+    const nodes: HTMLElement[] = [el('h2', '', `${count(labels.length, 'version', 'versions')} written`)];
+    const said = notedLine('Make', ctx.notes);
+    if (said) nodes.push(said);
+    const change = button('Change a version', 'secondary', () => {
+      draft.at = 0;
+      ctx.repaint();
+    });
+    nodes.push(wait(), change);
+    return nodes;
+  }
+  const texts = (draft.texts ??= [...written]) as string[];
+  const last = at === labels.length - 1;
+  const heading = el('h2');
+  heading.append(lab.task ? `${lab.task} ` : '', 'Lean on ', el('span', 'lab-var', lower(labels[at]!)), '.');
+  const box = el('textarea', 'lab-reason lab-prose');
+  box.rows = 5;
+  box.maxLength = 2000;
+  box.setAttribute('aria-label', `Your ${lower(labels[at]!)} version`);
+  box.value = texts[at] ?? '';
+  box.addEventListener('input', () => { texts[at] = box.value; });
+  const nodes: HTMLElement[] = [heading];
+  if (lab.same) nodes.push(muted(`Keep the same: ${lab.same}`));
+  nodes.push(box, muted(`Version ${at + 1} of ${labels.length}.`));
+  const note = last ? noteBox('Make', ctx.notes) : null;
+  if (note) nodes.push(note);
+  const go = button(last ? 'Finish' : `Next: ${lower(labels[at + 1]!)}`, 'primary', () => {
+    const text = box.value.trim();
+    if (!text) return void box.focus();
+    if (last && !noteAllows('Make', ctx.notes)) return;
+    go.disabled = true;
+    // The next box opens once this one is saved; a save that fails leaves the student here with their words.
+    void ctx.act(async () => {
+      const next = await ctx.client.write(at, text);
+      draft.at = at + 1;
+      return next;
+    });
+  });
+  nodes.push(go);
+  if (at > 0) {
+    nodes.push(button(`Back to ${lower(labels[at - 1]!)}`, 'secondary', () => {
+      draft.at = at - 1;
+      ctx.repaint();
+    }));
+  }
+  return nodes;
+};
+
 const test: LabStepView = (ctx) => {
   const { lab, status, draft } = ctx;
   const reading = status.reading;
-  if (!reading) return [el('h2', '', lab.judge_question), wait()];
-  if (!reading.item) return [el('h2', '', lab.judge === 'pick' ? 'Choice sent' : 'Rating sent'), wait()];
+  const writers = lab.level === 'students';
+  if (!reading) return [el('h2', '', lab.judge_question), ...(writers && status.round?.step_name === 'Test' ? [muted('There is no writing to read yet.')] : []), wait()];
+  if (!reading.item) {
+    const nodes: HTMLElement[] = [el('h2', '', writers ? `${count(reading.total, 'writer', 'writers')} read` : lab.judge === 'pick' ? 'Choice sent' : 'Rating sent')];
+    const note = noteBox('Test', ctx.notes);
+    nodes.push(...(note ? [note] : [wait()]));
+    return nodes;
+  }
   const item = reading.item;
   if (item.kind === 'text') {
     const piece = el('div', 'lab-piece', item.text);
@@ -144,7 +207,7 @@ const test: LabStepView = (ctx) => {
     });
     nodes.push(piece);
   });
-  nodes.push(muted('Tap one.'));
+  nodes.push(muted(writers ? `Writer ${reading.index + 1} of ${reading.total}. Tap one.` : 'Tap one.'));
   return nodes;
 };
 
@@ -168,6 +231,16 @@ const result: LabStepView = (ctx) => {
     if (read.value === null) mine.append(el('strong', '', 'You chose'), ` the ${name} version.`);
     else mine.append(el('strong', '', 'You read'), ` the ${name} version and gave it ${read.value}.`);
     nodes.push(mine);
+  }
+  const own = me.own;
+  if (own && own.readers > 0) {
+    // How the student's own writing went: every version, with the one readers chose most first.
+    const best = own.chosen.indexOf(Math.max(...own.chosen));
+    const mine = el('p');
+    mine.append(el('strong', '', 'Your writing: '), `${own.chosen[best]} of your ${own.readers} ${own.readers === 1 ? 'reader' : 'readers'} chose your ${lower(labels[best] ?? '')} version.`);
+    nodes.push(mine);
+    const rest = own.chosen.map((n, i) => ({ n, i })).filter((x) => x.i !== best).map((x) => `${labels[x.i]} ${x.n}`);
+    if (rest.length) nodes.push(muted(`Your other versions: ${rest.join(', ')}.`));
   }
   const note = noteBox('Result', ctx.notes);
   if (note) nodes.push(note);
@@ -216,6 +289,7 @@ export function registerSetSteps(register: (level: LabLevel, step: LabStep, view
     register(level, 'Predict', predict);
     register(level, 'Result', result);
     register(level, 'Explain', explain);
+    register(level, 'Test', test);
   }
-  register('supplied', 'Test', test);
+  register('students', 'Make', make);
 }

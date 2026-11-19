@@ -76,11 +76,32 @@ const test: LabBoardView = ({ lab, board }) => ({
   inner: [
     el('h2', '', lab.judge === 'pick' ? 'Readers are choosing' : 'Readers are rating'),
     el('p', '', lab.judge_question),
-    muted(lab.judge === 'pick' ? 'Each reader gets every version in a shuffled order, with the names hidden.' : 'The class is split so each version has the same number of readers. Nobody knows which one they have.'),
+    muted(lab.level === 'students' ? 'Each reader gets up to six anonymous writers, with the options hidden.'
+      : lab.judge === 'pick' ? 'Each reader gets every version in a shuffled order, with the names hidden.' : 'The class is split so each version has the same number of readers. Nobody knows which one they have.'),
     meter(board.counts.done, board.counts.here)
   ],
-  status: `${board.counts.done} of ${board.counts.here} ${lab.judge === 'pick' ? 'choices' : 'ratings'} in`
+  status: lab.level === 'students' ? `${board.counts.done} of ${board.counts.here} readers finished` : `${board.counts.done} of ${board.counts.here} ${lab.judge === 'pick' ? 'choices' : 'ratings'} in`
 });
+
+/** Students write it: the task, the options, and how many have every version written. */
+const make: LabBoardView = ({ lab, board }) => {
+  const chips = el('div', 'lab-chips');
+  for (const option of lab.options ?? []) chips.append(el('span', 'lab-chip', option));
+  const n = (lab.options ?? []).length;
+  const inner: HTMLElement[] = [el('h2', '', lab.task || 'Write one version for each option')];
+  if (lab.same) inner.push(el('p', '', `Keep the same: ${lab.same}`));
+  inner.push(muted(`${n} versions, one for each option.`), chips, meter(board.counts.done, board.counts.here));
+  return { inner, status: `${board.counts.done} of ${board.counts.here} finished` };
+};
+
+/** The piece readers chose most, with no name on it. */
+function bestPiece(ctx: LabBoardContext): HTMLElement | null {
+  const best = ctx.board.best;
+  if (!best) return null;
+  const piece = el('div', 'lab-piece');
+  piece.append(el('small', '', `Most chosen: ${best.chosen} of ${best.readers} ${best.readers === 1 ? 'reader' : 'readers'}`), best.text);
+  return piece;
+}
 
 const result: LabBoardView = (ctx) => {
   const { lab, board } = ctx;
@@ -93,6 +114,13 @@ const result: LabBoardView = (ctx) => {
     muted(r.win ? `Ahead by ${r.lead}. That counts as a win.` : `Ahead by ${r.lead}. A win needs ${lab.threshold} or more.`)
   ];
   if (ctx.open.versions) inner.push(...versions(ctx));
+  const best = ctx.open.best ? bestPiece(ctx) : null;
+  if (best) inner.push(best);
+  const showBest = button(ctx.open.best ? 'Hide' : 'Show the most chosen piece', 'secondary', () => {
+    ctx.open.best = !ctx.open.best;
+    ctx.repaint();
+  });
+  showBest.dataset.act = 'best';
   const show = button(ctx.open.versions ? 'Hide the versions' : labels.length === 2 ? 'Show both versions' : 'Show the versions', 'secondary', () => {
     ctx.open.versions = !ctx.open.versions;
     ctx.repaint();
@@ -102,7 +130,7 @@ const result: LabBoardView = (ctx) => {
   return {
     inner,
     status: lab.judge === 'pick' ? `${r.values.reduce((a, b) => a + b, 0)} choices from ${readers}` : `Average out of 10, from ${readers}`,
-    extra: board.texts ? [show] : []
+    extra: board.texts ? [show] : board.best ? [showBest] : []
   };
 };
 
@@ -111,6 +139,8 @@ const explain: LabBoardView = (ctx) => {
   const inner: HTMLElement[] = [el('h2', '', explainQuestion({ level: lab.level, judge: lab.judge, options: lab.options, prompt: lab.explain_prompt, result: board.results }))];
   if (board.results) inner.push(muted(setEvidence({ options: lab.options ?? [], judge: lab.judge, result: board.results })));
   inner.push(...versions(ctx));
+  const best = bestPiece(ctx);
+  if (best) inner.push(best);
   if (board.debrief) inner.push(muted(`Your notes: ${board.debrief}`));
   return { inner, status: `${board.explained ?? 0} of ${board.counts.here} handed in` };
 };
@@ -120,8 +150,46 @@ for (const level of ['supplied', 'students'] as const) {
   registerLabBoardStep(level, 'Predict', predict);
   registerLabBoardStep(level, 'Result', result);
   registerLabBoardStep(level, 'Explain', explain);
+  registerLabBoardStep(level, 'Test', test);
 }
-registerLabBoardStep('supplied', 'Test', test);
+registerLabBoardStep('students', 'Make', make);
+
+/**
+ * Flagged work waiting for the teacher, under the stage: initials, the words,
+ * and Release or Remove. Released work joins the reading when the class moves
+ * to Test; removed work stays out.
+ */
+export function heldPanel(board: LabBoard, o: { release(owner: string): void; remove(owner: string): void }): HTMLElement | null {
+  const held = board.held ?? [];
+  if (held.length === 0) return null;
+  const card = el('section', 'lab-card lab-held');
+  card.setAttribute('aria-label', 'Held for you');
+  card.append(
+    el('h2', '', held.length === 1 ? '1 piece held for you' : `${held.length} pieces held for you`),
+    muted(board.round?.step_name === 'Make' || board.round?.step_name === 'Design'
+      ? 'The filter flagged these. Release one and readers get it when you move to Test. Remove one and it stays out.'
+      : 'The filter flagged these, so readers did not get them.')
+  );
+  for (const item of held) {
+    const row = el('div', 'lab-held__row');
+    const words = el('div', 'lab-held__words');
+    words.append(el('strong', '', item.initials || 'A student'));
+    for (const piece of item.pieces) {
+      const line = el('p', piece.flagged ? 'is-flagged' : '');
+      line.append(el('span', 'lab-label', piece.flagged ? `${piece.label} · flagged` : piece.label), piece.text);
+      words.append(line);
+    }
+    const buttons = el('div', 'lab-held__buttons');
+    const release = button('Release', 'secondary', () => o.release(item.owner));
+    release.dataset.act = 'release';
+    const remove = button('Remove', 'ghost', () => o.remove(item.owner));
+    remove.dataset.act = 'remove';
+    buttons.append(release, remove);
+    row.append(words, buttons);
+    card.append(row);
+  }
+  return card;
+}
 
 /**
  * The teacher's board for a published lab: the step strip, the stage for the
@@ -229,7 +297,8 @@ export function mountLabBoard(o: LabBoardOptions): LabBoardHandle {
     end.dataset.act = 'end';
     const foot = el('div', 'lab-board__start');
     foot.append(end, rounds());
-    root.replaceChildren(stepStrip(round), card, error, foot);
+    const held = heldPanel(board, { release: (owner) => void run(o.api.release(owner)), remove: (owner) => void run(o.api.remove(owner)) });
+    root.replaceChildren(stepStrip(round), card, ...(held ? [held] : []), error, foot);
   }
 
   async function refresh(): Promise<void> {
