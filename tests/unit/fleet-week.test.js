@@ -187,6 +187,37 @@ test('placement closes early once every active player has placed', async () => {
   assert.equal(state.round, 0);
 });
 
+test('placement waits for the whole class: one early placer does not close it', async () => {
+  const { store } = await fleetLesson();
+  await teach(store, 'campaign_open', { mode: 'lesson' });
+  const c = await campaignOf(store);
+  // Only student 1 has looked, and places: nobody else has placed, so placement stays open.
+  await play(store, 1, 'fleet_state');
+  const team1 = fleet.teamOf(c.pairing, ownerOf(1));
+  await play(store, 1, 'fleet_place', { ships: fleet.autoPlace(fleet.shipsFor(team1, ownerOf(1)), [], [], fleet.rng('early')) });
+  let view = await play(store, 1, 'fleet_state', {}, T0 + 500);
+  assert.equal(view.phase, 'placement');
+  assert.equal(view.round, 0);
+  // Everyone else places. Until the last one has, placement stays open.
+  const layouts = [];
+  for (const team of c.pairing.teams) {
+    const laid = team.owners.includes(ownerOf(1)) ? [...(await store.get(k.campaignFleet('fw', c.id, ownerOf(1))))] : [];
+    for (const owner of team.owners.filter((o) => o !== ownerOf(1))) {
+      const ships = fleet.autoPlace(fleet.shipsFor(team, owner), laid, laid.flatMap((s) => s.squares), fleet.rng(`late:${owner}`));
+      layouts.push([nOf(owner), ships]);
+      laid.push(...ships);
+    }
+  }
+  for (const [n, ships] of layouts.slice(0, -1)) await play(store, n, 'fleet_place', { ships }, T0 + 600);
+  view = await play(store, 1, 'fleet_state', {}, T0 + 650);
+  assert.equal(view.phase, 'placement');
+  const [lastN, lastShips] = layouts[layouts.length - 1];
+  await play(store, lastN, 'fleet_place', { ships: lastShips }, T0 + 660);
+  view = await play(store, 1, 'fleet_state', {}, T0 + 700);
+  assert.equal(view.phase, 'firing');
+  assert.equal(view.round, 1);
+});
+
 test('placement validation messages surface', async () => {
   const { store } = await fleetLesson();
   await teach(store, 'campaign_open', { mode: 'lesson' });

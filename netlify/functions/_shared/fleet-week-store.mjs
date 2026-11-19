@@ -76,15 +76,22 @@ export function activeOwners(campaign, clock) {
 
 /**
  * Lesson mode (§1.3): the open round has closed when its cap has run out, the
- * teacher tapped Next round, or every active player is done (placed, or spent
- * four shots). Nobody active yet means nobody is done.
+ * teacher tapped Next round, or everyone needed is done. Placement (round 0)
+ * needs every rostered player in the pairing to have placed; a firing round
+ * needs every active player (decision 8) to have spent four shots. Nobody
+ * active yet means nobody is done.
  */
 export function roundClosed(campaign, clock, now) {
   if (!roundOpen(campaign, clock)) return false;
   if (now >= clock.closes_at) return true;
   if (clock.next === clock.round) return true;
-  const active = activeOwners(campaign, clock);
   const done = obj(clock.done);
+  if (clock.round === 0) {
+    // Placement waits for the whole class: every rostered player in the pairing (never the ghost) must place.
+    const players = campaign.pairing.teams.filter((t) => !t.ghost).flatMap((t) => t.owners);
+    return players.length > 0 && players.every((o) => done[o] === 0);
+  }
+  const active = activeOwners(campaign, clock);
   return active.length > 0 && active.every((o) => done[o] === clock.round);
 }
 

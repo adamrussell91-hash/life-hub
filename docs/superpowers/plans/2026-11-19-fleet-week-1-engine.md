@@ -493,6 +493,30 @@ Add a branch in `netlify/functions/games.mjs` (operator gate): `campaign_*`, `vo
   - Open a ready PR "Games: Fleet week engine (schema, rules, lesson-mode server)" with an invented-example-only body.
   - Enable auto-merge (merge commit).
 
+## Deviations (as built, Tasks 2–6)
+
+Rules (Tasks 2–3):
+- Practice shots (a match already won) do not count toward `first_try`.
+- Only an earlier hit or miss on a square makes a later shot `dup`. A dud, void or practice shot leaves the square open.
+- `Shot.seq` is the commit time in ms (server clock), per owner. Ties are broken by owner.
+- `pickVariant` first prefers a variant this player hasn't been given, then the one least given to others in the match.
+
+Server (Tasks 4–6):
+1. Teacher actions live in `_shared/fleet-week-teacher.mjs`, and campaign storage and resolution in `_shared/fleet-week-store.mjs`. `fleet-week.mjs` holds the student actions and the view.
+2. The keys are `campaignCurrent`, `campaignClock` and so on, because `gameKeys.current` already exists. `clock.fired[owner] = round` records "committed a shot in round R − 1" for decision 8. A firing round's early close needs at least one active player.
+3. Server fixture answers are "Mast A0", "Mast B0" and "Line 0", so the leak sweep can search for them case-sensitively without false matches in hex or base36 ids. Students type them in lower case.
+4. Hits reach students as opaque per-team aliases, because real hit ids contain the owner hash.
+5. Closing a campaign clears `current/{class}`. The view therefore carries the campaign id, and student actions accept `campaign_id`, so a closed campaign stays readable.
+6. `fleet_recall` takes the ship id (`s3`) as `ship_key`. The server adds the rival team.
+7. Extra commit refusals:
+   - 409 `fired`: the same square twice by one player in one round.
+   - 409 `returns_later`: the player's own dud square before it returns.
+   - 409 `no_shot`: an answer with no open shot.
+8. `void_shot` works only in the open round. Any other round gets `too_late`, to be revisited in plan 3.
+9. Students see reveal names as first name and last initial ("Ivo P."). Reveal settles the last resolved state, so shots in a round that is still open are dropped.
+
+**Placement decision (19 Nov):** round 0 closes early only when every rostered player in the pairing (never the ghost) has placed. Otherwise it closes at the placement cap or on **Next round**. Firing rounds keep decision 8 as built.
+
 ## Self-review against the spec
 
 - §1.1 grid and variants → Tasks 1 and 2. §1.2 teams and ghost → Task 2. §1.3 lesson clock → Task 4 (week clock → plan 4). §1.4 outcomes and confidence → Task 3. §1.5 sinking → Task 3 and Task 5 (`fleet_recall`). §1.6 reports → Tasks 3, 5 and 6. §1.7 scoring → Task 3. §1.8 call signs and anonymity → Tasks 2 and 5. §1.9 two-step commit, server timer and writing logs → Task 5. Flags → Task 6.
