@@ -436,7 +436,7 @@ function livelyLines(state: FleetState, team: string): string[] {
 }
 
 function countFirstTry(state: FleetState, shot: Shot, outcome: Outcome): void {
-  if (shot.returning || !['hit', 'miss', 'dud', 'practice'].includes(outcome)) return;
+  if (shot.returning || !['hit', 'miss', 'dud'].includes(outcome)) return;
   const tally = (state.first_try[shot.owner] ??= { right: 0, total: 0 });
   tally.total++;
   if (shot.correct === true) tally.right++;
@@ -468,7 +468,6 @@ export function resolveRound(prev: FleetState, input: RoundInput): FleetState {
   settleRecalls(state, round, input.recalls, false);
 
   const shots = clone(input.shots).sort((a, b) => a.seq - b.seq);
-  const taken = new Set<string>();                 // `${team}:${square}` fired this round
   const results: ShotResult[] = [];
   for (const shot of shots) {
     const team = teamOf(pairing, shot.owner);
@@ -489,10 +488,11 @@ export function resolveRound(prev: FleetState, input: RoundInput): FleetState {
       res = result('void');
     } else if (!match || state.ended[match.id]) {
       res = result('practice');
-    } else if (chart[shot.square] || taken.has(`${team.id}:${shot.square}`)) {
+    } else if (chart[shot.square]) {
+      // Already hit or missed, before or earlier this round (the chart updates as shots resolve).
+      // A dud, void or practice shot leaves the square open to a teammate (§1.4).
       res = result('dup');
     } else {
-      taken.add(`${team.id}:${shot.square}`);
       if (shot.correct !== true) {
         res = result('dud');
         state.returns.push({ owner: shot.owner, square: shot.square, variant: shot.variant === 0 ? 1 : 0, due: round + 2 });

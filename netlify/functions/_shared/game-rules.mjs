@@ -2608,7 +2608,7 @@ function livelyLines(state, team) {
   return [...rows, ...cols];
 }
 function countFirstTry(state, shot, outcome) {
-  if (shot.returning || !["hit", "miss", "dud", "practice"].includes(outcome)) return;
+  if (shot.returning || !["hit", "miss", "dud"].includes(outcome)) return;
   const tally = state.first_try[shot.owner] ??= { right: 0, total: 0 };
   tally.total++;
   if (shot.correct === true) tally.right++;
@@ -2629,7 +2629,6 @@ function resolveRound(prev, input) {
   settleHits(state, round, input, false);
   settleRecalls(state, round, input.recalls, false);
   const shots = clone(input.shots).sort((a, b) => a.seq - b.seq);
-  const taken = /* @__PURE__ */ new Set();
   const results = [];
   for (const shot of shots) {
     const team = teamOf(pairing, shot.owner);
@@ -2649,10 +2648,9 @@ function resolveRound(prev, input) {
       res = result("void");
     } else if (!match || state.ended[match.id]) {
       res = result("practice");
-    } else if (chart[shot.square] || taken.has(`${team.id}:${shot.square}`)) {
+    } else if (chart[shot.square]) {
       res = result("dup");
     } else {
-      taken.add(`${team.id}:${shot.square}`);
       if (shot.correct !== true) {
         res = result("dud");
         state.returns.push({ owner: shot.owner, square: shot.square, variant: shot.variant === 0 ? 1 : 0, due: round + 2 });

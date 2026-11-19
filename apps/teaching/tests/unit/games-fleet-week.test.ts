@@ -343,6 +343,11 @@ describe('fleet_week resolveRound: shots', () => {
     expect(s1.returns).toEqual([]);
     expect(results(play(s1, 2, [shot(1, 'ben', 0)]))[0]).toMatchObject({ outcome: 'dup', damage: 0 });
   });
+  it('an earlier teammate dud, void or practice shot leaves the square open', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 0, { correct: false }), shot(2, 'ben', 0), shot(3, 'ann', 6, { voided: true }), shot(4, 'ben', 6)]);
+    expect(results(s1).map((r) => r.outcome)).toEqual(['dud', 'hit', 'void', 'miss']);
+    expect(s1.hits).toHaveLength(1);
+  });
   it('a voided shot records nothing and does not return', () => {
     const s1 = play(placed(), 1, [shot(1, 'ann', 0, { voided: true }), shot(2, 'ben', 6, { voided: true, correct: false })]);
     expect(results(s1).map((r) => r.outcome)).toEqual(['void', 'void']);
@@ -421,6 +426,7 @@ describe('fleet_week resolveRound: sinking and ending', () => {
     expect(results(s2).map((r) => r.outcome)).toEqual(['practice', 'practice']);
     expect(s2.charts.t2[6]).toBeUndefined();
     expect(s2.charts.t1).toEqual({});
+    expect(s2.first_try).toEqual(s1.first_try);
   });
 });
 
