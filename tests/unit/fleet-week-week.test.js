@@ -351,23 +351,84 @@ test('a resolved round folds its shots into game events, a play, box 1 and the s
   const resolved = await store.get(k.campaignResolved('fw', c.id, 1));
   const stored = [];
   for (const n of N) stored.push(...((await store.get(k.campaignShots('fw', c.id, 1, ownerOf(n)))) ?? []));
-  await foldRound(store, k, c, resolved, 1, stored, { now: T + 9100 });
+  const marker = await store.get(k.campaignFolded('fw', c.id, 1));
+  assert.deepEqual(marker.boxed, Object.fromEntries(Object.keys(marker.boxed).map((o) => [o, o === ownerOf(1) ? 1 : 0])));
+  await foldRound(store, k, c, resolved, 1, stored, { now: T + 9100, boxed: marker.boxed });
   assert.deepEqual(await store.get(k.events('fw', playId, ownerOf(1))), events);
   assert.equal((await store.get(k.play('fw', playId))).boxed, 1);
 });
 
-test('a fold that throws is retried by the next request, then marked done', async () => {
+test('a fold that keeps failing backs off: one try per backoff, not one per poll', async () => {
   const { store, c, T } = await lessonGame();
   const shot = await play(store, 1, 'fleet_commit', { square: 3, sure: false }, T + 10);
   await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, T + 20);
   const playId = fleetPlayId(c, ownerOf(1));
   const eventsKey = k.events('fw', playId, ownerOf(1));
   const foldedKey = k.campaignFolded('fw', c.id, 1);
-  // Every fold during the first request dies writing its events (that request's own retry pass fails too).
   const orig = store.setJSON.bind(store);
-  let failures = 0;
+  let failing = true;
+  let attempts = 0;
   store.setJSON = async (key, v, o) => {
-    if (key === eventsKey) { failures += 1; throw new Error('blob store hiccup'); }
+    if (key === eventsKey) {
+      attempts += 1;
+      if (failing) throw new Error('blob store hiccup');
+    }
+    return orig(key, v, o);
+  };
+  const second = T + 30 + 30000;
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    await teach(store, 'campaign_next', {}, T + 30);
+    // Ten polls from phones straight after the failure: no new attempt.
+    for (let i = 0; i < 10; i++) await play(store, (i % 8) + 1, 'fleet_state', {}, T + 31 + i);
+    assert.equal(attempts, 1);
+    assert.deepEqual(await store.get(foldedKey), { at: T + 30, tries: 1, boxed: (await store.get(foldedKey)).boxed, failed_at: T + 30 });
+    assert.ok(await store.get(k.campaignResolved('fw', c.id, 1)));
+    // Still failing once the 30 s backoff has passed: one more try, then 60 s.
+    await play(store, 5, 'fleet_state', {}, T + 30 + 29999);
+    assert.equal(attempts, 1);
+    await play(store, 5, 'fleet_state', {}, T + 30 + 30000);
+    assert.equal(attempts, 2);
+    assert.equal((await store.get(foldedKey)).tries, 2);
+    await play(store, 5, 'fleet_state', {}, second + 59999);
+    assert.equal(attempts, 2);
+    // Fixed: the next try after the backoff completes it.
+    failing = false;
+    await play(store, 5, 'fleet_state', {}, second + 60000);
+    assert.equal(attempts, 3);
+  } finally {
+    console.error = quiet;
+    store.setJSON = orig;
+  }
+  assert.equal((await store.get(eventsKey)).length, 1);
+  assert.equal((await store.get(foldedKey)).done, true);
+  assert.ok(await store.get(k.play('fw', playId)));
+  // Done rounds aren't folded again.
+  store.writes.length = 0;
+  await play(store, 5, 'fleet_state', {}, second + 60001);
+  assert.equal(store.writes.filter((key) => key === eventsKey || key === foldedKey).length, 0);
+});
+
+test('the backoff doubles and is capped at 15 minutes', async () => {
+  const { foldBackoff } = await import('../../netlify/functions/_shared/fleet-week-store.mjs');
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 10].map(foldBackoff), [30000, 60000, 120000, 240000, 480000, 900000, 900000]);
+});
+
+test('a retried fold sends organiser cards to box 1 once', async () => {
+  const { store, c, state, T } = await taggedGame();
+  const team = fleet.teamOf(c.pairing, ownerOf(1));
+  const rivalShips = state.fleets[fleet.rivalOf(c.pairing, team.id)];
+  const sea = [...Array(25).keys()].find((x) => !rivalShips.some((s) => s.squares.includes(x)));
+  await play(store, 1, 'fleet_commit', { square: sea, sure: false }, T + 10);
+  await play(store, 1, 'fleet_answer', { answer: 'a guess', writing }, T + 20);
+  const playId = fleetPlayId(c, ownerOf(1));
+  const practiceKey = () => [...store.data.keys()].find((key) => key.startsWith('organiser_practice/class1/'));
+  // The fold dies after the box-1 step, writing the play record.
+  const orig = store.setJSON.bind(store);
+  let failing = true;
+  store.setJSON = async (key, v, o) => {
+    if (failing && key === k.play('fw', playId)) throw new Error('blob store hiccup');
     return orig(key, v, o);
   };
   const quiet = console.error;
@@ -376,21 +437,36 @@ test('a fold that throws is retried by the next request, then marked done', asyn
     await teach(store, 'campaign_next', {}, T + 30);
   } finally {
     console.error = quiet;
-    store.setJSON = orig;
   }
-  assert.equal(failures, 2); // the winner's fold, then the same request's retry pass
-  assert.ok(await store.get(k.campaignResolved('fw', c.id, 1)));
-  assert.equal(await store.get(eventsKey), null);
-  assert.equal(await store.get(foldedKey), null); // the claim was given back
-  // Any later request completes it.
-  await play(store, 5, 'fleet_state', {}, T + 40);
-  assert.equal((await store.get(eventsKey)).length, 1);
-  assert.deepEqual(await store.get(foldedKey), { done: true, at: T + 40 });
-  assert.ok(await store.get(k.play('fw', playId)));
-  // Done rounds aren't folded again.
+  failing = false;
+  store.setJSON = orig;
+  const mark = await store.get(k.campaignFolded('fw', c.id, 1));
+  assert.equal(mark.boxed[ownerOf(1)], 1);
+  assert.equal(store.data.get(practiceKey()).boxes.ol_simile.box, 1);
+  // The student moves the card on before the retry; the retry must not send it back again.
+  store.data.set(practiceKey(), { ...store.data.get(practiceKey()), boxes: { ol_simile: { box: 2, due: '2026-12-01' } } });
   store.writes.length = 0;
-  await play(store, 5, 'fleet_state', {}, T + 50);
-  assert.equal(store.writes.filter((key) => key === eventsKey || key === foldedKey).length, 0);
+  await play(store, 5, 'fleet_state', {}, T + 30 + 30000);
+  assert.equal((await store.get(k.campaignFolded('fw', c.id, 1))).done, true);
+  assert.equal(store.writes.filter((key) => key.startsWith('organiser_practice/')).length, 0);
+  assert.deepEqual(store.data.get(practiceKey()).boxes.ol_simile, { box: 2, due: '2026-12-01' });
+  assert.equal((await store.get(k.play('fw', playId))).boxed, 1);
+});
+
+test('a wrong practice shot sends its organiser card to box 1 too', async () => {
+  const { store, c, T } = await taggedGame();
+  const team = fleet.teamOf(c.pairing, ownerOf(1));
+  const target = fleet.rivalOf(c.pairing, team.id);
+  // A round where student 1's match is already won: their wrong answer resolves as practice.
+  const state = {
+    round: 1, fleets: {}, charts: {}, damage: {}, first_try: {}, hits: [], sinks: [], pings: [], returns: [], given: [], ended: {},
+    log: [{ round: 1, results: [{ seq: 5, owner: ownerOf(1), square: 3, sure: false, variant: 0, item: 'q3a', correct: false, returning: false, outcome: 'practice', target, damage: 0 }] }]
+  };
+  await foldRound(store, k, c, state, 1, [], { now: T + 10 });
+  const playRecord = await store.get(k.play('fw', fleetPlayId(c, ownerOf(1))));
+  assert.equal(playRecord.boxed, 1);
+  const practice = store.data.get([...store.data.keys()].find((key) => key.startsWith('organiser_practice/class1/')));
+  assert.equal(practice.boxes.ol_simile.box, 1);
 });
 
 test('a fold whose request died is taken over once its lease runs out', async () => {
@@ -412,6 +488,94 @@ test('a fold whose request died is taken over once its lease runs out', async ()
   await resolve(store, k, c, T + 30 + 60000);
   assert.equal((await store.get(eventsKey)).length, 1);
   assert.equal((await store.get(foldedKey)).done, true);
+});
+
+// ---------------------------------------------------------------- dawn reports (week mode, §1.3)
+
+/** Wednesday 18 November 2026, 6:00 am Sydney: dawn after Tuesday's cut-off. */
+const WED_DAWN = Date.parse('2026-11-17T19:00:00.000Z');
+
+test('week mode: a round resolves at its cut-off, but students see it at 6 am the next day', async () => {
+  const { dawnAfter } = await import('../../netlify/functions/_shared/fleet-week-store.mjs');
+  const { store } = await fleetLesson();
+  await teach(store, 'campaign_open', { mode: 'week' });
+  const c = await campaignOf(store);
+  assert.equal(dawnAfter(c, 1), WED_DAWN);
+  assert.equal(dawnAfter(c, 0), 0);
+  await play(store, 1, 'fleet_state', {}, MON_8PM + H);
+  const state0 = await store.get(k.campaignResolved('fw', c.id, 0));
+  const team = fleet.teamOf(c.pairing, ownerOf(1));
+  const rival = c.pairing.teams.find((t) => t.id === fleet.rivalOf(c.pairing, team.id));
+  const sq = state0.fleets[rival.id][3].squares[0];
+  const shot = await play(store, 1, 'fleet_commit', { square: sq, sure: false }, MON_8PM + 2 * H);
+  await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, MON_8PM + 2 * H + 1000);
+  const night = c.schedule[1] + H; // Tuesday 9 pm
+  // The teacher sees the result at once.
+  const room = await teach(store, 'campaign_state', {}, night);
+  assert.equal(room.round, 2);
+  assert.equal(room.log.find((l) => l.round === 1).results[0].outcome, 'hit');
+  // Students don't, until dawn: no report, no mark on either chart, no hit or report signals.
+  const shooter = await play(store, 1, 'fleet_state', {}, night);
+  assert.equal(shooter.round, 2);
+  assert.equal(shooter.phase, 'firing');
+  assert.equal(shooter.report, undefined);
+  assert.deepEqual(shooter.rival.chart, {});
+  assert.deepEqual(shooter.rival.sunk, []);
+  assert.equal(shooter.recall, undefined);
+  const victim = nOf(rival.owners[0]);
+  assert.deepEqual((await play(store, victim, 'fleet_state', {}, night)).team.chart, {});
+  assert.deepEqual(kinds(await play(store, victim, 'signals', {}, night)), ['round_open']);
+  // Firing at the hit square before dawn is allowed (it resolves as a duplicate), so nothing gives the hit away.
+  const partner = nOf(team.owners.find((o) => o !== ownerOf(1)));
+  assert.ok((await play(store, partner, 'fleet_commit', { square: sq, sure: false }, night + 1000)).question);
+  // At dawn the report, the hit and the signals arrive.
+  assert.equal((await play(store, 1, 'fleet_state', {}, WED_DAWN - 1)).report, undefined);
+  const morning = await play(store, 1, 'fleet_state', {}, WED_DAWN);
+  assert.equal(morning.report.round, 1);
+  assert.equal(morning.rival.chart[sq], 'hit');
+  assert.equal(morning.recall.ship_key, 's3');
+  assert.deepEqual(kinds(await play(store, victim, 'signals', {}, WED_DAWN)), ['hit', 'report_ready', 'round_open']);
+  await rejectsWith(play(store, 1, 'fleet_commit', { square: sq, sure: false }, WED_DAWN + 1), 'known');
+});
+
+test('week mode: the reveal opens at 6 am after the last cut-off (Friday), not at the cut-off', async () => {
+  const { store } = await fleetLesson();
+  await teach(store, 'campaign_open', { mode: 'week' });
+  const c = await campaignOf(store);
+  const friday6am = Date.parse('2026-11-19T19:00:00.000Z');
+  const thursdayNight = await play(store, 1, 'fleet_state', {}, c.schedule[3] + H);
+  assert.equal(thursdayNight.phase, 'waiting');
+  assert.equal((await campaignOf(store)).revealed_at, null);
+  assert.equal((await play(store, 1, 'fleet_state', {}, friday6am - 1)).phase, 'waiting');
+  assert.equal((await play(store, 1, 'fleet_state', {}, friday6am)).phase, 'reveal');
+  assert.equal((await campaignOf(store)).revealed_at, friday6am);
+});
+
+test('week mode: the teacher can still open the reveal before Friday', async () => {
+  const { store } = await fleetLesson();
+  await teach(store, 'campaign_open', { mode: 'week' });
+  const c = await campaignOf(store);
+  await teach(store, 'campaign_reveal', {}, c.schedule[1] + H);
+  assert.equal((await play(store, 1, 'fleet_state', {}, c.schedule[1] + H + 1)).phase, 'reveal');
+});
+
+test('one broken campaign in the class index is skipped; the others still signal', async () => {
+  const { profileAction } = await import('../../netlify/functions/_shared/profile.mjs');
+  const { store, c, T } = await lessonGame();
+  const idx = await store.get('game-campaigns/class1');
+  // A second campaign whose clock blob is missing (a half-finished open, or deleted data).
+  store.data.set(k.campaign('fw', 'aaaaaaaaaaaaaaaa'), { ...c, id: 'aaaaaaaaaaaaaaaa' });
+  store.data.set('game-campaigns/class1', { campaigns: [...idx.campaigns, { lesson_id: 'gl1', game_id: 'fw', id: 'aaaaaaaaaaaaaaaa', at: T }] });
+  const quiet = console.error;
+  const logged = [];
+  console.error = (...a) => logged.push(a.join(' '));
+  try {
+    const r = await profileAction(store, 'class1', { action: 'fleet_signals', class_token: whoFleet(1).class_token }, { now: new Date(T + 5) });
+    assert.deepEqual(r.events.map((e) => e.id), [`${c.id}:round_open:1`]);
+  } finally {
+    console.error = quiet;
+  }
+  assert.ok(logged.some((l) => l.includes('aaaaaaaaaaaaaaaa')));
 });
 
 test('the fold runs once per round, from the request that wrote it', async () => {

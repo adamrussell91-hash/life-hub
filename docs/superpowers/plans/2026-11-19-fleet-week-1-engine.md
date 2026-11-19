@@ -566,7 +566,12 @@ Server only. The screens (arcade, content editor, launcher, campaign, editor, co
 3. **Learning data** (§4).
    - `_shared/fleet-week-fold.mjs` `foldRound` is called by the request whose create-only write of `resolved/{r}` won (r ≥ 1). It writes GameEvents, the play record and box 1 for duds, then runs `rebuildSummary`.
    - It is idempotent: it replaces that round's events by `cid` (`r{round}-{seq}`). A failed fold is logged and never blocks play.
-   - Retry (follow-up fix): each fold claims `folded/{round}` create-only (`{ at }`), and on success the marker becomes `{ done: true, at }`. A fold that throws deletes its claim. Every `ensureResolved` call ends with `ensureFolded`: one marker read per resolved round, and any round without `done` is folded again, in order. A claim older than `FOLD_LEASE_MS` (60 s) counts as a dead request and can be taken over.
+   - Retry (follow-up fixes): each fold claims `folded/{round}` create-only (`{ at, tries, boxed }`), and on success the marker becomes `{ done: true, at, boxed }`.
+     - A fold that throws keeps its marker as `{ failed_at, tries }`. It is tried again only after an exponential backoff: 30 s, then 60 s, then 2 min and so on, capped at 15 min (`foldBackoff`). So a fold that keeps failing runs once per backoff, never once per poll.
+     - Every `ensureResolved` call ends with `ensureFolded`: one marker read per resolved round, and any round whose fold is due is folded again, in order.
+     - A claim with no failure that is older than `FOLD_LEASE_MS` (60 s) counts as a dead request and can be taken over.
+     - The box-1 step is recorded per player in the marker's `boxed` (owner → cards moved) as soon as `sendPiecesToBoxOne` returns. A retry skips any player already recorded, so a card is never sent back twice.
+     - The play record keeps `boxed_by_round`, and its `boxed` is their sum, so a re-fold counts a round once.
    - Damage reports and recall lines appear in `campaign_state.written` as short written answers, with the quiz writing summary (check `block`) and the log for replay.
 4. **Results insight.** `campaign_insight` is added. Pure `squareStats`, `hardestSquares` and `calibration` are in rules.ts. The reveal carries `reveal.class` (student view) and `board` (`campaign_state` once revealed): per-square accuracy and the hardest squares, with no answers or names.
 5. **Balance.** `balance: 'mixed'` uses `pairTeamsMixed` (rules.ts, seeded from the secret). `campaign.balance` is stored, and any other value gets 400 `bad_balance`.
@@ -588,7 +593,12 @@ Server only. The screens (arcade, content editor, launcher, campaign, editor, co
     - Weekdays come from the class's time-zone date (Sydney), never UTC.
   - Week rounds default to 3 (`body.rounds`, 1–8). They ignore the game's lesson-mode `settings.rounds`.
   - The cut-off is `body.cutoff`, then the game's `settings.cutoff`, then '20:00'.
-- **"Reveal open after round 3"** is read as the reveal opening automatically once the last round has resolved, on the next request after that cut-off. The teacher can still reveal earlier.
+- **Dawn rule (week mode; follow-up fix, §1.3 "ready the next morning", "the reveal is Friday").**
+  - A firing round still resolves at its cut-off, and the teacher sees it at once (`campaign_state`, `campaign_insight`).
+  - Students see each round's results from 06:00 Sydney on the day after its cut-off (`dawnAfter`). Until then, `visibleState` gives their view and signals the latest round whose dawn has passed. That covers the report, both charts, sunk ships, the recall prompt, owed reports, duds and the `hit` and `report_ready` signals.
+  - The commit's "already known" check uses that same visible state, so firing before dawn at a square the team hit last night is allowed and resolves as a duplicate, instead of giving the hit away with a refusal.
+  - The reveal opens by itself at 06:00 on the day after the last round's cut-off (Friday in a normal week). The teacher can open it at any time before then.
+  - The next round still opens at the cut-off, so `round_open` ("Four shells ready.") can show the evening before.
 - **Signals.**
   - `round_open` shows only in a firing round the player can fire in, with shots left and the round not closing. Placement raises no signal.
   - `hit` means any hit on the player's team's fleet in the last resolved round.
@@ -603,7 +613,8 @@ Server only. The screens (arcade, content editor, launcher, campaign, editor, co
   - `extra` also carries `square`, `round` and `outcome`.
   - `play_id` is `sha256('fleet:' + campaign + ':' + owner)`, cut to 16 hex.
   - The play record is rewritten each round, with `mode` 'live' (lesson) or 'campaign' (week; the play record has no mode schema), plus `campaign_id` and `rounds`.
-  - Box 1 uses the round's duds (outcome `dud`) whose item carries a `kp:` tag. `sendPiecesToBoxOne` decides whether the piece is on an organiser line.
+  - Box 1 uses every wrong answer in the round whose item carries a `kp:` tag: duds, and wrong practice and duplicate shots too (a wrong answer is a wrong answer), never a voided shot. `sendPiecesToBoxOne` decides whether the piece is on an organiser line.
+  - Signals isolate campaigns: one campaign that throws (for example a missing clock blob) is logged and skipped, and the other campaigns still signal.
 - **Written answers** stay in the reports blob, where plan 1 stored them. `campaign_state.written` presents them in the quiz's short-written-answer shape. A report rejected by the teacher disappears from the list, because the filing is deleted.
 - **Insight.**
   - "Answered" counts every shot except voided ones, practice shots included.
@@ -627,5 +638,5 @@ Server only. The screens (arcade, content editor, launcher, campaign, editor, co
 ### Gaps
 
 - Each request reads one `folded/{round}` marker for every resolved round (at most 8) to find a fold that needs retrying.
-- Week mode has no minimum placement window and no "reveal at" time. School holidays are not skipped.
+- Week mode has no minimum placement window. School holidays are not skipped. The dawn hour is fixed at 06:00 and is not a setting.
 - The class index keeps the newest 20 campaigns. A lesson deleted under an open campaign is skipped, not cleaned up.

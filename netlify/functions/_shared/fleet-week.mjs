@@ -28,7 +28,7 @@ import { FLEET_ACTIONS, campaignIndexKey, gameKeys } from './game-store.mjs';
 import { cleanWritingLog } from './quiz-core.mjs';
 import { checkAnswer, fleet } from './game-rules.mjs';
 import {
-  LATE_GRACE_MS, SHOTS_PER_ROUND, aliasFor, ensureCampaign, ensureResolved, firesIn, findCampaign, hashFor, list, loadFleetGame, markClock, obj, reportInputs,
+  LATE_GRACE_MS, SHOTS_PER_ROUND, aliasFor, ensureCampaign, ensureResolved, firesIn, findCampaign, hashFor, visibleState, list, loadFleetGame, markClock, obj, reportInputs,
   roundClosing, roundOpen, roundsOf, touchClock, updateJSON
 } from './fleet-week-store.mjs';
 
@@ -71,11 +71,6 @@ async function readTeam(store, k, campaign, owners, keyOf) {
   return Object.fromEntries(await Promise.all(owners.map(async (o) => [o, await read(store, keyOf(campaign, k, o))])));
 }
 
-/** The latest settled state for the view: the final one once revealed. */
-async function viewState(store, k, campaign, state) {
-  if (!campaign.revealed_at) return state;
-  return (await read(store, k.campaignResolved(campaign.game_id, campaign.id, 'final'))) ?? state;
-}
 
 /** Hits this player owes a damage report for: a teammate's, still owed, not filed by anyone on the team. */
 function owedHits(state, team, owner, reports) {
@@ -98,7 +93,8 @@ export async function viewFor(store, k, campaign, keys, state, clock, owner, now
   const { team, rival } = sidesOf(campaign, owner);
   const phase = phaseOf(campaign, clock);
   const signs = fleet.callSigns(owner, campaign.joined, hashFor(campaign.secret));
-  const shown = await viewState(store, k, campaign, state);
+  // What this player may see: the final state once revealed; in week mode, nothing from a round before its dawn.
+  const shown = await visibleState(store, k, campaign, state, now);
   const reports = await readTeam(store, k, campaign, team.owners, reportsKey);
   const mine = obj(reports[owner]);
 
@@ -283,10 +279,13 @@ async function commit(ctx, body) {
   if (!variants.length) reject(400, 'bad_square', 'Pick a square on the chart.');
   const key = shotsKey(campaign, k, round, owner);
   const back = state.returns.find((r) => r.owner === owner && r.square === square);
+  // "Already known" goes by what the team can see: in week mode a hit made at last night's cut-off isn't known
+  // until dawn, so firing there is allowed (it resolves as a duplicate) rather than giving the result away.
+  const seen = await visibleState(store, k, campaign, state, now);
   /** Why this shot can't be fired, given the player's shots so far (checked before the hold and again at the write). */
   const refuse = (shots) => {
     if (shots.length >= SHOTS_PER_ROUND) reject(409, 'no_shots', 'You’ve used your four shots this round.');
-    if (obj(state.charts[rival.id])[square]) reject(409, 'known', 'Your team already knows that square. Pick another.');
+    if (obj(seen.charts?.[rival.id])[square]) reject(409, 'known', 'Your team already knows that square. Pick another.');
     if (shots.some((s) => s.square === square)) reject(409, 'fired', 'You’ve fired there this round. Pick another.');
     if (back && back.due > round) reject(409, 'returns_later', `That square comes back to you in round ${back.due}.`);
   };
@@ -483,7 +482,7 @@ export async function signalsFor(store, k, found, owner, now) {
   const team = fleet.teamOf(campaign.pairing, owner);
   if (!team) return [];
   const seen = new Set(list(obj(await read(store, k.campaignSeen(campaign.game_id, campaign.id, owner))).ids));
-  const shown = await viewState(store, k, campaign, state);
+  const shown = await visibleState(store, k, campaign, state, now);
   const events = [];
   const add = (kind, round) => events.push({ id: `${campaign.id}:${kind}:${round}`, kind, line: SIGNAL_LINES[kind], game_id: campaign.game_id, lesson_id: campaign.lesson });
   if (campaign.revealed_at) {
@@ -546,8 +545,16 @@ async function classCampaigns(store, classId) {
   return new Map(found.filter(Boolean).map((x) => [x.campaign.id, x]));
 }
 
+/** Signals across campaigns. One broken campaign is logged and skipped, never a failed page for every student. */
 async function collectSignals(store, campaignsById, owner, now) {
-  const lists = await Promise.all([...campaignsById.values()].map(({ k, campaign }) => signalsFor(store, k, campaign, owner, now)));
+  const lists = await Promise.all([...campaignsById.values()].map(async ({ k, campaign }) => {
+    try {
+      return await signalsFor(store, k, campaign, owner, now);
+    } catch (e) {
+      console.error('fleet week: signals skipped a campaign', campaign?.id, e?.message);
+      return [];
+    }
+  }));
   return { events: lists.flat() };
 }
 

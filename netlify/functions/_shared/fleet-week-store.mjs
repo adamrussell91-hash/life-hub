@@ -272,43 +272,70 @@ async function roundInput(store, k, campaign, round) {
 
 /** A fold that started this long ago and never finished (its request died) may be taken over. */
 export const FOLD_LEASE_MS = 60000;
+/** After a fold fails, wait this long before the next try, doubling each time up to FOLD_BACKOFF_MAX_MS. */
+export const FOLD_BACKOFF_MS = 30000;
+export const FOLD_BACKOFF_MAX_MS = 15 * 60000;
+/** How long after its `tries`-th failure a fold may run again: 30 s, 60 s, 2 min, … up to 15 min. */
+export const foldBackoff = (tries) => Math.min(FOLD_BACKOFF_MAX_MS, FOLD_BACKOFF_MS * 2 ** Math.max(0, (tries ?? 1) - 1));
+
+/** Whether a fold marker lets a fold run now: none yet, a failure past its backoff, or a claim whose request died. */
+function foldDue(mark, now) {
+  if (!mark) return true;
+  if (mark.done) return false;
+  if (mark.failed_at != null) return now >= mark.failed_at + foldBackoff(mark.tries);
+  return now - (mark.at ?? 0) >= FOLD_LEASE_MS;
+}
 
 /**
- * Fold round `r` into the learning data at most once at a time (§4). The
- * `folded/{r}` marker is claimed create-only (or taken over once its lease
- * has run out), the fold runs, and the marker becomes `{ done: true }`. A fold
- * that throws gives its claim back, so the next request tries again. Never
- * throws: a failed fold never stops play. True when this call folded the round.
+ * Fold round `r` into the learning data at most once at a time (§4).
+ *
+ *   folded/{r}   { at, tries?, failed_at?, boxed: { owner: cards } }   claimed or failed
+ *                { done: true, at, boxed }                             folded
+ *
+ * The marker is claimed create-only (or with an etag over a failed or dead
+ * claim). A fold that throws keeps the marker as `{ failed_at, tries }` and is
+ * tried again only after its backoff (30 s, doubling, capped at 15 min), so a
+ * fold that keeps failing never runs on every poll. Each player's box-1 step
+ * is recorded in `boxed` as it succeeds and skipped on a retry, so an organiser
+ * card is never sent back twice. Never throws. True when this call folded the round.
  */
 export async function foldOnce(store, k, campaign, state, r, stored, now) {
   const key = k.campaignFolded(campaign.game_id, campaign.id, r);
   const held = await readWithEtag(store, key);
-  if (held.data?.done || (held.data && now - (held.data.at ?? 0) < FOLD_LEASE_MS)) return false;
-  const claimed = await store.setJSON(key, { at: now }, held.data ? (held.etag ? { onlyIfMatch: held.etag } : {}) : { onlyIfNew: true });
+  if (!foldDue(held.data, now)) return false;
+  const mark = { at: now, tries: held.data?.tries ?? 0, boxed: { ...obj(held.data?.boxed) } };
+  const claimed = await store.setJSON(key, mark, held.data ? (held.etag ? { onlyIfMatch: held.etag } : {}) : { onlyIfNew: true });
   if (claimed?.modified === false) return false;
   try {
-    await foldRound(store, k, campaign, state, r, stored, { now });
-    await store.setJSON(key, { done: true, at: now });
+    await foldRound(store, k, campaign, state, r, stored, {
+      now,
+      boxed: mark.boxed,
+      onBoxed: async (owner, cards) => {
+        mark.boxed = { ...mark.boxed, [owner]: cards };
+        await store.setJSON(key, mark);
+      }
+    });
+    await store.setJSON(key, { done: true, at: now, boxed: mark.boxed });
     return true;
   } catch (e) {
     console.error('fleet week: fold failed', campaign.id, r, e?.message);
     try {
-      await store.delete(key);
+      await store.setJSON(key, { ...mark, failed_at: now, tries: mark.tries + 1 });
     } catch {
-      // The lease runs out on its own.
+      // The claim's lease runs out on its own.
     }
     return false;
   }
 }
 
-/** Retry: fold every resolved firing round that has no `{ done }` marker, in order. One small read per round otherwise. */
+/** Retry: fold every resolved firing round whose marker says a fold is due, in order. One small read per round otherwise. */
 export async function ensureFolded(store, k, campaign, clock, now) {
   const last = Math.min(clock.round - 1, roundsOf(campaign));
   if (last < 1) return;
   const rounds = Array.from({ length: last }, (_, i) => i + 1);
   const marks = await mapBounded(rounds, 8, (r) => read(store, k.campaignFolded(campaign.game_id, campaign.id, r)));
   for (const [i, r] of rounds.entries()) {
-    if (marks[i]?.done) continue;
+    if (!foldDue(marks[i], now)) continue;
     const state = await read(store, k.campaignResolved(campaign.game_id, campaign.id, r));
     if (!state) continue;
     await foldOnce(store, k, campaign, state, r, await roundShots(store, k, campaign, r), now);
@@ -375,14 +402,46 @@ export async function revealCampaign(store, k, campaign, now) {
   return data;
 }
 
+/** The hour a week-mode report reaches students: 'the next morning' (§1.3). */
+export const DAWN = { hh: 6, mm: 0 };
+
 /**
- * ensureResolved, and in week mode the reveal too: it opens by itself once the
- * last firing round has closed and resolved (§1.3). Returns the campaign as it
+ * When round `r`'s results reach students. Week mode: 06:00 on the day after
+ * its cut-off, in the class's time zone. Lesson mode and placement: at once (0).
+ */
+export function dawnAfter(campaign, r) {
+  if (campaign.mode !== 'week' || r < 1) return 0;
+  const close = list(campaign.schedule)[r];
+  if (close == null) return 0;
+  const tz = campaign.settings?.tz ?? FLEET_TZ;
+  const day = dayAfter(tz, close, 1);
+  return zonedInstant(tz, day.y, day.m, day.d, DAWN.hh, DAWN.mm);
+}
+
+/**
+ * The state students may see (§1.3 "reports are ready the next morning"): the
+ * final state once revealed; in week mode, the latest round whose dawn has
+ * passed (a round resolves at its cut-off, but its hits, misses, report and
+ * signals wait for the morning). The teacher always sees the latest state.
+ */
+export async function visibleState(store, k, campaign, state, now) {
+  if (campaign.revealed_at) return (await read(store, k.campaignResolved(campaign.game_id, campaign.id, 'final'))) ?? state;
+  let v = state.round;
+  while (v >= 1 && now < dawnAfter(campaign, v)) v -= 1;
+  if (v === state.round) return state;
+  return (await read(store, k.campaignResolved(campaign.game_id, campaign.id, v))) ?? state;
+}
+
+/**
+ * ensureResolved, and in week mode the reveal too: it opens by itself at dawn
+ * after the last firing round's cut-off (§1.3: the reveal is Friday). Returns the campaign as it
  * now stands with the state and clock.
  */
 export async function ensureCampaign(store, k, campaign, now) {
   const resolved = await ensureResolved(store, k, campaign, now);
   if (campaign.mode !== 'week' || campaign.revealed_at || campaign.closed_at || resolved.clock.round <= roundsOf(campaign)) return { campaign, ...resolved };
+  // Week mode: the fog lifts at dawn after the last cut-off (Friday morning in a normal week).
+  if (now < dawnAfter(campaign, roundsOf(campaign))) return { campaign, ...resolved };
   return { campaign: await revealCampaign(store, k, campaign, now), ...resolved };
 }
 

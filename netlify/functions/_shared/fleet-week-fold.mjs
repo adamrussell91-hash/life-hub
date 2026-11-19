@@ -71,7 +71,7 @@ const fleetTeamOf = (campaign, owner) => list(campaign.pairing?.teams).find((t) 
  * Fold round `round` of `state` (just resolved) into the game events. `stored`
  * is every owner's stored shots for that round (answers, deadlines, times).
  */
-export async function foldRound(store, k, campaign, state, round, stored, { now = Date.now() } = {}) {
+export async function foldRound(store, k, campaign, state, round, stored, { now = Date.now(), boxed: boxedBefore = {}, onBoxed = async () => {} } = {}) {
   const results = list(state.log?.find((l) => l.round === round)?.results);
   if (!results.length) return { plays: 0 };
   const record = await read(store, k.version(campaign.version));
@@ -98,15 +98,25 @@ export async function foldRound(store, k, campaign, state, round, stored, { now 
     const evidence = eventsToEvidence(keys, events);
     const score = { ...playScore(evidence), total: gameTotal(keys) };
     // Duds this round on a square whose item carries a knowledge piece: that organiser card goes back to box 1.
-    const pieces = [...new Set(mine.filter((r) => r.outcome === 'dud').flatMap((r) => piecesOf(keys.items?.[r.item])))];
-    const boxed = roster && student && pieces.length ? await sendPiecesToBoxOne(store, roster, student, pieces, { now: new Date(now) }) : 0;
+    // Every wrong answer this round (a dud, and a wrong practice or duplicate shot too; never a voided one) on an
+    // item that carries a knowledge piece: that organiser card goes back to box 1. Once per player per round:
+    // a retried fold finds the player in `boxedBefore` and skips the step.
+    let boxed = boxedBefore[owner];
+    if (boxed === undefined) {
+      const wrong = mine.filter((r) => r.outcome !== 'void' && !r.voided && r.correct !== true);
+      const pieces = [...new Set(wrong.flatMap((r) => piecesOf(keys.items?.[r.item])))];
+      boxed = roster && student && pieces.length ? await sendPiecesToBoxOne(store, roster, student, pieces, { now: new Date(now) }) : 0;
+      await onBoxed(owner, boxed);
+    }
     const playKey = k.play(campaign.game_id, playId);
     const prev = obj(await read(store, playKey));
     await store.setJSON(playKey, {
       play_id: playId, game_id: campaign.game_id, kind: 'fleet_week', mode: playModeFor(campaign), campaign_id: campaign.id,
       class_id: campaign.class_id, owner, ...(studentId ? { student_id: studentId } : {}), version: campaign.version,
       started_at: iso(campaign.created_at), ended_at: iso(Math.max(...events.map((e) => e.at))), folded: true, score,
-      boxed: (prev.boxed ?? 0) + boxed, rounds: [...new Set([...list(prev.rounds), round])].sort((a, b) => a - b)
+      // Cards sent to box 1, by round, so a re-fold of a round counts it once.
+      boxed_by_round: { ...obj(prev.boxed_by_round), [round]: boxed },
+      boxed: Object.values({ ...obj(prev.boxed_by_round), [round]: boxed }).reduce((n, b) => n + (Number(b) || 0), 0), rounds: [...new Set([...list(prev.rounds), round])].sort((a, b) => a - b)
     });
     plays += 1;
   }
