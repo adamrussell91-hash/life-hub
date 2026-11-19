@@ -24,6 +24,7 @@ import { keepMinutesDecisions, saveMinutesReview } from '@/lib/meeting-minutes';
 import { mountMinutesCard } from '@/views/meeting-minutes-card';
 import { askConfirm, createRecordingModel, mountRecordingStrip } from '@/views/meeting-recording-strip';
 import { mountRecordingCard } from '@/views/meeting-recording-card';
+import { mountRecordingUpload } from '@/views/meeting-recording-upload';
 import { directoryRowFor, groupRoom, indexDirectory, initialsFor, isSelfAttendee, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
 import { fetchSelfPerson } from '@/api/network-ecology';
 import { createPillGroup } from '@/lib/pills';
@@ -444,6 +445,7 @@ export async function renderMeetingPage(
     .split('\n').map((line) => line.trim()).filter(Boolean);
   const recModel = createRecordingModel(id);
   const recStrip = mountRecordingStrip({ meetingId: id, kind: 'meeting', people: recAttendees, room: false, notes: noteLines, model: recModel });
+  const recUpload = mountRecordingUpload({ meetingId: id, kind: 'meeting', people: recAttendees, room: false, notes: noteLines, model: recModel });
   const recCard = mountRecordingCard({
     meetingId: id,
     kind: 'meeting',
@@ -1153,7 +1155,7 @@ export async function renderMeetingPage(
   }
 
   function paintDuring(): void {
-    main.append(liveStrip(), recStrip.below, minutesCard(), actions, mentions);
+    main.append(liveStrip(), recStrip.below, minutesCard(), recUpload.el, actions, mentions);
     full.append(notesCard(
       'Notes',
       'Start a line with »me to log something you owe, »Name for something they owe, ✓ for a decision, @Name for who said what.'
@@ -1165,7 +1167,7 @@ export async function renderMeetingPage(
   function paintAfter(): void {
     // Still recording after the meeting moved to After: the controls stay in reach.
     if (recStrip.isActive()) main.append(liveStrip(), recStrip.below);
-    main.append(recCard.el, minutesCard());
+    main.append(recCard.el, minutesCard(), recUpload.el);
     if (record.purpose) main.append(purposeCheckCard());
     main.append(wrapUpCard(), actions, mentions);
     full.append(notesCard('Notes', 'Your notes from the meeting. Still editable.'));

@@ -330,13 +330,13 @@ describe('meeting page', () => {
     expect(canvas.querySelector('[data-part="clare-brief"]')!.textContent).toContain('Rachel wants the date locked');
 
     canvas.querySelector<HTMLButtonElement>('[data-set-phase="during"]')!.click();
-    expect(parts()).toEqual(['live-strip', 'minutes', 'actions', 'mentions']);
+    expect(parts()).toEqual(['live-strip', 'minutes', 'rec-upload', 'actions', 'mentions']);
     expect(fullParts()).toEqual(['notes']);
     expect(notesHeading()).toBe('Notes');
     expect(canvas.querySelector('[data-part="live-strip"]')!.textContent).toContain('30 min in · 45 min left');
 
     canvas.querySelector<HTMLButtonElement>('[data-set-phase="after"]')!.click();
-    expect(parts()).toEqual(['minutes', 'purpose-check-card', 'wrap-up', 'actions', 'mentions']);
+    expect(parts()).toEqual(['minutes', 'rec-upload', 'purpose-check-card', 'wrap-up', 'actions', 'mentions']);
     expect(fullParts()).toEqual(['notes']);
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-preparation"]')!.hidden).toBe(true);
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-follow_up"]')!.hidden).toBe(false);
