@@ -26,7 +26,8 @@ const SVG: Record<GameKind, { tone: 1 | 2 | 3 | 4; paths: string }> = {
   articulate: { tone: 3, paths: '<path d="M5 7h22v13H13l-6 5v-5H5z" fill="currentColor"/>' },
   pictionary: { tone: 2, paths: '<path d="M6 26l3-8L22 5l5 5L14 23z" fill="currentColor"/>' },
   who_said_it: { tone: 4, paths: '<path d="M7 9h8v8c0 4-3 6-6 6M17 9h8v8c0 4-3 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4"/>' },
-  answer_chain: { tone: 2, paths: '<g fill="none" stroke="currentColor" stroke-width="2.4"><rect x="3" y="11" width="12" height="10" rx="5"/><rect x="17" y="11" width="12" height="10" rx="5"/><path d="M12 16h8"/></g>' }
+  answer_chain: { tone: 2, paths: '<g fill="none" stroke="currentColor" stroke-width="2.4"><rect x="3" y="11" width="12" height="10" rx="5"/><rect x="17" y="11" width="12" height="10" rx="5"/><path d="M12 16h8"/></g>' },
+  fleet_week: { tone: 2, paths: '<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4v16"/><path d="M16 6l8 11h-8"/><path d="M4 21h24l-4 6H8z"/></g>' }
 };
 
 /** One line on what each game is, for the kind picker (from the mockups). */
@@ -43,7 +44,8 @@ export const GAME_KIND_BLURB: Record<GameKind, string> = {
   articulate: 'Describe the term without the banned words.',
   pictionary: 'Draw a term or a moment; the class guesses.',
   who_said_it: 'Pick the character, or call out a fake quote.',
-  answer_chain: 'Teams grow question–answer chains. Shadow, steal, capture.'
+  answer_chain: 'Teams grow question–answer chains. Shadow, steal, capture.',
+  fleet_week: 'A week-long hunt: every square is a question.'
 };
 
 /** The glyph tile for a kind. `size` 'lg' is the arcade card's 56px tile. */

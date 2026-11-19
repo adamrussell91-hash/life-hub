@@ -346,7 +346,8 @@ var GAME_KINDS = [
   "articulate",
   "pictionary",
   "who_said_it",
-  "answer_chain"
+  "answer_chain",
+  "fleet_week"
 ];
 var GameKindSchema = z3.enum(GAME_KINDS);
 var GAME_KIND_INFO = {
@@ -362,7 +363,8 @@ var GAME_KIND_INFO = {
   articulate: { label: "Articulate", solo: false, live: true, team: true, shapes: ["term"] },
   pictionary: { label: "Pictionary", solo: false, live: true, team: false, shapes: ["term", "quote"] },
   who_said_it: { label: "Who said it?", solo: true, live: true, team: false, shapes: ["quote"] },
-  answer_chain: { label: "Answer chain", solo: false, live: true, team: true, shapes: [] }
+  answer_chain: { label: "Answer chain", solo: false, live: true, team: true, shapes: [] },
+  fleet_week: { label: "Fleet week", solo: false, live: false, team: true, shapes: ["question"] }
 };
 var GAME_LIMITS = {
   games: 8,
@@ -386,6 +388,7 @@ var GAME_LIMITS = {
   category: 40,
   /** Letters in a Wheel puzzle (A–Z only). */
   wheelLetters: 60,
+  fleetLabel: 40,
   wheelText: 120,
   message: 40,
   prompt: 1e3,
@@ -621,6 +624,25 @@ var WhoSaidItSchema = z3.object({
   items: z3.array(QuoteItemSchema).max(GAME_COUNTS.who_said_it.max).default([]),
   settings: z3.object({ seconds: Seconds(10, 60, 20) }).prefault({})
 });
+var FLEET_SIZE = 5;
+var FleetSquareSchema = z3.object({ variants: z3.array(QuestionItemSchema).max(2).default([]) });
+var FleetWeekSchema = z3.object({
+  ...base2,
+  kind: z3.literal("fleet_week"),
+  columns: z3.array(z3.string().max(GAME_LIMITS.fleetLabel)).max(FLEET_SIZE).default([]),
+  rows: z3.array(z3.string().max(GAME_LIMITS.fleetLabel)).max(FLEET_SIZE).default([]),
+  /** Row-major, index = row * 5 + col. */
+  squares: z3.array(FleetSquareSchema).max(FLEET_SIZE * FLEET_SIZE).default([]),
+  /** recall[i] is ship s{i}'s line (sizes 3, 2, 2, 1). */
+  recall: z3.array(QuestionItemSchema).max(4).default([]),
+  settings: z3.object({
+    rounds: z3.number().int().min(2).max(8).default(5),
+    round_cap_s: z3.number().int().min(60).max(600).default(240),
+    placement_cap_s: z3.number().int().min(30).max(300).default(120),
+    answer_s: z3.number().int().min(20).max(120).default(60),
+    cutoff: z3.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default("20:00")
+  }).prefault({})
+});
 var GameSchema = z3.discriminatedUnion("kind", [
   CrosswordSchema,
   FindAWordSchema,
@@ -634,7 +656,8 @@ var GameSchema = z3.discriminatedUnion("kind", [
   ArticulateSchema,
   PictionarySchema,
   WhoSaidItSchema,
-  AnswerChainSchema
+  AnswerChainSchema,
+  FleetWeekSchema
 ]);
 var GameLessonSchema = z3.object({
   games: z3.array(GameSchema).max(GAME_LIMITS.games).default([]),
@@ -675,7 +698,10 @@ var PublicGameSchema = z3.object({
   cast: z3.array(CastMemberSchema.pick({ id: true, name: true, emblem: true, image_url: true })).optional(),
   message: z3.object({ length: z3.number().int(), question: z3.record(z3.string(), z3.unknown()).optional() }).optional(),
   /** Crossword and find-a-word: the grid, built at publish. */
-  grid: PublicGridSchema.optional()
+  grid: PublicGridSchema.optional(),
+  /** Fleet week: the grid's axis labels (the questions stay on the server). */
+  columns: z3.array(z3.string()).optional(),
+  rows: z3.array(z3.string()).optional()
 });
 var PublicGameLessonSchema = z3.object({
   games: z3.array(PublicGameSchema).max(GAME_LIMITS.games),
@@ -694,7 +720,10 @@ export {
   ConnectionsWallSchema,
   CrosswordSchema,
   FAKE_SPEAKER,
+  FLEET_SIZE,
   FindAWordSchema,
+  FleetSquareSchema,
+  FleetWeekSchema,
   GAME_COUNTS,
   GAME_KINDS,
   GAME_KIND_INFO,

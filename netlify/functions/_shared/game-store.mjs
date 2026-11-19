@@ -17,7 +17,16 @@ export const gameKeys = (lesson) => ({
   summary: (game, cls) => `games/${lesson}/${game}/summary/${cls}`,
   /** Live rooms opened for a game (game-rooms.mjs): { room, code, class_id, version, opened_at, folded }. */
   rooms: (game) => `games/${lesson}/${game}/rooms/`,
-  room: (game, room) => `games/${lesson}/${game}/rooms/${room}`
+  room: (game, room) => `games/${lesson}/${game}/rooms/${room}`,
+  /** Fleet week campaigns (fleet-week-store.mjs). Campaign ids are 16 hex, so never 'current'. */
+  campaign: (game, id) => `games/${lesson}/${game}/campaigns/${id}`,
+  campaignCurrent: (game, cls) => `games/${lesson}/${game}/campaigns/current/${cls}`,
+  campaignClock: (game, id) => `games/${lesson}/${game}/campaigns/${id}/clock`,
+  campaignFleet: (game, id, owner) => `games/${lesson}/${game}/campaigns/${id}/fleet/${owner}`,
+  campaignShots: (game, id, round, owner) => `games/${lesson}/${game}/campaigns/${id}/shots/${round}/${owner}`,
+  campaignResolved: (game, id, round) => `games/${lesson}/${game}/campaigns/${id}/resolved/${round}`,
+  campaignReports: (game, id, owner) => `games/${lesson}/${game}/campaigns/${id}/reports/${owner}`,
+  campaignSeen: (game, id, owner) => `games/${lesson}/${game}/campaigns/${id}/seen/${owner}`
 });
 
 /** A live room's join code → where it is. Freed when the room folds, or once it is 6 h old. */

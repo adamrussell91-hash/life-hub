@@ -1,4 +1,9 @@
 // Generated from apps/teaching/src/games/core/server-entry.ts; regenerate with scripts/generate-alchemy-schema.mjs.
+var __defProp = Object.defineProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 
 // apps/teaching/src/quiz/core.ts
 import { z as z2 } from "zod";
@@ -768,7 +773,8 @@ var GAME_KINDS = [
   "articulate",
   "pictionary",
   "who_said_it",
-  "answer_chain"
+  "answer_chain",
+  "fleet_week"
 ];
 var GameKindSchema = z3.enum(GAME_KINDS);
 var GAME_KIND_INFO = {
@@ -784,7 +790,8 @@ var GAME_KIND_INFO = {
   articulate: { label: "Articulate", solo: false, live: true, team: true, shapes: ["term"] },
   pictionary: { label: "Pictionary", solo: false, live: true, team: false, shapes: ["term", "quote"] },
   who_said_it: { label: "Who said it?", solo: true, live: true, team: false, shapes: ["quote"] },
-  answer_chain: { label: "Answer chain", solo: false, live: true, team: true, shapes: [] }
+  answer_chain: { label: "Answer chain", solo: false, live: true, team: true, shapes: [] },
+  fleet_week: { label: "Fleet week", solo: false, live: false, team: true, shapes: ["question"] }
 };
 var GAME_LIMITS = {
   games: 8,
@@ -808,6 +815,7 @@ var GAME_LIMITS = {
   category: 40,
   /** Letters in a Wheel puzzle (A–Z only). */
   wheelLetters: 60,
+  fleetLabel: 40,
   wheelText: 120,
   message: 40,
   prompt: 1e3,
@@ -1042,6 +1050,25 @@ var WhoSaidItSchema = z3.object({
   items: z3.array(QuoteItemSchema).max(GAME_COUNTS.who_said_it.max).default([]),
   settings: z3.object({ seconds: Seconds(10, 60, 20) }).prefault({})
 });
+var FLEET_SIZE = 5;
+var FleetSquareSchema = z3.object({ variants: z3.array(QuestionItemSchema).max(2).default([]) });
+var FleetWeekSchema = z3.object({
+  ...base2,
+  kind: z3.literal("fleet_week"),
+  columns: z3.array(z3.string().max(GAME_LIMITS.fleetLabel)).max(FLEET_SIZE).default([]),
+  rows: z3.array(z3.string().max(GAME_LIMITS.fleetLabel)).max(FLEET_SIZE).default([]),
+  /** Row-major, index = row * 5 + col. */
+  squares: z3.array(FleetSquareSchema).max(FLEET_SIZE * FLEET_SIZE).default([]),
+  /** recall[i] is ship s{i}'s line (sizes 3, 2, 2, 1). */
+  recall: z3.array(QuestionItemSchema).max(4).default([]),
+  settings: z3.object({
+    rounds: z3.number().int().min(2).max(8).default(5),
+    round_cap_s: z3.number().int().min(60).max(600).default(240),
+    placement_cap_s: z3.number().int().min(30).max(300).default(120),
+    answer_s: z3.number().int().min(20).max(120).default(60),
+    cutoff: z3.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default("20:00")
+  }).prefault({})
+});
 var GameSchema = z3.discriminatedUnion("kind", [
   CrosswordSchema,
   FindAWordSchema,
@@ -1055,7 +1082,8 @@ var GameSchema = z3.discriminatedUnion("kind", [
   ArticulateSchema,
   PictionarySchema,
   WhoSaidItSchema,
-  AnswerChainSchema
+  AnswerChainSchema,
+  FleetWeekSchema
 ]);
 var GameLessonSchema = z3.object({
   games: z3.array(GameSchema).max(GAME_LIMITS.games).default([]),
@@ -1096,7 +1124,10 @@ var PublicGameSchema = z3.object({
   cast: z3.array(CastMemberSchema.pick({ id: true, name: true, emblem: true, image_url: true })).optional(),
   message: z3.object({ length: z3.number().int(), question: z3.record(z3.string(), z3.unknown()).optional() }).optional(),
   /** Crossword and find-a-word: the grid, built at publish. */
-  grid: PublicGridSchema.optional()
+  grid: PublicGridSchema.optional(),
+  /** Fleet week: the grid's axis labels (the questions stay on the server). */
+  columns: z3.array(z3.string()).optional(),
+  rows: z3.array(z3.string()).optional()
 });
 var PublicGameLessonSchema = z3.object({
   games: z3.array(PublicGameSchema).max(GAME_LIMITS.games),
@@ -1116,10 +1147,10 @@ function seededRandom(seed) {
     return ((t ^ t >>> 14) >>> 0) / 4294967296;
   };
 }
-function shuffleWith(list, rng) {
+function shuffleWith(list, rng2) {
   const out = [...list];
   for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
+    const j = Math.floor(rng2() * (i + 1));
     [out[i], out[j]] = [out[j], out[i]];
   }
   return out;
@@ -1222,8 +1253,8 @@ var Board = class {
     }
     Object.assign(this, { minX, minY, maxX, maxY });
   }
-  candidates(id, word, rng) {
-    if (this.empty) return [{ id, word, x: 0, y: 0, dir: "across", crossings: 0, area: word.length, tie: rng() }];
+  candidates(id, word, rng2) {
+    if (this.empty) return [{ id, word, x: 0, y: 0, dir: "across", crossings: 0, area: word.length, tie: rng2() }];
     const seen = /* @__PURE__ */ new Set();
     const out = [];
     for (const [k, cell] of this.cells) {
@@ -1242,7 +1273,7 @@ var Board = class {
         const ex = dir === "across" ? x + word.length - 1 : x;
         const ey = dir === "down" ? y + word.length - 1 : y;
         const area = (Math.max(this.maxX, ex) - Math.min(this.minX, x) + 1) * (Math.max(this.maxY, ey) - Math.min(this.minY, y) + 1);
-        out.push({ id, word, x, y, dir, crossings, area, tie: rng() });
+        out.push({ id, word, x, y, dir, crossings, area, tie: rng2() });
       }
     }
     return out.sort((a, b) => b.crossings - a.crossings || a.area - b.area || a.tie - b.tie);
@@ -1259,11 +1290,11 @@ function generateCrossword(words, seed, options = {}) {
   const attempts = options.attempts ?? 10;
   const budget = options.budget ?? 1500;
   const branch = options.branch ?? 3;
-  const rng = seededRandom(seed);
+  const rng2 = seededRandom(seed);
   const usable = words.filter((w) => /^[A-Z]{2,}$/.test(w.word) && w.word.length <= max);
   let best = null;
   for (let attempt2 = 0; attempt2 < attempts; attempt2++) {
-    const order = shuffleWith(usable, rng).map((w) => ({ w, k: w.word.length + (attempt2 ? (rng() - 0.5) * Math.min(attempt2, 4) : 0) })).sort((a, b) => b.k - a.k).map((x) => x.w);
+    const order = shuffleWith(usable, rng2).map((w) => ({ w, k: w.word.length + (attempt2 ? (rng2() - 0.5) * Math.min(attempt2, 4) : 0) })).sort((a, b) => b.k - a.k).map((x) => x.w);
     const board = new Board(max);
     let nodes = 0;
     const record = () => {
@@ -1278,7 +1309,7 @@ function generateCrossword(words, seed, options = {}) {
         return board.placed.length === usable.length;
       }
       const [next, ...rest] = queue;
-      const options2 = board.candidates(next.id, next.word, rng).slice(0, branch);
+      const options2 = board.candidates(next.id, next.word, rng2).slice(0, branch);
       if (!options2.length && !next.deferred && rest.length) return search([...rest, { ...next, deferred: true }]);
       for (const c of options2) {
         const fresh = board.place(c);
@@ -1403,14 +1434,14 @@ function strayCopies(rows, placements) {
   }
   return out;
 }
-function fillerPicker(words, rng) {
+function fillerPicker(words, rng2) {
   const weight = /* @__PURE__ */ new Map();
   for (const ch of "ABCDEFGHIJKLMNOPRSTUVWY") weight.set(ch, 1);
   for (const w of words) for (const ch of w) weight.set(ch, (weight.get(ch) ?? 0) + 3);
   const letters = [...weight.entries()];
   const total = letters.reduce((n, [, v]) => n + v, 0);
   return () => {
-    let r = rng() * total;
+    let r = rng2() * total;
     for (const [ch, v] of letters) {
       r -= v;
       if (r < 0) return ch;
@@ -1418,7 +1449,7 @@ function fillerPicker(words, rng) {
     return "E";
   };
 }
-function attempt(size, input, rng) {
+function attempt(size, input, rng2) {
   const dirs = input.directions === "easy" ? DIRECTIONS_EASY : DIRECTIONS_ALL;
   const grid = Array(size * size).fill(null);
   const placements = [];
@@ -1441,25 +1472,25 @@ function attempt(size, input, rng) {
             if (held === word[i]) overlap += 1;
             else ok = false;
           }
-          if (ok && overlap < word.length) spots.push({ x, y, dx, dy, overlap, tie: rng() });
+          if (ok && overlap < word.length) spots.push({ x, y, dx, dy, overlap, tie: rng2() });
         }
       }
     }
     if (!spots.length) return false;
     const sharing = spots.filter((s) => s.overlap > 0);
-    const pool = sharing.length && rng() < 0.5 ? sharing : spots;
+    const pool = sharing.length && rng2() < 0.5 ? sharing : spots;
     const pick = pool.reduce((a, b) => b.tie < a.tie ? b : a);
     const p = make(pick.x, pick.y, pick.dx, pick.dy);
     for (let i = 0; i < word.length; i++) grid[(p.y + p.dy * i) * size + p.x + p.dx * i] = word[i];
     placements.push(p);
     return true;
   };
-  const words = shuffleWith(input.words, rng).sort((a, b) => b.word.length - a.word.length);
+  const words = shuffleWith(input.words, rng2).sort((a, b) => b.word.length - a.word.length);
   for (const w of words) {
     if (w.word.length > size || !tryPlace(w.word, (x, y, dx, dy) => ({ id: w.id, owner: w.id, word: w.word, x, y, dx, dy, decoy: false }))) unplaced.push(w.id);
   }
   const placedWords = new Set(placements.map((p) => p.word));
-  for (const d of shuffleWith(input.decoys ?? [], rng)) {
+  for (const d of shuffleWith(input.decoys ?? [], rng2)) {
     if (answerWords.has(d.word) || placedWords.has(d.word)) continue;
     if (d.word.length > size || !tryPlace(d.word, (x, y, dx, dy) => ({ id: null, owner: d.owner, word: d.word, x, y, dx, dy, decoy: true }))) decoysUnplaced.push(d.word);
     else placedWords.add(d.word);
@@ -1473,7 +1504,7 @@ function attempt(size, input, rng) {
     grid[cell] = message[i];
   });
   const fillerCells = free.slice(msgCells.length);
-  const filler = fillerPicker([...placements.map((p) => p.word)], rng);
+  const filler = fillerPicker([...placements.map((p) => p.word)], rng2);
   for (const cell of fillerCells) grid[cell] = filler();
   const rowsOf = () => Array.from({ length: size }, (_, y) => grid.slice(y * size, y * size + size).join(""));
   let rows = rowsOf();
@@ -1484,7 +1515,7 @@ function attempt(size, input, rng) {
     for (const occ of stray) {
       const loose = occ.cells.filter((c2) => fillerSet.has(c2));
       if (!loose.length) continue;
-      const c = loose[Math.floor(rng() * loose.length)];
+      const c = loose[Math.floor(rng2() * loose.length)];
       const [x, y] = c.split(",").map(Number);
       grid[y * size + x] = filler();
       changed = true;
@@ -1510,7 +1541,7 @@ function attempt(size, input, rng) {
   };
 }
 function generateWordSearch(input) {
-  const rng = seededRandom(input.seed);
+  const rng2 = seededRandom(input.seed);
   const words = input.words.filter((w) => /^[A-Z]+$/.test(w.word));
   const decoys = (input.decoys ?? []).filter((d) => /^[A-Z]{2,}$/.test(d.word));
   const clean = { ...input, words, decoys, message: (input.message ?? "").replace(/[^A-Z]/g, "") };
@@ -1523,7 +1554,7 @@ function generateWordSearch(input) {
   let best = null;
   for (let size = start; size <= WORDSEARCH_MAX; size++) {
     for (let i = 0; i < perSize; i++) {
-      const a = attempt(size, clean, rng);
+      const a = attempt(size, clean, rng2);
       if (!best || a.score > best.score) best = a;
       if (a.score >= perfect) return { ...a.layout, unplaced: input.words.filter((w) => !words.includes(w) || a.layout.unplaced.includes(w.id)).map((w) => w.id) };
     }
@@ -1606,6 +1637,8 @@ function gameItems(game) {
       return game.puzzles.flatMap((p) => [...p.bank, ...p.explain ? [p.explain] : []]);
     case "connections":
       return game.walls.flatMap((w) => w.groups);
+    case "fleet_week":
+      return [...game.squares.flatMap((sq) => sq.variants), ...game.recall];
     case "battles":
     case "answer_chain":
       return [];
@@ -1808,6 +1841,13 @@ function gameIssues(lesson) {
         if (game.items.length >= GAME_COUNTS.team_match.min && distinct.size < 12) out.push(`${where} needs at least 12 different answers.`);
         break;
       }
+      case "fleet_week": {
+        if (game.squares.length < 25 || game.squares.some((sq) => sq.variants.length === 0)) out.push(`${where} needs all 25 squares filled.`);
+        const labelled = (l) => l.length === 5 && l.every((x) => x.trim());
+        if (!labelled(game.columns) || !labelled(game.rows)) out.push(`${where} needs five row and five column labels.`);
+        if (game.recall.length < 4) out.push(`${where} needs a recall line for each of the four ships.`);
+        break;
+      }
       case "answer_chain":
         if (!game.start_answer.trim()) out.push(`${where}: give the answer every chain starts from.`);
         break;
@@ -1848,6 +1888,11 @@ function gameWarnings(lesson) {
     const items = gameItems(game);
     const untagged = items.filter((x) => !hasTags(x, x.shape === "question" ? x.question : void 0)).length;
     if (untagged) out.push(`${where}: ${untagged} ${untagged === 1 ? "item has" : "items have"} no tags, so ${untagged === 1 ? "it" : "they"} won\u2019t show in Results by knowledge piece.`);
+    if (game.kind === "fleet_week") {
+      game.squares.forEach((sq, si) => {
+        if (sq.variants.length === 1) out.push(`${where}: square ${"ABCDE"[Math.floor(si / 5)]}${si % 5 + 1} has only one question, so partners may share answers.`);
+      });
+    }
     if (game.kind === "articulate") {
       for (const t of game.items) {
         const term = normaliseAnswer(t.term);
@@ -2015,6 +2060,7 @@ function splitGame(game, random = Math.random) {
     count = pubItems.length;
   }
   if (game.kind === "battles" || game.kind === "answer_chain") count = 1;
+  if (game.kind === "fleet_week") count = 25;
   if (!info.solo && pubItems.length) {
     keys.live = { items: pubItems };
     if (game.kind === "jeopardy") {
@@ -2041,6 +2087,17 @@ function splitGame(game, random = Math.random) {
     }
     keys.live = { items: keys.live?.items ?? pubItems, ...keys.live, cards };
   }
+  if (game.kind === "fleet_week") {
+    keys.live = {
+      items: pubItems,
+      fleet: {
+        columns: game.columns.map((c) => c.trim()),
+        rows: game.rows.map((r) => r.trim()),
+        squares: game.squares.map((sq) => sq.variants.map((v) => v.id)),
+        recall: game.recall.map((r) => r.id)
+      }
+    };
+  }
   if (game.kind === "answer_chain") {
     keys.live = { items: [], chain: { start: game.start_answer.trim(), theme: game.theme.trim(), tags: evidenceTags(game) } };
   }
@@ -2063,7 +2120,8 @@ function splitGame(game, random = Math.random) {
     ...info.solo && walls ? { walls } : {},
     ...info.solo && game.kind === "who_said_it" ? { cast: game.cast.map(({ id, name, emblem, image_url }) => ({ id, name: name.trim(), ...emblem ? { emblem } : {}, ...image_url ? { image_url } : {} })) } : {},
     ...info.solo && message ? { message } : {},
-    ...info.solo && grid ? { grid } : {}
+    ...info.solo && grid ? { grid } : {},
+    ...game.kind === "fleet_week" ? { columns: game.columns.map((c) => c.trim()), rows: game.rows.map((r) => r.trim()) } : {}
   };
   return { public: pub, keys };
 }
@@ -2252,6 +2310,428 @@ function quotePoints(correct, fake, ms, seconds) {
   const share = Math.max(0, 1 - ms / Math.max(1, seconds * 1e3));
   return (100 + Math.round(share * 10) * 10) * (fake ? 2 : 1);
 }
+
+// apps/teaching/src/games/kinds/fleet-week/rules.ts
+var rules_exports = {};
+__export(rules_exports, {
+  DAMAGE: () => DAMAGE,
+  GHOST_ID: () => GHOST_ID,
+  GRID: () => GRID2,
+  NAMES: () => NAMES,
+  RANKS: () => RANKS,
+  SHIP_IDS: () => SHIP_IDS,
+  SHIP_SIZES: () => SHIP_SIZES,
+  SQUARES: () => SQUARES,
+  autoPlace: () => autoPlace,
+  callSigns: () => callSigns,
+  colOf: () => colOf,
+  emptyState: () => emptyState,
+  fnv1a: () => fnv1a,
+  halfDamage: () => halfDamage,
+  matchOf: () => matchOf,
+  pairTeams: () => pairTeams,
+  pickVariant: () => pickVariant,
+  placementProblem: () => placementProblem,
+  resolveRound: () => resolveRound,
+  rivalOf: () => rivalOf,
+  rng: () => rng,
+  rowOf: () => rowOf,
+  settleAll: () => settleAll,
+  shipLine: () => shipLine,
+  shipsFor: () => shipsFor,
+  squareLabel: () => squareLabel,
+  standings: () => standings,
+  teamOf: () => teamOf
+});
+var GRID2 = 5;
+var SQUARES = GRID2 * GRID2;
+var ROW_LETTERS = "ABCDE";
+var SHIP_SIZES = [3, 2, 2, 1];
+var SHIP_IDS = ["s0", "s1", "s2", "s3"];
+function fnv1a(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function rng(seed) {
+  return seededRandom(fnv1a(seed));
+}
+function rowOf(i) {
+  return Math.floor(i / GRID2);
+}
+function colOf(i) {
+  return i % GRID2;
+}
+function onGrid(i) {
+  return Number.isInteger(i) && i >= 0 && i < SQUARES;
+}
+function squareLabel(i) {
+  return onGrid(i) ? `${ROW_LETTERS[rowOf(i)]}${colOf(i) + 1}` : "?";
+}
+function neighbours(i) {
+  const out = [];
+  if (rowOf(i) > 0) out.push(i - GRID2);
+  if (rowOf(i) < GRID2 - 1) out.push(i + GRID2);
+  if (colOf(i) > 0) out.push(i - 1);
+  if (colOf(i) < GRID2 - 1) out.push(i + 1);
+  return out;
+}
+function shipLine(start, size, dir) {
+  if (!onGrid(start) || size < 1) return null;
+  if (dir === "h" && colOf(start) + size > GRID2) return null;
+  if (dir === "v" && rowOf(start) + size > GRID2) return null;
+  return Array.from({ length: size }, (_, k) => start + k * (dir === "h" ? 1 : GRID2));
+}
+function sizeOf(id) {
+  return SHIP_SIZES[SHIP_IDS.indexOf(id)];
+}
+function shipsFor(team, owner) {
+  const at = team.owners.indexOf(owner);
+  if (at < 0) return [];
+  const split = team.owners.length === 3 ? [["s0"], ["s1", "s3"], ["s2"]] : [["s0", "s3"], ["s1", "s2"]];
+  return split[at] ? [...split[at]] : [];
+}
+function isStraight(squares) {
+  if (squares.length <= 1) return true;
+  const sorted = [...squares].sort((a, b) => a - b);
+  const step = sorted[1] - sorted[0];
+  if (step !== 1 && step !== GRID2) return false;
+  return sorted.every((s, k) => k === 0 || s - sorted[k - 1] === step);
+}
+function staysOnChart(squares) {
+  if (!squares.every(onGrid)) return false;
+  const sorted = [...squares].sort((a, b) => a - b);
+  const sideways = sorted.length > 1 && sorted[1] - sorted[0] === 1;
+  return !sideways || sorted.every((s) => rowOf(s) === rowOf(sorted[0]));
+}
+function placementProblem(ships, owner, team, fleet) {
+  const mine = shipsFor(team, owner);
+  const ids = ships.map((s) => s.id);
+  const complete = mine.length > 0 && ids.length === mine.length && mine.every((id) => ids.includes(id)) && ships.every((s) => s.squares.length === sizeOf(s.id));
+  if (!complete) return "Place each of your ships.";
+  if (!ships.every((s) => isStraight(s.squares))) return "Ships go in a straight line.";
+  if (!ships.every((s) => staysOnChart(s.squares))) return "That ship would leave the chart.";
+  const partner = fleet.filter((s) => !mine.includes(s.id)).flatMap((s) => s.squares);
+  const own = ships.flatMap((s) => s.squares);
+  if (new Set(own).size !== own.length || own.some((s) => partner.includes(s))) return "Ships can\u2019t overlap.";
+  if (own.some((s) => neighbours(s).some((n) => partner.includes(n)))) return "Keep a square of sea between your ships and your partner\u2019s.";
+  return null;
+}
+var TOUCH_TRIES = 200;
+function autoPlace(ids, fleet, partnerSquares, random) {
+  const taken = new Set(fleet.flatMap((s) => s.squares));
+  const nearPartner = new Set(partnerSquares.flatMap((s) => [s, ...neighbours(s)]));
+  const options = ids.map((id) => {
+    const lines2 = [];
+    for (let start = 0; start < SQUARES; start++) {
+      for (const dir of sizeOf(id) === 1 ? ["h"] : ["h", "v"]) {
+        const line = shipLine(start, sizeOf(id), dir);
+        if (line && !line.some((s) => taken.has(s))) lines2.push(line);
+      }
+    }
+    return shuffleWith(lines2, random);
+  });
+  const search = (keepTouch, budget) => {
+    let tries = 0;
+    const chosen = [];
+    const used = /* @__PURE__ */ new Set();
+    const step = (k) => {
+      if (k === ids.length) return true;
+      for (const line of options[k]) {
+        if (++tries > budget) return false;
+        if (line.some((s) => used.has(s) || keepTouch && nearPartner.has(s))) continue;
+        chosen.push(line);
+        line.forEach((s) => used.add(s));
+        if (step(k + 1)) return true;
+        chosen.pop();
+        line.forEach((s) => used.delete(s));
+      }
+      return false;
+    };
+    return step(0) ? chosen : null;
+  };
+  const lines = search(true, TOUCH_TRIES) ?? search(false, Number.POSITIVE_INFINITY) ?? [];
+  return lines.map((squares, k) => ({ id: ids[k], squares }));
+}
+var GHOST_ID = "ghost";
+function pairTeams(owners, random) {
+  const shuffled3 = shuffleWith(owners, random);
+  const groups = [];
+  for (let i = 0; i < shuffled3.length; i += 2) groups.push(shuffled3.slice(i, i + 2));
+  const last = groups[groups.length - 1];
+  if (groups.length > 1 && last.length === 1) groups[groups.length - 2].push(...groups.pop());
+  const teams = groups.map((g, k) => ({ id: `t${k + 1}`, owners: g }));
+  if (teams.length % 2 === 1) teams.push({ id: GHOST_ID, owners: [], ghost: true });
+  const matches = [];
+  for (let k = 0; k + 1 < teams.length; k += 2) matches.push({ id: `m${k / 2 + 1}`, teams: [teams[k].id, teams[k + 1].id] });
+  return { teams, matches };
+}
+function teamOf(pairing, owner) {
+  return pairing.teams.find((t) => t.owners.includes(owner));
+}
+function matchOf(pairing, team) {
+  return pairing.matches.find((m) => m.teams.includes(team));
+}
+function rivalOf(pairing, team) {
+  const m = matchOf(pairing, team);
+  if (!m) return "";
+  return m.teams[0] === team ? m.teams[1] : m.teams[0];
+}
+var RANKS = ["Captain", "Commander", "Admiral", "Ensign", "Bosun"];
+var NAMES = [
+  "Kestrel",
+  "Lark",
+  "Pike",
+  "Gannet",
+  "Petrel",
+  "Squall",
+  "Tern",
+  "Osprey",
+  "Heron",
+  "Curlew",
+  "Plover",
+  "Merlin",
+  "Skua",
+  "Shearwater",
+  "Fulmar",
+  "Dunlin",
+  "Gale",
+  "Swift",
+  "Kittiwake",
+  "Puffin",
+  "Wren",
+  "Sleet",
+  "Corsair",
+  "Marlin"
+];
+var SIGNS = RANKS.length * NAMES.length;
+function signAt(k) {
+  return `${RANKS[Math.floor(k / NAMES.length)]} ${NAMES[k % NAMES.length]}`;
+}
+function callSigns(viewer, joined, hash) {
+  const used = /* @__PURE__ */ new Set();
+  const out = {};
+  let extra = 1;
+  for (const subject of joined) {
+    if (subject in out) continue;
+    let k = (hash(`${viewer}|${subject}`) % SIGNS + SIGNS) % SIGNS;
+    if (used.size >= SIGNS) {
+      out[subject] = `${signAt(k)} ${++extra}`;
+      continue;
+    }
+    while (used.has(k)) k = (k + 1) % SIGNS;
+    used.add(k);
+    out[subject] = signAt(k);
+  }
+  return out;
+}
+function pickVariant(square, owner, matchOwners, given, count, returning) {
+  if (count <= 1) return 0;
+  if (returning) return returning.not === 0 ? 1 : 0;
+  const mine = Array.from({ length: count }, () => 0);
+  const others = Array.from({ length: count }, () => 0);
+  for (const g of given) {
+    if (g.square !== square || g.variant < 0 || g.variant >= count) continue;
+    if (g.owner === owner) mine[g.variant]++;
+    else if (matchOwners.includes(g.owner)) others[g.variant]++;
+  }
+  let best = 0;
+  for (let v = 1; v < count; v++) {
+    if (mine[v] < mine[best] || mine[v] === mine[best] && others[v] < others[best]) best = v;
+  }
+  return best;
+}
+var DAMAGE = { hit: 2, sure: 4, returning: 1, sink_bonus: 2 };
+function halfDamage(full) {
+  return Math.max(1, Math.floor(full / 2));
+}
+function emptyState(pairing) {
+  const perTeam = (make) => Object.fromEntries(pairing.teams.map((t) => [t.id, make()]));
+  return {
+    round: -1,
+    fleets: perTeam(() => []),
+    charts: perTeam(() => ({})),
+    damage: perTeam(() => 0),
+    first_try: {},
+    hits: [],
+    sinks: [],
+    pings: [],
+    returns: [],
+    given: [],
+    ended: Object.fromEntries(pairing.matches.map((m) => [m.id, false])),
+    log: []
+  };
+}
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+function buildFleet(team, placements, seed) {
+  const fleet = [];
+  const squaresOf = (ships) => ships.flatMap((s) => s.squares);
+  const unplaced = [];
+  for (const owner of team.owners) {
+    const ids = shipsFor(team, owner);
+    if (!ids.length) continue;
+    const own = placements[owner];
+    if (own && placementProblem(own, owner, team, fleet) === null) {
+      fleet.push(...ids.map((id) => ({ id, squares: [...own.find((s) => s.id === id).squares].sort((a, b) => a - b) })));
+    } else {
+      unplaced.push(owner);
+    }
+  }
+  for (const owner of unplaced) fleet.push(...autoPlace(shipsFor(team, owner), fleet, squaresOf(fleet), rng(seed + owner)));
+  const missing = SHIP_IDS.filter((id) => !fleet.some((s) => s.id === id));
+  if (missing.length) fleet.push(...autoPlace([...missing], fleet, squaresOf(fleet), rng(seed + team.id)));
+  return SHIP_IDS.map((id) => fleet.find((s) => s.id === id));
+}
+function settleHit(state, hit, filed) {
+  hit.status = filed[hit.id] != null ? "full" : "half";
+  state.damage[hit.team] = (state.damage[hit.team] ?? 0) + (hit.status === "full" ? hit.full : halfDamage(hit.full));
+}
+function settleHits(state, input, round) {
+  for (const hit of state.hits) {
+    if (hit.status !== "owed") continue;
+    hit.rejected = input.rejected[hit.id] ?? 0;
+    hit.due = hit.round + 1 + Math.min(hit.rejected, 1);
+    if (round === void 0 || round >= hit.due) settleHit(state, hit, input.filed);
+  }
+}
+function settleRecalls(state, recalls, round) {
+  for (const sink of state.sinks) {
+    if (sink.recall !== "pending" || round !== void 0 && sink.round >= round) continue;
+    const answer = recalls[`${sink.target}:${sink.ship}`];
+    sink.recall = answer === true ? "right" : answer === false ? "wrong" : "none";
+    if (answer === true) {
+      sink.bonus = DAMAGE.sink_bonus;
+      state.damage[sink.team] = (state.damage[sink.team] ?? 0) + sink.bonus;
+    }
+  }
+}
+function linesWithOpenShipSquares(state, team) {
+  const chart = state.charts[team] ?? {};
+  const open = (state.fleets[team] ?? []).flatMap((s) => s.squares).filter((sq) => chart[sq] !== "hit");
+  const rows = [...new Set(open.map(rowOf))].sort((a, b) => a - b).map((r) => `row:${ROW_LETTERS[r]}`);
+  const cols = [...new Set(open.map(colOf))].sort((a, b) => a - b).map((c) => `col:${c + 1}`);
+  return [...rows, ...cols];
+}
+function countFirstTry(state, shot, outcome) {
+  if (shot.returning || !["hit", "miss", "dud"].includes(outcome)) return;
+  const tally = state.first_try[shot.owner] ??= { right: 0, total: 0 };
+  tally.total++;
+  if (shot.correct === true) tally.right++;
+}
+function resolveRound(prev, input) {
+  const state = clone(prev);
+  const { pairing, round, seed } = input;
+  if (round !== prev.round + 1) throw new Error(`Fleet week: round ${round} out of order`);
+  for (const t of pairing.teams) {
+    state.charts[t.id] ??= {};
+    state.damage[t.id] ??= 0;
+  }
+  for (const m of pairing.matches) state.ended[m.id] ??= false;
+  if (round === 0) {
+    for (const t of pairing.teams) state.fleets[t.id] = buildFleet(t, input.placements ?? {}, seed);
+    state.round = 0;
+    return state;
+  }
+  settleHits(state, input, round);
+  settleRecalls(state, input.recalls, round);
+  const shots = clone(input.shots).sort((a, b) => a.seq - b.seq || (a.owner < b.owner ? -1 : a.owner > b.owner ? 1 : 0));
+  const results = [];
+  for (const shot of shots) {
+    const team = teamOf(pairing, shot.owner);
+    const match = team && matchOf(pairing, team.id);
+    if (!team || !match || !onGrid(shot.square)) {
+      results.push({ ...shot, outcome: "void", target: team ? rivalOf(pairing, team.id) : "", damage: 0 });
+      continue;
+    }
+    const target = rivalOf(pairing, team.id);
+    const chart = state.charts[target] ??= {};
+    const result = (outcome, extra = {}) => ({ ...shot, outcome, target, damage: 0, ...extra });
+    state.given.push({ owner: shot.owner, square: shot.square, variant: shot.variant });
+    if (shot.returning) {
+      const at = state.returns.findIndex((r) => r.owner === shot.owner && r.square === shot.square);
+      if (at >= 0) state.returns.splice(at, 1);
+    }
+    let res;
+    const ship = (state.fleets[target] ?? []).find((s) => s.squares.includes(shot.square));
+    if (shot.voided) {
+      res = result("void");
+    } else if (state.ended[match.id]) {
+      res = result("practice");
+    } else if (chart[shot.square]) {
+      res = result("dup");
+    } else {
+      if (shot.correct !== true) {
+        res = result("dud");
+        state.returns.push({ owner: shot.owner, square: shot.square, variant: shot.variant === 0 ? 1 : 0, due: round + 2 });
+        const lines = shot.sure ? linesWithOpenShipSquares(state, team.id) : [];
+        if (lines.length) {
+          const pick = lines[Math.floor(rng(seed + shot.owner + shot.seq)() * lines.length)];
+          state.pings.push({ to: target, about: team.id, line: pick, round });
+        }
+      } else if (!ship) {
+        chart[shot.square] = "miss";
+        res = result("miss");
+      } else {
+        chart[shot.square] = "hit";
+        const full = (shot.sure ? DAMAGE.sure : DAMAGE.hit) + (shot.returning ? DAMAGE.returning : 0);
+        const alone = !team.owners.some((o) => o !== shot.owner);
+        const hit = {
+          id: `h${round}-${shot.owner}-${shot.seq}`,
+          owner: shot.owner,
+          team: team.id,
+          target,
+          square: shot.square,
+          round,
+          full,
+          due: round + 1,
+          rejected: 0,
+          status: "owed"
+        };
+        if (alone) settleHit(state, hit, { [hit.id]: round });
+        state.hits.push(hit);
+        if (ship.squares.every((sq) => chart[sq] === "hit")) {
+          state.sinks.push({ target, ship: ship.id, by: shot.owner, team: team.id, round, recall: "pending", bonus: 0 });
+          const fleet = state.fleets[target] ?? [];
+          if (fleet.every((s) => s.squares.every((sq) => chart[sq] === "hit"))) state.ended[match.id] = true;
+        }
+        res = result("hit", { ship: ship.id, damage: full });
+      }
+    }
+    countFirstTry(state, shot, res.outcome);
+    results.push(res);
+  }
+  state.log.push({ round, results });
+  state.round = round;
+  return state;
+}
+function settleAll(state, input) {
+  const next = clone(state);
+  settleHits(next, input);
+  settleRecalls(next, input.recalls);
+  return next;
+}
+function standings(state, pairing) {
+  const row = (id) => {
+    const team = pairing.teams.find((t) => t.id === id);
+    const tallies = (team?.owners ?? []).map((o) => state.first_try[o]).filter(Boolean);
+    const right = tallies.reduce((n, t) => n + t.right, 0);
+    const total = tallies.reduce((n, t) => n + t.total, 0);
+    return { team: id, damage: state.damage[id] ?? 0, sunk: state.sinks.filter((s) => s.team === id).length, accuracy: total ? right / total : 0 };
+  };
+  const compare = (a, b) => b.damage - a.damage || b.sunk - a.sunk || b.accuracy - a.accuracy;
+  return pairing.matches.map((m) => {
+    const teams = m.teams.map(row).sort(compare);
+    const [top, next] = teams;
+    const ghost = pairing.teams.find((t) => t.id === top.team)?.ghost;
+    const winner = !ghost && (!next || compare(top, next) !== 0) ? top.team : null;
+    return { match: m.id, teams, winner };
+  });
+}
 export {
   GAME_MOVES,
   GameEventSchema,
@@ -2267,6 +2747,7 @@ export {
   crosswordHint,
   eventsToEvidence,
   evidenceTags,
+  rules_exports as fleet,
   gameIssues,
   gameItems,
   gameTotal,

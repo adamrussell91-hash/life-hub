@@ -2,6 +2,7 @@
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { gameTeacherAction, GameError } from './_shared/games.mjs';
 import { listRooms, openRoom } from './_shared/game-rooms.mjs';
+import { fleetTeacherAction, isFleetTeacherAction } from './_shared/fleet-week-teacher.mjs';
 import { errorResponse, guardRequestOrigin, okResponse, withCors, methodNotAllowed } from './_shared/http.mjs';
 export const config = { path: '/api/lessons/:id/game' };
 export function createGamesHandler(deps = {}) {
@@ -16,7 +17,9 @@ export function createGamesHandler(deps = {}) {
       // Live rooms (game-rooms.mjs): open one for a class, or list the open ones to resume.
       const result = body?.action === 'open' ? await openRoom(store, match?.[1], body, { env, fetchImpl: deps.fetch ?? fetch })
         : body?.action === 'rooms' ? await listRooms(store, match?.[1], { env })
-          : await gameTeacherAction(store, match?.[1], body);
+          // Fleet week campaigns (fleet-week-teacher.mjs).
+          : isFleetTeacherAction(body?.action) ? await fleetTeacherAction(store, match?.[1], body)
+            : await gameTeacherAction(store, match?.[1], body);
       return withCors(okResponse(200, result, { 'cache-control': 'no-store' }), request, env);
     } catch (e) {
       if (e instanceof GameError || e instanceof SyntaxError) return withCors(errorResponse(e.status ?? 400, e.code ?? 'bad_request', e instanceof SyntaxError ? 'Invalid request.' : e.message, false), request, env);
