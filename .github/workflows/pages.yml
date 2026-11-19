@@ -89,6 +89,9 @@ jobs:
       # The Tasks Hub build resolves its own node_modules.
       - name: Install Tasks Hub dependencies
         run: npm ci --ignore-scripts --prefer-offline --prefix apps/tasks
+      # Professional Hub has its own packages too (pdf-lib for the NESA PDF).
+      - name: Install Professional Hub dependencies
+        run: npm ci --ignore-scripts --prefer-offline --prefix apps/professional
       - name: Transfer Grove release input
         if: ${{ hashFiles('apps/life/assets/grove/deployment/release-input.enc') != '' }}
         run: node scripts/transfer-grove-release.mjs

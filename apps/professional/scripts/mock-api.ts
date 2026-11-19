@@ -20,6 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import seedData from '../fixtures/seed.json' with { type: 'json' };
 import { mockNetworkEcologyWorld } from './mock-network-ecology';
+import { createMockMeetingRecordings } from './mock-meeting-recordings';
 
 const MOCK_DIR = path.dirname(fileURLToPath(import.meta.url));
 const NOTION_COMMS_CANDIDATES = [
@@ -696,6 +697,7 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
   };
 
   let authenticated = false;
+  const recordings = createMockMeetingRecordings();
   const meetingSheetShares = new Map<string, { token: string; created_at: string; updated_at: string; picks: unknown; sheet: unknown }>();
 
   function json(status: number, body: unknown) {
@@ -4174,6 +4176,17 @@ export function createMockApi(options: { careerDemo?: boolean } = {}) {
         req.on('data', (c: Buffer) => chunks.push(c));
         req.on('end', () => resolve());
       });
+      if (recordings.matches(req.url ?? '')) {
+        const headers: Record<string, string> = {};
+        for (const [k, v] of Object.entries((req as { headers?: Record<string, string | string[]> }).headers ?? {})) {
+          if (typeof v === 'string' && k !== 'host' && k !== 'content-length') headers[k] = v;
+        }
+        const response = await recordings.handle(req.method ?? 'GET', req.url ?? '/', headers, Buffer.concat(chunks));
+        res.statusCode = response.status;
+        res.setHeader('Content-Type', response.headers.get('content-type') ?? 'application/json');
+        res.end(Buffer.from(await response.arrayBuffer()));
+        return;
+      }
       let body: unknown;
       const raw = Buffer.concat(chunks).toString('utf8');
       if (raw) {

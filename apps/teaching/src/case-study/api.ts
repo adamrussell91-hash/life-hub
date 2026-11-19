@@ -128,3 +128,55 @@ export function caseTeacherApi(lessonId: string): CaseTeacherApi {
 }
 
 export type { CaseEvidence };
+
+// ---------------------------------------------------------------- practice run
+// POST /api/lessons/:id/case-practice  (netlify/functions/case-practice.mjs → _shared/case-practice.mjs)
+
+export type CasePracticeClass = {
+  pace: 'teacher' | 'own';
+  /** Stations the practice class has open (teacher pace). */
+  open_to: number;
+  /** The last station: 3 when Rules is off, else 4. */
+  last: number;
+  parts_open: number;
+  parts_total: number;
+  outcome_revealed: boolean;
+};
+export type CasePracticeState = {
+  /** The lesson as a student gets it. Its lesson_id is the practice copy's, never the real lesson's. */
+  lesson: import('@/schemas/published-lesson').PublishedLesson;
+  status: CaseStatus;
+  class: CasePracticeClass;
+};
+export type CasePracticeApi = {
+  /** Carries on the last run if the case hasn't changed since, else starts again from this lesson. */
+  open(lesson: import('@/schemas/lesson').Lesson): Promise<CasePracticeState>;
+  /** Wipes the last run and starts again from this lesson. */
+  start(lesson: import('@/schemas/lesson').Lesson): Promise<CasePracticeState>;
+  state(): Promise<CasePracticeState>;
+  /** The pretend student's CaseClient: the real student screen, on the practice copy. */
+  client: CaseClient;
+  /** A class move on the practice copy (teacher pace). */
+  move(action: 'open' | 'release_part' | 'reveal', station?: number): Promise<CasePracticeState>;
+};
+
+export function casePracticeApi(lessonId: string): CasePracticeApi {
+  const path = `/api/lessons/${encodeURIComponent(lessonId)}/case-practice`;
+  const op = <T>(name: string, extra: Record<string, unknown> = {}) => apiPost<T>(path, { op: name, ...extra });
+  const draft = (lesson: import('@/schemas/lesson').Lesson) => ({ draft: { title: lesson.title, unit_id: lesson.unit_id, pedagogical_mode: lesson.pedagogical_mode, blocks: lesson.blocks, case: lesson.case } });
+  const student = (action: string, extra: Record<string, unknown> = {}) => op<CaseStatus>('student', { body: { action, ...extra } });
+  return {
+    open: (lesson) => op('open', draft(lesson)),
+    start: (lesson) => op('start', draft(lesson)),
+    state: () => op('state'),
+    client: {
+      status: () => student('status'),
+      claim: () => student('status'),
+      save: (input) => student('save', { ...input }),
+      nextPart: () => student('next_part'),
+      advance: () => student('advance'),
+      lock: (input) => student('lock', input)
+    },
+    move: (action, station) => op('teacher', { body: { action, ...(station === undefined ? {} : { station }) } })
+  };
+}

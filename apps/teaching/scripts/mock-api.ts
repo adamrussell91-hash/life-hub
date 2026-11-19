@@ -120,6 +120,7 @@ import { createPublishedLabHandler } from '../../../netlify/functions/published-
 import { createLabHandler } from '../../../netlify/functions/lab.mjs';
 import { prepareLabPublish, storeLabConfig } from '../../../netlify/functions/_shared/lab.mjs';
 import { LAB_CLASS_ID, LAB_ROSTER, LAB_WALKS, isLabWalk, labClassAct, labClassJoin, type LabWalkId } from './mock-lab-class';
+import { createCasePracticeHandler } from '../../../netlify/functions/case-practice.mjs';
 import { createPublishedRotationHandler } from '../../../netlify/functions/published-rotation.mjs';
 import { createRotationHandler } from '../../../netlify/functions/rotation.mjs';
 import { createGamesHandler } from '../../../netlify/functions/games.mjs';
@@ -4390,6 +4391,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? createPublishedGamesHandler(deps)
       : /^\/api\/lessons\/[^/]+\/case$/.test(path)
         ? createCaseHandler(deps)
+      : /^\/api\/lessons\/[^/]+\/case-practice$/.test(path)
+        ? createCasePracticeHandler(deps)
       : /^\/api\/units\/[^/]+\/organiser$/.test(path)
         ? createOrganiserHandler(deps)
       : path.startsWith('/api/published/organiser/')
@@ -4566,6 +4569,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/lab\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/case$/.test(path) ||
       /^\/api\/published\/case\/[^/]+$/.test(path) ||
+      /^\/api\/lessons\/[^/]+\/case-practice$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/rotation$/.test(path) ||
       /^\/api\/published\/rotation\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/game$/.test(path) ||

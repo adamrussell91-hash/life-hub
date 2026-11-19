@@ -72,7 +72,9 @@
 .cs-conf__top { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; }
 .cs-conf input { width: 100%; accent-color: var(--navy); }
 .cs-conf__ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
-.cs-blocks { display: grid; gap: 12px; margin-bottom: 16px; }
+.cs-blocks { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-bottom: 16px; }
+/* A wide block (long line, video, table) must not size the column: it would spill into Your work. */
+.cs-blocks > * { min-width: 0; }
 
 /* Evidence */
 .cs-evidence { display: grid; gap: 6px; margin: 4px 0 12px; }
@@ -131,3 +133,7 @@
 .cs-turn[data-who='examiner'] { background: transparent; color: var(--muted, #6b7788); font-style: italic; }
 .cs-turn__who { display: block; font-style: normal; font-size: 0.6875rem; letter-spacing: 0.06em; color: var(--muted, #6b7788); margin-bottom: 2px; }
 .cs-tasks { border-top: 2px solid var(--line); padding-top: 14px; display: grid; gap: 14px; }
+
+/* Try it as a student: the class moves under "Your move" (practice.ts). */
+.cpractice__moves { display: flex; flex-wrap: wrap; gap: 8px; }
+.cpractice__student { min-width: 0; }

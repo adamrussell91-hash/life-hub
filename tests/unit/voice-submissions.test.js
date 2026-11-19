@@ -177,6 +177,24 @@ test('transcription keeps fillers via the prompt and writes the trimmed transcri
   assert.ok(![...store.data.keys()].some((k) => k.startsWith('voice_transcribe_queue/')));
 });
 
+test('a take deleted while Whisper is working stays deleted', async () => {
+  for (const ok of [true, false]) {
+    const store = memoryStore(lessonSeed());
+    await submit(store);
+    const [row] = await listVoiceSubmissions(store, 'lesson1', 'viva1');
+    const knowledgeFetch = async () => {
+      await deleteVoiceSubmission(store, 'lesson1', 'viva1', row.id);
+      return ok
+        ? new Response(JSON.stringify({ text: 'Um, so', segments: [] }), { status: 200 })
+        : new Response(JSON.stringify({ error: 'busy' }), { status: 502 });
+    };
+    const { results } = await processVoiceTranscriptions({ store, env: { RESEARCH_KERNEL_SHARED_SECRET: 'x' }, knowledgeFetch });
+    assert.equal(results[0].skipped, true);
+    assert.equal(await store.get(voiceKeys.submission('lesson1', 'viva1', row.id), { type: 'json' }), null);
+    assert.deepEqual(await listVoiceSubmissions(store, 'lesson1', 'viva1'), []);
+  }
+});
+
 test('a failing transcription retries, then gives up with an error the inbox can show', async () => {
   const store = memoryStore(lessonSeed());
   await submit(store);
