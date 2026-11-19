@@ -214,3 +214,11 @@ button.fw-cell:disabled { cursor: default; }
   .fw-dawn > span, .fw-dawn__text, .fw-warm { animation: none; }
   .fw-dawn__night { opacity: 0; }
 }
+
+/* Reveal: the class's hardest squares (topics and counts only, no answers). */
+.fw-hardest { display: grid; gap: var(--space-2); }
+.fw-hardest__list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.fw-hardest__item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); padding: 8px 12px; border-radius: var(--radius-md, 12px); background: var(--game-team-1-soft, #dceafa); color: var(--navy); }
+.fw-hardest__square { font-weight: 700; font-variant-numeric: tabular-nums; }
+.fw-hardest__topic { min-width: 0; overflow-wrap: anywhere; }
+.fw-hardest__count { font-size: var(--text-sm); white-space: nowrap; color: var(--muted); }
