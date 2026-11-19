@@ -292,3 +292,279 @@ export function pickVariant(square: number, owner: string, matchOwners: string[]
   for (let v = 1; v < count; v++) if (times[v] < times[best]) best = v;
   return best;
 }
+
+// ---------------------------------------------------------------------------
+// Round resolution (§1.3–§1.7, §3.2; decisions 5–7, 9 and 10)
+// ---------------------------------------------------------------------------
+
+/** One committed shot. `correct` is decided at answer time (decision 9); null means no answer in time. */
+export type Shot = {
+  seq: number; owner: string; square: number; sure: boolean; variant: number; item: string;
+  correct: boolean | null;
+  returning: boolean; voided?: boolean;
+};
+/** A hit waiting on (or settled by) its damage report (§1.6; decision 6). */
+export type Hit = {
+  id: string; owner: string; team: string; target: string; square: number; round: number;
+  full: number; due: number; rejected: number; status: 'owed' | 'full' | 'half';
+};
+/** A sunk ship. `by` is the player who landed the last hit and owes the recall line; `team` is theirs (§1.5). */
+export type SinkRecord = { target: string; ship: ShipId; by: string; team: string; round: number; recall: 'pending' | 'right' | 'wrong' | 'none'; bonus: number };
+/** A sonar ping: `about` team's chart has a ship square on `line` ('row:B' or 'col:3'), told to team `to` (§1.4). */
+export type Ping = { to: string; about: string; line: string; round: number };
+/** A dud square coming back to its player with the other variant (§1.4). */
+export type Return = { owner: string; square: number; variant: number; due: number };
+export type Outcome = 'hit' | 'miss' | 'dud' | 'dup' | 'void' | 'practice';
+/** A resolved shot. `damage` is the hit's full value before its report settles; 0 for anything else. */
+export type ShotResult = Shot & { outcome: Outcome; target: string; ship?: ShipId; damage: number };
+
+/** Cumulative campaign state after a round (§3.1). */
+export type FleetState = {
+  /** Last resolved round (0 = placement). */
+  round: number;
+  /** Team id → ships, frozen after round 0. */
+  fleets: Record<string, Ship[]>;
+  /** Target team id → squares known to its rival. */
+  charts: Record<string, Record<number, 'hit' | 'miss'>>;
+  /** Damage dealt BY each team. */
+  damage: Record<string, number>;
+  /** Owner → first-try answers (fresh shots only). */
+  first_try: Record<string, { right: number; total: number }>;
+  hits: Hit[]; sinks: SinkRecord[]; pings: Ping[]; returns: Return[];
+  given: Given[];
+  /** Match id → over (a fleet was sunk outright). */
+  ended: Record<string, boolean>;
+  log: Array<{ round: number; results: ShotResult[] }>;
+};
+export type RoundInput = {
+  pairing: Pairing; round: number; seed: string;
+  /** Owner → ships (round 0 only; missing or invalid → autoPlace). */
+  placements: Record<string, Ship[]>;
+  /** Every owner's shots for this round. */
+  shots: Shot[];
+  /** Hit id → round filed. The server deletes the entry when the teacher rejects a report. */
+  filed: Record<string, number>;
+  /** Hit id → times rejected. */
+  rejected: Record<string, number>;
+  /** `${target}:${ship}` → recall line answered right. */
+  recalls: Record<string, boolean>;
+};
+
+/** Damage table (§1.7; decision 5). */
+export const DAMAGE = { hit: 2, sure: 4, returning: 1, sink_bonus: 2 } as const;
+
+/** Half damage for a hit whose report did not land in time: never below 1 (decision 5). */
+export function halfDamage(full: number): number {
+  return Math.max(1, Math.floor(full / 2));
+}
+
+/** The state before placement: every team and match known, nothing on the charts (§3.1). */
+export function emptyState(pairing: Pairing): FleetState {
+  const perTeam = <T>(make: () => T) => Object.fromEntries(pairing.teams.map((t) => [t.id, make()]));
+  return {
+    round: -1,
+    fleets: perTeam(() => [] as Ship[]),
+    charts: perTeam(() => ({}) as Record<number, 'hit' | 'miss'>),
+    damage: perTeam(() => 0),
+    first_try: {},
+    hits: [], sinks: [], pings: [], returns: [], given: [],
+    ended: Object.fromEntries(pairing.matches.map((m) => [m.id, false])),
+    log: []
+  };
+}
+
+/** A deep copy; state and input are plain JSON, so this keeps resolveRound from touching its arguments. */
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/** Round 0 (§1.3 placement; decision 2): each owner's layout if it stands, else auto-placed; leftovers and the ghost auto-placed. */
+function buildFleet(team: Team, placements: Record<string, Ship[]>, seed: string): Ship[] {
+  const fleet: Ship[] = [];
+  const squaresOf = (ships: Ship[]) => ships.flatMap((s) => s.squares);
+  for (const owner of team.owners) {
+    const ids = shipsFor(team, owner);
+    if (!ids.length) continue;
+    const own = placements[owner];
+    const ok = own && placementProblem(own, owner, team, fleet) === null;
+    const ships = ok
+      ? ids.map((id) => ({ id, squares: [...(own.find((s) => s.id === id) as Ship).squares].sort((a, b) => a - b) }))
+      : autoPlace(ids, fleet, squaresOf(fleet), rng(seed + owner));
+    fleet.push(...ships);
+  }
+  const missing = SHIP_IDS.filter((id) => !fleet.some((s) => s.id === id));
+  if (missing.length) fleet.push(...autoPlace([...missing], fleet, squaresOf(fleet), rng(seed + team.id)));
+  return SHIP_IDS.map((id) => fleet.find((s) => s.id === id) as Ship);
+}
+
+/** Settle one owed hit: filed and not since rejected → full, else half (decision 6). */
+function settleHit(state: FleetState, hit: Hit, filed: Record<string, number>): void {
+  hit.status = filed[hit.id] != null ? 'full' : 'half';
+  state.damage[hit.team] = (state.damage[hit.team] ?? 0) + (hit.status === 'full' ? hit.full : halfDamage(hit.full));
+}
+
+/** Settle owed hits whose deadline has passed (or all of them, at the reveal). */
+function settleHits(state: FleetState, round: number, input: Pick<RoundInput, 'filed' | 'rejected'>, all: boolean): void {
+  for (const hit of state.hits) {
+    if (hit.status !== 'owed') continue;
+    hit.rejected = input.rejected[hit.id] ?? 0;
+    hit.due = hit.round + 1 + Math.min(hit.rejected, 1);
+    if (all || round >= hit.due) settleHit(state, hit, input.filed);
+  }
+}
+
+/** Settle recall lines owed for ships sunk before `round` (or all of them, at the reveal) (§1.5). */
+function settleRecalls(state: FleetState, round: number, recalls: Record<string, boolean>, all: boolean): void {
+  for (const sink of state.sinks) {
+    if (sink.recall !== 'pending' || (!all && sink.round >= round)) continue;
+    const answer = recalls[`${sink.target}:${sink.ship}`];
+    sink.recall = answer === true ? 'right' : answer === false ? 'wrong' : 'none';
+    if (answer === true) {
+      sink.bonus = DAMAGE.sink_bonus;
+      state.damage[sink.team] = (state.damage[sink.team] ?? 0) + sink.bonus;
+    }
+  }
+}
+
+/** Lines ('row:A'…, 'col:1'…) of a team's chart that still hold an unhit ship square (§1.4 sonar ping). */
+function livelyLines(state: FleetState, team: string): string[] {
+  const chart = state.charts[team] ?? {};
+  const open = (state.fleets[team] ?? []).flatMap((s) => s.squares).filter((sq) => chart[sq] !== 'hit');
+  const rows = [...new Set(open.map(rowOf))].sort((a, b) => a - b).map((r) => `row:${ROW_LETTERS[r]}`);
+  const cols = [...new Set(open.map(colOf))].sort((a, b) => a - b).map((c) => `col:${c + 1}`);
+  return [...rows, ...cols];
+}
+
+function countFirstTry(state: FleetState, shot: Shot, outcome: Outcome): void {
+  if (shot.returning || !['hit', 'miss', 'dud', 'practice'].includes(outcome)) return;
+  const tally = (state.first_try[shot.owner] ??= { right: 0, total: 0 });
+  tally.total++;
+  if (shot.correct === true) tally.right++;
+}
+
+/**
+ * Resolve one closed round into the next cumulative state (§3.2; plan Task 3).
+ * Pure: `prev` and `input` are never mutated, and the same inputs give the same
+ * output. Round 0 builds the fleets. A firing round settles hits whose report
+ * deadline has passed, settles recall lines from earlier sinks, then resolves
+ * the round's shots in `seq` order (§1.4–§1.7).
+ */
+export function resolveRound(prev: FleetState, input: RoundInput): FleetState {
+  const state = clone(prev);
+  const { pairing, round, seed } = input;
+  for (const t of pairing.teams) {
+    state.charts[t.id] ??= {};
+    state.damage[t.id] ??= 0;
+  }
+  for (const m of pairing.matches) state.ended[m.id] ??= false;
+
+  if (round === 0) {
+    for (const t of pairing.teams) state.fleets[t.id] = buildFleet(t, input.placements ?? {}, seed);
+    state.round = 0;
+    return state;
+  }
+
+  settleHits(state, round, input, false);
+  settleRecalls(state, round, input.recalls, false);
+
+  const shots = clone(input.shots).sort((a, b) => a.seq - b.seq);
+  const taken = new Set<string>();                 // `${team}:${square}` fired this round
+  const results: ShotResult[] = [];
+  for (const shot of shots) {
+    const team = teamOf(pairing, shot.owner);
+    if (!team) continue;                           // not in this campaign
+    const target = rivalOf(pairing, team.id);
+    const match = matchOf(pairing, team.id);
+    const chart = (state.charts[target] ??= {});
+    const result = (outcome: Outcome, extra: Partial<ShotResult> = {}): ShotResult => ({ ...shot, outcome, target, damage: 0, ...extra });
+    state.given.push({ owner: shot.owner, square: shot.square, variant: shot.variant });
+    if (shot.returning) {
+      const at = state.returns.findIndex((r) => r.owner === shot.owner && r.square === shot.square);
+      if (at >= 0) state.returns.splice(at, 1);
+    }
+
+    let res: ShotResult;
+    const ship = (state.fleets[target] ?? []).find((s) => s.squares.includes(shot.square));
+    if (shot.voided) {
+      res = result('void');
+    } else if (!match || state.ended[match.id]) {
+      res = result('practice');
+    } else if (chart[shot.square] || taken.has(`${team.id}:${shot.square}`)) {
+      res = result('dup');
+    } else {
+      taken.add(`${team.id}:${shot.square}`);
+      if (shot.correct !== true) {
+        res = result('dud');
+        state.returns.push({ owner: shot.owner, square: shot.square, variant: shot.variant === 0 ? 1 : 0, due: round + 2 });
+        const lines = shot.sure ? livelyLines(state, team.id) : [];
+        if (lines.length) {
+          const pick = lines[Math.floor(rng(seed + shot.seq)() * lines.length)];
+          state.pings.push({ to: target, about: team.id, line: pick, round });
+        }
+      } else if (!ship) {
+        chart[shot.square] = 'miss';
+        res = result('miss');
+      } else {
+        chart[shot.square] = 'hit';
+        const full = (shot.sure ? DAMAGE.sure : DAMAGE.hit) + (shot.returning ? DAMAGE.returning : 0);
+        const alone = !team.owners.some((o) => o !== shot.owner);
+        const hit: Hit = {
+          id: `h${round}-${shot.seq}`, owner: shot.owner, team: team.id, target, square: shot.square, round,
+          full, due: round + 1, rejected: 0, status: 'owed'
+        };
+        if (alone) settleHit(state, hit, { [hit.id]: round });
+        state.hits.push(hit);
+        if (ship.squares.every((sq) => chart[sq] === 'hit')) {
+          state.sinks.push({ target, ship: ship.id, by: shot.owner, team: team.id, round, recall: 'pending', bonus: 0 });
+          const fleet = state.fleets[target] ?? [];
+          if (fleet.every((s) => s.squares.every((sq) => chart[sq] === 'hit'))) state.ended[match.id] = true;
+        }
+        res = result('hit', { ship: ship.id, damage: full });
+      }
+    }
+    countFirstTry(state, shot, res.outcome);
+    results.push(res);
+  }
+
+  state.log.push({ round, results });
+  state.round = round;
+  return state;
+}
+
+/** At the reveal: settle every open hit as if due, and every pending recall line (§1.6, §1.7; decision 6). */
+export function settleAll(state: FleetState, input: Pick<RoundInput, 'filed' | 'rejected' | 'recalls'>): FleetState {
+  const next = clone(state);
+  settleHits(next, next.round, input, true);
+  settleRecalls(next, next.round, input.recalls, true);
+  return next;
+}
+
+// ---------------------------------------------------------------------------
+// Standings (§1.7)
+// ---------------------------------------------------------------------------
+
+export type TeamStanding = { team: string; damage: number; sunk: number; accuracy: number };
+export type MatchStanding = { match: string; teams: TeamStanding[]; winner: string | null };
+
+/**
+ * Each match's table and winner (§1.7): most damage dealt, then ships sunk by the
+ * team, then first-try accuracy (right / total, 0 with no shots). A full tie has
+ * no winner, and the ghost never wins.
+ */
+export function standings(state: FleetState, pairing: Pairing): MatchStanding[] {
+  const row = (id: string): TeamStanding => {
+    const team = pairing.teams.find((t) => t.id === id);
+    const tallies = (team?.owners ?? []).map((o) => state.first_try[o]).filter(Boolean);
+    const right = tallies.reduce((n, t) => n + t.right, 0);
+    const total = tallies.reduce((n, t) => n + t.total, 0);
+    return { team: id, damage: state.damage[id] ?? 0, sunk: state.sinks.filter((s) => s.team === id).length, accuracy: total ? right / total : 0 };
+  };
+  const compare = (a: TeamStanding, b: TeamStanding) => b.damage - a.damage || b.sunk - a.sunk || b.accuracy - a.accuracy;
+  return pairing.matches.map((m) => {
+    const teams = m.teams.map(row).sort(compare);
+    const [top, next] = teams;
+    const ghost = pairing.teams.find((t) => t.id === top.team)?.ghost;
+    const winner = !ghost && (!next || compare(top, next) !== 0) ? top.team : null;
+    return { match: m.id, teams, winner };
+  });
+}

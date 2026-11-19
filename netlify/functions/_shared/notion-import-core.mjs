@@ -4716,7 +4716,8 @@ var GAME_KINDS = [
   "articulate",
   "pictionary",
   "who_said_it",
-  "answer_chain"
+  "answer_chain",
+  "fleet_week"
 ];
 var GameKindSchema = z17.enum(GAME_KINDS);
 var GAME_LIMITS = {
@@ -4741,6 +4742,7 @@ var GAME_LIMITS = {
   category: 40,
   /** Letters in a Wheel puzzle (A–Z only). */
   wheelLetters: 60,
+  fleetLabel: 40,
   wheelText: 120,
   message: 40,
   prompt: 1e3,
@@ -4975,6 +4977,25 @@ var WhoSaidItSchema = z17.object({
   items: z17.array(QuoteItemSchema).max(GAME_COUNTS.who_said_it.max).default([]),
   settings: z17.object({ seconds: Seconds(10, 60, 20) }).prefault({})
 });
+var FLEET_SIZE = 5;
+var FleetSquareSchema = z17.object({ variants: z17.array(QuestionItemSchema2).max(2).default([]) });
+var FleetWeekSchema = z17.object({
+  ...base2,
+  kind: z17.literal("fleet_week"),
+  columns: z17.array(z17.string().max(GAME_LIMITS.fleetLabel)).max(FLEET_SIZE).default([]),
+  rows: z17.array(z17.string().max(GAME_LIMITS.fleetLabel)).max(FLEET_SIZE).default([]),
+  /** Row-major, index = row * 5 + col. */
+  squares: z17.array(FleetSquareSchema).max(FLEET_SIZE * FLEET_SIZE).default([]),
+  /** recall[i] is ship s{i}'s line (sizes 3, 2, 2, 1). */
+  recall: z17.array(QuestionItemSchema2).max(4).default([]),
+  settings: z17.object({
+    rounds: z17.number().int().min(2).max(8).default(5),
+    round_cap_s: z17.number().int().min(60).max(600).default(240),
+    placement_cap_s: z17.number().int().min(30).max(300).default(120),
+    answer_s: z17.number().int().min(20).max(120).default(60),
+    cutoff: z17.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default("20:00")
+  }).prefault({})
+});
 var GameSchema = z17.discriminatedUnion("kind", [
   CrosswordSchema,
   FindAWordSchema,
@@ -4988,7 +5009,8 @@ var GameSchema = z17.discriminatedUnion("kind", [
   ArticulateSchema,
   PictionarySchema,
   WhoSaidItSchema,
-  AnswerChainSchema
+  AnswerChainSchema,
+  FleetWeekSchema
 ]);
 var GameLessonSchema = z17.object({
   games: z17.array(GameSchema).max(GAME_LIMITS.games).default([]),
@@ -5029,7 +5051,10 @@ var PublicGameSchema = z17.object({
   cast: z17.array(CastMemberSchema.pick({ id: true, name: true, emblem: true, image_url: true })).optional(),
   message: z17.object({ length: z17.number().int(), question: z17.record(z17.string(), z17.unknown()).optional() }).optional(),
   /** Crossword and find-a-word: the grid, built at publish. */
-  grid: PublicGridSchema.optional()
+  grid: PublicGridSchema.optional(),
+  /** Fleet week: the grid's axis labels (the questions stay on the server). */
+  columns: z17.array(z17.string()).optional(),
+  rows: z17.array(z17.string()).optional()
 });
 var PublicGameLessonSchema = z17.object({
   games: z17.array(PublicGameSchema).max(GAME_LIMITS.games),
@@ -5061,6 +5086,8 @@ function gameItems(game) {
       return game.puzzles.flatMap((p) => [...p.bank, ...p.explain ? [p.explain] : []]);
     case "connections":
       return game.walls.flatMap((w) => w.groups);
+    case "fleet_week":
+      return [...game.squares.flatMap((sq) => sq.variants), ...game.recall];
     case "battles":
     case "answer_chain":
       return [];
@@ -5200,6 +5227,13 @@ function gameIssues(lesson) {
       case "team_match": {
         const distinct = new Set(game.items.map(matchAnswer).filter(Boolean));
         if (game.items.length >= GAME_COUNTS.team_match.min && distinct.size < 12) out.push(`${where2} needs at least 12 different answers.`);
+        break;
+      }
+      case "fleet_week": {
+        if (game.squares.length < 25 || game.squares.some((sq) => sq.variants.length === 0)) out.push(`${where2} needs all 25 squares filled.`);
+        const labelled = (l) => l.length === 5 && l.every((x) => x.trim());
+        if (!labelled(game.columns) || !labelled(game.rows)) out.push(`${where2} needs five row and five column labels.`);
+        if (game.recall.length < 4) out.push(`${where2} needs a recall line for each of the four ships.`);
         break;
       }
       case "answer_chain":

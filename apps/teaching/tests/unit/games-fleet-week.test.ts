@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { GAME_KINDS, GameSchema } from '../../src/games/core/schema';
 import { gameIssues, gameItems, gameWarnings, splitGame } from '../../src/games/core/model';
 import {
-  autoPlace, callSigns, fnv1a, pairTeams, pickVariant, placementProblem, rng, shipLine, shipsFor, squareLabel,
-  type Given, type Ship, type ShipId, type Team
+  autoPlace, callSigns, emptyState, fnv1a, pairTeams, pickVariant, placementProblem, resolveRound, rng, settleAll, shipLine, shipsFor,
+  squareLabel, standings,
+  type FleetState, type Given, type Pairing, type RoundInput, type Ship, type ShipId, type Shot, type Team
 } from '../../src/games/kinds/fleet-week/rules';
 
 const sa = (id: string, prompt: string, accepted: string[]) => ({
@@ -223,4 +224,252 @@ describe('fleet_week pickVariant', () => {
     expect(pickVariant(5, 'ann', match, [], 2, { not: 1 })).toBe(0);
   });
   it('uses the only variant when there is one', () => expect(pickVariant(5, 'ann', match, [], 1, { not: 0 })).toBe(0));
+});
+
+// ---------------------------------------------------------------------------
+// Pure rules, part 2: resolveRound, settlement, standings
+// ---------------------------------------------------------------------------
+
+/** t1 (ann, ben) v t2 (cat, dan). Both fleets: s0 A1–A3, s3 A5, s1 E1–E2, s2 C4–D4. */
+const duel: Pairing = { teams: [{ id: 't1', owners: ['ann', 'ben'] }, { id: 't2', owners: ['cat', 'dan'] }], matches: [{ id: 'm1', teams: ['t1', 't2'] }] };
+const duelPlacements = () => ({ ann: annShips(), ben: benShips(), cat: annShips(), dan: benShips() });
+
+const input = (pairing: Pairing, round: number, over: Partial<RoundInput> = {}): RoundInput => ({
+  pairing, round, seed: 'fw', placements: {}, shots: [], filed: {}, rejected: {}, recalls: {}, ...over
+});
+const placed = (pairing: Pairing = duel, placements: Record<string, Ship[]> = duelPlacements()) =>
+  resolveRound(emptyState(pairing), input(pairing, 0, { placements }));
+const shot = (seq: number, owner: string, square: number, over: Partial<Shot> = {}): Shot => ({
+  seq, owner, square, sure: false, variant: 0, item: `q${square}a`, correct: true, returning: false, ...over
+});
+const play = (state: FleetState, round: number, shots: Shot[], over: Partial<RoundInput> = {}, pairing: Pairing = duel) =>
+  resolveRound(state, input(pairing, round, { shots, ...over }));
+const results = (state: FleetState) => state.log[state.log.length - 1].results;
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === 'object') {
+    Object.values(value as object).forEach(deepFreeze);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+describe('fleet_week resolveRound: placement', () => {
+  it('builds fleets from placements at round 0', () => {
+    const s = placed();
+    expect(s.round).toBe(0);
+    expect(s.fleets.t1).toEqual([ship('s0', [0, 1, 2]), ship('s1', [20, 21]), ship('s2', [13, 18]), ship('s3', [4])]);
+    expect(s.fleets.t2.flatMap((x) => x.squares).sort((a, b) => a - b)).toEqual([0, 1, 2, 4, 13, 18, 20, 21]);
+  });
+  it('auto-places a player who never placed, keeping clear of the partner', () => {
+    const s = placed(duel, { ann: annShips(), cat: annShips(), dan: benShips() });
+    const benPart = s.fleets.t1.filter((x) => x.id === 's1' || x.id === 's2');
+    expect(benPart).toHaveLength(2);
+    expect(placementProblem(benPart, 'ben', duel.teams[0], s.fleets.t1)).toBeNull();
+  });
+  it('auto-places the ghost fleet, and the ghost can be hit', () => {
+    const p = pairTeams(['ann', 'ben'], rng('g'));
+    expect(p.matches[0].teams).toEqual(['t1', 'ghost']);
+    const s0 = placed(p, {});
+    const ghostSquares = s0.fleets.ghost.flatMap((x) => x.squares);
+    expect(new Set(ghostSquares).size).toBe(8);
+    const s1 = play(s0, 1, [shot(1, 'ann', ghostSquares[0])], {}, p);
+    expect(results(s1)[0]).toMatchObject({ outcome: 'hit', target: 'ghost' });
+    expect(s1.charts.ghost[ghostSquares[0]]).toBe('hit');
+  });
+});
+
+describe('fleet_week resolveRound: shots', () => {
+  it('right on a ship is a hit; damage waits for settlement', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 0)]);
+    expect(results(s1)[0]).toMatchObject({ outcome: 'hit', target: 't2', ship: 's0', damage: 2 });
+    expect(s1.charts.t2[0]).toBe('hit');
+    expect(s1.damage.t1).toBe(0);
+    expect(s1.hits[0]).toMatchObject({ owner: 'ann', team: 't1', target: 't2', square: 0, round: 1, full: 2, due: 2, status: 'owed' });
+    const s2 = play(s1, 2, [], { filed: { [s1.hits[0].id]: 1 } });
+    expect(s2.hits[0].status).toBe('full');
+    expect(s2.damage.t1).toBe(2);
+  });
+  it('right off a ship is a miss', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 6)]);
+    expect(results(s1)[0]).toMatchObject({ outcome: 'miss', damage: 0 });
+    expect(s1.charts.t2[6]).toBe('miss');
+    expect(s1.hits).toEqual([]);
+  });
+  it('wrong is a dud that returns two rounds later with the other variant', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 0, { correct: false })]);
+    expect(results(s1)[0].outcome).toBe('dud');
+    expect(s1.charts.t2[0]).toBeUndefined();
+    expect(s1.returns).toEqual([{ owner: 'ann', square: 0, variant: 1, due: 3 }]);
+  });
+  it('no answer in time is a dud', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 0, { correct: null, variant: 1 })]);
+    expect(results(s1)[0].outcome).toBe('dud');
+    expect(s1.returns).toEqual([{ owner: 'ann', square: 0, variant: 0, due: 3 }]);
+  });
+  it('sure and right on a ship is worth 4', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 0, { sure: true })]);
+    expect(s1.hits[0].full).toBe(4);
+    expect(play(s1, 2, [], { filed: { [s1.hits[0].id]: 1 } }).damage.t1).toBe(4);
+  });
+  it('sure and wrong pings a line of the firing team’s chart that holds an unhit ship square', () => {
+    // cat sinks t1's one-square ship at A5, so column 5 holds no unhit ship square.
+    const s1 = play(placed(), 1, [shot(1, 'cat', 4)]);
+    const allowed = ['row:A', 'row:C', 'row:D', 'row:E', 'col:1', 'col:2', 'col:3', 'col:4'];
+    const lines = new Set<string>();
+    for (let k = 0; k < 20; k++) {
+      const s2 = play(s1, 2, [shot(k, 'ann', 7, { sure: true, correct: false })], {}, duel);
+      expect(s2.pings).toHaveLength(1);
+      expect(s2.pings[0]).toMatchObject({ to: 't2', about: 't1', round: 2 });
+      expect(allowed).toContain(s2.pings[0].line);
+      lines.add(s2.pings[0].line);
+    }
+    expect(lines.size).toBeGreaterThan(1);
+  });
+  it('unsure and wrong sends no ping', () => {
+    expect(play(placed(), 1, [shot(1, 'ann', 7, { correct: false })]).pings).toEqual([]);
+  });
+  it('a returning hit is worth one more, and the return is used up', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 0, { correct: false })]);
+    const s3 = play(play(s1, 2, []), 3, [shot(1, 'ann', 0, { returning: true, variant: 1 })]);
+    expect(s3.hits[0].full).toBe(3);
+    expect(s3.returns).toEqual([]);
+    expect(play(s3, 4, []).damage.t1).toBe(1);
+  });
+  it('a teammate firing the same square later in the round is a dup', () => {
+    const s1 = play(placed(), 1, [shot(2, 'ben', 0, { correct: false }), shot(1, 'ann', 0)]);
+    expect(results(s1).map((r) => r.outcome)).toEqual(['hit', 'dup']);
+    expect(s1.hits).toHaveLength(1);
+    expect(s1.returns).toEqual([]);
+    expect(results(play(s1, 2, [shot(1, 'ben', 0)]))[0]).toMatchObject({ outcome: 'dup', damage: 0 });
+  });
+  it('a voided shot records nothing and does not return', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 0, { voided: true }), shot(2, 'ben', 6, { voided: true, correct: false })]);
+    expect(results(s1).map((r) => r.outcome)).toEqual(['void', 'void']);
+    expect(s1.charts.t2).toEqual({});
+    expect(s1.hits).toEqual([]);
+    expect(s1.returns).toEqual([]);
+  });
+  it('first-try accuracy counts fresh hits, misses and duds only', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 0), shot(2, 'ann', 6), shot(3, 'ann', 7, { correct: false }), shot(4, 'ann', 8, { voided: true })]);
+    expect(s1.first_try.ann).toEqual({ right: 2, total: 3 });
+    const s3 = play(play(s1, 2, []), 3, [shot(1, 'ann', 7, { returning: true, variant: 1 })]);
+    expect(s3.first_try.ann).toEqual({ right: 2, total: 3 });
+  });
+});
+
+describe('fleet_week resolveRound: damage reports', () => {
+  it('not filed by the deadline sticks at half: 2 → 1, 4 → 2', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 0), shot(2, 'ben', 1, { sure: true })]);
+    const s2 = play(s1, 2, []);
+    expect(s2.hits.map((h) => h.status)).toEqual(['half', 'half']);
+    expect(s2.damage.t1).toBe(3);
+  });
+  it('rejected once then refiled counts in full, settled one round later', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 0)]);
+    const id = s1.hits[0].id;
+    const s2 = play(s1, 2, [], { rejected: { [id]: 1 } });
+    expect(s2.hits[0]).toMatchObject({ status: 'owed', due: 3, rejected: 1 });
+    expect(s2.damage.t1).toBe(0);
+    const s3 = play(s2, 3, [], { filed: { [id]: 3 }, rejected: { [id]: 1 } });
+    expect(s3.hits[0].status).toBe('full');
+    expect(s3.damage.t1).toBe(2);
+  });
+  it('a player with no teammate gets full damage at once', () => {
+    const solo: Pairing = { teams: [{ id: 't1', owners: ['ann'] }, { id: 't2', owners: ['cat', 'dan'] }], matches: [{ id: 'm1', teams: ['t1', 't2'] }] };
+    const s0 = placed(solo, { ann: annShips(), cat: annShips(), dan: benShips() });
+    expect(s0.fleets.t1.map((x) => x.id).sort()).toEqual(['s0', 's1', 's2', 's3']);
+    const s1 = play(s0, 1, [shot(1, 'ann', 0)], {}, solo);
+    expect(s1.hits[0].status).toBe('full');
+    expect(s1.damage.t1).toBe(2);
+  });
+  it('a team of three all fire, and any teammate can file the report', () => {
+    const trio: Pairing = { teams: [{ id: 't1', owners: ['ann', 'ben', 'eve'] }, { id: 't2', owners: ['cat', 'dan'] }], matches: [{ id: 'm1', teams: ['t1', 't2'] }] };
+    const s0 = placed(trio, { ann: [ship('s0', [0, 1, 2])], ben: [ship('s1', [20, 21]), ship('s3', [4])], eve: [ship('s2', [13, 18])], cat: annShips(), dan: benShips() });
+    expect(s0.fleets.t1).toHaveLength(4);
+    const s1 = play(s0, 1, [shot(1, 'ann', 0), shot(2, 'ben', 6), shot(3, 'eve', 13)], {}, trio);
+    expect(results(s1).map((r) => r.outcome)).toEqual(['hit', 'miss', 'hit']);
+    expect(s1.hits.map((h) => h.status)).toEqual(['owed', 'owed']);
+    const eveHit = s1.hits[1].id;
+    const s2 = play(s1, 2, [], { filed: { [eveHit]: 1 } }, trio);
+    expect(s2.hits.map((h) => h.status)).toEqual(['half', 'full']);
+    expect(s2.damage.t1).toBe(3);
+  });
+});
+
+describe('fleet_week resolveRound: sinking and ending', () => {
+  it('a right recall line adds 2 at the next resolve', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 4)]);
+    expect(s1.sinks).toEqual([{ target: 't2', ship: 's3', by: 'ann', team: 't1', round: 1, recall: 'pending', bonus: 0 }]);
+    const s2 = play(s1, 2, [], { filed: { [s1.hits[0].id]: 1 }, recalls: { 't2:s3': true } });
+    expect(s2.sinks[0]).toMatchObject({ recall: 'right', bonus: 2 });
+    expect(s2.damage.t1).toBe(4);
+  });
+  it('a wrong recall line still sinks the ship, with no bonus', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 4)]);
+    const s2 = play(s1, 2, [], { recalls: { 't2:s3': false } });
+    expect(s2.sinks).toHaveLength(1);
+    expect(s2.sinks[0]).toMatchObject({ recall: 'wrong', bonus: 0 });
+    expect(s2.damage.t1).toBe(1);
+  });
+  it('sinking the whole fleet ends the match; later shots are practice', () => {
+    const squares = [0, 1, 2, 4, 13, 18, 20, 21];
+    const s1 = play(placed(), 1, squares.map((sq, k) => shot(k + 1, k < 4 ? 'ann' : 'ben', sq)));
+    expect(s1.sinks).toHaveLength(4);
+    expect(s1.ended.m1).toBe(true);
+    const s2 = play(s1, 2, [shot(1, 'ann', 6), shot(2, 'cat', 0)]);
+    expect(results(s2).map((r) => r.outcome)).toEqual(['practice', 'practice']);
+    expect(s2.charts.t2[6]).toBeUndefined();
+    expect(s2.charts.t1).toEqual({});
+  });
+});
+
+describe('fleet_week settleAll', () => {
+  it('settles every open hit and every pending recall at the reveal', () => {
+    const s1 = play(placed(), 1, [shot(1, 'ann', 4), shot(2, 'ben', 0, { sure: true })]);
+    const done = settleAll(s1, { filed: { [s1.hits[1].id]: 1 }, rejected: {}, recalls: {} });
+    expect(done.hits.map((h) => h.status)).toEqual(['half', 'full']);
+    expect(done.sinks[0]).toMatchObject({ recall: 'none', bonus: 0 });
+    expect(done.damage.t1).toBe(5);
+    expect(s1.hits[0].status).toBe('owed');
+  });
+});
+
+describe('fleet_week standings', () => {
+  const owners2 = (t: string) => [`${t}a`, `${t}b`];
+  const eight: Pairing = {
+    teams: ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8'].map((id) => ({ id, owners: owners2(id) })),
+    matches: [{ id: 'm1', teams: ['t1', 't2'] }, { id: 'm2', teams: ['t3', 't4'] }, { id: 'm3', teams: ['t5', 't6'] }, { id: 'm4', teams: ['t7', 't8'] }]
+  };
+  it('ranks by damage, then ships sunk, then first-try accuracy', () => {
+    const s = emptyState(eight);
+    Object.assign(s.damage, { t1: 4, t2: 6, t3: 4, t4: 4, t5: 2, t6: 2 });
+    s.sinks.push({ target: 't4', ship: 's3', by: 't3a', team: 't3', round: 1, recall: 'wrong', bonus: 0 });
+    Object.assign(s.first_try, { t5a: { right: 1, total: 2 }, t6a: { right: 2, total: 2 }, t6b: { right: 1, total: 2 } });
+    const table = standings(s, eight);
+    expect(table.map((m) => m.winner)).toEqual(['t2', 't3', 't6', null]);
+    expect(table[0].teams.map((t) => t.team)).toEqual(['t2', 't1']);
+    expect(table[1].teams[0]).toEqual({ team: 't3', damage: 4, sunk: 1, accuracy: 0 });
+    expect(table[2].teams[0]).toMatchObject({ team: 't6', accuracy: 0.75 });
+  });
+  it('never crowns the ghost', () => {
+    const p = pairTeams(['ann', 'ben'], rng('g'));
+    expect(standings(emptyState(p), p)[0].winner).toBeNull();
+  });
+});
+
+describe('fleet_week resolveRound: purity', () => {
+  it('is deterministic and never mutates its input', () => {
+    const s0 = placed(duel, { ann: annShips(), cat: annShips() });
+    const s1 = play(s0, 1, [shot(1, 'ann', 0), shot(2, 'ben', 7, { sure: true, correct: false }), shot(3, 'cat', 4)]);
+    const in2 = input(duel, 2, { shots: [shot(1, 'ann', 1, { sure: true }), shot(2, 'dan', 9, { correct: false })], filed: { [s1.hits[0].id]: 1 }, recalls: {} });
+    const frozenPrev = deepFreeze(structuredClone(s1));
+    const frozenInput = deepFreeze(structuredClone(in2));
+    const a = resolveRound(frozenPrev, frozenInput);
+    const b = resolveRound(structuredClone(s1), structuredClone(in2));
+    expect(a).toEqual(b);
+    expect(frozenPrev).toEqual(s1);
+    expect(placed(duel, { ann: annShips() })).toEqual(placed(duel, { ann: annShips() }));
+    expect(() => resolveRound(deepFreeze(emptyState(duel)), deepFreeze(input(duel, 0, { placements: duelPlacements() })))).not.toThrow();
+  });
 });
