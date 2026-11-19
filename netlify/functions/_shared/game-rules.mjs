@@ -2365,11 +2365,11 @@ function rowOf(i) {
 function colOf(i) {
   return i % GRID2;
 }
-function squareLabel(i) {
-  return `${ROW_LETTERS[rowOf(i)]}${colOf(i) + 1}`;
-}
 function onGrid(i) {
   return Number.isInteger(i) && i >= 0 && i < SQUARES;
+}
+function squareLabel(i) {
+  return onGrid(i) ? `${ROW_LETTERS[rowOf(i)]}${colOf(i) + 1}` : "?";
 }
 function neighbours(i) {
   const out = [];
@@ -2514,28 +2514,34 @@ function signAt(k) {
 function callSigns(viewer, joined, hash) {
   const used = /* @__PURE__ */ new Set();
   const out = {};
+  let extra = 1;
   for (const subject of joined) {
     if (subject in out) continue;
     let k = (hash(`${viewer}|${subject}`) % SIGNS + SIGNS) % SIGNS;
-    let probes = 0;
-    while (used.has(k) && probes < SIGNS) {
-      k = (k + 1) % SIGNS;
-      probes++;
+    if (used.size >= SIGNS) {
+      out[subject] = `${signAt(k)} ${++extra}`;
+      continue;
     }
+    while (used.has(k)) k = (k + 1) % SIGNS;
     used.add(k);
-    out[subject] = probes < SIGNS ? signAt(k) : `${signAt(k)} ${used.size}`;
+    out[subject] = signAt(k);
   }
   return out;
 }
 function pickVariant(square, owner, matchOwners, given, count, returning) {
   if (count <= 1) return 0;
   if (returning) return returning.not === 0 ? 1 : 0;
-  const times = Array.from({ length: count }, () => 0);
+  const mine = Array.from({ length: count }, () => 0);
+  const others = Array.from({ length: count }, () => 0);
   for (const g of given) {
-    if (g.square === square && g.owner !== owner && matchOwners.includes(g.owner) && g.variant >= 0 && g.variant < count) times[g.variant]++;
+    if (g.square !== square || g.variant < 0 || g.variant >= count) continue;
+    if (g.owner === owner) mine[g.variant]++;
+    else if (matchOwners.includes(g.owner)) others[g.variant]++;
   }
   let best = 0;
-  for (let v = 1; v < count; v++) if (times[v] < times[best]) best = v;
+  for (let v = 1; v < count; v++) {
+    if (mine[v] < mine[best] || mine[v] === mine[best] && others[v] < others[best]) best = v;
+  }
   return best;
 }
 var DAMAGE = { hit: 2, sure: 4, returning: 1, sink_bonus: 2 };
@@ -2565,14 +2571,18 @@ function clone(value) {
 function buildFleet(team, placements, seed) {
   const fleet = [];
   const squaresOf = (ships) => ships.flatMap((s) => s.squares);
+  const unplaced = [];
   for (const owner of team.owners) {
     const ids = shipsFor(team, owner);
     if (!ids.length) continue;
     const own = placements[owner];
-    const ok = own && placementProblem(own, owner, team, fleet) === null;
-    const ships = ok ? ids.map((id) => ({ id, squares: [...own.find((s) => s.id === id).squares].sort((a, b) => a - b) })) : autoPlace(ids, fleet, squaresOf(fleet), rng(seed + owner));
-    fleet.push(...ships);
+    if (own && placementProblem(own, owner, team, fleet) === null) {
+      fleet.push(...ids.map((id) => ({ id, squares: [...own.find((s) => s.id === id).squares].sort((a, b) => a - b) })));
+    } else {
+      unplaced.push(owner);
+    }
   }
+  for (const owner of unplaced) fleet.push(...autoPlace(shipsFor(team, owner), fleet, squaresOf(fleet), rng(seed + owner)));
   const missing = SHIP_IDS.filter((id) => !fleet.some((s) => s.id === id));
   if (missing.length) fleet.push(...autoPlace([...missing], fleet, squaresOf(fleet), rng(seed + team.id)));
   return SHIP_IDS.map((id) => fleet.find((s) => s.id === id));
@@ -2581,17 +2591,17 @@ function settleHit(state, hit, filed) {
   hit.status = filed[hit.id] != null ? "full" : "half";
   state.damage[hit.team] = (state.damage[hit.team] ?? 0) + (hit.status === "full" ? hit.full : halfDamage(hit.full));
 }
-function settleHits(state, round, input, all) {
+function settleHits(state, input, round) {
   for (const hit of state.hits) {
     if (hit.status !== "owed") continue;
     hit.rejected = input.rejected[hit.id] ?? 0;
     hit.due = hit.round + 1 + Math.min(hit.rejected, 1);
-    if (all || round >= hit.due) settleHit(state, hit, input.filed);
+    if (round === void 0 || round >= hit.due) settleHit(state, hit, input.filed);
   }
 }
-function settleRecalls(state, round, recalls, all) {
+function settleRecalls(state, recalls, round) {
   for (const sink of state.sinks) {
-    if (sink.recall !== "pending" || !all && sink.round >= round) continue;
+    if (sink.recall !== "pending" || round !== void 0 && sink.round >= round) continue;
     const answer = recalls[`${sink.target}:${sink.ship}`];
     sink.recall = answer === true ? "right" : answer === false ? "wrong" : "none";
     if (answer === true) {
@@ -2600,7 +2610,7 @@ function settleRecalls(state, round, recalls, all) {
     }
   }
 }
-function livelyLines(state, team) {
+function linesWithOpenShipSquares(state, team) {
   const chart = state.charts[team] ?? {};
   const open = (state.fleets[team] ?? []).flatMap((s) => s.squares).filter((sq) => chart[sq] !== "hit");
   const rows = [...new Set(open.map(rowOf))].sort((a, b) => a - b).map((r) => `row:${ROW_LETTERS[r]}`);
@@ -2616,6 +2626,7 @@ function countFirstTry(state, shot, outcome) {
 function resolveRound(prev, input) {
   const state = clone(prev);
   const { pairing, round, seed } = input;
+  if (round !== prev.round + 1) throw new Error(`Fleet week: round ${round} out of order`);
   for (const t of pairing.teams) {
     state.charts[t.id] ??= {};
     state.damage[t.id] ??= 0;
@@ -2626,15 +2637,18 @@ function resolveRound(prev, input) {
     state.round = 0;
     return state;
   }
-  settleHits(state, round, input, false);
-  settleRecalls(state, round, input.recalls, false);
-  const shots = clone(input.shots).sort((a, b) => a.seq - b.seq);
+  settleHits(state, input, round);
+  settleRecalls(state, input.recalls, round);
+  const shots = clone(input.shots).sort((a, b) => a.seq - b.seq || (a.owner < b.owner ? -1 : a.owner > b.owner ? 1 : 0));
   const results = [];
   for (const shot of shots) {
     const team = teamOf(pairing, shot.owner);
-    if (!team) continue;
+    const match = team && matchOf(pairing, team.id);
+    if (!team || !match || !onGrid(shot.square)) {
+      results.push({ ...shot, outcome: "void", target: team ? rivalOf(pairing, team.id) : "", damage: 0 });
+      continue;
+    }
     const target = rivalOf(pairing, team.id);
-    const match = matchOf(pairing, team.id);
     const chart = state.charts[target] ??= {};
     const result = (outcome, extra = {}) => ({ ...shot, outcome, target, damage: 0, ...extra });
     state.given.push({ owner: shot.owner, square: shot.square, variant: shot.variant });
@@ -2646,7 +2660,7 @@ function resolveRound(prev, input) {
     const ship = (state.fleets[target] ?? []).find((s) => s.squares.includes(shot.square));
     if (shot.voided) {
       res = result("void");
-    } else if (!match || state.ended[match.id]) {
+    } else if (state.ended[match.id]) {
       res = result("practice");
     } else if (chart[shot.square]) {
       res = result("dup");
@@ -2654,9 +2668,9 @@ function resolveRound(prev, input) {
       if (shot.correct !== true) {
         res = result("dud");
         state.returns.push({ owner: shot.owner, square: shot.square, variant: shot.variant === 0 ? 1 : 0, due: round + 2 });
-        const lines = shot.sure ? livelyLines(state, team.id) : [];
+        const lines = shot.sure ? linesWithOpenShipSquares(state, team.id) : [];
         if (lines.length) {
-          const pick = lines[Math.floor(rng(seed + shot.seq)() * lines.length)];
+          const pick = lines[Math.floor(rng(seed + shot.owner + shot.seq)() * lines.length)];
           state.pings.push({ to: target, about: team.id, line: pick, round });
         }
       } else if (!ship) {
@@ -2667,7 +2681,7 @@ function resolveRound(prev, input) {
         const full = (shot.sure ? DAMAGE.sure : DAMAGE.hit) + (shot.returning ? DAMAGE.returning : 0);
         const alone = !team.owners.some((o) => o !== shot.owner);
         const hit = {
-          id: `h${round}-${shot.seq}`,
+          id: `h${round}-${shot.owner}-${shot.seq}`,
           owner: shot.owner,
           team: team.id,
           target,
@@ -2697,8 +2711,8 @@ function resolveRound(prev, input) {
 }
 function settleAll(state, input) {
   const next = clone(state);
-  settleHits(next, next.round, input, true);
-  settleRecalls(next, next.round, input.recalls, true);
+  settleHits(next, input);
+  settleRecalls(next, input.recalls);
   return next;
 }
 function standings(state, pairing) {

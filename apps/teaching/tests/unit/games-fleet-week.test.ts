@@ -69,6 +69,9 @@ describe('fleet_week grid', () => {
     expect(squareLabel(7)).toBe('B3');
     expect(squareLabel(24)).toBe('E5');
   });
+  it('labels a square off the chart as ?', () => {
+    expect([squareLabel(-1), squareLabel(25), squareLabel(2.5)]).toEqual(['?', '?', '?']);
+  });
   it('builds a line inside the chart', () => {
     expect(shipLine(0, 3, 'h')).toEqual([0, 1, 2]);
     expect(shipLine(2, 3, 'v')).toEqual([2, 7, 12]);
@@ -191,6 +194,13 @@ describe('fleet_week callSigns', () => {
     expect(new Set(Object.values(callSigns('ann', many, fnv1a))).size).toBe(30);
     expect(new Set(Object.values(callSigns('ann', many, () => 7))).size).toBe(30);
   });
+  it('numbers the extras once all 120 signs are used', () => {
+    const crowd = Array.from({ length: 123 }, (_, i) => `s${i}`);
+    const signs = callSigns('ann', crowd, () => 0);
+    expect(new Set(Object.values(signs)).size).toBe(123);
+    expect([signs.s120, signs.s121, signs.s122]).toEqual(['Captain Kestrel 2', 'Captain Kestrel 3', 'Captain Kestrel 4']);
+    expect(new Set(Object.values(callSigns('ann', crowd, fnv1a))).size).toBe(123);
+  });
   it('differs between viewers', () => {
     const a = callSigns('ann', joined, fnv1a);
     const b = callSigns('ben', joined, fnv1a);
@@ -218,6 +228,11 @@ describe('fleet_week pickVariant', () => {
   it('picks the least given when both are taken', () => {
     const given: Given[] = [{ owner: 'ann', square: 5, variant: 0 }, { owner: 'ben', square: 5, variant: 1 }, { owner: 'cat', square: 5, variant: 0 }];
     expect(pickVariant(5, 'dan', match, given, 2)).toBe(1);
+  });
+  it('prefers a variant this player has not had for the square', () => {
+    expect(pickVariant(5, 'ann', match, [{ owner: 'ann', square: 5, variant: 0 }], 2)).toBe(1);
+    const given: Given[] = [{ owner: 'ann', square: 5, variant: 1 }, { owner: 'ben', square: 5, variant: 0 }];
+    expect(pickVariant(5, 'ann', match, given, 2)).toBe(0);
   });
   it('gives a returning square the other variant', () => {
     expect(pickVariant(5, 'ann', match, [], 2, { not: 0 })).toBe(1);
@@ -266,6 +281,15 @@ describe('fleet_week resolveRound: placement', () => {
     const benPart = s.fleets.t1.filter((x) => x.id === 's1' || x.id === 's2');
     expect(benPart).toHaveLength(2);
     expect(placementProblem(benPart, 'ben', duel.teams[0], s.fleets.t1)).toBeNull();
+  });
+  it('keeps a valid layout when the teammate never placed', () => {
+    const pair: Pairing = { teams: [{ id: 't1', owners: ['a', 'b'] }, { id: 't2', owners: ['c', 'd'] }], matches: [{ id: 'm1', teams: ['t1', 't2'] }] };
+    const bShips = [ship('s1', [0, 1]), ship('s2', [2, 3])];
+    for (let k = 0; k < 30; k++) {
+      const s = resolveRound(emptyState(pair), input(pair, 0, { seed: `seed-${k}`, placements: { b: bShips } }));
+      expect(s.fleets.t1.filter((x) => x.id === 's1' || x.id === 's2')).toEqual(bShips);
+      expect(new Set(s.fleets.t1.flatMap((x) => x.squares)).size).toBe(8);
+    }
   });
   it('auto-places the ghost fleet, and the ghost can be hit', () => {
     const p = pairTeams(['ann', 'ben'], rng('g'));
@@ -347,6 +371,31 @@ describe('fleet_week resolveRound: shots', () => {
     const s1 = play(placed(), 1, [shot(1, 'ann', 0, { correct: false }), shot(2, 'ben', 0), shot(3, 'ann', 6, { voided: true }), shot(4, 'ben', 6)]);
     expect(results(s1).map((r) => r.outcome)).toEqual(['dud', 'hit', 'void', 'miss']);
     expect(s1.hits).toHaveLength(1);
+  });
+  it('keeps hits apart when two owners commit at the same time', () => {
+    const s1 = play(placed(), 1, [shot(1, 'cat', 0), shot(1, 'ann', 0)]);
+    expect(results(s1).map((r) => r.owner)).toEqual(['ann', 'cat']);
+    const ids = s1.hits.map((h) => h.id);
+    expect(new Set(ids).size).toBe(2);
+    const annHit = s1.hits.find((h) => h.owner === 'ann') as (typeof s1.hits)[number];
+    const s2 = play(s1, 2, [], { filed: { [annHit.id]: 1 } });
+    expect(Object.fromEntries(s2.hits.map((h) => [h.owner, h.status]))).toEqual({ ann: 'full', cat: 'half' });
+  });
+  it('a stranger, an unmatched team or a square off the chart is void', () => {
+    const odd: Pairing = { ...duel, teams: [...duel.teams, { id: 't3', owners: ['eve'] }] };
+    const s0 = placed(odd, { ...duelPlacements() });
+    const s1 = play(s0, 1, [shot(1, 'zed', 0), shot(2, 'eve', 0), shot(3, 'ann', 25), shot(4, 'ann', -1)], {}, odd);
+    expect(results(s1).map((r) => r.outcome)).toEqual(['void', 'void', 'void', 'void']);
+    expect(s1.charts.t1).toEqual({});
+    expect(s1.charts.t2).toEqual({});
+    expect(s1.charts.t3).toEqual({});
+    expect(s1.hits).toEqual([]);
+  });
+  it('refuses a round out of order', () => {
+    const s1 = play(placed(), 1, []);
+    expect(() => play(s1, 1, [])).toThrow('Fleet week: round 1 out of order');
+    expect(() => play(s1, 3, [])).toThrow('Fleet week: round 3 out of order');
+    expect(() => play(emptyState(duel), 1, [])).toThrow('Fleet week: round 1 out of order');
   });
   it('a voided shot records nothing and does not return', () => {
     const s1 = play(placed(), 1, [shot(1, 'ann', 0, { voided: true }), shot(2, 'ben', 6, { voided: true, correct: false })]);

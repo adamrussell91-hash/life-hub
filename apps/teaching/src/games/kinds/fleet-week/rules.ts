@@ -57,13 +57,13 @@ export function colOf(i: number): number {
   return i % GRID;
 }
 
-/** Screen label of a square, 'A1'..'E5': row letter, column number (decision 1). */
-export function squareLabel(i: number): string {
-  return `${ROW_LETTERS[rowOf(i)]}${colOf(i) + 1}`;
-}
-
 function onGrid(i: number): boolean {
   return Number.isInteger(i) && i >= 0 && i < SQUARES;
+}
+
+/** Screen label of a square, 'A1'..'E5': row letter, column number; '?' off the chart (decision 1). */
+export function squareLabel(i: number): string {
+  return onGrid(i) ? `${ROW_LETTERS[rowOf(i)]}${colOf(i) + 1}` : '?';
 }
 
 /** Orthogonal neighbours of a square that are on the chart ("touch", decision 3). */
@@ -148,10 +148,13 @@ export function placementProblem(ships: Ship[], owner: string, team: Team, fleet
 const TOUCH_TRIES = 200;
 
 /**
- * Place `ids` at random on a chart that already holds `fleet`, keeping clear of
- * `partnerSquares` (§3.5 never places; decision 3). A randomised backtracking
- * search: it keeps the touch rule for up to 200 tries, then drops it. Overlap is
- * never allowed. Returns the ships in `ids` order.
+ * Place `ids` at random on a chart that already holds `fleet` (§3.5 "never
+ * places ships"; decision 3). No square of a new ship may overlap `fleet` or
+ * another new ship. The new ships should also not touch `partnerSquares`
+ * orthogonally; they may touch each other. A backtracking search over the
+ * shuffled candidate lines keeps that touch rule for up to 200 candidate tries;
+ * if it finds nothing it searches again without it. Returns the ships in `ids`
+ * order, or fewer ships only if no non-overlapping layout exists at all.
  */
 export function autoPlace(ids: ShipId[], fleet: Ship[], partnerSquares: number[], random: Rng): Ship[] {
   const taken = new Set(fleet.flatMap((s) => s.squares));
@@ -259,14 +262,18 @@ function signAt(k: number): string {
 export function callSigns(viewer: string, joined: string[], hash: (s: string) => number): Record<string, string> {
   const used = new Set<number>();
   const out: Record<string, string> = {};
+  let extra = 1;
   for (const subject of joined) {
     if (subject in out) continue;
     let k = ((hash(`${viewer}|${subject}`) % SIGNS) + SIGNS) % SIGNS;
-    let probes = 0;
-    while (used.has(k) && probes < SIGNS) { k = (k + 1) % SIGNS; probes++; }
+    if (used.size >= SIGNS) {
+      // All 120 are taken: number the extras with a running counter so each stays unique.
+      out[subject] = `${signAt(k)} ${++extra}`;
+      continue;
+    }
+    while (used.has(k)) k = (k + 1) % SIGNS;
     used.add(k);
-    // More than 120 subjects cannot all be unique; number the overflow.
-    out[subject] = probes < SIGNS ? signAt(k) : `${signAt(k)} ${used.size}`;
+    out[subject] = signAt(k);
   }
   return out;
 }
@@ -277,19 +284,24 @@ export function callSigns(viewer: string, joined: string[], hash: (s: string) =>
 
 /**
  * Which of a square's `count` variants a player gets (§1.1). A returning square
- * gets a variant other than `returning.not`. Otherwise prefer a variant nobody
- * else in the match has been given for this square (lowest index first), else
- * the one given the fewest times.
+ * gets a variant other than `returning.not`. Otherwise prefer a variant this
+ * owner has not been given for this square, then one nobody else in the match
+ * has been given (fewest times wins), then the lower index.
  */
 export function pickVariant(square: number, owner: string, matchOwners: string[], given: Given[], count: number, returning?: { not: number }): number {
   if (count <= 1) return 0;
   if (returning) return returning.not === 0 ? 1 : 0;
-  const times = Array.from({ length: count }, () => 0);
+  const mine = Array.from({ length: count }, () => 0);
+  const others = Array.from({ length: count }, () => 0);
   for (const g of given) {
-    if (g.square === square && g.owner !== owner && matchOwners.includes(g.owner) && g.variant >= 0 && g.variant < count) times[g.variant]++;
+    if (g.square !== square || g.variant < 0 || g.variant >= count) continue;
+    if (g.owner === owner) mine[g.variant]++;
+    else if (matchOwners.includes(g.owner)) others[g.variant]++;
   }
   let best = 0;
-  for (let v = 1; v < count; v++) if (times[v] < times[best]) best = v;
+  for (let v = 1; v < count; v++) {
+    if (mine[v] < mine[best] || (mine[v] === mine[best] && others[v] < others[best])) best = v;
+  }
   return best;
 }
 
@@ -299,6 +311,7 @@ export function pickVariant(square: number, owner: string, matchOwners: string[]
 
 /** One committed shot. `correct` is decided at answer time (decision 9); null means no answer in time. */
 export type Shot = {
+  /** Commit time in ms (server clock); ties broken by owner. Not unique across owners. */
   seq: number; owner: string; square: number; sure: boolean; variant: number; item: string;
   correct: boolean | null;
   returning: boolean; voided?: boolean;
@@ -378,20 +391,27 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-/** Round 0 (§1.3 placement; decision 2): each owner's layout if it stands, else auto-placed; leftovers and the ghost auto-placed. */
+/**
+ * Round 0 (§1.3 placement; decision 2). First accept every owner's submitted
+ * layout that stands against the layouts already accepted (in team order), so a
+ * missing teammate can never cost anyone their layout. Then auto-place the
+ * owners with no valid layout, then any ships nobody owns (a team of one, the ghost).
+ */
 function buildFleet(team: Team, placements: Record<string, Ship[]>, seed: string): Ship[] {
   const fleet: Ship[] = [];
   const squaresOf = (ships: Ship[]) => ships.flatMap((s) => s.squares);
+  const unplaced: string[] = [];
   for (const owner of team.owners) {
     const ids = shipsFor(team, owner);
     if (!ids.length) continue;
     const own = placements[owner];
-    const ok = own && placementProblem(own, owner, team, fleet) === null;
-    const ships = ok
-      ? ids.map((id) => ({ id, squares: [...(own.find((s) => s.id === id) as Ship).squares].sort((a, b) => a - b) }))
-      : autoPlace(ids, fleet, squaresOf(fleet), rng(seed + owner));
-    fleet.push(...ships);
+    if (own && placementProblem(own, owner, team, fleet) === null) {
+      fleet.push(...ids.map((id) => ({ id, squares: [...(own.find((s) => s.id === id) as Ship).squares].sort((a, b) => a - b) })));
+    } else {
+      unplaced.push(owner);
+    }
   }
+  for (const owner of unplaced) fleet.push(...autoPlace(shipsFor(team, owner), fleet, squaresOf(fleet), rng(seed + owner)));
   const missing = SHIP_IDS.filter((id) => !fleet.some((s) => s.id === id));
   if (missing.length) fleet.push(...autoPlace([...missing], fleet, squaresOf(fleet), rng(seed + team.id)));
   return SHIP_IDS.map((id) => fleet.find((s) => s.id === id) as Ship);
@@ -403,20 +423,20 @@ function settleHit(state: FleetState, hit: Hit, filed: Record<string, number>): 
   state.damage[hit.team] = (state.damage[hit.team] ?? 0) + (hit.status === 'full' ? hit.full : halfDamage(hit.full));
 }
 
-/** Settle owed hits whose deadline has passed (or all of them, at the reveal). */
-function settleHits(state: FleetState, round: number, input: Pick<RoundInput, 'filed' | 'rejected'>, all: boolean): void {
+/** Settle owed hits whose deadline has passed by `round`, or all of them when `round` is omitted (the reveal). */
+function settleHits(state: FleetState, input: Pick<RoundInput, 'filed' | 'rejected'>, round?: number): void {
   for (const hit of state.hits) {
     if (hit.status !== 'owed') continue;
     hit.rejected = input.rejected[hit.id] ?? 0;
     hit.due = hit.round + 1 + Math.min(hit.rejected, 1);
-    if (all || round >= hit.due) settleHit(state, hit, input.filed);
+    if (round === undefined || round >= hit.due) settleHit(state, hit, input.filed);
   }
 }
 
-/** Settle recall lines owed for ships sunk before `round` (or all of them, at the reveal) (§1.5). */
-function settleRecalls(state: FleetState, round: number, recalls: Record<string, boolean>, all: boolean): void {
+/** Settle recall lines owed for ships sunk before `round`, or all of them when `round` is omitted (the reveal) (§1.5). */
+function settleRecalls(state: FleetState, recalls: Record<string, boolean>, round?: number): void {
   for (const sink of state.sinks) {
-    if (sink.recall !== 'pending' || (!all && sink.round >= round)) continue;
+    if (sink.recall !== 'pending' || (round !== undefined && sink.round >= round)) continue;
     const answer = recalls[`${sink.target}:${sink.ship}`];
     sink.recall = answer === true ? 'right' : answer === false ? 'wrong' : 'none';
     if (answer === true) {
@@ -427,7 +447,7 @@ function settleRecalls(state: FleetState, round: number, recalls: Record<string,
 }
 
 /** Lines ('row:A'…, 'col:1'…) of a team's chart that still hold an unhit ship square (§1.4 sonar ping). */
-function livelyLines(state: FleetState, team: string): string[] {
+function linesWithOpenShipSquares(state: FleetState, team: string): string[] {
   const chart = state.charts[team] ?? {};
   const open = (state.fleets[team] ?? []).flatMap((s) => s.squares).filter((sq) => chart[sq] !== 'hit');
   const rows = [...new Set(open.map(rowOf))].sort((a, b) => a - b).map((r) => `row:${ROW_LETTERS[r]}`);
@@ -452,6 +472,7 @@ function countFirstTry(state: FleetState, shot: Shot, outcome: Outcome): void {
 export function resolveRound(prev: FleetState, input: RoundInput): FleetState {
   const state = clone(prev);
   const { pairing, round, seed } = input;
+  if (round !== prev.round + 1) throw new Error(`Fleet week: round ${round} out of order`);
   for (const t of pairing.teams) {
     state.charts[t.id] ??= {};
     state.damage[t.id] ??= 0;
@@ -464,16 +485,20 @@ export function resolveRound(prev: FleetState, input: RoundInput): FleetState {
     return state;
   }
 
-  settleHits(state, round, input, false);
-  settleRecalls(state, round, input.recalls, false);
+  settleHits(state, input, round);
+  settleRecalls(state, input.recalls, round);
 
-  const shots = clone(input.shots).sort((a, b) => a.seq - b.seq);
+  const shots = clone(input.shots).sort((a, b) => a.seq - b.seq || (a.owner < b.owner ? -1 : a.owner > b.owner ? 1 : 0));
   const results: ShotResult[] = [];
   for (const shot of shots) {
     const team = teamOf(pairing, shot.owner);
-    if (!team) continue;                           // not in this campaign
+    const match = team && matchOf(pairing, team.id);
+    if (!team || !match || !onGrid(shot.square)) {
+      // Not a shot this campaign can place: a stranger, a team with no match, or a square off the chart.
+      results.push({ ...shot, outcome: 'void', target: team ? rivalOf(pairing, team.id) : '', damage: 0 });
+      continue;
+    }
     const target = rivalOf(pairing, team.id);
-    const match = matchOf(pairing, team.id);
     const chart = (state.charts[target] ??= {});
     const result = (outcome: Outcome, extra: Partial<ShotResult> = {}): ShotResult => ({ ...shot, outcome, target, damage: 0, ...extra });
     state.given.push({ owner: shot.owner, square: shot.square, variant: shot.variant });
@@ -486,7 +511,7 @@ export function resolveRound(prev: FleetState, input: RoundInput): FleetState {
     const ship = (state.fleets[target] ?? []).find((s) => s.squares.includes(shot.square));
     if (shot.voided) {
       res = result('void');
-    } else if (!match || state.ended[match.id]) {
+    } else if (state.ended[match.id]) {
       res = result('practice');
     } else if (chart[shot.square]) {
       // Already hit or missed, before or earlier this round (the chart updates as shots resolve).
@@ -496,9 +521,9 @@ export function resolveRound(prev: FleetState, input: RoundInput): FleetState {
       if (shot.correct !== true) {
         res = result('dud');
         state.returns.push({ owner: shot.owner, square: shot.square, variant: shot.variant === 0 ? 1 : 0, due: round + 2 });
-        const lines = shot.sure ? livelyLines(state, team.id) : [];
+        const lines = shot.sure ? linesWithOpenShipSquares(state, team.id) : [];
         if (lines.length) {
-          const pick = lines[Math.floor(rng(seed + shot.seq)() * lines.length)];
+          const pick = lines[Math.floor(rng(seed + shot.owner + shot.seq)() * lines.length)];
           state.pings.push({ to: target, about: team.id, line: pick, round });
         }
       } else if (!ship) {
@@ -509,7 +534,7 @@ export function resolveRound(prev: FleetState, input: RoundInput): FleetState {
         const full = (shot.sure ? DAMAGE.sure : DAMAGE.hit) + (shot.returning ? DAMAGE.returning : 0);
         const alone = !team.owners.some((o) => o !== shot.owner);
         const hit: Hit = {
-          id: `h${round}-${shot.seq}`, owner: shot.owner, team: team.id, target, square: shot.square, round,
+          id: `h${round}-${shot.owner}-${shot.seq}`, owner: shot.owner, team: team.id, target, square: shot.square, round,
           full, due: round + 1, rejected: 0, status: 'owed'
         };
         if (alone) settleHit(state, hit, { [hit.id]: round });
@@ -534,8 +559,8 @@ export function resolveRound(prev: FleetState, input: RoundInput): FleetState {
 /** At the reveal: settle every open hit as if due, and every pending recall line (§1.6, §1.7; decision 6). */
 export function settleAll(state: FleetState, input: Pick<RoundInput, 'filed' | 'rejected' | 'recalls'>): FleetState {
   const next = clone(state);
-  settleHits(next, next.round, input, true);
-  settleRecalls(next, next.round, input.recalls, true);
+  settleHits(next, input);
+  settleRecalls(next, input.recalls);
   return next;
 }
 
