@@ -17,6 +17,7 @@ Status: reviewed by Adam 11 Nov (answers in §11); Phase 0 mockups next. Nothing
 
 - The twelve games: **crossword, find-a-word, Jeopardy, Wheel of Fortune, team match** (his own Quizlet Live), **points rush** (his own Gimkit/Blooket, without the gimmicks), **short-answer battles** (his own ShortAnswer), **wager, Connections wall, Articulate, Pictionary, Who said it?**
 - Rejected as "classroom activities, not games": odd one out, cloze race, timeline/sequencing, link chain, spot the error, Just a Minute, brain dump race.
+- **Added 19 Nov: Answer chain (§6.13).** Not the rejected "link chain" activity: teams race reversed question–answer chains with shadowing, captures and an anonymous peer review. Approved from the playable mockup `docs/mockups/games/answer-chain.html`.
 - Wager: everyone starts with 100 **points** (never money), bets any amount, right answers split the pot of wrong bets, most points wins.
 - Find-a-word plays from **clues, not a word list** (definitions and, better, examples), with **decoy words** and a **hidden message**.
 - Wheel of Fortune: every student solves **privately** on their phone; the app records **how many letters were showing** when each student got it; letters are **earned by answering**; every solve is followed by a **solve-then-explain** question.
@@ -416,6 +417,26 @@ Built **on the existing comparative judgement engine** (`_shared/cj-maths.mjs` a
 - **Motion:** cast portraits fan in as a hand of cards on the phone; on reveal, the right character card flips forward on the board with the quote's source.
 - **Data:** per student per quote. **Speaker confusion matrix** (true speaker × chosen speaker). **Fake catch rate** (fakes called fake) and **false-alarm rate** (real quotes called fake), shown together as one "ear for the text" score per student (sensitivity minus false alarms).
 - **Print:** quote list with tick boxes for each character and "fake".
+
+### 6.13 Answer chain
+
+Every team runs one chain from the same start answer: question, answer, question, answer… Each link's writer sees only the link before theirs, so chains drift. All chains run at once, one link per round. Live only, team game (2–6 teams).
+
+- **Content:** a start answer (one word or a short name), an optional topic line, tags. Settings: links per chain (4–12, always even, default 6), seconds to write a question (default 20) and to answer (default 10), review seconds (default 90).
+- **One job per round**, shown huge on the phone, with the whole game as a strip of jobs at the top:
+  - **WRITE:** your turn in your own chain. Answers are one word; questions get a "?" added.
+  - **SHADOW:** a teammate is answering. Answer the same question secretly and wager 1–3. Match: +3 × wager; miss: −wager. Everyone shadows about once a game, never the answer to their own question.
+  - **STEAL:** every other round. Another team's freshest question and the letter count of its answer. Guess the word to **capture** it: +10 to the thief, +5 to the question's writer (it was clear enough to crack). Three guesses, 3 s lockout after a miss; a link is captured once.
+  - **WARM UP:** before any answer exists (rounds 1–2), non-writers predict where their chain will land (+5 if right).
+- **Timeouts:** an answer writer out of time is replaced by the first shadow answer (+3 to that shadow); a question writer out of time gets a backup question. Neither scores.
+- **Links tick themselves** (+5 to the writer). An answer most shadows disagree with is **held** (no points) until the review settles it.
+- **Bonuses:** two teams with the same answer at the same link, +5 each; a chain that lands back on the start answer, +5 to each of its writers.
+- **Board:** a thread per team with a bead per link, text hidden until the reveal; a capture takes over the whole board (CAPTURED!!, the thief's team, the word, the victim team); the reveal walks each chain link by link with the writer's initials.
+- **Review (anonymous, after the reveal):** each phone gets up to 12 pairs, never its own. Fix up to 3 answers (type the better one) or flag questions as unclear, and star the most accurate. A fix or unclear flag counts when 3+ reviewers and 20%+ of those shown the pair agree. Points: fix matching the class's fix +3 (spotted it, different fix +1), agreed unclear flag +2, star on the class favourite +2, +5 to each writer of the most-starred pair.
+- **Feedback goes to phones only (Adam, 19 Nov):** each writer sees how their own questions and answers fared; each reviewer sees whether the class agreed with them. The board never shows a fix, only the most-starred pair.
+- **Teacher check:** before feedback goes out, the board offers a Teacher check panel (closed by default, because it's on the projector) to agree or overrule each pair over the bar; it sends itself after 20 s. Open question: a teacher-only device view so the check never needs the board.
+- **Data:** every write, shadow, steal and review is recorded per student (`ctx.record`, `extra.act`), unjudged.
+- **Edge:** a late joiner steals; a dropped writer's links fall to timeouts.
 
 ---
 

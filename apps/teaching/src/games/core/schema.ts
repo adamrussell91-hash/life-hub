@@ -34,7 +34,8 @@ export const GAME_KINDS = [
   'connections',
   'articulate',
   'pictionary',
-  'who_said_it'
+  'who_said_it',
+  'answer_chain'
 ] as const;
 export type GameKind = (typeof GAME_KINDS)[number];
 export const GameKindSchema = z.enum(GAME_KINDS);
@@ -54,7 +55,8 @@ export const GAME_KIND_INFO: Record<GameKind, { label: string; solo: boolean; li
   connections: { label: 'Connections wall', solo: true, live: true, team: false, shapes: ['group'] },
   articulate: { label: 'Articulate', solo: false, live: true, team: true, shapes: ['term'] },
   pictionary: { label: 'Pictionary', solo: false, live: true, team: false, shapes: ['term', 'quote'] },
-  who_said_it: { label: 'Who said it?', solo: true, live: true, team: false, shapes: ['quote'] }
+  who_said_it: { label: 'Who said it?', solo: true, live: true, team: false, shapes: ['quote'] },
+  answer_chain: { label: 'Answer chain', solo: false, live: true, team: true, shapes: [] }
 };
 
 /* ── Limits ────────────────────────────────────────────────────────── */
@@ -86,7 +88,10 @@ export const GAME_LIMITS = {
   prompt: 1000,
   criterion: 200,
   chips: 6,
-  chip: 60
+  chip: 60,
+  /** Answer chain: the answer every chain starts from, and the topic line. */
+  startAnswer: 40,
+  theme: 120
 } as const;
 
 /** Item counts per kind (spec §6): `min` is checked at publish, `max` always. */
@@ -309,6 +314,25 @@ export const BattlesSchema = z.object({
   ...ItemTagsShape
 });
 
+export const AnswerChainSchema = z.object({
+  ...base,
+  kind: z.literal('answer_chain'),
+  /** The answer every team's chain starts from (one word or a short name). */
+  start_answer: Text(GAME_LIMITS.startAnswer),
+  /** Optional: keeps every link on topic ("The water cycle"). */
+  theme: Text(GAME_LIMITS.theme),
+  settings: z
+    .object({
+      /** Links per chain: question, answer, question… always even, so a chain ends on an answer. */
+      links: z.number().int().min(4).max(12).default(6),
+      question_seconds: z.number().int().min(10).max(60).default(20),
+      answer_seconds: z.number().int().min(5).max(30).default(10),
+      review_seconds: z.number().int().min(30).max(180).default(90)
+    })
+    .prefault({}),
+  ...ItemTagsShape
+});
+
 export const WagerSchema = z.object({
   ...base,
   kind: z.literal('wager'),
@@ -370,7 +394,8 @@ export const GameSchema = z.discriminatedUnion('kind', [
   ConnectionsSchema,
   ArticulateSchema,
   PictionarySchema,
-  WhoSaidItSchema
+  WhoSaidItSchema,
+  AnswerChainSchema
 ]);
 export type Game = z.infer<typeof GameSchema>;
 export type GameOf<K extends GameKind> = Extract<Game, { kind: K }>;

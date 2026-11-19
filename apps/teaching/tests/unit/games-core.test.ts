@@ -19,8 +19,8 @@ const seeded = (seed = 7) => {
 };
 
 describe('game schema', () => {
-  it('has the twelve kinds, and a draft fills its defaults', () => {
-    expect(GAME_KINDS).toHaveLength(12);
+  it('has the thirteen kinds, and a draft fills its defaults', () => {
+    expect(GAME_KINDS).toHaveLength(13);
     const g = parse({ id: 'g1', kind: 'team_match' });
     expect(g.kind === 'team_match' && g.settings.wrong_tap).toBe('back3');
     expect(g.title).toBe('');

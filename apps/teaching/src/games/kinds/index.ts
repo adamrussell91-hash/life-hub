@@ -6,6 +6,7 @@
  * `games/solo/registry.ts`. The arcade and print import this file, so a kind
  * registered here is playable and printable everywhere.
  */
+import './answer-chain';
 import './articulate';
 import './battles';
 import './connections';

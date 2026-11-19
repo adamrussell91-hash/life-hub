@@ -767,7 +767,8 @@ var GAME_KINDS = [
   "connections",
   "articulate",
   "pictionary",
-  "who_said_it"
+  "who_said_it",
+  "answer_chain"
 ];
 var GameKindSchema = z3.enum(GAME_KINDS);
 var GAME_KIND_INFO = {
@@ -782,7 +783,8 @@ var GAME_KIND_INFO = {
   connections: { label: "Connections wall", solo: true, live: true, team: false, shapes: ["group"] },
   articulate: { label: "Articulate", solo: false, live: true, team: true, shapes: ["term"] },
   pictionary: { label: "Pictionary", solo: false, live: true, team: false, shapes: ["term", "quote"] },
-  who_said_it: { label: "Who said it?", solo: true, live: true, team: false, shapes: ["quote"] }
+  who_said_it: { label: "Who said it?", solo: true, live: true, team: false, shapes: ["quote"] },
+  answer_chain: { label: "Answer chain", solo: false, live: true, team: true, shapes: [] }
 };
 var GAME_LIMITS = {
   games: 8,
@@ -811,7 +813,10 @@ var GAME_LIMITS = {
   prompt: 1e3,
   criterion: 200,
   chips: 6,
-  chip: 60
+  chip: 60,
+  /** Answer chain: the answer every chain starts from, and the topic line. */
+  startAnswer: 40,
+  theme: 120
 };
 var GAME_COUNTS = {
   crossword: { min: 6, max: 30 },
@@ -981,6 +986,22 @@ var BattlesSchema = z3.object({
   settings: z3.object({ write_minutes: z3.number().int().min(2).max(8).default(4) }).prefault({}),
   ...ItemTagsShape
 });
+var AnswerChainSchema = z3.object({
+  ...base2,
+  kind: z3.literal("answer_chain"),
+  /** The answer every team's chain starts from (one word or a short name). */
+  start_answer: Text2(GAME_LIMITS.startAnswer),
+  /** Optional: keeps every link on topic ("The water cycle"). */
+  theme: Text2(GAME_LIMITS.theme),
+  settings: z3.object({
+    /** Links per chain: question, answer, question… always even, so a chain ends on an answer. */
+    links: z3.number().int().min(4).max(12).default(6),
+    question_seconds: z3.number().int().min(10).max(60).default(20),
+    answer_seconds: z3.number().int().min(5).max(30).default(10),
+    review_seconds: z3.number().int().min(30).max(180).default(90)
+  }).prefault({}),
+  ...ItemTagsShape
+});
 var WagerSchema = z3.object({
   ...base2,
   kind: z3.literal("wager"),
@@ -1033,7 +1054,8 @@ var GameSchema = z3.discriminatedUnion("kind", [
   ConnectionsSchema,
   ArticulateSchema,
   PictionarySchema,
-  WhoSaidItSchema
+  WhoSaidItSchema,
+  AnswerChainSchema
 ]);
 var GameLessonSchema = z3.object({
   games: z3.array(GameSchema).max(GAME_LIMITS.games).default([]),
@@ -1585,6 +1607,7 @@ function gameItems(game) {
     case "connections":
       return game.walls.flatMap((w) => w.groups);
     case "battles":
+    case "answer_chain":
       return [];
   }
 }
@@ -1785,6 +1808,9 @@ function gameIssues(lesson) {
         if (game.items.length >= GAME_COUNTS.team_match.min && distinct.size < 12) out.push(`${where} needs at least 12 different answers.`);
         break;
       }
+      case "answer_chain":
+        if (!game.start_answer.trim()) out.push(`${where}: give the answer every chain starts from.`);
+        break;
       case "battles":
         if (!game.prompt.trim() && !game.question_ref) out.push(`${where}: write the prompt students answer.`);
         if (!game.criterion.trim()) out.push(`${where}: say what makes one answer better.`);
@@ -1988,7 +2014,7 @@ function splitGame(game, random = Math.random) {
     }
     count = pubItems.length;
   }
-  if (game.kind === "battles") count = 1;
+  if (game.kind === "battles" || game.kind === "answer_chain") count = 1;
   if (!info.solo && pubItems.length) {
     keys.live = { items: pubItems };
     if (game.kind === "jeopardy") {
@@ -2014,6 +2040,9 @@ function splitGame(game, random = Math.random) {
       };
     }
     keys.live = { items: keys.live?.items ?? pubItems, ...keys.live, cards };
+  }
+  if (game.kind === "answer_chain") {
+    keys.live = { items: [], chain: { start: game.start_answer.trim(), theme: game.theme.trim(), tags: evidenceTags(game) } };
   }
   if (game.kind === "battles") {
     keys.live = {

@@ -34,7 +34,8 @@ const NOUNS: Record<PublicGame['kind'], [string, string]> = {
   connections: ['tile', 'tiles'],
   articulate: ['card', 'cards'],
   pictionary: ['prompt', 'prompts'],
-  who_said_it: ['quote', 'quotes']
+  who_said_it: ['quote', 'quotes'],
+  answer_chain: ['chain', 'chains']
 };
 const countText = (g: PublicGame) => (g.count ? `${g.count} ${NOUNS[g.kind][g.count === 1 ? 0 : 1]}` : '');
 
