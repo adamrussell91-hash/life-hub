@@ -1,0 +1,145 @@
+/* Fleet week, the student's phone (spec §3.4). A quiet sea: deep blue water,
+ * drawn hulls, red hits, white misses, fog over what the team doesn't know.
+ * Reuses the game tokens from games/games.css. */
+.fw {
+  --fw-deep: #0d2f57;
+  --fw-sea: #1d5a8f;
+  --fw-shallow: #3f86b8;
+  --fw-fog: rgba(226, 236, 246, 0.82);
+  --fw-hull: #5b6675;
+  --fw-hull-hi: #8d99a8;
+  --fw-hit: var(--game-wrong, #d4544f);
+  --fw-miss: #f4f8fc;
+}
+.fw-panel { background: linear-gradient(180deg, #eef5fb 0%, var(--warm-white, #fff) 40%); }
+.fw-head { flex-wrap: wrap; }
+.fw-score { margin: 0 0 0 auto; padding: 6px 12px; border-radius: var(--radius-full, 999px); background: var(--fw-deep); color: #fff; font-size: var(--text-sm); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fw-score:empty { display: none; }
+.fw-stage { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); padding: var(--space-4); max-width: 34rem; margin: 0 auto; min-width: 0; }
+.fw-h { margin: 0; font-size: var(--text-md); color: var(--navy); }
+.fw-note { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.fw-note--wait { padding: var(--space-4); text-align: center; border-radius: var(--radius-md, 12px); background: var(--game-team-1-soft, #dceafa); color: var(--navy); }
+.fw-error { margin: 0; color: var(--danger, #b3261e); font-size: var(--text-sm); font-weight: 600; }
+.fw-error:empty { display: none; }
+.fw-wide { width: 100%; min-height: 48px; }
+.fw .btn { min-height: 44px; }
+.fw-shells { margin: 0; font-weight: 700; color: var(--navy); }
+
+/* Chart: a header row and column, then 5 × 5 squares of at least 44px. */
+.fw-chart-wrap { min-width: 0; }
+.fw-chart {
+  display: grid;
+  grid-template-columns: minmax(2.25rem, 4.5rem) repeat(5, minmax(44px, 1fr));
+  gap: 2px; padding: 4px; border-radius: 14px;
+  background: radial-gradient(circle at 30% 20%, var(--fw-shallow), var(--fw-sea) 45%, var(--fw-deep));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+.fw-corner { display: block; }
+.fw-col-label, .fw-row-label {
+  display: flex; align-items: center; justify-content: center; min-width: 0;
+  padding: 2px; color: #fff; font-size: 0.7rem; font-weight: 700; line-height: 1.1; text-align: center;
+  overflow: hidden; overflow-wrap: anywhere; hyphens: auto;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.fw-row-label { justify-content: flex-start; text-align: left; }
+.fw-cell {
+  position: relative; display: grid; place-items: center; min-height: 44px; min-width: 44px; aspect-ratio: 1;
+  margin: 0; padding: 0; border: 0; border-radius: 6px; font: inherit; color: inherit;
+  background: rgba(255, 255, 255, 0.06); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  transition: transform 160ms var(--game-ease, ease-out), box-shadow 160ms;
+}
+button.fw-cell { cursor: pointer; }
+button.fw-cell:disabled { cursor: default; }
+.fw-cell:focus-visible { outline: 3px solid var(--game-gold, #f2c14e); outline-offset: 1px; z-index: 1; }
+.fw-cell--selected { box-shadow: inset 0 0 0 3px var(--game-gold, #f2c14e); transform: scale(0.94); }
+.fw-mark { pointer-events: none; }
+
+/* Fog over unknown water. */
+.fw-fog { background: linear-gradient(135deg, var(--fw-fog), rgba(198, 214, 230, 0.7)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5); }
+.fw-cell--fired { opacity: 0.55; }
+.fw-cell--fired .fw-mark::before { content: '…'; color: var(--navy); font-weight: 700; }
+.fw-cell--dud .fw-mark::before { content: ''; display: block; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle, #7d8794 30%, transparent 70%); }
+.fw-cell--returning { box-shadow: inset 0 0 0 3px var(--game-team-3, #e0894a); }
+.fw-cell--returning .fw-mark::before { content: '↺'; color: var(--game-team-3, #e0894a); font-weight: 800; font-size: 1.1rem; }
+
+/* Hits and misses. */
+.fw-cell--miss .fw-mark::before { content: ''; display: block; width: 12px; height: 12px; border-radius: 50%; background: var(--fw-miss); box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.25); }
+.fw-cell--hit { background: rgba(212, 84, 79, 0.25); }
+.fw-cell--hit .fw-mark::before, .fw-cell--hit .fw-mark::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 60%; height: 4px; border-radius: 2px; background: var(--fw-hit);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.fw-cell--hit .fw-mark::after { transform: translate(-50%, -50%) rotate(-45deg); }
+
+/* Ships: a grey hull drawn across its squares, rounded at bow and stern. */
+.fw-ship::after {
+  content: ''; position: absolute; inset: 22% 0; border-radius: 0; pointer-events: none;
+  background: linear-gradient(180deg, var(--fw-hull-hi), var(--fw-hull));
+}
+.fw-ship--v::after { inset: 0 22%; background: linear-gradient(90deg, var(--fw-hull-hi), var(--fw-hull)); }
+.fw-ship--h.fw-ship--bow::after { left: 12%; border-radius: 999px 0 0 999px; }
+.fw-ship--h.fw-ship--stern::after { right: 12%; border-radius: 0 6px 6px 0; }
+.fw-ship--v.fw-ship--bow::after { top: 12%; border-radius: 999px 999px 0 0; }
+.fw-ship--v.fw-ship--stern::after { bottom: 12%; border-radius: 0 0 6px 6px; }
+.fw-ship--solo::after { inset: 22% 14%; border-radius: 999px; }
+.fw-ship--mate::after { opacity: 0.55; }
+.fw-ship .fw-mark { position: relative; z-index: 1; }
+
+.fw-legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); margin: 0; padding: 0; list-style: none; font-size: var(--text-xs, 0.75rem); color: var(--muted); }
+.fw-legend li { display: flex; align-items: center; gap: 6px; }
+.fw-key { position: relative; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 4px; background: var(--fw-sea); }
+.fw-key.fw-cell--hit .fw-mark::before { content: none; }
+.fw-key.fw-cell--hit::before, .fw-key.fw-cell--hit::after { content: ''; position: absolute; width: 14px; height: 3px; background: var(--fw-hit); transform: rotate(45deg); }
+.fw-key.fw-cell--hit::after { transform: rotate(-45deg); }
+.fw-key.fw-cell--miss::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--fw-miss); }
+.fw-key.fw-cell--dud::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: #7d8794; }
+.fw-key.fw-cell--returning::before { content: '↺'; color: var(--game-team-3, #e0894a); font-weight: 800; }
+
+/* Placement controls. */
+.fw-ships { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.fw-ship-pick { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+.fw-ship-pick[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+.fw-hull { display: inline-flex; gap: 2px; }
+.fw-hull__seg { width: 12px; height: 10px; border-radius: 3px; background: var(--fw-hull); }
+.fw-ship-pick[aria-pressed="true"] .fw-hull__seg { background: #fff; }
+.fw-turn { justify-self: start; }
+
+/* Firing: the square's labels, then Sure or Unsure. */
+.fw-fire { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-md, 12px); background: var(--paper, #fff); border: 1px solid var(--line); }
+.fw-fire__square { margin: 0; font-weight: 700; color: var(--navy); overflow-wrap: anywhere; }
+.fw-fire__buttons { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+
+/* Question, damage report and recall. */
+.fw-question { display: grid; gap: var(--space-2); padding: var(--space-4); border-radius: var(--radius-md, 12px); background: var(--paper, #fff); border: 1px solid var(--line); box-shadow: var(--elev-1); min-width: 0; }
+.fw-question__meta { margin: 0; font-size: var(--text-sm); color: var(--muted); overflow-wrap: anywhere; }
+.fw-question__prompt { margin: 0; font-size: var(--text-md); color: var(--ink); overflow-wrap: anywhere; }
+.fw-partner-answer { margin: 0; padding: var(--space-2) var(--space-3); border-left: 4px solid var(--game-team-1, #5b8fd6); background: var(--game-team-1-soft, #dceafa); border-radius: 0 8px 8px 0; overflow-wrap: anywhere; }
+.fw-clock { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--navy); }
+.fw-clock[data-low="true"] { color: var(--danger, #b3261e); }
+.fw-answer { display: grid; gap: var(--space-2); }
+.fw-label { margin: 0; font-size: var(--text-sm); font-weight: 700; color: var(--navy); }
+.fw-textarea { width: 100%; box-sizing: border-box; min-height: 44px; padding: 10px 12px; font: inherit; font-size: max(16px, 1rem); border: 1px solid var(--gm-line-2, #c9d3df); border-radius: 10px; background: #fff; color: var(--ink); resize: vertical; }
+.fw-textarea:focus-visible { outline: 3px solid var(--game-gold, #f2c14e); outline-offset: 1px; }
+.fw-sent { display: grid; place-items: center; min-height: 10rem; border-radius: var(--radius-md, 12px); background: radial-gradient(circle at 50% 30%, var(--fw-shallow), var(--fw-deep)); color: #fff; }
+.fw-sent__title { margin: 0; font-size: var(--text-lg, 1.25rem); font-weight: 800; }
+
+/* Dawn report. */
+.fw-report { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md, 12px); background: linear-gradient(180deg, #fde7c8, #fff6ea); }
+.fw-report__lines { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); }
+.fw-line { overflow-wrap: anywhere; }
+.fw-line--hit { font-weight: 700; }
+.fw-ping { margin: 0; font-size: var(--text-sm); font-weight: 700; color: var(--game-team-3, #e0894a); }
+.fw-ours summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 700; color: var(--navy); }
+
+/* Reveal. */
+.fw-reveal__title { font-size: var(--text-lg, 1.25rem); }
+.fw-standings, .fw-names { margin: 0; padding-left: 1.2rem; font-size: var(--text-sm); }
+
+@media (max-width: 420px) {
+  .fw-stage { padding: var(--space-3) 8px; }
+  .fw-chart { grid-template-columns: minmax(2rem, 3rem) repeat(5, minmax(44px, 1fr)); padding: 2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fw-cell { transition: none; }
+  .fw-cell--selected { transform: none; }
+}

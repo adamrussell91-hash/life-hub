@@ -11,6 +11,8 @@ import { hasPlayer } from './solo/registry';
 import { openSoloPlayer } from './solo/shell';
 import { openLivePhone } from './live/phone';
 import { liveStyle } from './live/board-parts';
+import { openFleetCampaign, type FleetCampaign } from './kinds/fleet-week/campaign';
+import { fleetCampaignClient, type FleetCampaignClient } from './kinds/fleet-week/campaign-api';
 import './kinds';
 import './games.css';
 
@@ -20,6 +22,8 @@ export type ArcadeOptions = {
   /** Null when opened without a class: the student is asked to open it from their class page. */
   client: GameClient | null;
   renderHero: (host: HTMLElement) => void;
+  /** Fleet week's campaign client; built from the lesson and class when absent (tests pass a fake). */
+  fleetClient?: FleetCampaignClient;
 };
 
 const NOUNS: Record<PublicGame['kind'], [string, string]> = {
@@ -56,6 +60,7 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
   let comingNext: string | null = null;
   let soloShell: { close(): Promise<void> } | null = null;
   let livePhone: { close(): void } | null = null;
+  let fleetCampaign: FleetCampaign | null = null;
   /** A code from a QR link (`?join=482913`), offered when the student taps Join live game. */
   const joinCode = (() => {
     try {
@@ -138,6 +143,8 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
         shell.querySelector<HTMLElement>(`[data-game-id="${g.id}"] .gm-card__soon`)?.focus();
       });
       foot.append(play);
+    } else if (g.kind === 'fleet_week' && client && options.classId) {
+      foot.append(fleetButton(g, options.classId));
     } else if (g.solo) {
       foot.append(el('span', 'gm-card__wait', 'Homework closed'));
     } else {
@@ -158,6 +165,25 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
     box?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     gate.querySelector<HTMLInputElement>('.gm-input')?.focus({ preventScroll: true });
     return true;
+  }
+
+  /** Fleet week: the campaign phone (kinds/fleet-week/campaign.ts); it waits for the teacher when no campaign is open. */
+  function fleetButton(g: PublicGame, classId: string): HTMLButtonElement {
+    const b = el('button', 'btn btn--primary gm-card__play', 'Open Fleet week');
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      if (nudgeInitials() || fleetCampaign) return;
+      fleetCampaign = openFleetCampaign(document.body, {
+        lessonId: lesson.lesson_id,
+        classId,
+        game: g,
+        client: options.fleetClient ?? fleetCampaignClient(lesson.lesson_id, classId),
+        onClose: () => {
+          fleetCampaign = null;
+        }
+      });
+    });
+    return b;
   }
 
   /** Join live game: the six-box code, then the live phone (games/live/phone.ts). */
@@ -246,6 +272,7 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
       disposed = true;
       void soloShell?.close();
       livePhone?.close();
+      fleetCampaign?.close();
       host.replaceChildren();
     }
   };
