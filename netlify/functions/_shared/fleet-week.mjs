@@ -250,38 +250,65 @@ async function commit(ctx, body) {
   const round = clock.round;
   const variants = list(keys.live.fleet.squares[square]);
   if (!variants.length) reject(400, 'bad_square', 'Pick a square on the chart.');
+  const key = shotsKey(campaign, k, round, owner);
+  const back = state.returns.find((r) => r.owner === owner && r.square === square);
+  /** Why this shot can't be fired, given the player's shots so far (checked before the hold and again at the write). */
+  const refuse = (shots) => {
+    if (shots.length >= SHOTS_PER_ROUND) reject(409, 'no_shots', 'You’ve used your four shots this round.');
+    if (obj(state.charts[rival.id])[square]) reject(409, 'known', 'Your team already knows that square. Pick another.');
+    if (shots.some((s) => s.square === square)) reject(409, 'fired', 'You’ve fired there this round. Pick another.');
+    if (back && back.due > round) reject(409, 'returns_later', `That square comes back to you in round ${back.due}.`);
+  };
+  const toShot = (open) => ({ square: open.square, sure: open.sure, question: publicQuestion(keys, open.item), deadline: open.deadline });
+
+  // A reload while a shot is open gets that shot back, unchanged; its clock write is repeated.
+  const before = list(await read(store, key));
+  const already = before.find((s) => shotOpen(s, now));
+  if (already) {
+    await holdForShot(ctx, already, before.length);
+    return toShot(already);
+  }
+  refuse(before);
+  // The hold goes on the clock BEFORE the shot is stored, so the round can't resolve between the two.
+  const deadline = now + campaign.settings.answer_ms;
+  const until = deadline + LATE_GRACE_MS;
+  const fourth = before.length + 1 >= SHOTS_PER_ROUND;
+  const held = await touchClock(store, k, campaign, round, (c) => {
+    if (roundClosing(c, now)) reject(409, 'not_firing', 'This round is closing. Wait for the next one.');
+    const hold = obj(c.open)[owner];
+    return {
+      seen: { ...obj(c.seen), [owner]: round },
+      fired: { ...obj(c.fired), [owner]: round },
+      open: { ...obj(c.open), [owner]: { round, until: Math.max(until, hold?.round === round ? hold.until : 0) } },
+      ...(fourth ? { done: { ...obj(c.done), [owner]: { round, until } } } : {})
+    };
+  });
+  if (held.data?.round !== round) reject(409, 'not_firing', 'That round has closed. Wait for the next one.');
+
   // What the match has been given this round, for the variant choice (§1.1).
   const others = await Promise.all(matchOwners.filter((o) => o !== owner).map((o) => read(store, shotsKey(campaign, k, round, o))));
   const given = [...state.given, ...others.flatMap((s) => list(s)).map((s) => ({ owner: s.owner, square: s.square, variant: s.variant }))];
-  const back = state.returns.find((r) => r.owner === owner && r.square === square);
-
   let shot = null;
   let count = 0;
-  await updateJSON(store, shotsKey(campaign, k, round, owner), (held) => {
-    const shots = list(held);
+  await updateJSON(store, key, (stored) => {
+    const shots = list(stored);
     count = shots.length;
     const open = shots.find((s) => shotOpen(s, now));
     if (open) { shot = open; return undefined; }
-    // Past the cap or Next round: shots already open may be answered, but nothing new is fired.
-    if (roundClosing(clock, now)) reject(409, 'not_firing', 'This round is closing. Wait for the next one.');
-    if (shots.length >= SHOTS_PER_ROUND) reject(409, 'no_shots', 'You’ve used your four shots this round.');
-    const known = obj(state.charts[rival.id])[square];
-    if (known) reject(409, 'known', 'Your team already knows that square. Pick another.');
-    if (shots.some((s) => s.square === square)) reject(409, 'fired', 'You’ve fired there this round. Pick another.');
-    if (back && back.due > round) reject(409, 'returns_later', `That square comes back to you in round ${back.due}.`);
+    refuse(shots);
     const returning = !!back;
     const variant = returning
       ? Math.min(back.variant, variants.length - 1)
       : fleet.pickVariant(square, owner, matchOwners, given, variants.length);
     const seq = Math.max(now, ...shots.map((s) => s.seq + 1));
-    shot = { seq, owner, square, sure, variant, item: variants[variant], deadline: now + campaign.settings.answer_ms, returning };
+    shot = { seq, owner, square, sure, variant, item: variants[variant], deadline, returning };
     count = shots.length + 1;
     // A shot whose time ran out unanswered is a dud (decision 9).
     return [...shots.map((s) => (s.correct === undefined ? { ...s, correct: null } : s)), shot];
   });
-  // Also on a resend: a clock write lost after the shot was stored is made good here.
-  await holdForShot(ctx, shot, count);
-  return { square: shot.square, sure: shot.sure, question: publicQuestion(keys, shot.item), deadline: shot.deadline };
+  // A racing commit got there first: make sure the clock matches the shot that stands.
+  if (shot.deadline !== deadline || count !== before.length + 1) await holdForShot(ctx, shot, count);
+  return toShot(shot);
 }
 
 async function answer(ctx, body) {
@@ -291,6 +318,7 @@ async function answer(ctx, body) {
   const text = cleanText(body.answer);
   let late = false;
   let resend = false;
+  let seq = null;
   let shots = [];
   await updateJSON(store, shotsKey(campaign, k, round, owner), (held) => {
     shots = list(held);
@@ -302,6 +330,7 @@ async function answer(ctx, body) {
       reject(409, 'no_shot', 'Pick a square first.');
     }
     const s = shots[at];
+    seq = s.seq;
     if (now > s.deadline + LATE_GRACE_MS) {
       late = true;
       shots[at] = { ...s, correct: null, late: true };
@@ -312,25 +341,48 @@ async function answer(ctx, body) {
     return shots;
   });
   // Release this player's hold, and mark them done after their fourth. Not fatal if it loses:
-  // the hold and `done` both run out at the shot's deadline anyway.
-  const settled = shots.length >= SHOTS_PER_ROUND && shots.every((s) => s.correct !== undefined);
-  try {
-    await touchClock(store, k, campaign, round, (c) => {
-      const patch = {};
-      const hold = obj(c.open)[owner];
-      if (hold && hold.round === round && hold.until > now) patch.open = { ...obj(c.open), [owner]: { round, until: now } };
-      const done = settled ? doneFrom(c, owner, round, now) : null;
-      if (done) patch.done = done;
-      return Object.keys(patch).length ? patch : undefined;
-    });
-  } catch {
-    // ignore: see above
+  // the hold and `done` both run out at the shot's deadline anyway, and a resend repeats it.
+  const release = async () => {
+    const settled = shots.length >= SHOTS_PER_ROUND && shots.every((s) => s.correct !== undefined);
+    try {
+      await touchClock(store, k, campaign, round, (c) => {
+        const patch = {};
+        const hold = obj(c.open)[owner];
+        if (hold && hold.round === round && hold.until > now) patch.open = { ...obj(c.open), [owner]: { round, until: now } };
+        const done = settled ? doneFrom(c, owner, round, now) : null;
+        if (done) patch.done = done;
+        return Object.keys(patch).length ? patch : undefined;
+      });
+    } catch {
+      // ignore: see above
+    }
+  };
+  if (late) {
+    await release();
+    reject(409, 'late', 'Time ran out on that shot.');
   }
-  if (late) reject(409, 'late', 'Time ran out on that shot.');
-  if (resend) return { ok: true };
-  // Backstop: the round resolved between our read and write, so this answer missed it.
-  if (await read(store, k.campaignResolved(campaign.game_id, campaign.id, round))) reject(409, 'late', 'That round closed before your answer landed.');
-  return { ok: true };
+  if (resend) {
+    await release();
+    return { ok: true };
+  }
+
+  /**
+   * Did the round resolve under this answer? Ask the resolved log for this shot:
+   * resolved with the answer → ok; resolved without it → late; not resolved → null.
+   */
+  const landed = async () => {
+    const resolved = await read(store, k.campaignResolved(campaign.game_id, campaign.id, round));
+    if (!resolved) return null;
+    const mine = list(resolved.log?.find((l) => l.round === round)?.results).find((r) => r.owner === owner && r.seq === seq);
+    if (mine && mine.correct !== null) return { ok: true };
+    reject(409, 'late', 'That round closed before your answer landed.');
+  };
+  // Before releasing the hold: the round can't have resolved since, unless it had already.
+  const early = await landed();
+  if (early) return early;
+  await release();
+  // A poll may resolve the round as soon as the hold is released; that resolution includes this answer.
+  return (await landed()) ?? { ok: true };
 }
 
 /**

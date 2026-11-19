@@ -716,3 +716,62 @@ test('two opens racing make one campaign and leave no orphan', async () => {
   assert.equal(store.writes.filter((key) => /campaigns\/[a-f0-9]{16}$/.test(key)).length, 1);
   assert.equal(store.writes.filter((key) => /campaigns\/[a-f0-9]{16}\/clock$/.test(key)).length, 1);
 });
+
+test('an answer counted by a resolution right after its hold is released is ok, not late (C2)', async () => {
+  const { store, c } = await startGame();
+  const shot = await play(store, 1, 'fleet_commit', { square: 12, sure: false }, CAP - 10000);
+  const clockKey = k.campaignClock('fw', c.id);
+  const resolvedKey = k.campaignResolved('fw', c.id, 1);
+  const orig = store.setJSON.bind(store);
+  let armed = true;
+  // A phone polls the moment the answer's clock write releases the hold.
+  store.setJSON = async (key, v, o) => {
+    const r = await orig(key, v, o);
+    if (armed && key === clockKey && v.open?.[ownerOf(1)]?.until === CAP + 3000) { armed = false; await resolveNow(store, k, c, CAP + 3001); }
+    return r;
+  };
+  assert.deepEqual(await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, CAP + 3000), { ok: true });
+  store.setJSON = orig;
+  assert.equal(armed, false);
+  const mine = (await store.get(resolvedKey)).log[0].results.find((r) => r.owner === ownerOf(1));
+  assert.equal(mine.correct, true);
+});
+
+test('a resolution between the shot write and the clock can’t strand the shot (B3)', async () => {
+  const { store, c } = await startGame();
+  const shotsKey = k.campaignShots('fw', c.id, 1, ownerOf(1));
+  const orig = store.setJSON.bind(store);
+  let armed = true;
+  store.setJSON = async (key, v, o) => {
+    const r = await orig(key, v, o);
+    if (armed && key === shotsKey) { armed = false; await resolveNow(store, k, c, CAP); }
+    return r;
+  };
+  const shot = await play(store, 1, 'fleet_commit', { square: 12, sure: false }, CAP - 1);
+  store.setJSON = orig;
+  assert.equal(armed, false);
+  assert.ok(shot.question);
+  // The hold went on first, so the cap-time resolution waited for this shot.
+  assert.equal(await store.get(k.campaignResolved('fw', c.id, 1)), null);
+  assert.deepEqual(await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, CAP + 2000), { ok: true });
+  assert.equal((await play(store, 2, 'fleet_state', {}, CAP + 2001)).round, 2);
+  const mine = (await store.get(k.campaignResolved('fw', c.id, 1))).log[0].results.find((r) => r.owner === ownerOf(1));
+  assert.equal(mine.correct, true);
+});
+
+test('a commit that loses its round before the hold lands is refused, and nothing is stored', async () => {
+  const { store, c } = await startGame();
+  const clockKey = k.campaignClock('fw', c.id);
+  const origGet = store.getWithMetadata.bind(store);
+  let reads = 0;
+  // The round resolves (at the cap) just as the commit goes to write its hold
+  // (the request's own resolve check is the first clock read; the hold is the second).
+  store.getWithMetadata = async (key, o) => {
+    if (key === clockKey && ++reads === 2) await resolveNow(store, k, c, CAP);
+    return origGet(key, o);
+  };
+  await rejectsWith(play(store, 1, 'fleet_commit', { square: 12, sure: false }, CAP - 1), 'not_firing');
+  store.getWithMetadata = origGet;
+  assert.ok(reads >= 2);
+  assert.equal(await store.get(k.campaignShots('fw', c.id, 1, ownerOf(1))), null);
+});

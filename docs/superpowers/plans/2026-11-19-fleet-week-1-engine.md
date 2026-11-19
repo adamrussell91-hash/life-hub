@@ -525,7 +525,8 @@ Server (Tasks 4–6):
   - A shot is open while it is unanswered and `now <= deadline + 2 s`. So the round really closes at the later of the cap (or Next) and the last open deadline plus grace.
   - Once the cap or Next has been reached, no new shots can be committed. A shot already in flight can still be answered.
   - Early close when everyone is done is unchanged.
-- An answer whose round has resolved before the answer was written gets 409 `late`, not ok.
+- When the round resolves around an answer, the reply follows what the resolved log holds for that shot (owner, seq): ok if the resolution counted the answer, 409 `late` if it saw the shot unanswered. The log is checked before and after the clock write that releases the hold.
+- A commit writes its hold (with `seen`, `fired`, and `done` on the fourth shot) to the clock before the shot is stored. If the round has already moved on, the commit is refused with 409 `not_firing` and nothing is stored. A resolution can never fall between the two writes and strand the shot.
 - `done` is recorded with the shots:
   - Each commit makes one clock write (`seen`, `fired`, the shot's hold `open[owner] = { round, until }`). On the fourth commit the same write sets `done[owner] = { round, until: deadline + grace }`.
   - The fourth answer brings `until` down to the answer time.
@@ -537,7 +538,7 @@ Server (Tasks 4–6):
 - `updateJSON` (now in `_shared/etag-json.mjs`, shared with `games.mjs`) retries up to 6 times with jittered pauses. The random source and sleep are injectable.
 - A damage report is filed in the shooter's reports blob as `filed[hit] = { round, by, text, writing }`, next to `rejected[hit]`:
   - The "already filed?" check runs inside the etag write, so one filing wins.
-  - A rejection is a single write.
+  - A rejection is a single write. It deletes the filing and sets `rejected[hit] = 1` (a flag, not a running count). A second rejection of the same hit is refused with 409 `returned_once`, "Already returned once." The Task 6 table's "increments a counter" means exactly this.
 - Teacher actions load the keys for `campaign.version`.
 - `campaign_open` writes the class pointer create-only first, then the clock, then the campaign. If the pointer write loses, nothing else is written. A pointer with no campaign behind it counts as stale after 10 s.
 
