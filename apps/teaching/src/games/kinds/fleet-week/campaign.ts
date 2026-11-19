@@ -14,6 +14,8 @@ import { watchWriting } from '@/quiz/writing-watch';
 import type { PublicGame } from '../../core/schema';
 import { GRID, SHIP_IDS, SHIP_SIZES, colOf, rowOf, shipLine, squareLabel, type ShipId } from './rules';
 import type { FleetCampaignClient, FleetLine, FleetOwed, FleetQuestion, FleetShip, FleetView } from './campaign-api';
+import { calm } from '../../motion/motion';
+import { createSea, type Sea, type SeaChart, type SeaMode } from './sea';
 import './fleet-week.css';
 
 export type FleetCampaignOptions = {
@@ -35,6 +37,8 @@ const errText = (e: unknown, fallback: string) => (e instanceof Error && e.messa
 const errCode = (e: unknown) => (e && typeof e === 'object' && 'code' in e ? String((e as { code: unknown }).code) : '');
 
 type Cell = { cls: string[]; label: string; disabled?: boolean };
+/** The rendered sea under a chart: which one (kept across repaints), how it draws, and what it shows. */
+type SeaSpec = { key: string; mode: SeaMode; state: SeaChart };
 type Draft = { text: string; log: WritingLog | null };
 
 /** Ship segment classes: bow, mid, stern or solo, and the way it lies. */
@@ -74,6 +78,9 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
   let activeShip: ShipId | null = null;
   let across = true;
   let message = '';
+  /** Rendered seas by key ('ours', 'theirs', …): one canvas each, moved into every rebuilt chart. */
+  const seas = new Map<string, { layer: HTMLElement; sea: Sea; lifted: boolean }>();
+  let dawnRound = -1;
 
   const root = el('div', 'gm gm-solo fw');
   root.setAttribute('role', 'dialog');
@@ -126,12 +133,38 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
   }
 
   // ------------------------------------------------------------ chart
-  function chart(caption: string, cellOf: (sq: number) => Cell, onTap?: (sq: number) => void, current?: number | null): HTMLElement {
+  /** The sea layer for a chart, or null when the canvas isn't available (the CSS look stays). */
+  function seaLayer(spec: SeaSpec): HTMLElement | null {
+    let entry = seas.get(spec.key);
+    if (!entry) {
+      const layer = el('div', 'fw-sea-layer');
+      layer.setAttribute('aria-hidden', 'true');
+      entry = { layer, sea: createSea(layer, { seed: `${view?.campaign ?? 'fleet'}:${spec.key}`, mode: spec.mode, size: GRID }), lifted: false };
+      seas.set(spec.key, entry);
+    }
+    if (!entry.sea.live) return null;
+    entry.sea.update(spec.state);
+    if (spec.mode === 'reveal' && !entry.lifted) {
+      entry.lifted = true;
+      const sea = entry.sea;
+      if (calm()) void sea.lift();
+      else window.setTimeout(() => void sea.lift(), 500);
+    }
+    return entry.layer;
+  }
+
+  function chart(caption: string, cellOf: (sq: number) => Cell, onTap?: (sq: number) => void, current?: number | null, sea?: SeaSpec): HTMLElement {
     const labels = view?.labels ?? { columns: [], rows: [] };
     const wrap = el('div', 'fw-chart-wrap');
     const grid = el('div', 'fw-chart');
     grid.setAttribute('role', 'grid');
     grid.setAttribute('aria-label', caption);
+    const layer = sea ? seaLayer(sea) : null;
+    if (layer) {
+      // Canvas under the buttons: the squares stay DOM buttons on top.
+      grid.classList.add('fw-chart--sea', `fw-chart--${sea!.mode}`);
+      grid.append(layer);
+    }
     grid.append(el('span', 'fw-corner'));
     for (let c = 0; c < GRID; c++) {
       const h = el('span', 'fw-col-label', labels.columns[c] || String(c + 1));
@@ -172,6 +205,12 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
     return parts.length ? `${squareLabel(sq)} · ${parts.join(' × ')}` : squareLabel(sq);
   }
 
+  /** Our fleet as the sea draws it: my ships in my colour, my partner's in theirs. */
+  function ourSea(v: FleetView, ships: FleetShip[] = v.team.fleet): SeaSpec {
+    const mine = new Set(v.me.ships);
+    return { key: 'ours', mode: 'own', state: { ships: ships.map((s) => ({ squares: s.squares, tone: mine.has(s.id) ? 'own' : 'mate' })), marks: v.team.chart } };
+  }
+
   function ourChart(v: FleetView, caption: string): HTMLElement {
     const parts = shipParts(v.team.fleet);
     return chart(caption, (sq) => {
@@ -180,7 +219,7 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
       const cls = [...(ship?.cls ?? ['fw-sea'])];
       if (mark) cls.push(`fw-cell--${mark}`);
       return { cls, label: [ship ? 'our ship' : 'open sea', mark === 'hit' ? 'hit' : mark === 'miss' ? 'their miss' : ''].filter(Boolean).join(', ') };
-    });
+    }, undefined, undefined, ourSea(v));
   }
 
   // ------------------------------------------------------------ screens
@@ -293,7 +332,7 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
         const ship = parts.get(sq);
         const isMate = mateSquares.has(sq);
         return { cls: ship ? [...ship.cls, ...(isMate ? ['fw-ship--mate'] : [])] : ['fw-sea'], label: ship ? (isMate ? 'partner’s ship' : 'your ship') : 'open sea' };
-      }, tap),
+      }, tap, undefined, ourSea(v, [...mate, ...own])),
       errLine(),
       confirm
     ];
@@ -330,7 +369,7 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
       selected = selected === sq ? null : sq;
       message = '';
       repaint();
-    } : undefined, selected));
+    } : undefined, selected, { key: 'theirs', mode: 'rival', state: { marks: v.rival.chart } }));
     out.push(legend());
     if (canFire && selected !== null) {
       const bar = el('div', 'fw-fire');
@@ -515,13 +554,29 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
     return `${l.side === 'us' ? 'We' : 'They'}: ${l.by} → ${squareLabel(l.square)}, ${what}${extra ? ` (${extra})` : ''}`;
   }
 
+  /** Sunrise over the report: night fades, the sun climbs, light warms. It plays once per round. */
+  function dawn(round: number): HTMLElement {
+    const head = el('div', 'fw-dawn');
+    if (round === dawnRound || calm()) head.classList.add('fw-dawn--risen');
+    dawnRound = round;
+    for (const part of ['sky', 'rays', 'sun', 'night', 'water']) {
+      const layer = el('span', `fw-dawn__${part}`);
+      layer.setAttribute('aria-hidden', 'true');
+      head.append(layer);
+    }
+    const text = el('div', 'fw-dawn__text');
+    text.append(el('h3', 'fw-h fw-report__title', `Dawn report · round ${round}`), el('p', 'fw-dawn__sub', 'The round has closed. Here is what landed.'));
+    head.append(text);
+    return head;
+  }
+
   function reportBlock(v: FleetView): HTMLElement {
     const box = el('section', 'fw-report');
     if (!v.report) {
       box.hidden = true;
       return box;
     }
-    box.append(el('h3', 'fw-h fw-report__title', `Dawn report · round ${v.report.round}`));
+    box.append(dawn(v.report.round), el('span', 'fw-warm'));
     const list = el('ul', 'fw-report__lines');
     for (const l of v.report.lines) {
       const li = el('li', `fw-line fw-line--${l.side} fw-line--${l.outcome}`, lineText(l));
@@ -554,16 +609,18 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
     for (const [sign, name] of Object.entries(r.names)) names.append(el('li', '', `${sign} was ${name}`));
     out.push(el('h3', 'fw-h', 'Who was who'), names);
     out.push(note(`Your Sure shots: ${r.calibration.right} right out of ${r.calibration.total}.`));
-    const fleetChart = (ships: FleetShip[], marks: Record<string, 'hit' | 'miss'>, caption: string) => {
+    const fleetChart = (ships: FleetShip[], marks: Record<string, 'hit' | 'miss'>, caption: string, key: string, tone: 'rival' | 'own') => {
       const parts = shipParts(ships);
+      const hits = new Set(Object.entries(marks).filter(([, m]) => m === 'hit').map(([k]) => Number(k)));
+      const sea: SeaSpec = { key, mode: 'reveal', state: { marks, ships: ships.map((s) => ({ squares: s.squares, tone: s.squares.every((q) => hits.has(q)) ? 'sunk' : tone })) } };
       return chart(caption, (sq) => {
         const ship = parts.get(sq);
         const mark = marks[sq];
         return { cls: [...(ship?.cls ?? ['fw-sea']), ...(mark ? [`fw-cell--${mark}`] : [])], label: [ship ? 'ship' : 'sea', mark ?? ''].filter(Boolean).join(', ') };
-      });
+      }, undefined, undefined, sea);
     };
-    out.push(el('h3', 'fw-h', 'Their fleet'), fleetChart(r.fleets.them, v.rival.chart, 'Their fleet'));
-    out.push(el('h3', 'fw-h', 'Our fleet'), fleetChart(r.fleets.us, v.team.chart, 'Our fleet'));
+    out.push(el('h3', 'fw-h', 'Their fleet'), fleetChart(r.fleets.them, v.rival.chart, 'Their fleet', 'reveal-theirs', 'rival'));
+    out.push(el('h3', 'fw-h', 'Our fleet'), fleetChart(r.fleets.us, v.team.chart, 'Our fleet', 'reveal-ours', 'own'));
     return out;
   }
 
@@ -670,6 +727,8 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
     window.clearInterval(pollTimer);
     window.clearInterval(clockTimer);
     document.removeEventListener('visibilitychange', onVisible);
+    for (const { sea } of seas.values()) sea.destroy();
+    seas.clear();
     root.remove();
     returnFocus?.focus();
     options.onClose?.();

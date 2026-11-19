@@ -6,6 +6,8 @@ import { gameGlyph } from '../../glyphs';
 import { pills } from '../../item-editors';
 import { GRID, squareLabel } from './rules';
 import type { FleetCampaignState, FleetControlApi, FleetFlag, FleetLogResult, FleetMember, FleetTeamState } from './control-api';
+import { calm } from '../../motion/motion';
+import { createSea, type Sea } from './sea';
 import './control-room.css';
 
 /**
@@ -100,9 +102,14 @@ export function hardestSquares(s: FleetCampaignState, limit = 3): Array<{ square
     .slice(0, limit);
 }
 
-function chart(team: FleetTeamState | undefined, marks: Map<number, 'hit' | 'miss'>, size: 'sm' | 'lg'): HTMLElement {
+function chart(team: FleetTeamState | undefined, marks: Map<number, 'hit' | 'miss'>, size: 'sm' | 'lg', sea?: HTMLElement): HTMLElement {
   const ships = new Set((team?.fleet ?? []).flatMap((ship) => ship.squares));
   const grid = el('div', `fc-chart fc-chart--${size}`);
+  if (sea) {
+    // The rendered sea sits under the cells; the cells keep marks and titles.
+    grid.classList.add('fc-chart--sea');
+    grid.append(sea);
+  }
   grid.setAttribute('role', 'img');
   const hits = [...marks.values()].filter((m) => m === 'hit').length;
   const misses = marks.size - hits;
@@ -201,6 +208,15 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
   let boardEl: HTMLElement | null = null;
   let boardAt = 0;
+  /** Board seas by `match:team`, kept across repaints so the fog lifts once per showing. */
+  const boardSeas = new Map<string, { layer: HTMLElement; sea: Sea; lifted: boolean }>();
+  function dropSeas(keep?: string): void {
+    for (const [k, v] of boardSeas) {
+      if (keep && k.startsWith(`${keep}:`)) continue;
+      v.sea.destroy();
+      boardSeas.delete(k);
+    }
+  }
   const openReplays = new Set<string>();
 
   const root = el('div', 'fc');
@@ -500,6 +516,7 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
     boardEl.focus();
   }
   function closeBoard(): void {
+    dropSeas();
     boardEl?.remove();
     boardEl = null;
   }
@@ -507,6 +524,31 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
     if (!state?.matches.length) return;
     boardAt = (boardAt + d + state.matches.length) % state.matches.length;
     paintBoard();
+  }
+  /** The reveal sea for one team's chart: fog first, then it lifts and the ships appear. */
+  function revealSea(key: string, seed: string, team: FleetTeamState | undefined, marks: Map<number, 'hit' | 'miss'>, side: number): HTMLElement | undefined {
+    let entry = boardSeas.get(key);
+    if (!entry) {
+      const layer = el('div', 'fc-sea');
+      layer.setAttribute('aria-hidden', 'true');
+      entry = { layer, sea: createSea(layer, { seed, mode: 'reveal', size: GRID }), lifted: false };
+      boardSeas.set(key, entry);
+    }
+    if (!entry.sea.live) return undefined;
+    const hits = new Set([...marks].filter(([, v]) => v === 'hit').map(([k]) => k));
+    entry.sea.update({
+      ships: (team?.fleet ?? []).map((ship) => ({ squares: ship.squares, tone: ship.squares.every((q) => hits.has(q)) ? 'sunk' : side ? 'teamB' : 'teamA' })),
+      marks: Object.fromEntries(marks)
+    });
+    return entry.layer;
+  }
+  function liftSeas(): void {
+    const waiting = [...boardSeas.values()].filter((v) => !v.lifted && v.sea.live);
+    if (!waiting.length) return;
+    waiting.forEach((v) => (v.lifted = true));
+    const go = () => waiting.forEach((v) => void v.sea.lift());
+    if (calm()) go();
+    else setTimeout(go, 700);
   }
   function paintBoard(): void {
     const s = state;
@@ -521,9 +563,11 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
     nav.append(prev, el('span', 'fc-board__count', m ? `Match ${boardAt + 1} of ${s.matches.length}` : ''), nxt, btn('Close', 'ghost', closeBoard));
     boardEl.append(el('p', 'fc-board__kicker', `Fleet week · ${title}`), nav);
     if (!m) {
+      dropSeas();
       boardEl.append(el('p', 'fc-board__empty', 'No matches.'));
       return;
     }
+    dropSeas(m.id);
     const standing = s.standings.find((st) => st.match === m.id);
     const winner = standing?.winner ? teamById.get(standing.winner) : undefined;
     boardEl.append(el('h2', 'fc-board__winner', winner ? `${teamName(winner)} win${winner.members.length === 1 ? 's' : ''}` : standing ? 'A draw' : ''));
@@ -533,10 +577,12 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
       const row = standing?.teams.find((r) => r.team === tid);
       const side = el('section', `fc-board__side${winner && winner.id === tid ? ' is-winner' : ''}`);
       side.append(el('h3', 'fc-board__team', teamName(t)), el('p', 'fc-board__stats', `${row?.damage ?? t?.damage ?? 0} damage · ${row?.sunk ?? 0} sunk · ${Math.round((row?.accuracy ?? 0) * 100)}% first try`));
-      side.append(chart(t, chartMarks(s, tid), 'lg'));
+      const marks = chartMarks(s, tid);
+      side.append(chart(t, marks, 'lg', revealSea(`${m.id}:${tid}`, `${s.campaign_id}:${m.id}:${tid}`, t, marks, m.teams.indexOf(tid))));
       sides.append(side);
     }
     boardEl.append(sides);
+    liftSeas();
     const hard = hardestSquares(s);
     if (hard.length) {
       const cols = (o.game as { columns?: string[] }).columns ?? [];
@@ -577,6 +623,7 @@ export function openFleetControlRoom(host: HTMLElement, o: FleetControlOptions):
       disposed = true;
       if (pollTimer) clearTimeout(pollTimer);
       clearInterval(tick);
+      dropSeas();
       root.remove();
       returnFocus?.focus();
     }
