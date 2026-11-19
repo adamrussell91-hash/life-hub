@@ -3,6 +3,7 @@ import { deviceToken } from '@/quiz/dom';
 import type { QuestionKey } from '@/quiz/core';
 import type { PublicGame, QuestionItem, QuoteItem, TermItem } from './core/schema';
 import type { GameMove, Strength } from './core/events';
+import { fleetControlApi, type FleetControlApi } from './kinds/fleet-week/control-api';
 
 // ---------------------------------------------------------------- student
 // POST /api/published/game/:lessonId  (netlify/functions/published-games.mjs → _shared/games.mjs, gameStudentAction)
@@ -150,6 +151,8 @@ export type GameTeacherApi = {
   open?(gameId: string, classId: string, opts?: { teams?: number }): Promise<LiveOpen>;
   /** Rooms still open for this lesson (so a refreshed board can reconnect). */
   rooms?(): Promise<{ rooms: LiveRoomInfo[] }>;
+  /** Fleet week campaigns (the control room). */
+  fleet?: FleetControlApi;
 };
 
 /**
@@ -183,6 +186,7 @@ export function gameTeacherApi(lessonId: string): GameTeacherApi {
     pushToMarkbook: (class_id, game_id, title) => call('markbook_push', { class_id, game_id, ...(title ? { title } : {}) }),
     sources: () => call<UnitSources>('sources'),
     open: (game_id, class_id, opts) => call<LiveOpen>('open', { game_id, class_id, ...(opts?.teams ? { teams: opts.teams } : {}) }),
-    rooms: () => call<{ rooms: LiveRoomInfo[] }>('rooms')
+    rooms: () => call<{ rooms: LiveRoomInfo[] }>('rooms'),
+    fleet: fleetControlApi(call)
   };
 }
