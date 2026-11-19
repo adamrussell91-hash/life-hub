@@ -21,6 +21,8 @@ export const gameKeys = (lesson) => ({
   /** Fleet week campaigns (fleet-week-store.mjs). Campaign ids are 16 hex, so never 'current'. */
   campaign: (game, id) => `games/${lesson}/${game}/campaigns/${id}`,
   campaignCurrent: (game, cls) => `games/${lesson}/${game}/campaigns/current/${cls}`,
+  /** The class's latest campaign of this game and its past ones: { id, at, ids: [oldest … newest] }. Kept on close, for Results. */
+  campaignLatest: (game, cls) => `games/${lesson}/${game}/campaigns/latest/${cls}`,
   campaignClock: (game, id) => `games/${lesson}/${game}/campaigns/${id}/clock`,
   campaignFleet: (game, id, owner) => `games/${lesson}/${game}/campaigns/${id}/fleet/${owner}`,
   campaignShots: (game, id, round, owner) => `games/${lesson}/${game}/campaigns/${id}/shots/${round}/${owner}`,

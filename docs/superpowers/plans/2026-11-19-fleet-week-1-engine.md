@@ -583,6 +583,11 @@ Server only. The screens (arcade, content editor, launcher, campaign, editor, co
    - `campaign_state.now` (server ms) and `campaign_state.shots` (the open round's shots: `{ round, owner, owner_name, seq, square, square_label, sure, answered, voided? }`, with no answer text).
    - The view gains `rival.duds` and `shots.fired` (square numbers only; the leak sweep checks both).
 
+8. **Results after a game has ended** (follow-up fix).
+   - `campaigns/latest/{class}` (`{ id, at, ids }`) is set at `campaign_open` and kept at `campaign_close`, unlike `current/{class}`.
+   - `campaign_state` and `campaign_insight` take an optional `campaign_id`. Without one they use the open campaign, then the latest. They work on a closed campaign, and `campaign_state` then returns `phase: 'closed'` and `read_only: true`. Every other action on a closed campaign is still refused with `closed`.
+   - `campaign_list { game_id, class_id }` returns `{ campaigns: [{ id, mode, opened_at, closed_at, revealed_at }] }`, newest first. It comes from the latest pointer's `ids` (the last 50) plus the open campaign.
+
 ### Interpretations
 
 - **Time zone.** Classes have no time zone field. Week mode uses `cls.time_zone` if it is a valid IANA name, otherwise Australia/Sydney, stored as `settings.tz`.
