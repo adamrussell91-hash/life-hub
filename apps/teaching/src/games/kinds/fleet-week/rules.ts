@@ -565,6 +565,64 @@ export function settleAll(state: FleetState, input: Pick<RoundInput, 'filed' | '
 }
 
 // ---------------------------------------------------------------------------
+// Results insight (§4)
+// ---------------------------------------------------------------------------
+
+export type Tally = { answered: number; right: number };
+export type SquareStat = Tally & { square: number; first: Tally; returning: Tally };
+
+/** A resolved shot that counts as an answer: everything but a voided shot (no answer in time is a wrong one). */
+function answeredShot(r: ShotResult): boolean {
+  return r.outcome !== 'void' && !r.voided;
+}
+
+/**
+ * Accuracy per square across every resolved round (§4 heat map): answered and
+ * right, split into first tries and returning squares. Always 25 entries, in
+ * square order.
+ */
+export function squareStats(state: Pick<FleetState, 'log'>): SquareStat[] {
+  const out: SquareStat[] = Array.from({ length: SQUARES }, (_, square) => ({ square, answered: 0, right: 0, first: { answered: 0, right: 0 }, returning: { answered: 0, right: 0 } }));
+  for (const entry of state.log) {
+    for (const r of entry.results) {
+      if (!answeredShot(r) || !onGrid(r.square)) continue;
+      const stat = out[r.square];
+      const part = r.returning ? stat.returning : stat.first;
+      const right = r.correct === true ? 1 : 0;
+      stat.answered++;
+      stat.right += right;
+      part.answered++;
+      part.right += right;
+    }
+  }
+  return out;
+}
+
+/** The class's hardest squares (§4, the board): lowest accuracy first, then most answered, then square order. Answered squares only. */
+export function hardestSquares(stats: SquareStat[], count = 5): Array<Tally & { square: number; accuracy: number }> {
+  return stats
+    .filter((s) => s.answered > 0)
+    .map((s) => ({ square: s.square, answered: s.answered, right: s.right, accuracy: s.right / s.answered }))
+    .sort((a, b) => a.accuracy - b.accuracy || b.answered - a.answered || a.square - b.square)
+    .slice(0, count);
+}
+
+/** Calibration per owner (§4): how often Sure was right, and Unsure for comparison. Voided shots don't count. */
+export function calibration(state: Pick<FleetState, 'log'>): Record<string, { sure: Tally; unsure: Tally }> {
+  const out: Record<string, { sure: Tally; unsure: Tally }> = {};
+  for (const entry of state.log) {
+    for (const r of entry.results) {
+      if (!answeredShot(r)) continue;
+      const row = (out[r.owner] ??= { sure: { answered: 0, right: 0 }, unsure: { answered: 0, right: 0 } });
+      const part = r.sure ? row.sure : row.unsure;
+      part.answered++;
+      if (r.correct === true) part.right++;
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Standings (§1.7)
 // ---------------------------------------------------------------------------
 

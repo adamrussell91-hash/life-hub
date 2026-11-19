@@ -379,6 +379,52 @@ test('damage reports and recall lines reach the control room as written answers 
   assert.ok(recall.writing.log);
 });
 
+// ---------------------------------------------------------------- 4. Results insight
+
+test('campaign_insight: heat map, first try v returning, calibration, confident errors, hardest squares', async () => {
+  const { store, c, state, T } = await lessonGame();
+  const team = fleet.teamOf(c.pairing, ownerOf(1));
+  const rivalShips = state.fleets[fleet.rivalOf(c.pairing, team.id)].flatMap((s) => s.squares);
+  const sea = [...Array(25).keys()].filter((x) => !rivalShips.includes(x));
+  // Round 1: student 1 is sure and wrong on sea[0], sure and right on sea[1]; student 3 unsure and wrong on 24.
+  let shot = await play(store, 1, 'fleet_commit', { square: sea[0], sure: true }, T + 10);
+  await play(store, 1, 'fleet_answer', { answer: 'the sea', writing }, T + 11);
+  shot = await play(store, 1, 'fleet_commit', { square: sea[1], sure: true }, T + 12);
+  await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, T + 13);
+  await play(store, 3, 'fleet_commit', { square: 24, sure: false }, T + 14);
+  await play(store, 3, 'fleet_answer', { answer: 'no idea', writing }, T + 15);
+  await teach(store, 'campaign_next', {}, T + 20);
+  await teach(store, 'campaign_next', {}, T + 30); // round 2 passes empty
+  // Round 3: sea[0] returns to student 1 with the other variant; right this time.
+  shot = await play(store, 1, 'fleet_commit', { square: sea[0], sure: false }, T + 40);
+  await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, T + 41);
+  await teach(store, 'campaign_next', {}, T + 50);
+  const insight = await teach(store, 'campaign_insight', {}, T + 60);
+  assert.equal(insight.grid.length, 25);
+  const cell = insight.grid[sea[0]];
+  assert.deepEqual([cell.answered, cell.right, cell.first.answered, cell.first.right, cell.returning.answered, cell.returning.right], [2, 1, 1, 0, 1, 1]);
+  assert.match(cell.label, /^[A-E][1-5]$/);
+  assert.equal(cell.row, ['Fear', 'Pride', 'Home', 'Loss', 'Hope'][Math.floor(sea[0] / 5)]);
+  const ivo = insight.calibration.find((r) => r.name === 'Ivo Penn');
+  assert.deepEqual([ivo.sure_right, ivo.sure_total, ivo.unsure_right, ivo.unsure_total], [1, 2, 1, 1]);
+  assert.equal(ivo.calibration, 0.5);
+  assert.equal(insight.calibration.length, 8);
+  assert.equal(insight.confident_errors.length, 1);
+  const err = insight.confident_errors[0];
+  assert.deepEqual([err.name, err.square, err.answer, err.round], ['Ivo Penn', sea[0], 'the sea', 1]);
+  assert.match(err.prompt, new RegExp(`^Question ${sea[0]} [AB]\\?$`));
+  assert.ok(insight.hardest.some((h) => h.square === 24 && h.accuracy === 0));
+  assert.ok(insight.hardest.every((h, i, all) => i === 0 || all[i - 1].accuracy <= h.accuracy));
+  // The board, once revealed: per-square accuracy and hardest squares, no answers.
+  const room = await teach(store, 'campaign_reveal', {}, T + 70);
+  assert.equal(room.board.squares.length, 25);
+  assert.ok(room.board.hardest.length >= 1);
+  const view = await play(store, 5, 'fleet_state', {}, T + 80);
+  assert.deepEqual(view.reveal.class, room.board);
+  const text = JSON.stringify(view.reveal.class);
+  assert.ok(!/the sea|no idea|mast|Mast|Ivo/.test(text));
+});
+
 // ---------------------------------------------------------------- phone view extras
 
 test('the view lists my team’s fired squares this round and its duds still unknown', async () => {

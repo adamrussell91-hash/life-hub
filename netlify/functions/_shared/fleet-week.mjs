@@ -185,10 +185,24 @@ export async function viewFor(store, k, campaign, keys, state, clock, owner, now
       names: Object.fromEntries([...team.owners, ...rival.owners].map((o) => [signs[o], named(o)])),
       fleets: { us: list(shown.fleets[team.id]), them: list(shown.fleets[rival.id]) },
       standings: match ? { winner: match.winner ? sides(match.winner) : null, teams: match.teams.map((t) => ({ side: sides(t.team), damage: t.damage, sunk: t.sunk, accuracy: t.accuracy })) } : null,
-      calibration: { right: mineLog.filter((r) => r.correct === true).length, total: mineLog.length }
+      calibration: { right: mineLog.filter((r) => r.correct === true).length, total: mineLog.length },
+      // For the board: the class's accuracy per square and its hardest squares. No answers, no names.
+      class: revealBoard(keys, shown)
     };
   }
   return view;
+}
+
+/** The class's per-square accuracy and hardest squares, labelled with the grid's topics (§4). */
+export function revealBoard(keys, state) {
+  const info = (square) => ({
+    label: fleet.squareLabel(square), row: list(keys.live?.fleet?.rows)[fleet.rowOf(square)] ?? '', column: list(keys.live?.fleet?.columns)[fleet.colOf(square)] ?? ''
+  });
+  const stats = fleet.squareStats(state);
+  return {
+    squares: stats.map((s) => ({ square: s.square, ...info(s.square), answered: s.answered, right: s.right })),
+    hardest: fleet.hardestSquares(stats).map((s) => ({ ...s, ...info(s.square) }))
+  };
 }
 
 // ---------------------------------------------------------------- actions

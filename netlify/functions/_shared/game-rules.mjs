@@ -2323,11 +2323,13 @@ __export(rules_exports, {
   SHIP_SIZES: () => SHIP_SIZES,
   SQUARES: () => SQUARES,
   autoPlace: () => autoPlace,
+  calibration: () => calibration,
   callSigns: () => callSigns,
   colOf: () => colOf,
   emptyState: () => emptyState,
   fnv1a: () => fnv1a,
   halfDamage: () => halfDamage,
+  hardestSquares: () => hardestSquares,
   matchOf: () => matchOf,
   pairTeams: () => pairTeams,
   pickVariant: () => pickVariant,
@@ -2340,6 +2342,7 @@ __export(rules_exports, {
   shipLine: () => shipLine,
   shipsFor: () => shipsFor,
   squareLabel: () => squareLabel,
+  squareStats: () => squareStats,
   standings: () => standings,
   teamOf: () => teamOf
 });
@@ -2714,6 +2717,41 @@ function settleAll(state, input) {
   settleHits(next, input);
   settleRecalls(next, input.recalls);
   return next;
+}
+function answeredShot(r) {
+  return r.outcome !== "void" && !r.voided;
+}
+function squareStats(state) {
+  const out = Array.from({ length: SQUARES }, (_, square) => ({ square, answered: 0, right: 0, first: { answered: 0, right: 0 }, returning: { answered: 0, right: 0 } }));
+  for (const entry of state.log) {
+    for (const r of entry.results) {
+      if (!answeredShot(r) || !onGrid(r.square)) continue;
+      const stat = out[r.square];
+      const part = r.returning ? stat.returning : stat.first;
+      const right = r.correct === true ? 1 : 0;
+      stat.answered++;
+      stat.right += right;
+      part.answered++;
+      part.right += right;
+    }
+  }
+  return out;
+}
+function hardestSquares(stats, count = 5) {
+  return stats.filter((s) => s.answered > 0).map((s) => ({ square: s.square, answered: s.answered, right: s.right, accuracy: s.right / s.answered })).sort((a, b) => a.accuracy - b.accuracy || b.answered - a.answered || a.square - b.square).slice(0, count);
+}
+function calibration(state) {
+  const out = {};
+  for (const entry of state.log) {
+    for (const r of entry.results) {
+      if (!answeredShot(r)) continue;
+      const row = out[r.owner] ??= { sure: { answered: 0, right: 0 }, unsure: { answered: 0, right: 0 } };
+      const part = r.sure ? row.sure : row.unsure;
+      part.answered++;
+      if (r.correct === true) part.right++;
+    }
+  }
+  return out;
 }
 function standings(state, pairing) {
   const row = (id) => {
