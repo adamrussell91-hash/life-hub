@@ -168,3 +168,15 @@ test('a pasted written answer reaches To mark with its typing record, so it can 
   const shortAnswer = toMark.questions.find(q => q.id === 'qa')?.answers[0];
   assert.equal(shortAnswer?.writing, undefined, 'short answers carry no typing record');
 });
+
+test('the quiz itself shows an ask under its question, so the student rewrites it there', async () => {
+  const { store, wrenId } = await setup();
+  await quizTeacherAction(store, 'quiz1', { action: 'again_ask', attempt_id: wrenId, question_id: 'qb', comment: 'One claim and a quote.' });
+  const mine = await quizAction(store, 'quiz1', { ...wren, action: 'status' });
+  assert.deepEqual(mine.results.at(-1).again.map(a => [a.id, a.state, a.comment, a.question.prompt]), [['qb', 'asked', 'One claim and a quote.', 'Explain the ending.']]);
+  assert.equal((await quizAction(store, 'quiz1', { ...pip, action: 'status' })).results.at(-1).again, undefined, 'only the student who was asked');
+
+  await quizAction(store, 'quiz1', { ...wren, action: 'again_save', question_id: 'qb', part: 'answer', field: 'text', text: 'Both houses lose a child.' });
+  await quizAction(store, 'quiz1', { ...wren, action: 'again_send', question_id: 'qb' });
+  assert.equal((await quizAction(store, 'quiz1', { ...wren, action: 'status' })).results.at(-1).again[0].state, 'sent');
+});

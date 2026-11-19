@@ -1,0 +1,7 @@
+/* The box a student rewrites a returned piece in: on the progress page and inside a quiz. */
+.pg-redraft { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); justify-items: start; }
+.pg-redraft__prompt { margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.pg-redraft__locked { color: var(--muted); line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pg-redraft__box { width: 100%; box-sizing: border-box; min-height: 110px; font: inherit; line-height: 1.6; padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); color: inherit; }
+.pg-redraft__status { margin: 0; min-height: 1.4em; font-size: var(--text-sm); color: var(--muted); }
+.pg-redraft .btn { min-height: 44px; }
