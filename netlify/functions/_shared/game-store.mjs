@@ -29,6 +29,21 @@ export const gameKeys = (lesson) => ({
   campaignSeen: (game, id, owner) => `games/${lesson}/${game}/campaigns/${id}/seen/${owner}`
 });
 
+/**
+ * The Fleet week campaigns open for a class, across every lesson:
+ * { campaigns: [{ lesson_id, game_id, id, at }] }. Written at campaign_open,
+ * trimmed at campaign_close, so a student page with no lesson id (the now
+ * strip) can find its signals with one read.
+ */
+export const campaignIndexKey = (cls) => `game-campaigns/${cls}`;
+
+/**
+ * Fleet week's student actions (fleet-week.mjs). Kept in this leaf module so
+ * games.mjs can list them at load time whatever order the modules load in
+ * (fleet-week.mjs reaches games.mjs through the learning-data fold).
+ */
+export const FLEET_ACTIONS = ['fleet_state', 'fleet_place', 'fleet_commit', 'fleet_answer', 'fleet_report', 'fleet_recall', 'signals', 'signals_seen'];
+
 /** A live room's join code → where it is. Freed when the room folds, or once it is 6 h old. */
 export const roomCodeKey = (code) => `game-rooms/codes/${code}`;
 
