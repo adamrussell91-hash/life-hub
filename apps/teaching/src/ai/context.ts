@@ -73,6 +73,7 @@ function lessonTypeLine(mode: Lesson['pedagogical_mode']): string {
   if (mode === 'quiz') return 'quiz';
   if (mode === 'tutorial') return 'tutorial (quiz_question only inside a group’s exit check section; follow the tutorial recipe)';
   if (mode === 'case_study') return 'case_study (no quiz_question; its settings are in lesson.case, which you change with propose_update_case; follow the case study recipe)';
+  if (mode === 'lab') return 'lab (students test a claim on readers; no quiz_question; its settings are in lesson.lab, which the teacher fills in on the Lab card)';
   return `${mode ?? 'lesson'} (not a quiz)`;
 }
 

@@ -84,3 +84,35 @@ test('the queue labels a redraft, carries its draft on the row, and lists who wa
   assert.deepEqual(task.rows, [{ student_id: ava.id, initials: 'AN', draft: 2, sent_scope: { part: 'answers', field: 'q1', start: 0, end: 7 } }]);
   assert.deepEqual(task.asked, [{ initials: 'NP', asked_at: '2026-11-01T00:00:00Z' }]);
 });
+
+test('a lab’s explanation is handed in once the class has its column, and then waits in the queue', async () => {
+  const { labStore, ROSTER } = await import('./helpers/lab-store.js');
+  const { workAction } = await import('../../netlify/functions/_shared/lesson-work.mjs');
+  const { labAction, labTeacherAction } = await import('../../netlify/functions/_shared/lab.mjs');
+  const store = labStore();
+  const kt = { class_id: 'class1', class_token: 'a'.repeat(48) };
+  await labTeacherAction(store, 'lab1', { action: 'start' });
+  await labAction(store, 'lab1', { ...kt, action: 'claim', initials: ROSTER[0].initials });
+  await workAction(store, 'lab1', { ...kt, action: 'save', block_id: 'lab_explain', part: 'answers', fields: { lab_explain_q: 'With the company as the subject there is nowhere else to look.' } });
+  // No column yet: hand-in is closed and nothing waits.
+  await assert.rejects(workAction(store, 'lab1', { ...kt, action: 'handin', block_id: 'lab_explain' }), (e) => e.code === 'not_marked');
+  assert.equal((await toMarkQueue(store, { now: () => Date.parse('2026-11-19T03:00:00Z') })).tasks.length, 0);
+
+  // The column the board makes when the teacher starts the round (apps/teaching/src/lab/after.ts labColumn), saved through the markbook.
+  const { markbookAction } = await import('../../netlify/functions/_shared/markbook.mjs');
+  const labColumn = { id: 'labcolumn001', kind: 'assessment', title: 'Lab: Explanation', date: '2026-11-19', weight: 0, criteria: [{ id: 'labexplain', label: 'Explanation', max: 4, outcomes: [], concepts: [] }], piece: { lesson_id: 'lab1', block_id: 'lab_explain' } };
+  await markbookAction(store, 'class1', { action: 'save_column', column: labColumn });
+  assert.deepEqual((await workAction(store, 'lab1', { ...kt, action: 'status' })).handin_blocks, ['lab_explain']);
+  const handed = await workAction(store, 'lab1', { ...kt, action: 'handin', block_id: 'lab_explain' });
+  assert.ok(handed.handed_in_at);
+
+  const out = await toMarkQueue(store, { now: () => Date.parse(handed.handed_in_at) + 1000 });
+  assert.equal(out.tasks.length, 1);
+  const t = out.tasks[0];
+  assert.deepEqual([t.class_id, t.column_id, t.title, t.waiting, t.handed_in, t.roster], ['class1', 'labcolumn001', 'Lab: Explanation', 1, 1, 17]);
+
+  // The After class list has the answer's opening words for the teacher, with initials.
+  const after = await labTeacherAction(store, 'lab1', { action: 'after' });
+  assert.deepEqual(after.students.map((s) => [s.initials, s.student_id, !!s.handed_in_at, s.explanation]), [['KT', ROSTER[0].id, true, 'With the company as the subject there is nowhere else to look.']]);
+  assert.equal(after.class_id, 'class1');
+});

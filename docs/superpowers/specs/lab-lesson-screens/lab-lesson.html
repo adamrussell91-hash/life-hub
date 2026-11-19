@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab lesson</title>
+<style>
+  /* Tokens copied from packages/design-kit/tokens.css */
+  :root { --paper:#fbf8f2; --marine:#142b51; --navy:#17375e; --navy-2:#244f7c; --ink:#13233a; --muted:#6b7788; --line:rgba(23,55,94,.10); --lilac:#e8e0f1; --lilac-ink:#5d4e70; --success:#2f7a4f; --on-dark:rgba(255,255,255,.92); --on-dark-muted:rgba(255,255,255,.66);
+    --text-sm:.8125rem; --text-base:.9375rem; --text-md:1.0625rem; --text-lg:1.3125rem; --text-xl:2rem; --radius-sm:.875rem; --radius-md:1.25rem; --elev-1:0 1px 2px rgba(20,35,70,.06); --elev-2:0 6px 18px rgba(39,55,74,.08); --mono:ui-monospace, 'SF Mono', Menlo, monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:var(--text-base)/1.55 Inter, ui-sans-serif, system-ui, sans-serif; }
+  button, textarea, select, input { font:inherit; color:inherit; }
+  /* Mock controls: not part of the product. */
+  .mock { position:sticky; top:0; z-index:5; background:var(--marine); color:var(--on-dark); display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; padding:8px 16px; font-size:var(--text-sm); }
+  .mock b { font-weight:600; color:var(--on-dark-muted); }
+  .mock .seg { display:flex; flex-wrap:wrap; background:rgba(255,255,255,.1); border-radius:18px; padding:2px; }
+  .mock .seg button { border:0; background:none; color:var(--on-dark); padding:5px 12px; border-radius:999px; cursor:pointer; min-height:32px; }
+  .mock .seg button.on { background:#fff; color:var(--marine); font-weight:600; }
+  .mock .go { margin-left:auto; border:1px solid rgba(255,255,255,.4); background:none; color:#fff; border-radius:999px; padding:5px 14px; cursor:pointer; min-height:32px; }
+  .mock .go[disabled] { opacity:.35; cursor:default; }
+  .page { max-width:60rem; margin:0 auto; padding:24px 16px 96px; }
+  .page.student { max-width:50rem; }
+  .eyebrow { margin:0; font-size:var(--text-sm); font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .title { margin:4px 0 12px; font-size:clamp(var(--text-lg), 4vw, var(--text-xl)); font-weight:700; letter-spacing:-.015em; line-height:1.15; color:var(--navy); }
+  .meta { display:flex; flex-wrap:wrap; gap:4px 16px; align-items:baseline; padding:14px 20px; border-radius:var(--radius-md); color:var(--on-dark); background:linear-gradient(165deg, var(--navy) 0%, var(--navy-2) 100%); box-shadow:var(--elev-2); }
+  .meta strong { font-weight:600; } .meta span { font-size:var(--text-sm); color:var(--on-dark-muted); }
+  .strip { margin:20px 0 14px; }
+  .strip p { margin:0 0 6px; font-size:var(--text-sm); color:var(--muted); } .strip p b { color:var(--ink); }
+  .dots { display:flex; gap:4px; } .dots i { flex:1; height:4px; border-radius:999px; background:var(--line); }
+  .dots i.seen { background:color-mix(in srgb, var(--marine) 45%, #fff); } .dots i.here { background:var(--marine); }
+  /* Lab notes: one line that grows as the pair works. */
+  .notes { margin:0 0 14px; padding:8px 14px; border:1px dashed color-mix(in srgb, var(--lilac-ink) 40%, #fff); border-radius:10px; font:var(--text-sm)/1.5 var(--mono); color:var(--lilac-ink); }
+  .notes b { font-family:Inter, sans-serif; font-weight:600; margin-right:8px; }
+  .note { display:grid; gap:4px; } .note span { font-size:var(--text-sm); font-weight:600; color:var(--lilac-ink); }
+  .note textarea { border:1px dashed color-mix(in srgb, var(--lilac-ink) 45%, #fff); font:var(--text-base)/1.5 var(--mono); } .note em { font-style:normal; font-size:var(--text-sm); color:var(--lilac-ink); }
+  .said { font:var(--text-sm)/1.5 var(--mono); color:var(--lilac-ink); border-left:3px solid var(--lilac); padding-left:10px; }
+  .nl { margin:0; padding:0; list-style:none; display:grid; gap:6px; font:var(--text-sm)/1.5 var(--mono); } .nl b { font-family:Inter, sans-serif; margin-right:8px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:var(--radius-md); box-shadow:var(--elev-1); padding:24px; display:grid; gap:16px; min-width:0; }
+  .card h2 { margin:0; font-size:var(--text-lg); line-height:1.25; } .card p { margin:0; }
+  .muted { color:var(--muted); }
+  .btn { min-height:44px; padding:8px 20px; border-radius:var(--radius-sm); border:1px solid var(--marine); background:var(--marine); color:#fff; cursor:pointer; font-weight:600; }
+  .btn.second { background:#fff; color:var(--marine); border-color:var(--line); font-weight:500; }
+  .btn[disabled] { opacity:.35; cursor:default; }
+  .student .card > .btn { justify-self:start; min-width:11rem; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { min-height:40px; padding:6px 16px; border-radius:999px; border:1px solid transparent; background:var(--lilac); color:var(--lilac-ink); }
+  button.chip { cursor:pointer; } .chip.on { background:var(--lilac-ink); color:#fff; }
+  .chip.plain { background:#fff; border-color:var(--line); color:var(--ink); } .chip.plain.on { background:var(--marine); color:#fff; border-color:var(--marine); }
+  .facts { display:grid; gap:6px; } .facts span { color:var(--muted); display:inline-block; min-width:5.5rem; }
+  textarea, .field { width:100%; border:1px solid var(--line); border-radius:var(--radius-sm); padding:12px 14px; background:#fff; line-height:1.55; }
+  textarea { resize:vertical; }
+  textarea.prose, .piece { font-family:Georgia, 'Times New Roman', serif; font-size:var(--text-md); line-height:1.6; }
+  .piece { display:block; width:100%; text-align:left; border:1px solid var(--line); border-radius:var(--radius-sm); padding:14px 16px; background:#fff; }
+  button.piece { cursor:pointer; } button.piece:hover { border-color:var(--lilac-ink); }
+  .piece.on { border-color:var(--lilac-ink); box-shadow:0 0 0 3px var(--lilac); }
+  .piece small, .label { display:block; font:600 var(--text-sm) Inter, sans-serif; color:var(--muted); margin:0 0 2px; }
+  .var { background:var(--lilac); color:var(--lilac-ink); border-radius:5px; padding:0 4px; }
+  .bars { display:grid; gap:10px; }
+  .bar { display:grid; grid-template-columns:5.5rem 1fr 3rem; gap:12px; align-items:center; }
+  .bar i { display:block; height:22px; border-radius:6px; background:color-mix(in srgb, var(--lilac-ink) 30%, #fff); transition:width .9s cubic-bezier(.2,.8,.2,1); }
+  .bar.top i { background:var(--lilac-ink); } .bar.top span:first-child { font-weight:700; }
+  .bar span:last-child { text-align:right; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .meter { height:10px; border-radius:999px; background:var(--lilac); overflow:hidden; max-width:26rem; }
+  .meter i { display:block; height:100%; width:0; background:var(--lilac-ink); transition:width .5s; }
+  .scale { display:grid; gap:4px; } .scale input { width:100%; accent-color:var(--lilac-ink); }
+  .ends { display:flex; justify-content:space-between; font-size:var(--text-sm); color:var(--muted); }
+  /* The bench: control beside the pair's version. */
+  .bench { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .pane { border:1px solid var(--line); border-radius:var(--radius-sm); padding:12px 14px; min-width:0; }
+  .pane.live { border-color:color-mix(in srgb, var(--lilac-ink) 45%, #fff); background:color-mix(in srgb, var(--lilac) 22%, #fff); }
+  .poem { list-style:none; margin:0; padding:0; counter-reset:l; font:var(--text-md)/1.95 Georgia, serif; }
+  .poem li { counter-increment:l; display:grid; grid-template-columns:1.5rem 1fr; }
+  .poem li::before { content:counter(l); font:var(--text-sm)/2.5 var(--mono); color:var(--muted); }
+  .bench .poem { font-size:var(--text-base); } .bench .poem li { grid-template-columns:1.2rem 1fr; }
+  .tok { border:0; background:none; padding:1px 2px; border-radius:5px; font:inherit; color:inherit; }
+  button.tok { cursor:pointer; } button.tok:hover { background:var(--lilac); }
+  .tok.var { background:var(--lilac); color:var(--lilac-ink); padding:1px 4px; } .tok.cut { background:var(--lilac); color:var(--lilac-ink); text-decoration:line-through; }
+  .tok.sel { outline:2px solid var(--lilac-ink); }
+  .mk { display:inline-block; width:4px; height:1.1em; margin-left:3px; border-radius:2px; background:var(--lilac-ink); vertical-align:-.15em; }
+  .tools { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .tools input { flex:1 1 8rem; min-width:0; min-height:44px; border:1px solid var(--line); border-radius:var(--radius-sm); padding:6px 12px; }
+  .tools .btn { padding:8px 14px; }
+  /* Readings: every rating is a dot. */
+  .reading p { margin:0 0 2px; } .reading svg { display:block; width:100%; max-width:30rem; height:auto; }
+  .reading circle { fill:var(--lilac-ink); opacity:0; animation:drop .35s ease-out forwards; }
+  .reading.ctl circle { fill:color-mix(in srgb, var(--ink) 35%, #fff); }
+  .reading .ax { stroke:var(--muted); stroke-width:1; } .reading .mean { stroke:var(--ink); stroke-width:2; } .reading text { font:10px var(--mono); fill:var(--muted); }
+  @keyframes drop { from { opacity:0; transform:translateY(-10px); } to { opacity:1; } }
+  .finds { display:grid; gap:6px; }
+  .find { display:grid; grid-template-columns:minmax(0,15rem) 1fr 3.2rem; gap:12px; align-items:center; text-align:left; border:0; background:none; padding:6px 8px; border-radius:10px; cursor:pointer; font-size:var(--text-md); }
+  .find:hover, .find.on { background:color-mix(in srgb, var(--lilac) 45%, #fff); } .find.mine span:first-child { font-weight:700; }
+  .find .track { position:relative; height:22px; border-left:0; } .find .track::before { content:''; position:absolute; left:50%; top:-4px; bottom:-4px; width:2px; background:var(--ink); }
+  .find .track i { position:absolute; top:0; bottom:0; border-radius:5px; background:var(--lilac-ink); transition:width .8s cubic-bezier(.2,.8,.2,1); width:0; }
+  .find .track i.small { background:color-mix(in srgb, var(--lilac-ink) 30%, #fff); }
+  .find span:last-child { text-align:right; font:var(--text-base) var(--mono); color:var(--muted); }
+  .axis { display:grid; grid-template-columns:minmax(0,15rem) 1fr 3.2rem; gap:12px; padding:0 8px; font-size:var(--text-sm); color:var(--muted); } .axis div { display:flex; justify-content:space-between; }
+  /* Board: the same card, sized for the projector. */
+  .board .card { padding:36px 40px 0; min-height:24rem; grid-template-rows:1fr auto; }
+  .board .inner { display:grid; gap:18px; align-content:start; font-size:var(--text-lg); min-width:0; }
+  .board h2 { font-size:var(--text-xl); letter-spacing:-.015em; color:var(--navy); }
+  .board .bar { font-size:var(--text-lg); grid-template-columns:9rem 1fr 3.5rem; } .board .bar i { height:30px; }
+  .board .piece { font-size:1.4rem; padding:20px 24px; } .board .chip { font-size:var(--text-md); } .board .poem { font-size:1.45rem; }
+  .board .bench .poem { font-size:var(--text-md); } .board .bench { font-size:var(--text-base); }
+  .ctrl { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin:28px -40px 0; padding:14px 40px; border-top:1px solid var(--line); font-size:var(--text-base); color:var(--muted); }
+  .ctrl div { display:flex; gap:8px; flex-wrap:wrap; }
+  .board .card.flat { padding:24px; min-height:0; grid-template-rows:none; } .board .card.flat h2 { font-size:var(--text-lg); color:var(--ink); }
+  .rows { margin:0; } .row { display:grid; grid-template-columns:13rem 1fr; gap:16px; padding:14px 0; border-bottom:1px solid var(--line); }
+  .row:last-child { border-bottom:0; } .row dt { color:var(--muted); } .row dd { margin:0; display:grid; gap:6px; min-width:0; } .row small { color:var(--muted); font-size:var(--text-sm); }
+  table { width:100%; border-collapse:collapse; } th { text-align:left; font-size:var(--text-sm); color:var(--muted); font-weight:600; padding:8px; border-bottom:1px solid var(--line); }
+  td { padding:10px 8px; border-bottom:1px solid var(--line); vertical-align:top; } .held { color:var(--success); font-weight:600; }
+  @media (max-width:640px) {
+    .card { padding:18px 16px; } .board .card { padding:22px 16px 0; min-height:0; } .board .inner { font-size:var(--text-md); } .board h2 { font-size:1.5rem; }
+    .board .bar { font-size:var(--text-base); grid-template-columns:6rem 1fr 2.5rem; } .board .piece, .board .poem { font-size:var(--text-md); }
+    .ctrl { margin:20px -16px 0; padding:12px 16px; } .row { grid-template-columns:1fr; gap:2px; } .bar { grid-template-columns:4.5rem 1fr 2.5rem; }
+    .bench { grid-template-columns:1fr; } .find, .axis { grid-template-columns:1fr 5rem 3rem; font-size:var(--text-base); }
+    thead { display:none; } tr { display:grid; gap:2px; padding:10px 0; border-bottom:1px solid var(--line); } td { border:0; padding:0; }
+  }
+  @media (prefers-reduced-motion:reduce) { .bar i, .meter i, .find .track i { transition:none; } .reading circle { animation:none; opacity:1; } }
+</style>
+</head>
+<body>
+<div class="mock" id="mock"></div>
+<div id="page"></div>
+<script>
+const CLASS = 17, OTHERS = 16;
+const POEM = ['I meant to tell you — once', 'the kettle stopped, once the light', 'had settled on the bench,', 'but the words, I think,', 'were somewhere else. Perhaps', 'tomorrow. Would tomorrow do?'];
+const LABS = {
+  poem: {
+    kind: 'design', name: 'Pairs design it', title: 'What makes this speaker sound hesitant?', question: 'What makes this speaker sound hesitant?',
+    claim: 'The line breaks create the hesitation.', measure: 'How hesitant does the speaker sound?', notes: 'The breaks matter, but the hedges and the closing question do more. Push them to say the claim needs both.',
+    control: 6.6, win: 1,
+    trials: [
+      { who: 'Pair 1', ops: { cut: [21, 22] }, pred: -1, mean: 4.8, f: 1 },
+      { who: 'Pair 2', ops: { join: [26] }, pred: -1, mean: 6.2, f: 0 },
+      { who: 'Pair 3', ops: { rep: { 28: 'Tomorrow', 29: 'would', 30: 'do.' } }, desc: 'Turned the question into a statement', pred: -1, mean: 4.3, f: 2 },
+      { who: 'Pair 4', ops: { cut: [5] }, desc: 'Cut the dash', pred: -1, mean: 5.9, f: 3 },
+      { who: 'Pair 5', ops: { cut: [10] }, desc: 'Cut the second "once"', pred: 0, mean: 6.0, f: 4 },
+      { who: 'Pair 6', ops: { rep: { 1: 'wanted' } }, pred: 1, mean: 6.9, f: 5 },
+      { who: 'Pair 7', ops: { brk: [14] }, pred: 1, mean: 7.8, f: 0 }
+    ],
+    purpose: 'Your essay will claim that form creates meaning. Today you find out how much of this hesitation the line breaks really carry, so that claim rests on evidence.',
+    features: [{ n: 'Line break (enjambment)', lv: 'Form' }, { n: 'Hedging (modality)', lv: 'Sentence' }, { n: 'Sentence type', lv: 'Sentence' }, { n: 'Punctuation (caesura)', lv: 'Sentence' }, { n: 'Repetition', lv: 'Sentence' }, { n: 'Word choice (connotation)', lv: 'Word' }]
+  },
+  storm: {
+    name: 'Students write it', title: 'Which sense makes a storm feel most real?', question: 'Which sense makes a storm feel most real to a reader?',
+    same: 'The moment the storm hits the house. Two or three sentences.', options: ['Sight', 'Sound', 'Touch'], source: 'students', judge: 'pick',
+    predictQ: 'Which sense will win?', judgeQ: 'Which one feels most real?', notes: 'Sound puts the reader inside the house. Link to the storm stanza in the set poem.',
+    otherPred: [9, 4, 3], base: [20, 45, 31], win: 8,
+    mine: ['The sky goes the colour of a bruise. Rain comes sideways in white sheets and the back fence disappears.', 'The gutters choke and spit. Something heavy rolls across the roof and the whole house hums like a struck drum.', 'The air presses on my skin like a wet hand. The floorboards shiver up through my feet.'],
+    mineChosen: [1, 1, 4],
+    writers: [
+      { order: [1, 2, 0], t: ['Lightning turns the kitchen white for one long second. Every cup on the shelf throws a shadow, then the dark folds back in.', 'First a hiss in the trees, then a crack that splits the afternoon. The windows answer with a low rattle.', 'The door handle is suddenly cold and slick. Wind shoves through the gap and lifts the hair on my arms.'] },
+      { order: [2, 0, 1], t: ['Leaves spin past the window in a green blur. The street light flickers twice and gives up.', 'Rain drums the tin so hard we stop talking. Under it, the dog whines at a pitch I have never heard.', 'The whole wall leans into my shoulder. Damp creeps through my socks before I see any water.'] },
+      { order: [0, 1, 2], t: ['A grey curtain walks up the paddock towards us. One by one the hills are rubbed out.', 'The roof groans once, like something waking. Then every sheet of iron starts to chatter at the same time.', 'Pressure pops in my ears. The glass under my palm trembles like a held breath.'] },
+      { order: [1, 0, 2], t: ['The clothesline whips in circles, flinging pegs. Water runs brown and fast where the path used to be.', 'Thunder lands on the house like a dropped piano. The silence after it is louder.', 'Heat drains out of the room in one pull. My shirt sticks, cold, between my shoulder blades.'] },
+      { order: [2, 1, 0], t: ['The neighbour\'s roof shines black and slick. Beyond it there is only white.', 'A whistle starts under the door and climbs. Somewhere a gate slams, and slams, and slams.', 'Grit stings my face when I open the door. The wind leans on my chest until I step back.'] },
+      { order: [0, 2, 1], t: ['The gum tree bends until its crown touches the shed. Hail bounces white across the lawn.', 'Hail hits the car like thrown gravel. Inside, the fridge clicks off and the house goes quiet.', 'The floor hums under my heels. Each gust pushes the cold a little further down my collar.'] }
+    ],
+    best: 'The gutters choke and spit. Something heavy rolls across the roof and the whole house hums like a struck drum.'
+  },
+  river: {
+    name: 'You supply it', title: 'Does the passive voice shrink the blame?', question: 'Does the passive voice shrink the blame?',
+    same: 'The events, their order and the length of the paragraph.', options: ['Active', 'Passive'], source: 'supplied', judge: 'rate',
+    predictQ: 'Which version will make readers blame the company more?', judgeQ: 'How much is the company to blame?', notes: 'The passive removes the doer. Ask who is missing from each sentence.',
+    otherPred: [11, 5], win: 1, otherSum: [63.2, 41], otherN: [8, 8], myVersion: 1,
+    texts: ['For three years the company <v>dumped waste</v> upstream of the town. <v>Its managers ignored</v> two written warnings from the council. By spring, <v>scientists had declared</v> the river dead, and <v>the company had still not answered</v> a single letter.',
+            'For three years <v>waste was dumped</v> upstream of the town. Two written warnings from the council <v>were ignored</v>. By spring, the river <v>had been declared</v> dead, and not a single letter <v>had been answered</v>.']
+  }
+};
+const fresh = () => ({ pred: null, reason: '', locked: false, texts: null, v: 0, made: false, judged: [], rating: 5, rated: false, explain: '', handed: false,
+  tokens: baseTokens(), sel: -1, ready: false, k: 0, ratings: [], notes: {}, qdone: false, tdone: false, rdone: false, feat: null, named: false });
+const s = { lab: 'poem', view: 'board', step: 0, tick: 0, revealed: false, showBest: false, open: -1, notesOn: true, miss: '', me: null };
+const L = () => LABS[s.lab];
+const isDesign = () => L().kind === 'design';
+const steps = () => isDesign() ? ['Question', 'Design', 'Predict', 'Test', 'Result', 'Name it', 'Explain'] : L().source === 'students' ? ['Question', 'Predict', 'Make', 'Test', 'Result', 'Explain'] : ['Question', 'Predict', 'Test', 'Result', 'Explain'];
+const stepName = () => steps()[s.step] || 'After class';
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const plain = (t) => t.replace(/<\/?v>/g, '');
+const marked = (t) => t.replace(/<v>/g, '<span class="var">').replace(/<\/v>/g, '</span>');
+const low = (t) => t.charAt(0).toLowerCase() + t.slice(1);
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+const WAIT = '<p class="muted">Waiting for your teacher.</p>';
+
+/* ---------- The poem as apparatus ---------- */
+function baseTokens() {
+  const t = [];
+  POEM.forEach((line, li) => { const ws = line.split(' '); ws.forEach((w, wi) => { const br = wi === ws.length - 1 && li < POEM.length - 1; t.push({ w, line: li + 1, br, nbr: br, cut: false, rep: null }); }); });
+  return t;
+}
+function applyOps(ops) {
+  const t = baseTokens();
+  (ops.cut || []).forEach((i) => t[i].cut = true); (ops.join || []).forEach((i) => t[i].nbr = false); (ops.brk || []).forEach((i) => t[i].nbr = true);
+  Object.entries(ops.rep || {}).forEach(([i, w]) => t[i].rep = w);
+  return t;
+}
+const changed = (x) => x.cut || x.rep !== null || x.nbr !== x.br;
+function describe(t) {
+  const out = []; let i = 0;
+  while (i < t.length) {
+    if (!changed(t[i])) { i++; continue; }
+    let j = i; while (j + 1 < t.length && changed(t[j + 1])) j++;
+    const run = t.slice(i, j + 1), cuts = run.filter((x) => x.cut), reps = run.filter((x) => x.rep !== null && !x.cut);
+    if (cuts.length) out.push(`cut "${cuts.map((x) => x.w).join(' ')}"`);
+    if (reps.length) out.push(`changed "${reps.map((x) => x.w).join(' ')}" to "${reps.map((x) => x.rep).join(' ')}"`);
+    run.filter((x) => x.br && !x.nbr).forEach((x) => out.push(`joined lines ${x.line} and ${x.line + 1}`));
+    run.filter((x) => !x.br && x.nbr).forEach((x) => out.push(`broke line ${x.line} after "${x.rep ?? x.w}"`));
+    i = j + 1;
+  }
+  return out;
+}
+function poemHTML(t, o = {}) {
+  const lines = [[]];
+  t.forEach((x, i) => {
+    if (x.cut && !o.marks) { if (x.nbr) lines.push([]); return; }
+    const cls = ['tok']; if (o.marks && x.cut) cls.push('cut'); else if (o.marks && x.rep !== null) cls.push('var'); if (i === o.sel) cls.push('sel');
+    let h = o.tap ? `<button class="${cls.join(' ')}" data-act="tok" data-i="${i}">${esc(x.rep ?? x.w)}</button>` : `<span class="${cls.join(' ')}">${esc(x.rep ?? x.w)}</span>`;
+    if (o.marks && x.nbr !== x.br) h += '<span class="mk"></span>';
+    lines[lines.length - 1].push(h);
+    if (x.nbr) lines.push([]);
+  });
+  return `<ol class="poem">${lines.filter((l) => l.length).map((l) => `<li><span>${l.join(' ')}</span></li>`).join('')}</ol>`;
+}
+function sample(mean, n) {
+  const pat = [-2, -1, -1, 0, 0, 1, 1, 2, -3, 3, 0, -1, 1, 0, -2, 2], f = Math.floor(mean), k = Math.round((mean - f) * n);
+  return Array.from({ length: n }, (_, i) => Math.max(0, Math.min(10, f + pat[i % pat.length] + (i < k ? 1 : 0))));
+}
+const avg = (a) => Math.round(a.reduce((x, y) => x + y, 0) / a.length * 10) / 10;
+const fmt = (x) => (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x).toFixed(1);
+function myMean(t) {
+  let e = 0;
+  t.forEach((x, i) => { if (x.cut) e -= [21, 22, 26].includes(i) ? 0.9 : i === 5 ? 0.7 : 0.3; else if (x.rep !== null) e += i >= 28 ? -0.8 : 0.2; if (x.br && !x.nbr) e -= 0.9; if (!x.br && x.nbr) e += 1.1; });
+  return Math.max(1.5, Math.min(9.5, L().control + e));
+}
+const TEST_ORDER = [-1, 0, 2, 6, 3, 4]; // the six texts this reader gets: -1 is the control
+function controlVals() { const v = sample(L().control, 38); TEST_ORDER.forEach((id, k) => { if (id === -1 && s.me.ratings[k] != null) v.push(s.me.ratings[k]); }); return v; }
+function allTrials() {
+  const l = L(), c = avg(controlVals());
+  const list = l.trials.map((tr, id) => { const tokens = applyOps(tr.ops), vals = sample(tr.mean, 8); TEST_ORDER.forEach((x, k) => { if (x === id && s.me.ratings[k] != null) vals.push(s.me.ratings[k]); }); return { who: tr.who, tokens, desc: tr.desc || cap(describe(tokens).join(', ')), pred: tr.pred, vals, f: tr.f }; });
+  if (s.me.ready) list.push({ who: 'Your pair', mine: true, tokens: s.me.tokens, desc: cap(describe(s.me.tokens).join(', ')), pred: s.me.pred ?? 0, vals: sample(myMean(s.me.tokens), 8), f: s.me.named ? s.me.feat : null });
+  list.forEach((x) => { x.shift = Math.round((avg(x.vals) - c) * 10) / 10; x.verdict = x.shift <= -l.win ? -1 : x.shift >= l.win ? 1 : 0; x.held = x.verdict === x.pred; });
+  return list;
+}
+const WORD = { '-1': 'less hesitant', 0: 'about as hesitant', 1: 'more hesitant' };
+function reading(vals, name, ctl) {
+  const counts = {}; vals.forEach((v) => counts[v] = (counts[v] || 0) + 1);
+  const H = Math.max(...Object.values(counts)) * 9 + 30, base = H - 22, x = (v) => 14 + v * 27.2, seen = {}, m = avg(vals);
+  const dots = vals.map((v, k) => { seen[v] = (seen[v] || 0) + 1; return `<circle cx="${x(v)}" cy="${base - (seen[v] - 1) * 9}" r="4" style="animation-delay:${k * 45}ms"/>`; }).join('');
+  return `<div class="reading ${ctl ? 'ctl' : ''}"><p><b>${name}</b> <span class="muted">average ${m.toFixed(1)}, ${vals.length} readers</span></p>
+    <svg viewBox="0 0 300 ${H}" role="img" aria-label="${name}: average ${m} from ${vals.length} readers">${dots}<line class="ax" x1="14" y1="${base + 8}" x2="286" y2="${base + 8}"/><line class="mean" x1="${x(m)}" y1="4" x2="${x(m)}" y2="${base + 8}"/>
+    ${[0, 5, 10].map((v) => `<text x="${x(v)}" y="${H - 2}" text-anchor="middle">${v}</text>`).join('')}</svg></div>`;
+}
+function findings(list) {
+  const rows = list.map((x, i) => ({ x, i })).sort((a, b) => a.x.shift - b.x.shift);
+  return `<div class="finds"><div class="axis"><span></span><div><span>Less hesitant</span><span>More</span></div><span></span></div>
+    ${rows.map(({ x, i }) => `<button class="find ${x.mine ? 'mine' : ''} ${s.open === i ? 'on' : ''}" data-act="open" data-i="${i}"><span>${x.desc}</span>
+      <span class="track"><i class="${x.verdict === 0 ? 'small' : ''}" data-w="${Math.min(50, Math.abs(x.shift) / 3 * 50)}" style="${x.shift < 0 ? 'right:50%' : 'left:50%'}"></i></span><span>${fmt(x.shift)}</span></button>`).join('')}</div>`;
+}
+function trialDetail(x) { return `<div class="bench"><div class="pane"><span class="label">${x.who}: ${low(x.desc)}</span>${poemHTML(x.tokens, { marks: true })}</div><div class="pane">${reading(controlVals(), 'Control', true)}${reading(x.vals, 'This version')}</div></div>`; }
+function mine() { return allTrials().find((x) => x.mine); }
+function notes() {
+  const m = s.me, bits = []; if (!isDesign()) return '';
+  if (m.ready) bits.push(cap(describe(m.tokens).join(', '))); if (m.locked) bits.push(`Predicted ${WORD[m.pred]}`);
+  if (s.step >= 4 && m.ready) bits.push(`Shift ${fmt(mine().shift)}`); if (m.named) bits.push(L().features[m.feat].n);
+  return bits.length ? `<p class="notes"><b>Lab notes</b>${bits.join(' · ')}</p>` : '';
+}
+
+function noteBox(key, prompt) {
+  if (!s.notesOn) return '';
+  return `<label class="note"><span>Lab note</span><textarea rows="2" data-note="${key}" placeholder="${prompt}">${esc(s.me.notes[key] || '')}</textarea>${s.miss === key ? '<em>Write your lab note to carry on.</em>' : ''}</label>`;
+}
+const noted = (key) => s.notesOn && s.me.notes[key] ? `<p class="said">${esc(s.me.notes[key])}</p>` : '';
+const saveNote = (act, key) => `<button class="btn" data-act="${act}" data-needs="${key}">Save note</button>`;
+const LEVELS = { Sentence: 'Sentence: hedges, questions, punctuation', Form: 'Form: line breaks', Word: 'Word: word choice' };
+function levelBars() {
+  const l = L(), t = allTrials().filter((x) => x.f != null);
+  const rows = Object.keys(LEVELS).map((lv) => { const xs = t.filter((x) => l.features[x.f].lv === lv); return { lv, n: xs.length, v: xs.length ? Math.round(xs.reduce((a, x) => a + Math.abs(x.shift), 0) / xs.length * 10) / 10 : 0 }; }).sort((a, b) => b.v - a.v);
+  return `<h2>The ${low(rows[0].lv)} level moved readers most</h2><p class="muted">Average shift for each level of language, from the pairs' trials.</p>
+    <div class="bars">${rows.map((r, i) => `<div class="bar ${i === 0 ? 'top' : ''}" style="grid-template-columns:minmax(0,24rem) 1fr 3rem"><span>${LEVELS[r.lv]} <small class="muted">${r.n} ${r.n === 1 ? 'trial' : 'trials'}</small></span><i data-w="${r.v / 3 * 100}" style="width:0"></i><span>${r.v.toFixed(1)}</span></div>`).join('')}</div>`;
+}
+function dStudent() {
+  const l = L(), m = s.me, n = stepName(), free = !s.notesOn;
+  if (n === 'Question') return `<h2>${l.question}</h2><p><span class="muted">Claim to test:</span> ${l.claim}</p><p><span class="muted">Why we are testing it:</span> ${l.purpose}</p><div class="pane">${poemHTML(baseTokens())}</div>
+    ${free || m.qdone ? `${noted('Question')}${WAIT}` : `${noteBox('Question', 'Where do you hear the hesitation? Quote it.')}${saveNote('qdone', 'Question')}`}`;
+  if (n === 'Design') {
+    if (m.ready) return `<h2>On the bench</h2><div class="pane live">${poemHTML(m.tokens, { marks: true })}</div>${noted('Design')}${WAIT}`;
+    const d = describe(m.tokens), x = m.tokens[m.sel];
+    const tools = !x ? '<p class="muted">Tap a word in your version to change it, cut it, or move a line break.</p>'
+      : `<div class="tools"><input data-rep value="${esc(x.rep ?? x.w)}" aria-label="Replace the word"><button class="btn second" data-act="rep">Replace</button><button class="btn second" data-act="cut">${x.cut ? 'Put back' : 'Cut'}</button>${m.sel < m.tokens.length - 1 ? `<button class="btn second" data-act="brk">${x.nbr ? 'Join to next line' : 'Break line after'}</button>` : ''}</div>`;
+    return `<h2>Change one thing</h2><div class="bench"><div class="pane"><span class="label">Control</span>${poemHTML(baseTokens())}</div><div class="pane live"><span class="label">Your version</span>${poemHTML(m.tokens, { marks: true, tap: true, sel: m.sel })}</div></div>${tools}
+      <p>${d.length === 0 ? '<span class="muted">No change yet.</span>' : d.length === 1 ? `<strong>One change:</strong> ${d[0]}.` : `<strong>${d.length} changes:</strong> ${d.join('; ')}. <span class="muted">One change gives a cleaner result.</span>`}</p>
+      ${d.length ? noteBox('Design', 'Why this change? What is it doing in the original?') : ''}
+      <div class="tools"><button class="btn" data-act="ready" data-needs="Design" ${d.length ? '' : 'disabled'}>Put it on the bench</button>${d.length ? '<button class="btn second" data-act="clear">Start over</button>' : ''}</div>`;
+  }
+  if (n === 'Predict') return m.locked ? `<h2>Locked in: ${WORD[m.pred]}</h2>${noted('Predict')}${WAIT}`
+    : `<h2>If we ${m.ready ? describe(m.tokens).join(', ') : 'make our change'}, the speaker will sound…</h2><div class="chips">${[-1, 0, 1].map((p) => `<button class="chip ${m.pred === p ? 'on' : ''}" data-act="dpred" data-i="${p}">${cap(WORD[p])}</button>`).join('')}</div>
+       ${noteBox('Predict', 'Because…')}<button class="btn" data-act="lock" data-needs="Predict" ${m.pred === null ? 'disabled' : ''}>Lock it in</button>`;
+  if (n === 'Test') { if (m.k >= 6) return `<h2>Six versions rated</h2>${free || m.tdone ? `${noted('Test')}${WAIT}` : `${noteBox('Test', 'Which version sounded most different? What had changed in it?')}${saveNote('tdone', 'Test')}`}`; const id = TEST_ORDER[m.k];
+    return `<h2>${l.measure}</h2><div class="pane">${poemHTML(id === -1 ? baseTokens() : applyOps(l.trials[id].ops))}</div><div class="scale"><input type="range" min="0" max="10" step="1" value="5" data-bind="cur"><div class="ends"><span>Not at all</span><span>Completely</span></div></div>
+      <p class="muted">Version ${m.k + 1} of 6. Some are changed and some are the original.</p><button class="btn" data-act="drate">Send</button>`; }
+  if (n === 'Result') { const x = mine(); if (!x) return `<h2>Your pair has no trial on the bench</h2>`;
+    return `<h2>Your change made the speaker sound ${WORD[x.verdict]}. ${x.held ? 'As you predicted.' : `You predicted ${WORD[x.pred]}.`}</h2>${reading(controlVals(), 'Control', true)}${reading(x.vals, 'Your version')}
+      <p><strong>Shift ${fmt(x.shift)}.</strong> <span class="muted">A shift of ${l.win} or more counts as a change.</span></p>
+      ${free || m.rdone ? noted('Result') : `${noteBox('Result', 'What do the dots show? Look at the spread and the overlap.')}${saveNote('rdone', 'Result')}`}`; }
+  if (n === 'Name it') return m.named ? `<h2>${l.features[m.feat].n}</h2><p class="muted">${l.features[m.feat].lv} level</p>${noted('Name it')}${WAIT}`
+    : `<h2>Name what you changed</h2><div class="chips">${l.features.map((f, i) => `<button class="chip plain ${m.feat === i ? 'on' : ''}" data-act="feat" data-i="${i}">${f.n}</button>`).join('')}</div>
+       ${noteBox('Name it', 'What does this feature do to the voice of the speaker?')}<button class="btn" data-act="named" data-needs="Name it" ${m.feat === null ? 'disabled' : ''}>Done</button>`;
+  if (n === 'Explain') { const x = mine(), all = allTrials(), top = all.slice().sort((a, b) => Math.abs(b.shift) - Math.abs(a.shift))[0], kept = steps().filter((k) => m.notes[k]);
+    return m.handed ? `<h2>Handed in</h2><p>${esc(m.explain) || '<span class="muted">Nothing written.</span>'}</p>`
+    : `<h2>Does the evidence support the claim?</h2><p><span class="muted">Claim:</span> ${l.claim}</p><p class="muted">${x ? `Your trial: ${low(x.desc)}, shift ${fmt(x.shift)}. ` : ''}Biggest shift in the class: ${low(top.desc)}, ${fmt(top.shift)}.</p>
+       ${s.notesOn && kept.length ? `<div class="pane"><span class="label">Your lab notes</span><ul class="nl">${kept.map((k) => `<li><b>${k}</b>${esc(m.notes[k])}</li>`).join('')}</ul></div>` : ''}
+       <textarea rows="6" data-bind="explain" placeholder="Write one analytical paragraph, as you would in the essay. Name the feature, quote the stanza and use a finding as evidence.">${esc(m.explain)}</textarea><button class="btn" data-act="hand">Hand in</button>`; }
+  return `<h2>Lab finished</h2><p class="muted">Your trial, your lab notes and your paragraph are with your teacher.</p>`;
+}
+function dBoard() {
+  const l = L(), n = stepName(), all = steps(), next = all[s.step + 1], meter = '<div class="meter"><i data-meter></i></div>';
+  let inner = '', status = `${CLASS} students in 8 pairs`, extra = '';
+  if (n === 'Question') inner = `<h2>${l.question}</h2><p><span class="muted">Claim to test:</span> ${l.claim}</p><p><span class="muted">Why we are testing it:</span> ${l.purpose}</p>${poemHTML(baseTokens())}`;
+  else if (n === 'Design') { status = '<span data-count></span> on the bench'; inner = `<h2>Change one thing in the stanza</h2><p>A line break, a word, or a cut. One change per pair.</p>${poemHTML(baseTokens())}${meter}`; }
+  else if (n === 'Predict') { status = '<span data-count></span> locked in'; const t = allTrials(), c = [-1, 0, 1].map((p) => t.filter((x) => x.pred === p).length);
+    inner = s.revealed ? `<h2>What the pairs predict</h2><div class="bars">${[-1, 0, 1].map((p, i) => `<div class="bar ${c[i] === Math.max(...c) ? 'top' : ''}"><span>${cap(WORD[p]).replace(' hesitant', '')}</span><i data-w="${c[i] / Math.max(...c) * 100}" style="width:0"></i><span>${c[i]}</span></div>`).join('')}</div>`
+      : `<h2>The speaker will sound…</h2><p class="muted">Each pair predicts what its own change will do. Predictions stay hidden until you reveal them.</p>${meter}`;
+    extra = `<button class="btn second" data-act="reveal">${s.revealed ? 'Hide predictions' : 'Reveal predictions'}</button>`; }
+  else if (n === 'Test') { status = '<span data-count></span> in'; inner = `<h2>Readers are rating</h2><p>${l.measure}</p><p class="muted">Each reader gets six versions with the changes unmarked. Some are the original.</p>${meter}`; }
+  else if (n === 'Result') { const t = allTrials(), top = t.slice().sort((a, b) => Math.abs(b.shift) - Math.abs(a.shift))[0]; status = `Control average ${avg(controlVals()).toFixed(1)}. Tap a row to see its readings.`;
+    inner = `<h2>Biggest shift: ${low(top.desc)}</h2>${findings(t)}${s.open >= 0 && t[s.open] ? trialDetail(t[s.open]) : ''}`; }
+  else if (n === 'Name it') { status = '<span data-count></span> named'; inner = levelBars(); }
+  else if (n === 'Explain') { status = '<span data-count></span> handed in'; inner = `<h2>Does the evidence support the claim?</h2><p><span class="muted">Claim:</span> ${l.claim}</p>${findings(allTrials())}<p class="muted">Your notes: ${l.notes}</p>`; }
+  else return dAfter();
+  return `<section class="card"><div class="inner">${inner}</div><div class="ctrl"><span>${status}</span><div>${extra}<button class="btn" data-act="next">${next ? `Next: ${next}` : 'Finish the lab'}</button></div></div></section>`;
+}
+function dAfter() {
+  const l = L(), t = allTrials(), held = t.filter((x) => x.held).length, sorted = t.slice().sort((a, b) => a.shift - b.shift), m = s.me;
+  const para = { 'Pair 1': 'Removing "I think" left the speaker sounding sure of where the words were, which suggests the hedges…', 'Pair 3': 'Once the question became a statement the stanza closed, so the hesitation is carried by…', 'Pair 7': 'The extra break after "settled" slowed the line, which supports the claim, although…' };
+  return `<section class="card flat"><h2>What the lab found</h2><dl class="rows">
+      <div class="row"><dt>Claim tested</dt><dd>${l.claim}</dd></div>
+      <div class="row"><dt>Class finding</dt><dd>${findings(t)}</dd></div>
+      <div class="row"><dt>Predictions</dt><dd>${held} of ${t.length} pairs predicted their result.</dd></div>
+      <div class="row"><dt>Level of language</dt><dd>${levelBars().replace(/<h2>(.*?)<\/h2>/, '<strong>$1.</strong>')}</dd></div>
+      <div class="row"><dt>Lab notes</dt><dd>${s.notesOn ? 'Kept at every step. Open a student to read theirs beside the paragraph.' : 'Off for this lab.'}</dd></div></dl>
+      <div><button class="btn second">Run it again</button></div></section>
+    <section class="card flat" style="margin-top:16px"><h2>Paragraphs to mark</h2><table><thead><tr><th>Pair</th><th>Change</th><th>Shift</th><th>Paragraph</th><th></th></tr></thead><tbody>
+      ${sorted.filter((x) => x.mine || para[x.who]).map((x) => `<tr><td>${x.who}</td><td>${x.desc}</td><td class="${x.held ? 'held' : ''}">${fmt(x.shift)}${x.held ? ', predicted' : ''}</td><td>${x.mine ? (esc(m.explain) || '<span class="muted">Nothing written</span>') : para[x.who]}</td><td><button class="btn second">Mark</button></td></tr>`).join('')}
+      <tr><td colspan="5" class="muted">${t.length - sorted.filter((x) => x.mine || para[x.who]).length} more pairs</td></tr></tbody></table></section>`;
+}
+function levelChips() { return `<div class="chips">${Object.entries(LABS).map(([k, x]) => `<button class="chip plain ${s.lab === k ? 'on' : ''}" data-act="lab" data-i="${k}">${x.name}</button>`).join('')}<span class="chip plain muted">Students pose the question</span></div>`; }
+function dPlan() {
+  const l = L();
+  return `<section class="card"><h2>Lab</h2><p class="muted">These lines are the whole lab. The steps build themselves from them.</p><dl class="rows">
+    <div class="row"><dt>Question</dt><dd>${l.question}</dd></div>
+    <div class="row"><dt>Claim to test</dt><dd>${l.claim}</dd></div>
+    <div class="row"><dt>Why we are doing this</dt><dd>${l.purpose}<small>Students see this with the question, and again when they write.</small></dd></div>
+    <div class="row"><dt>Control text</dt><dd><div class="pane">${poemHTML(baseTokens())}</div></dd></div>
+    <div class="row"><dt>Who decides the change</dt><dd>${levelChips()}<small>Each pair makes one change to the control: a line break, a word, or a cut.</small></dd></div>
+    <div class="row"><dt>What readers rate</dt><dd>"${l.measure}" from "Not at all" to "Completely".<small>Each student rates 6 versions with the changes unmarked. The control is mixed in.</small></dd></div>
+    <div class="row"><dt>Lab notes</dt><dd><div class="chips"><button class="chip plain ${s.notesOn ? 'on' : ''}" data-act="notes" data-i="on">Required at each step</button><button class="chip plain ${s.notesOn ? '' : 'on'}" data-act="notes" data-i="off">Off</button></div><small>One short note per step: what they noticed, why this change, what the dots show. The notes sit beside the paragraph when they write.</small></dd></div>
+    <div class="row"><dt>Features to name</dt><dd><div class="chips">${l.features.map((f) => `<span class="chip plain">${f.n}</span>`).join('')}</div><small>After the result, each pair names the feature they changed. The board then compares form, sentence and word.</small></dd></div>
+    <div class="row"><dt>Counts as a change</dt><dd>A shift of ${l.win} point or more from the control. Smaller than that is no clear change.</dd></div>
+    <div class="row"><dt>My debrief notes</dt><dd>${l.notes}<small>Only you see these.</small></dd></div></dl>
+    <div><button class="btn" data-act="view" data-i="board">Open on the board</button></div></section>`;
+}
+
+/* ---------- The two set labs ---------- */
+function meDone() { const m = s.me, n = stepName();
+  if (isDesign()) return n === 'Question' ? (!s.notesOn || m.qdone) : n === 'Design' ? m.ready : n === 'Predict' ? m.locked : n === 'Test' ? m.k >= 6 && (!s.notesOn || m.tdone) : n === 'Name it' ? m.named : n === 'Explain' ? m.handed : true;
+  return n === 'Predict' ? m.locked : n === 'Make' ? m.made : n === 'Test' ? (L().judge === 'pick' ? m.judged.length >= 6 : m.rated) : n === 'Explain' ? m.handed : true; }
+function othersDone() { return Math.min(OTHERS, s.tick * 2); }
+function tallies() {
+  const l = L();
+  if (l.judge === 'pick') { const t = l.base.slice(); s.me.judged.forEach((i) => t[i]++); return t; }
+  const sum = l.otherSum.slice(), n = l.otherN.slice(); if (s.me.rated) { sum[l.myVersion] += s.me.rating; n[l.myVersion]++; }
+  return sum.map((x, i) => Math.round(x / n[i] * 10) / 10);
+}
+function verdict() { const l = L(), t = tallies(), order = t.map((_, i) => i).sort((a, b) => t[b] - t[a]); return { t, order, top: order[0], lead: Math.round((t[order[0]] - t[order[1]]) * 10) / 10, win: t[order[0]] - t[order[1]] >= l.win }; }
+function preds() { const p = L().otherPred.slice(); if (s.me.locked) p[s.me.pred]++; return p; }
+function bars(values, top, scaleMax) {
+  const max = scaleMax || Math.max(...values, 1), order = values.map((_, i) => i).sort((a, b) => values[b] - values[a]);
+  return `<div class="bars">${order.map((i) => `<div class="bar ${i === top ? 'top' : ''}"><span>${L().options[i]}</span><i data-w="${values[i] / max * 100}" style="width:0"></i><span>${values[i]}</span></div>`).join('')}</div>`;
+}
+function headline(forMe) {
+  const l = L(), v = verdict(), w = l.options[v.top];
+  const first = !v.win ? 'Too close to call.' : l.judge === 'pick' ? `${w} won.` : `The ${low(w)} version drew more blame.`;
+  if (!forMe) { const p = preds(), cp = p.indexOf(Math.max(...p)); return `${first} ${cp === v.top ? 'Most of us predicted it.' : `Most of us predicted ${low(l.options[cp])}.`}`; }
+  return `${first} ${s.me.pred === v.top && v.win ? 'You called it.' : `You predicted ${low(l.options[s.me.pred ?? 0])}.`}`;
+}
+const evidence = () => { const l = L(), v = verdict(); return v.order.map((i) => `${l.options[i]} ${v.t[i]}`).join(', ') + (l.judge === 'pick' ? ` of ${CLASS * 6} choices.` : ' out of 10, on average.'); };
+const whyQ = () => { const l = L(), v = verdict(); return l.judge === 'pick' ? `Why did ${low(l.options[v.top])} win?` : 'Why did the blame change?'; };
+const facts = () => `<div class="facts"><p><span>Same</span>${L().same}</p><p><span>Changed</span>${L().options.map((o) => `<span class="chip" style="min-width:0;min-height:0;padding:2px 12px;margin-right:6px">${o}</span>`).join('')}</p></div>`;
+function student() {
+  if (isDesign()) return dStudent();
+  const l = L(), m = s.me, n = stepName();
+  if (n === 'Question') return `<h2>${l.question}</h2>${facts()}<p class="muted">${l.source === 'students' ? 'You will write the same moment once for each. Readers choose the one that feels most real.' : 'You will read one version of a short news paragraph and rate it.'}</p>${WAIT}`;
+  if (n === 'Predict') return m.locked ? `<h2>Locked in: ${low(l.options[m.pred])}</h2>${m.reason ? `<p>Because ${esc(m.reason)}</p>` : ''}${WAIT}`
+    : `<h2>${l.predictQ}</h2><div class="chips">${l.options.map((o, i) => `<button class="chip ${m.pred === i ? 'on' : ''}" data-act="pred" data-i="${i}">${o}</button>`).join('')}</div>
+       <textarea rows="2" data-bind="reason" placeholder="Because…">${esc(m.reason)}</textarea><button class="btn" data-act="lock" ${m.pred === null ? 'disabled' : ''}>Lock it in</button>`;
+  if (n === 'Make') { if (!m.texts) m.texts = l.mine.slice(); const last = m.v === l.options.length - 1;
+    return m.made ? `<h2>Three versions written</h2>${WAIT}`
+    : `<h2>The storm hits the house. Lean on <span class="var">${low(l.options[m.v])}</span>.</h2><textarea class="prose" rows="5" data-bind="text">${esc(m.texts[m.v])}</textarea>
+       <p class="muted">Version ${m.v + 1} of ${l.options.length}. Two or three sentences.</p><button class="btn" data-act="made">${last ? 'Finish' : `Next: ${low(l.options[m.v + 1])}`}</button>`; }
+  if (n === 'Test' && l.judge === 'pick') { const k = m.judged.length; if (k >= 6) return `<h2>Six writers read</h2>${WAIT}`; const w = l.writers[k];
+    return `<h2>${l.judgeQ}</h2>${w.order.map((sense, pos) => `<button class="piece" data-act="judge" data-i="${sense}"><small>${'ABC'[pos]}</small>${esc(w.t[sense])}</button>`).join('')}<p class="muted">Writer ${k + 1} of 6. Tap one.</p>`; }
+  if (n === 'Test') return m.rated ? `<h2>Rating sent</h2>${WAIT}`
+    : `<h2>${l.judgeQ}</h2><div class="piece">${esc(plain(l.texts[l.myVersion]))}</div><div class="scale"><input type="range" min="0" max="10" step="1" value="${m.rating}" data-bind="rating"><div class="ends"><span>A little</span><span>Completely</span></div></div><button class="btn" data-act="rate">Send</button>`;
+  if (n === 'Result') { const v = verdict();
+    return `<h2>${headline(true)}</h2>${bars(v.t, v.win ? v.top : -1, l.judge === 'rate' ? 10 : 0)}<p class="muted">${l.judge === 'pick' ? `${CLASS * 6} choices from ${CLASS} readers.` : `Average blame out of 10, from ${CLASS} readers.`}</p>
+      ${l.judge === 'pick' ? `<p><strong>Your writing:</strong> ${Math.max(...l.mineChosen)} of your 6 readers chose your ${low(l.options[l.mineChosen.indexOf(Math.max(...l.mineChosen))])} version.</p>` : `<p><strong>You read</strong> the ${low(l.options[l.myVersion])} version and gave it ${m.rating}.</p>`}`; }
+  if (n === 'Explain') return m.handed ? `<h2>Handed in</h2><p>${esc(m.explain) || '<span class="muted">No explanation written.</span>'}</p>`
+    : `<h2>${whyQ()}</h2><p class="muted">${evidence()}</p><textarea rows="5" data-bind="explain" placeholder="${l.judge === 'pick' ? 'It felt most real because…' : 'Readers blamed the company more when…'}">${esc(m.explain)}</textarea><button class="btn" data-act="hand">Hand in</button>`;
+  return `<h2>Lab finished</h2><p class="muted">Your prediction, your writing and your explanation are with your teacher.</p>`;
+}
+function board() {
+  if (isDesign()) return dBoard();
+  const l = L(), n = stepName(), all = steps(), next = all[s.step + 1];
+  const nextBtn = `<button class="btn" data-act="next">${next ? `Next: ${next}` : 'Finish the lab'}</button>`, meter = '<div class="meter"><i data-meter></i></div>';
+  let inner = '', status = `${CLASS} students here`, extra = '';
+  if (n === 'Question') inner = `<h2>${l.question}</h2>${facts()}`;
+  else if (n === 'Predict') { status = '<span data-count></span> locked in';
+    inner = s.revealed ? `<h2>What we predict</h2>${bars(preds(), preds().indexOf(Math.max(...preds())))}` : `<h2>${l.predictQ}</h2><p class="muted">Predictions stay hidden until you reveal them.</p>${meter}`;
+    extra = `<button class="btn second" data-act="reveal">${s.revealed ? 'Hide predictions' : 'Reveal predictions'}</button>`; }
+  else if (n === 'Make') { status = '<span data-count></span> finished'; inner = `<h2>Write the moment the storm hits the house</h2><p>Three versions. Two or three sentences each.</p><div class="chips">${l.options.map((o) => `<span class="chip">${o}</span>`).join('')}</div>${meter}`; }
+  else if (n === 'Test') { status = '<span data-count></span> in'; inner = `<h2>${l.judge === 'pick' ? 'Readers are choosing' : 'Readers are rating'}</h2><p>${l.judgeQ}</p><p class="muted">${l.judge === 'pick' ? 'Each reader gets six anonymous writers, with the senses hidden.' : 'Half the class has each version. Nobody knows which one they have.'}</p>${meter}`; }
+  else if (n === 'Result') { const v = verdict(); status = l.judge === 'pick' ? `${CLASS * 6} choices from ${CLASS} readers` : `Average blame out of 10, from ${CLASS} readers`;
+    inner = `<h2>${headline(false)}</h2>${bars(v.t, v.win ? v.top : -1, l.judge === 'rate' ? 10 : 0)}<p class="muted">Ahead by ${v.lead}. ${v.win ? 'That counts as a win.' : `A win needs ${l.win} or more.`}</p>${s.showBest ? best() : ''}`;
+    extra = `<button class="btn second" data-act="best">${s.showBest ? 'Hide' : l.judge === 'pick' ? 'Show the most chosen piece' : 'Show both versions'}</button>`; }
+  else if (n === 'Explain') { status = '<span data-count></span> handed in'; inner = `<h2>${whyQ()}</h2>${best()}<p class="muted">Your notes: ${l.notes}</p>`; }
+  else return after();
+  return `<section class="card"><div class="inner">${inner}</div><div class="ctrl"><span>${status}</span><div>${extra}${nextBtn}</div></div></section>`;
+}
+function best() { const l = L(); return l.judge === 'pick' ? `<div class="piece"><small>Most chosen: 6 of 6 readers</small>${l.best}</div>` : l.texts.map((t, i) => `<div class="piece"><small>${l.options[i]}</small>${marked(t)}</div>`).join(''); }
+function after() {
+  const l = L(), v = verdict(), p = preds(), m = s.me;
+  const mineBest = l.judge === 'pick' ? `${l.options[l.mineChosen.indexOf(Math.max(...l.mineChosen))]}, ${Math.max(...l.mineChosen)} of 6` : `Read ${low(l.options[l.myVersion])}, gave ${m.rating}`;
+  const rows = l.judge === 'pick'
+    ? [['KT', 0, 'Touch, 4 of 6', 'You hear a storm from inside the house, so sound is the one you cannot escape…'], ['RV', 1, 'Sound, 6 of 6', 'You can close your eyes to a storm but the noise still gets in…'], ['JM', 0, 'Sound, 3 of 6', 'Sight tells you what it looks like, sound tells you how big it is…']]
+    : [['KT', 0, 'Read active, gave 9', 'When the company is the subject of every sentence there is nowhere else to look…'], ['RV', 1, 'Read passive, gave 4', 'I did not notice the company was missing until we saw both versions…'], ['JM', 0, 'Read passive, gave 6', 'The passive makes it sound like weather, something that just happened…']];
+  const tr = (who, pred, bestCol, text) => `<tr><td>${who}</td><td class="${pred === v.top ? 'held' : ''}">${l.options[pred]}${pred === v.top ? ', held' : ''}</td><td>${bestCol}</td><td>${text}</td><td><button class="btn second">Mark</button></td></tr>`;
+  return `<section class="card flat"><h2>What the lab found</h2><dl class="rows">
+      <div class="row"><dt>Class finding</dt><dd>${headline(false)} ${evidence()}</dd></div>
+      <div class="row"><dt>Predictions</dt><dd>${p[v.top]} held, ${CLASS - p[v.top]} overturned.</dd></div></dl>
+      <div><button class="btn second">Run it again</button></div></section>
+    <section class="card flat" style="margin-top:16px"><h2>Explanations to mark</h2><table><thead><tr><th>Student</th><th>Predicted</th><th>${l.judge === 'pick' ? 'Their best version' : 'Their reading'}</th><th>Explanation</th><th></th></tr></thead><tbody>
+      ${tr('You', m.pred ?? 0, mineBest, esc(m.explain) || '<span class="muted">Nothing written</span>')}${rows.map((r) => tr(...r)).join('')}
+      <tr><td colspan="5" class="muted">13 more students</td></tr></tbody></table></section>`;
+}
+function plan() {
+  if (isDesign()) return dPlan();
+  const l = L(), on = (c) => c ? 'on' : '';
+  return `<section class="card"><h2>Lab</h2><p class="muted">These lines are the whole lab. The steps build themselves from them.</p><dl class="rows">
+    <div class="row"><dt>Question</dt><dd>${l.question}</dd></div>
+    <div class="row"><dt>Kept the same</dt><dd>${l.same}</dd></div>
+    <div class="row"><dt>Changed</dt><dd><div class="chips">${l.options.map((o) => `<span class="chip">${o}</span>`).join('')}<span class="chip plain">Add</span></div></dd></div>
+    <div class="row"><dt>Who decides the change</dt><dd>${levelChips()}<small>${l.source === 'students' ? 'You set the change. Each student writes one version per option, so the lab gains a Make step.' : 'You set the change and paste one version per option. Half the class reads each.'}</small></dd></div>
+    <div class="row"><dt>How readers judge</dt><dd><div class="chips"><span class="chip plain ${on(l.judge === 'pick')}">Pick one</span><span class="chip plain ${on(l.judge === 'rate')}">Rate on a line</span></div>
+      <small>"${l.judgeQ}" ${l.judge === 'pick' ? 'Each student reads 6 writers. Writers are anonymous and the options are hidden.' : 'Each student reads one version and places it from "A little" to "Completely".'}</small></dd></div>
+    <div class="row"><dt>Counts as a win</dt><dd>${l.judge === 'pick' ? 'Ahead by 8 choices or more.' : 'Ahead by 1 point or more out of 10.'} Closer than that is too close to call.</dd></div>
+    <div class="row"><dt>My debrief notes</dt><dd>${l.notes}<small>Only you see these.</small></dd></div></dl>
+    ${l.source === 'supplied' ? `<div class="rows">${l.texts.map((t, i) => `<div class="piece" style="margin-top:10px"><small>${l.options[i]}</small>${marked(t)}</div>`).join('')}</div>` : ''}
+    <div><button class="btn" data-act="view" data-i="board">Open on the board</button></div></section>`;
+}
+
+/* ---------- Frame ---------- */
+function render() {
+  const l = L(), all = steps(), over = s.step >= all.length;
+  document.getElementById('mock').innerHTML = `<b>Mock</b>
+    <div class="seg">${[['plan', 'Plan'], ['board', 'Board'], ['student', 'Student']].map(([k, n]) => `<button class="${s.view === k ? 'on' : ''}" data-act="view" data-i="${k}">${n}</button>`).join('')}</div>
+    <div class="seg">${Object.entries(LABS).map(([k, x]) => `<button class="${s.lab === k ? 'on' : ''}" data-act="lab" data-i="${k}">${x.name}</button>`).join('')}</div>
+    <button class="go" data-act="next" ${over ? 'disabled' : ''}>Move the class on</button><button class="go" style="margin-left:0" data-act="reset">Start again</button>`;
+  const strip = s.view === 'plan' ? '' : `<div class="strip"><p>${over ? '<b>After class</b>' : `<b>${all[s.step]}</b> · ${s.step + 1} of ${all.length}`}</p><div class="dots">${all.map((_, i) => `<i class="${i < s.step ? 'seen' : i === s.step ? 'here' : ''}"></i>`).join('')}</div></div>`;
+  const body = s.view === 'plan' ? plan() : s.view === 'board' ? board() : `${notes()}<section class="card">${student()}</section>`;
+  document.getElementById('page').innerHTML = `<main class="page ${s.view}"><p class="eyebrow">Lab</p><h1 class="title">${l.title}</h1>
+    <div class="meta"><strong>12 English Advanced</strong><span>Thursday 19 November · Period 3</span></div>${strip}${body}</main>`;
+  requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll('[data-w]').forEach((b) => b.style.width = b.dataset.w + '%')));
+  progress();
+}
+function progress() {
+  const l = L(), n = stepName(), o = othersDone(), c = document.querySelector('[data-count]'), m = document.querySelector('[data-meter]');
+  let done = o + (meDone() ? 1 : 0), total = CLASS, text = `${done} of ${total}`;
+  if (isDesign() && (n === 'Design' || n === 'Predict')) { done = Math.min(7, s.tick) + (meDone() ? 1 : 0); total = 8; text = `${done} of 8 pairs`; }
+  else if (n === 'Test' && (isDesign() || l.judge === 'pick')) { done = o * 6 + (isDesign() ? s.me.k : s.me.judged.length); total = CLASS * 6; text = `${done} of ${total} ${isDesign() ? 'ratings' : 'choices'}`; }
+  else if (n === 'Test') text = `${done} of ${total} ratings`;
+  if (c) c.textContent = text; if (m) m.style.width = done / total * 100 + '%';
+}
+setInterval(() => { if (s.tick < 8) { s.tick++; progress(); } }, 900);
+
+document.addEventListener('input', (e) => {
+  const b = e.target.dataset.bind, m = s.me; if (e.target.dataset.note) { m.notes[e.target.dataset.note] = e.target.value; return; } if (!b) return;
+  if (b === 'reason') m.reason = e.target.value; else if (b === 'explain') m.explain = e.target.value; else if (b === 'again') m.again = e.target.value;
+  else if (b === 'text') m.texts[m.v] = e.target.value; else if (b === 'rating') m.rating = +e.target.value;
+});
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-act]'); if (!t || t.disabled) return;
+  const a = t.dataset.act, i = t.dataset.i, m = s.me, tok = m.tokens[m.sel];
+  let top = true;
+  const need = t.dataset.needs;
+  if (need && s.notesOn && !(m.notes[need] || '').trim()) { s.miss = need; render(); const el = document.querySelector(`[data-note="${need}"]`); if (el) el.focus(); return; }
+  s.miss = '';
+  if (a === 'view') s.view = i;
+  else if (a === 'lab' || a === 'reset') { if (a === 'lab') s.lab = i; Object.assign(s, { step: 0, tick: 0, revealed: false, showBest: false, open: -1, me: fresh() }); }
+  else if (a === 'next') { if (s.step < steps().length) { s.step++; s.tick = 0; s.showBest = false; s.open = -1; } }
+  else if (a === 'pred') m.pred = +i;
+  else if (a === 'dpred') { m.pred = +i; top = false; }
+  else if (a === 'lock') m.locked = true;
+  else if (a === 'made') { if (m.v < L().options.length - 1) m.v++; else m.made = true; }
+  else if (a === 'judge') { t.classList.add('on'); m.judged.push(+i); setTimeout(render, 320); return; }
+  else if (a === 'rate') m.rated = true;
+  else if (a === 'hand') m.handed = true;
+  else if (a === 'reveal') s.revealed = !s.revealed;
+  else if (a === 'best') s.showBest = !s.showBest;
+  else if (a === 'tok') { m.sel = m.sel === +i ? -1 : +i; top = false; }
+  else if (a === 'rep') { const v = document.querySelector('[data-rep]').value.trim(); tok.rep = v && v !== tok.w ? v : null; tok.cut = false; top = false; }
+  else if (a === 'cut') { tok.cut = !tok.cut; top = false; }
+  else if (a === 'brk') { tok.nbr = !tok.nbr; top = false; }
+  else if (a === 'clear') { m.tokens = baseTokens(); m.sel = -1; top = false; }
+  else if (a === 'ready') { m.ready = true; m.sel = -1; }
+  else if (a === 'drate') { m.ratings.push(+document.querySelector('[data-bind=cur]').value); m.k++; }
+  else if (a === 'qdone' || a === 'tdone' || a === 'rdone' || a === 'named') m[a] = true;
+  else if (a === 'feat') { m.feat = +i; top = false; }
+  else if (a === 'notes') { s.notesOn = i === 'on'; top = false; }
+  else if (a === 'open') { s.open = s.open === +i ? -1 : +i; top = false; }
+  render(); if (top) window.scrollTo(0, 0);
+});
+s.me = fresh();
+render();
+</script>
+</body>
+</html>

@@ -301,6 +301,8 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       // So are a Station Rotation's stations and a Game lesson's games.
       if (next.rotation) lesson.rotation = next.rotation;
       if (next.game) lesson.game = next.game;
+      // A lab's Plan card is edited on the page as well.
+      if (next.lab) lesson.lab = next.lab;
     }
 
     function bumpDraftClock(): void {
