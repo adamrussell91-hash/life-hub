@@ -42,3 +42,10 @@ test('grove, config and the gate itself still run whole suites', () => {
   assert.ok(teaching('apps/teaching/tests/setup/web-storage.ts'));
   assert.ok(teaching('.github/workflows/pages.yml'));
 });
+
+test('a deploy-only workflow runs no whole suite; test workflows still do', () => {
+  assert.equal(tasks('.github/workflows/game-rooms-deploy.yml'), undefined);
+  assert.equal(teaching('.github/workflows/game-rooms-deploy.yml'), undefined);
+  assert.ok(tasks('.github/workflows/pr-check.yml'));
+  assert.ok(tasks('.github/workflows/game-rooms-deploy.yml', '.github/workflows/pages.yml'));
+});
