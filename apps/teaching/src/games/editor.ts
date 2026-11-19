@@ -14,6 +14,7 @@ import { pills, textInput } from './item-editors';
 import { canvasShowsOn, createGameTabs, type GameTab } from './editor-tabs';
 import { gridPanel, isGridGame, keepGridFields, type GridPanel } from './grid-editor';
 import { liveLauncher } from './live/launcher';
+import { fleetLauncher } from './kinds/fleet-week/control-room';
 import './games.css';
 
 export type GameEditorOptions = {
@@ -554,6 +555,9 @@ export function mountGameEditor(o: GameEditorOptions): GameEditorHandle {
     bar.append(refresh);
     resultsHost.append(bar);
     resultsHost.append(liveLauncher({ games: current().games, classId: resultsClass, className: classes.find((c) => c.id === resultsClass)?.name, api: o.api }));
+    // Fleet week isn't a live room: its own control room (kinds/fleet-week/control-room.ts).
+    const fleet = fleetLauncher({ games: current().games, classes, classId: resultsClass, lessonId: o.getLesson().id, api: o.api?.fleet ?? null });
+    if (fleet) resultsHost.append(fleet);
     if (!o.api) {
       resultsHost.append(el('p', 'gm-note', 'Results show here once students play.'));
       return;
