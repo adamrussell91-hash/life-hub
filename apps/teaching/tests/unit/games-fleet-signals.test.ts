@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/organiser/print', () => ({ printOrganiser: vi.fn() }));
-import { createFleetSignals, fleetHref, fleetTarget, resetFleetSignals, type FleetSignal, type FleetSignalSource } from '@/games/kinds/fleet-week/signals';
-import { viewSignals } from '@/games/kinds/fleet-week/campaign';
+import { TOAST_MS, createFleetSignals, fleetHref, fleetTarget, resetFleetSignals, type FleetSignal, type FleetSignalSource } from '@/games/kinds/fleet-week/signals';
+import { openFleetCampaign, viewSignals } from '@/games/kinds/fleet-week/campaign';
 import type { FleetView } from '@/games/kinds/fleet-week/campaign-api';
 import { renderNowStrip, resetNowStrip } from '@/student/now-strip';
 import { mountGameArcade } from '@/games/arcade';
@@ -88,6 +88,21 @@ describe('fleet week signals', () => {
     s.dispose();
   });
 
+  it('a toast that hides by itself counts as seen and clears the count', async () => {
+    vi.useFakeTimers();
+    const src = source([ev('report_ready', 3)]);
+    const s = createFleetSignals({ source: src, open: vi.fn() });
+    const badge = s.badge();
+    document.body.append(badge);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(badge.querySelector('.fws-anchor__count')?.textContent).toBe('1');
+    await vi.advanceTimersByTimeAsync(TOAST_MS + 10);
+    expect(document.querySelector('.fws-toast')).toBeNull();
+    expect(src.seen).toHaveBeenCalledWith(['0123456789abcdef:report_ready:3']);
+    expect(badge.querySelector('.fws-anchor__count')?.hasAttribute('hidden')).toBe(true);
+    s.dispose();
+  });
+
   it('never polls: reads on load and on focus only', async () => {
     vi.useFakeTimers();
     const src = source([]);
@@ -148,7 +163,23 @@ describe('signals on the now strip', () => {
     const badge = strip.querySelector<HTMLButtonElement>('.fws-anchor')!;
     expect(badge.hidden).toBe(false);
     expect(badge.querySelector('.fws-anchor__count')?.textContent).toBe('1');
+    expect(strip.classList.contains('ns-strip--quiet')).toBe(false);
     expect(renderNowStrip(undefined, { classId: 'class_fw', pointer: false })).toBeNull();
+    // Once seen, the anchor-only strip hides by class (no :has() needed).
+    badge.click();
+    expect(strip.classList.contains('ns-strip--quiet')).toBe(true);
+    s.dispose();
+  });
+
+  it('marks the strip row when the anchor shows beside a to-do', async () => {
+    const s = createFleetSignals({ source: source([ev('reveal', 'final')]), open: vi.fn() });
+    const todo = { countdowns: [], announcements: [], practice: null, waiting: [], more: 0, boxes: [{ key: 'now', items: [{ id: 'l1', title: 'Harbour Lights chapter four', kind: 'lesson', done: false, reason: '' }] }] } as never;
+    const strip = renderNowStrip(todo, { classId: 'class_fw', pointer: false, fleet: s })!;
+    document.body.append(strip);
+    const inner = strip.querySelector('.ns-strip__in')!;
+    expect(inner.classList.contains('ns-strip__in--anchor')).toBe(false);
+    await flush();
+    expect(inner.classList.contains('ns-strip__in--anchor')).toBe(true);
     s.dispose();
   });
 });
@@ -183,6 +214,31 @@ describe('signals on the arcade card', () => {
 });
 
 describe('signals inside the game, from the poll', () => {
+  it('a view change asks the lesson signals for the server ids, toasts them and sends them seen', async () => {
+    const game = { id: 'g_fleet', title: 'Harbour Lights fleet', kind: 'fleet_week', solo: false, live: false, count: 25, settings: {}, items: [] } as unknown as PublicGame;
+    const first = { campaign: 'c1', phase: 'firing', round: 1, rounds: 5, closes_at: null, labels: { columns: [], rows: [] }, me: { sign: 'Captain Heron', ships: [], placed: true }, team: { signs: {}, fleet: [], chart: {} }, rival: { signs: [], chart: {}, sunk: [] }, shots: { left: 0, returning: [] }, owed: [], match_over: false, score: { us: 0, them: 0 } } as unknown as FleetView;
+    const next = { ...first, round: 2, shots: { left: 4, returning: [] }, owed: [{ hit: 'h1', square: 7, due: 3, question: null, answer: 'x', by: 'Ensign Moss' }] } as unknown as FleetView;
+    const server = ev('report_owed', 1);
+    const client = {
+      state: vi.fn().mockResolvedValueOnce(first).mockResolvedValue(next),
+      place: vi.fn(), commit: vi.fn(), answer: vi.fn(), report: vi.fn(), recall: vi.fn(),
+      signals: vi.fn(async () => ({ events: [server, ev('reveal', 'final', 'g_other')] })),
+      signalsSeen: vi.fn(async () => ({ ok: true as const }))
+    };
+    const camp = openFleetCampaign(document.body, { lessonId: 'lesson_fw', classId: 'class_fw', game, client, pollMs: 60_000 });
+    await flush();
+    expect(client.signals).not.toHaveBeenCalled();
+    await camp.refresh();
+    await flush();
+    expect(client.signals).toHaveBeenCalledWith('g_fleet');
+    const toasts = [...document.querySelectorAll('.fws-toast')];
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0].getAttribute('data-signal')).toBe(server.id);
+    toasts[0].querySelector<HTMLButtonElement>('.fws-toast__close')!.click();
+    expect(client.signalsSeen).toHaveBeenCalledWith([server.id]);
+    camp.close();
+  });
+
   const base = { campaign: 'c1', phase: 'firing', round: 1, rounds: 5, closes_at: null, labels: { columns: [], rows: [] }, me: { sign: 'Captain Heron', ships: [], placed: true }, team: { signs: {}, fleet: [], chart: {} }, rival: { signs: [], chart: {}, sunk: [] }, shots: { left: 0, returning: [] }, owed: [], match_over: false, score: { us: 0, them: 0 } } as unknown as FleetView;
   const ids = { gameId: 'g_fleet', lessonId: 'lesson_fw' };
 

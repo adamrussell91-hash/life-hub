@@ -45,9 +45,8 @@ type SeaSpec = { key: string; mode: SeaMode; state: SeaChart };
 type Draft = { text: string; log: WritingLog | null };
 
 /**
- * The signals (§2) a poll brings, from how the view changed: the game page shows the same
- * toasts as the rest of the site without another request. Ids match the server's
- * (`campaign:kind:round`), so a toast shown here isn't shown again on this device.
+ * Whether a poll brought a signal (§2), from how the view changed. In the game this is only the
+ * trigger: the toasts themselves, with the server's ids, come from the lesson's `signals`.
  */
 export function viewSignals(prev: FleetView | null, next: FleetView, game: { gameId: string; lessonId: string }): FleetSignal[] {
   if (!prev || prev.campaign !== next.campaign) return [];
@@ -740,13 +739,37 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
     if (hadFocus !== undefined) stage.querySelector<HTMLElement>(`[data-square="${hadFocus}"]`)?.focus();
   }
 
-  function show(next: FleetView): void {
-    showFleetToasts(viewSignals(view, next, { gameId: game.id, lessonId }), {
-      open: (e) => bringIntoView(e.kind),
-      after: (e) => {
+  /**
+   * The poll saw something change that raises a signal: ask the lesson's `signals` for the
+   * server's own events (exact ids, only those not yet seen) and toast them. Shown is seen.
+   * A client without the endpoint (tests) toasts what the change itself says, unsent.
+   */
+  function signalsAfter(derived: FleetSignal[]): void {
+    if (!derived.length) return;
+    const how = {
+      open: (e: FleetSignal) => {
+        void client.signalsSeen?.([e.id]).catch(() => undefined);
+        bringIntoView(e.kind);
+      },
+      seen: (ids: string[]) => void client.signalsSeen?.(ids).catch(() => undefined),
+      after: (e: FleetSignal) => {
         if (e.kind === 'round_open') steamShip();
       }
-    });
+    };
+    if (!client.signals) {
+      showFleetToasts(derived, how);
+      return;
+    }
+    client.signals(game.id).then(
+      (r) => {
+        if (!closed) showFleetToasts((r?.events ?? []).filter((e) => e.game_id === game.id), how);
+      },
+      () => undefined
+    );
+  }
+
+  function show(next: FleetView): void {
+    signalsAfter(viewSignals(view, next, { gameId: game.id, lessonId }));
     view = next;
     waitingForTeacher = false;
     loadError = '';

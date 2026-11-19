@@ -153,7 +153,11 @@ function nextToast(): void {
     t.seen?.([t.e.id]);
     done();
   });
-  timer = window.setTimeout(done, TOAST_MS);
+  // Shown is seen (§2): a toast that hides by itself is marked too, and clears the count.
+  timer = window.setTimeout(() => {
+    t.seen?.([t.e.id]);
+    done();
+  }, TOAST_MS);
   current = box;
   document.body.append(box);
   if (!quiet) t.after?.(t.e);
@@ -161,7 +165,7 @@ function nextToast(): void {
 
 /**
  * Toasts, one after another, for events not yet toasted on this device. `open` runs when a
- * toast is tapped (and marks it seen); `seen` when it is dismissed, or tapped with no `open`;
+ * toast is tapped (and marks it seen); `seen` when it is dismissed, hides by itself, or is tapped with no `open`;
  * `after` (motion) when it slides in, unless calm.
  */
 export function showFleetToasts(events: FleetSignal[], how: Omit<Toast, 'e'> = {}): FleetSignal[] {
@@ -223,7 +227,7 @@ export type FleetSignalsOptions = {
 };
 export type FleetSignals = {
   /** An anchor badge counting waiting events (those `only` lets through). */
-  badge(opts?: { only?: (e: FleetSignal) => boolean; label?: string; hideWhenQuiet?: boolean }): HTMLButtonElement;
+  badge(opts?: { only?: (e: FleetSignal) => boolean; label?: string; hideWhenQuiet?: boolean; onCount?: (n: number) => void }): HTMLButtonElement;
   /** Read the events again (page load, focus). */
   refresh(): Promise<void>;
   /** The events waiting now. */
@@ -242,7 +246,7 @@ export function createFleetSignals(options: FleetSignalsOptions): FleetSignals {
   let waiting: FleetSignal[] = [];
   let disposed = false;
   let inflight: Promise<void> | null = null;
-  const badges: Array<{ node: HTMLButtonElement; only?: (e: FleetSignal) => boolean; label: string; hide: boolean }> = [];
+  const badges: Array<{ node: HTMLButtonElement; only?: (e: FleetSignal) => boolean; label: string; hide: boolean; onCount?: (n: number) => void }> = [];
 
   const counted = (only?: (e: FleetSignal) => boolean) => (only ? waiting.filter(only) : waiting);
 
@@ -260,6 +264,8 @@ export function createFleetSignals(options: FleetSignalsOptions): FleetSignals {
       b.node.classList.toggle('fws-anchor--waiting', n > 0);
       b.node.disabled = n === 0;
       b.node.hidden = b.hide && n === 0;
+      // For layouts that can't use :has(): the host toggles its own class.
+      b.onCount?.(n);
       b.node.setAttribute('aria-label', n ? `${b.label}: ${n} waiting` : `${b.label}: nothing waiting`);
     }
   }
@@ -315,7 +321,7 @@ export function createFleetSignals(options: FleetSignalsOptions): FleetSignals {
         const e = counted(opts.only)[0];
         if (e) openOne(e);
       });
-      badges.push({ node, only: opts.only, label, hide: !!opts.hideWhenQuiet });
+      badges.push({ node, only: opts.only, label, hide: !!opts.hideWhenQuiet, onCount: opts.onCount });
       // Dropped from the list once it has been on the page and left it (a redraw).
       queueMicrotask(() => {
         if (node.isConnected) node.dataset.mounted = '1';
