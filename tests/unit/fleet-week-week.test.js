@@ -247,6 +247,138 @@ test('seen ids are capped at 200 per player, oldest first out', async () => {
   await rejectsWith(play(store, 1, 'signals_seen', { ids: [] }, T + 6), 'bad_ids');
 });
 
+// ---------------------------------------------------------------- 3. learning data
+
+import { foldRound, fleetPlayId } from '../../netlify/functions/_shared/fleet-week-fold.mjs';
+import { classKey, unitKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
+import { organiserKey } from '../../netlify/functions/_shared/organiser.mjs';
+import { FLEET_ROSTER, fleetGame } from './helpers/fleet-fixture.mjs';
+
+/** The fixture game with every question tagged with one knowledge piece that sits on an organiser line. */
+async function taggedGame(open = { mode: 'lesson' }) {
+  const game = fleetGame();
+  for (const sq of game.squares) for (const v of sq.variants) v.pieces = ['kp_sim1'];
+  const made = await lessonGame({ game, open });
+  made.store.data.set(classKey('class1'), { id: 'class1', status: 'active', title: '8 English', students: FLEET_ROSTER, current_unit_id: 'unit1' });
+  made.store.data.set(unitKey('unit1'), { id: 'unit1', title: 'Harbour', lesson_ids: ['gl1'] });
+  made.store.data.set(organiserKey('unit1'), {
+    v: 2,
+    sections: [{ id: 'os_vocab', name: 'Vocabulary', kind: 'table', role: 'vocab', columns: [], lines: [{ id: 'ol_simile', cells: ['Simile', 'A comparison', ''], piece_id: 'kp_sim1', open: true }] }]
+  });
+  return made;
+}
+
+test('a resolved round folds its shots into game events, a play, box 1 and the summary', async () => {
+  const { store, c, state, T } = await taggedGame();
+  const team = fleet.teamOf(c.pairing, ownerOf(1));
+  const rivalShips = state.fleets[fleet.rivalOf(c.pairing, team.id)];
+  const ship = rivalShips[3].squares[0];
+  const sea = [...Array(25).keys()].find((x) => !rivalShips.some((s) => s.squares.includes(x)));
+  const a = await play(store, 1, 'fleet_commit', { square: ship, sure: true }, T + 1000);
+  await play(store, 1, 'fleet_answer', { answer: typed(a.question), writing }, T + 4000);
+  await play(store, 1, 'fleet_commit', { square: sea, sure: false }, T + 5000);
+  await play(store, 1, 'fleet_answer', { answer: 'a guess', writing }, T + 6000);
+  // Student 2's one shot is voided by the teacher.
+  await play(store, 2, 'fleet_commit', { square: 0, sure: false }, T + 7000);
+  await play(store, 2, 'fleet_answer', { answer: 'whatever', writing }, T + 7500);
+  const [two] = await store.get(k.campaignShots('fw', c.id, 1, ownerOf(2)));
+  await teach(store, 'void_shot', { round: 1, owner: ownerOf(2), seq: two.seq }, T + 8000);
+  await teach(store, 'campaign_next', {}, T + 9000);
+  await play(store, 3, 'fleet_state', {}, T + 9001);
+
+  const playId = fleetPlayId(c, ownerOf(1));
+  const events = await store.get(k.events('fw', playId, ownerOf(1)));
+  assert.equal(events.length, 2);
+  assert.deepEqual(events.map((e) => e.seq), [0, 1]);
+  const [hit, dud] = events;
+  assert.equal(hit.game, 'fleet_week');
+  assert.equal(hit.move, 'answer');
+  assert.equal(hit.play_id, playId);
+  assert.equal(hit.student_id, 'st_01');
+  assert.equal(hit.strength, 'live_solo');
+  assert.match(hit.item, new RegExp(`^q${ship}[ab]$`));
+  assert.equal(hit.response, typed(a.question));
+  assert.equal(hit.correct, true);
+  assert.equal(hit.time_ms, 3000);
+  assert.deepEqual(hit.extra, { sure: true, returning: false, on_ship: true, voided: false, square: ship, round: 1, outcome: 'hit' });
+  assert.equal(dud.correct, false);
+  assert.equal(dud.extra.on_ship, false);
+  const voided = (await store.get(k.events('fw', fleetPlayId(c, ownerOf(2)), ownerOf(2))))[0];
+  assert.equal(voided.correct, null);
+  assert.equal(voided.extra.voided, true);
+
+  const record = await store.get(k.play('fw', playId));
+  assert.equal(record.mode, 'live');
+  assert.equal(record.kind, 'fleet_week');
+  assert.equal(record.campaign_id, c.id);
+  assert.deepEqual([record.score.right, record.score.answered], [1, 2]);
+  assert.equal(record.boxed, 1);
+  const boxes = store.data.get([...store.data.keys()].find((key) => key.startsWith('organiser_practice/class1/')));
+  assert.equal(boxes.boxes.ol_simile.box, 1);
+
+  const summary = await store.get(k.summary('fw', 'class1'));
+  assert.deepEqual(summary.students.st_01.evidence.map((e) => [e.share, e.strength]).sort(), [[0, 'live_solo'], [1, 'live_solo']]);
+  assert.deepEqual(summary.students.st_02.evidence, []); // a voided shot is in the log but is not evidence
+
+  // A second fold of the same round changes nothing.
+  const resolved = await store.get(k.campaignResolved('fw', c.id, 1));
+  const stored = [];
+  for (const n of N) stored.push(...((await store.get(k.campaignShots('fw', c.id, 1, ownerOf(n)))) ?? []));
+  await foldRound(store, k, c, resolved, 1, stored, { now: T + 9100 });
+  assert.deepEqual(await store.get(k.events('fw', playId, ownerOf(1))), events);
+  assert.equal((await store.get(k.play('fw', playId))).boxed, 1);
+});
+
+test('the fold runs once per round, from the request that wrote it', async () => {
+  const { store, c, T } = await lessonGame();
+  const shot = await play(store, 1, 'fleet_commit', { square: 3, sure: false }, T + 10);
+  await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, T + 20);
+  store.writes.length = 0;
+  await Promise.all([teach(store, 'campaign_next', {}, T + 30), play(store, 1, 'fleet_state', {}, T + 40), play(store, 2, 'fleet_state', {}, T + 40), teach(store, 'campaign_state', {}, T + 40)]);
+  const playId = fleetPlayId(c, ownerOf(1));
+  assert.equal(store.writes.filter((key) => key === k.campaignResolved('fw', c.id, 1)).length, 1);
+  assert.equal(store.writes.filter((key) => key === k.play('fw', playId)).length, 1);
+});
+
+test('week mode folds as self-paced campaign play', async () => {
+  const { store } = await fleetLesson();
+  await teach(store, 'campaign_open', { mode: 'week' });
+  const c = await campaignOf(store);
+  await play(store, 1, 'fleet_state', {}, MON_8PM + H);
+  const shot = await play(store, 1, 'fleet_commit', { square: 3, sure: false }, MON_8PM + 2 * H);
+  await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, MON_8PM + 2 * H + 1000);
+  await play(store, 1, 'fleet_state', {}, c.schedule[1] + 1);
+  const playId = fleetPlayId(c, ownerOf(1));
+  assert.equal((await store.get(k.play('fw', playId))).mode, 'campaign');
+  assert.equal((await store.get(k.events('fw', playId, ownerOf(1))))[0].strength, 'self_paced');
+});
+
+test('damage reports and recall lines reach the control room as written answers with their logs', async () => {
+  const { store, c, state, T } = await lessonGame();
+  const team = fleet.teamOf(c.pairing, ownerOf(1));
+  const partner = nOf(team.owners.find((o) => o !== ownerOf(1)));
+  const sq = state.fleets[fleet.rivalOf(c.pairing, team.id)][3].squares[0];
+  const shot = await play(store, 1, 'fleet_commit', { square: sq, sure: false }, T + 10);
+  await play(store, 1, 'fleet_answer', { answer: typed(shot.question), writing }, T + 20);
+  await teach(store, 'campaign_next', {}, T + 30);
+  const owed = (await play(store, partner, 'fleet_state', {}, T + 40)).owed[0];
+  await play(store, partner, 'fleet_report', { hit: owed.hit, text: 'It names the feeling.', writing: { ...writing, pastes: 1 } }, T + 50);
+  await play(store, 1, 'fleet_recall', { ship_key: 's3', answer: 'line 3', writing }, T + 60);
+  const room = await teach(store, 'campaign_state', {}, T + 70);
+  const report = room.written.find((w) => w.kind === 'report');
+  assert.equal(report.name, FLEET_ROSTER[partner - 1].name);
+  assert.equal(report.shooter, 'Ivo Penn');
+  assert.equal(report.text, 'It names the feeling.');
+  assert.equal(report.prompt, shot.question.prompt);
+  assert.equal(report.answer, typed(shot.question));
+  assert.equal(report.writing.pastes, 1);
+  assert.ok(report.writing.flags.length);
+  assert.ok(Array.isArray(report.writing.log.steps));
+  const recall = room.written.find((w) => w.kind === 'recall');
+  assert.deepEqual([recall.name, recall.ship, recall.prompt, recall.text, recall.correct], ['Ivo Penn', 's3', 'Recall line 3?', 'line 3', true]);
+  assert.ok(recall.writing.log);
+});
+
 // ---------------------------------------------------------------- phone view extras
 
 test('the view lists my team’s fired squares this round and its duds still unknown', async () => {

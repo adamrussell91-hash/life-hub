@@ -22,6 +22,7 @@ import { mapBounded } from './blobs-list.mjs';
 import { read, reject } from './question-drop.mjs';
 import { fleet } from './game-rules.mjs';
 import { list, obj, readWithEtag, updateJSON } from './etag-json.mjs';
+import { foldRound } from './fleet-week-fold.mjs';
 
 export { list, obj, readWithEtag, updateJSON };
 export const SHOTS_PER_ROUND = 4;
@@ -222,17 +223,20 @@ export async function roundShots(store, k, campaign, round) {
   return owners.flatMap((o, i) => list(rows[i]));
 }
 
+/** The rules' input for a round, and the stored shots behind it (for the learning-data fold). */
 async function roundInput(store, k, campaign, round) {
   const base = { pairing: campaign.pairing, round, seed: seedFor(campaign.secret, `seed:${round}`), placements: {}, shots: [] };
+  let stored = [];
   const reports = reportInputs(await allReports(store, k, campaign));
   if (round === 0) {
     const owners = list(campaign.joined);
     const rows = await mapBounded(owners, 8, (o) => read(store, k.campaignFleet(campaign.game_id, campaign.id, o)));
     owners.forEach((o, i) => { if (Array.isArray(rows[i])) base.placements[o] = rows[i]; });
   } else {
-    base.shots = (await roundShots(store, k, campaign, round)).map(toShot);
+    stored = await roundShots(store, k, campaign, round);
+    base.shots = stored.map(toShot);
   }
-  return { ...base, ...reports };
+  return { input: { ...base, ...reports }, stored };
 }
 
 /**
@@ -252,9 +256,22 @@ export async function ensureResolved(store, k, campaign, now) {
     const resolvedKey = k.campaignResolved(campaign.game_id, campaign.id, r);
     let state = await read(store, resolvedKey);
     if (!state) {
-      const next = fleet.resolveRound(await stateBefore(store, k, campaign, r), await roundInput(store, k, campaign, r));
+      const { input, stored } = await roundInput(store, k, campaign, r);
+      const next = fleet.resolveRound(await stateBefore(store, k, campaign, r), input);
       const written = await store.setJSON(resolvedKey, next, { onlyIfNew: true });
-      state = written?.modified === false ? await read(store, resolvedKey) : next;
+      if (written?.modified === false) {
+        state = await read(store, resolvedKey);
+      } else {
+        state = next;
+        // Only the request that wrote the round folds it into the learning data (§4). A failed fold never stops play.
+        if (r >= 1) {
+          try {
+            await foldRound(store, k, campaign, next, r, stored, { now });
+          } catch (e) {
+            console.error('fleet week: fold failed', campaign.id, r, e?.message);
+          }
+        }
+      }
     }
     const round = r + 1;
     // Week mode catching up over missed rounds: each round opened when the one before it closed.

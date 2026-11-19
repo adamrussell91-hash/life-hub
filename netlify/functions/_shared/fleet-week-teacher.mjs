@@ -20,6 +20,7 @@ import { deviceHash, read, reject } from './question-drop.mjs';
 import { campaignIndexKey, gameKeys } from './game-store.mjs';
 import { fleet } from './game-rules.mjs';
 import { mapBounded } from './blobs-list.mjs';
+import { cleanWritingLog, summariseWriting } from './quiz-core.mjs';
 import {
   FLEET_TZ, allReports, ensureCampaign, ensureResolved, findCampaign, firstClock, revealCampaign, validZone, weekCloses, isDone, list, loadFleetGame, obj, readWithEtag, reportInputs, roundOpen, roundsOf,
   seedFor, updateJSON
@@ -131,6 +132,8 @@ async function campaignState(store, k, opened, roster, now) {
   rounds.flatMap((r) => owners.map((o) => [r, o])).forEach(([r, o], i) => shotsBy.set(`${r}:${o}`, list(shotRows[i])));
   const reports = await allReports(store, k, campaign);
   const { rejected } = reportInputs(reports);
+  const { keys } = await loadFleetGame(store, k, campaign.game_id, campaign.version);
+  const written = writtenAnswers(campaign, keys, shown, reports, shotsBy, nameOf);
 
   const flags = [];
   for (const [key, shots] of shotsBy) {
@@ -171,6 +174,7 @@ async function campaignState(store, k, opened, roster, now) {
     flags,
     log: shown.log.map((l) => ({ round: l.round, results: l.results.map((r) => ({ ...r, name: nameOf(r.owner) })) })),
     standings: fleet.standings(shown, campaign.pairing),
+    written,
     // The server clock, so the control room's countdown never trusts the device's.
     now,
     // Every shot committed in the open round, for Void shot (`owner` and `seq` are what void_shot takes). No answer text.
@@ -181,6 +185,43 @@ async function campaignState(store, k, opened, roster, now) {
       })))
       : []
   };
+}
+
+/** A question's prompt from the published keys' public items (never the answer). */
+const promptOf = (keys, itemId) => list(keys.live?.items).find((i) => i.id === itemId)?.question?.prompt ?? '';
+/** The writing log as a quiz's short written answer shows it: the summary (check on `block`) with the log for replay. */
+const writingOf = (raw, text) => {
+  const log = cleanWritingLog(raw);
+  return log ? { ...summariseWriting(log, text, 'block'), log } : null;
+};
+
+/**
+ * Damage reports and recall lines as short written answers (§4): who wrote
+ * what, for which question, with the writing log for the typing replay. A
+ * report shows the question and the shooter's typed answer it explains.
+ */
+function writtenAnswers(campaign, keys, state, reports, shotsBy, nameOf) {
+  const out = [];
+  for (const [owner, r] of Object.entries(reports)) {
+    for (const [hit, f] of Object.entries(obj(r.filed))) {
+      const h = state.hits.find((x) => x.id === hit);
+      const seq = Number(/-(\d+)$/.exec(hit)?.[1]);
+      const shot = h ? list(shotsBy.get(`${h.round}:${h.owner}`)).find((s) => s.seq === seq) : null;
+      out.push({
+        kind: 'report', hit, owner: f.by ?? owner, name: nameOf(f.by ?? owner), round: f.round, square: h?.square ?? null,
+        prompt: shot ? promptOf(keys, shot.item) : '', answer: shot?.answer ?? '', shooter: nameOf(owner), text: f.text ?? '', writing: writingOf(f.writing, f.text ?? '')
+      });
+    }
+    for (const [key, line] of Object.entries(obj(r.recall))) {
+      const ship = key.split(':')[1];
+      const item = list(keys.live?.fleet?.recall)[fleet.SHIP_IDS.indexOf(ship)];
+      out.push({
+        kind: 'recall', ship_key: key, ship, owner, name: nameOf(owner), round: line.round, prompt: item ? promptOf(keys, item) : '',
+        text: line.answer ?? '', correct: line.correct === true, writing: writingOf(line.writing, line.answer ?? '')
+      });
+    }
+  }
+  return out.sort((a, b) => a.round - b.round || a.kind.localeCompare(b.kind));
 }
 
 async function nextRound(store, k, campaign) {
