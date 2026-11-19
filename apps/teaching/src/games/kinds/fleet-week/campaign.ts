@@ -478,6 +478,7 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
     let log = draft.log;
     const watchNote = watchWriting(box, {
       check: 'block',
+      pasteNote: 'Pasting is off in Fleet week. Type your answer in your own words.',
       log,
       onLog: (next) => {
         log = next;

@@ -7,6 +7,8 @@ export type WritingWatch = {
   log: WritingLog | null;
   /** Called when a log is made, and after a paste, a drop or the student leaving the page. Typing itself rides the answer's own save. */
   onLog: (log: WritingLog) => void;
+  /** The line shown after a blocked paste; defaults to the quiz wording. */
+  pasteNote?: string;
 };
 
 /**
@@ -36,7 +38,7 @@ export function watchWriting(input: HTMLTextAreaElement, watch: WritingWatch): H
     current.pastes += 1;
     if (block) {
       event.preventDefault();
-      note.textContent = 'Pasting is off for this quiz. Type your answer in your own words.';
+      note.textContent = watch.pasteNote ?? 'Pasting is off for this quiz. Type your answer in your own words.';
       note.dataset.state = 'blocked';
     } else pasted = true;
     watch.onLog(current);
