@@ -116,9 +116,8 @@ test('hashFor is a stable 32-bit HMAC', () => {
   assert.equal(typeof fleet.callSigns, 'function');
 });
 
-test('week mode and classes with no list refuse to open', async () => {
+test('classes with no list refuse to open', async () => {
   const { store } = await fleetLesson();
-  await rejects(teach(store, 'campaign_open', { mode: 'week' }), 'week_mode_later');
   await rejects(teach(store, 'campaign_open', { mode: 'lesson', class_id: 'class0' }), 'need_roster');
 });
 

@@ -22,7 +22,7 @@ import { gameKeys } from './game-store.mjs';
 import { cleanWritingLog } from './quiz-core.mjs';
 import { checkAnswer, fleet } from './game-rules.mjs';
 import {
-  LATE_GRACE_MS, SHOTS_PER_ROUND, aliasFor, ensureResolved, findCampaign, hashFor, list, loadFleetGame, markClock, obj, reportInputs,
+  LATE_GRACE_MS, SHOTS_PER_ROUND, aliasFor, ensureCampaign, findCampaign, hashFor, list, loadFleetGame, markClock, obj, reportInputs,
   roundClosing, roundOpen, roundsOf, touchClock, updateJSON
 } from './fleet-week-store.mjs';
 
@@ -430,13 +430,14 @@ export async function fleetStudentAction(store, lessonId, body, { classId, stude
   if (!FLEET_ACTIONS.includes(action)) reject(400, 'bad_action', 'Unknown action.');
   if (!student) reject(409, 'need_roster', 'Fleet week needs a class list. Ask your teacher.');
   const k = gameKeys(lessonId);
-  const campaign = await findCampaign(store, k, body.game_id, classId, body.campaign_id);
-  if (!campaign || campaign.game_id !== body.game_id) reject(409, 'no_campaign', 'Your teacher hasn’t started this game yet.');
-  if (!list(campaign.joined).includes(owner)) reject(403, 'not_in_game', 'You joined after this game started. You’ll be in the next one.');
+  const found = await findCampaign(store, k, body.game_id, classId, body.campaign_id);
+  if (!found || found.game_id !== body.game_id) reject(409, 'no_campaign', 'Your teacher hasn’t started this game yet.');
+  if (!list(found.joined).includes(owner)) reject(403, 'not_in_game', 'You joined after this game started. You’ll be in the next one.');
   if (action === 'signals') return { events: [] };
-  const { keys } = await loadFleetGame(store, k, campaign.game_id, campaign.version);
-  if (action !== 'fleet_state' && (campaign.closed_at || campaign.revealed_at)) reject(409, 'closed', 'This game has finished.');
-  const { state, clock } = await ensureResolved(store, k, campaign, now);
+  const { keys } = await loadFleetGame(store, k, found.game_id, found.version);
+  if (action !== 'fleet_state' && (found.closed_at || found.revealed_at)) reject(409, 'closed', 'This game has finished.');
+  const resolved = await ensureCampaign(store, k, found, now);
+  const { campaign, state, clock } = resolved;
   const ctx = { store, k, campaign, keys, state, clock, owner, now };
 
   if (action === 'fleet_state') {

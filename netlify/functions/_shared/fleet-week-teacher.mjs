@@ -3,12 +3,12 @@
  * spec §3.3, plan Task 6). The control room sees real names; students never do
  * until the reveal.
  *
- *   campaign_open    { game_id, class_id, mode: 'lesson', rounds?, round_cap_s?, balance? } → campaign_state
+ *   campaign_open    { game_id, class_id, mode: 'lesson' | 'week', rounds?, round_cap_s?, cutoff? ('20:00'), balance? } → campaign_state
  *   campaign_state   { game_id, class_id } → names, matches, who has fired, owed reports, flags, standings
  *   campaign_next    lesson mode: close the open round now (it resolves on this request)
  *   void_shot        { round, owner, seq } while that round is open: the shot becomes a void dud that does not return
  *   reject_report    { hit } return a filed damage report to the partner, once
- *   campaign_reveal  settle every open hit and recall line (resolved/final); students see names and both fleets
+ *   campaign_reveal  (any phase) settle every open hit and recall line (resolved/final); students see names and both fleets
  *   campaign_close   end it and free the class for a new campaign
  */
 import { randomBytes } from 'node:crypto';
@@ -21,9 +21,12 @@ import { gameKeys } from './game-store.mjs';
 import { fleet } from './game-rules.mjs';
 import { mapBounded } from './blobs-list.mjs';
 import {
-  allReports, ensureResolved, findCampaign, firstClock, isDone, list, loadFleetGame, obj, readWithEtag, reportInputs, roundOpen, roundsOf,
+  FLEET_TZ, allReports, ensureCampaign, ensureResolved, findCampaign, firstClock, revealCampaign, validZone, weekCloses, isDone, list, loadFleetGame, obj, readWithEtag, reportInputs, roundOpen, roundsOf,
   seedFor, updateJSON
 } from './fleet-week-store.mjs';
+
+/** Week mode's firing days by default (Tuesday to Thursday when opened on a Monday). */
+const WEEK_ROUNDS = 3;
 
 /** A pointer whose campaign blob never arrived (its open died half way) is free after this long. */
 const POINTER_STALE_MS = 10000;
@@ -46,9 +49,12 @@ async function teacherContext(store, lessonId, body) {
   return { k, roster, classId: roster.cls.id };
 }
 
+const CUTOFF = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 async function openCampaign(store, lessonId, body, { k, roster, classId }, now) {
-  if (body.mode === 'week') reject(409, 'week_mode_later', 'Week mode isn’t ready yet. Play it in one lesson for now.');
-  if (body.mode !== undefined && body.mode !== 'lesson') reject(400, 'bad_mode', 'Pick lesson mode.');
+  const mode = body.mode ?? 'lesson';
+  if (mode !== 'lesson' && mode !== 'week') reject(400, 'bad_mode', 'Pick week or lesson mode.');
+  if (body.cutoff !== undefined && (typeof body.cutoff !== 'string' || !CUTOFF.test(body.cutoff))) reject(400, 'bad_cutoff', 'Give the cut-off as a time, like 20:00.');
   if (!roster.students.length) reject(409, 'need_roster', 'Fleet week needs a class list. Add one first.');
   const { record } = await loadFleetGame(store, k, body.game_id);
   const currentKey = k.campaignCurrent(body.game_id, classId);
@@ -69,14 +75,16 @@ async function openCampaign(store, lessonId, body, { k, roster, classId }, now) 
     game_id: body.game_id,
     version: record.version,
     class_id: classId,
-    mode: 'lesson',
+    mode,
     secret,
     created_at: now,
     settings: {
-      rounds: clampInt(body.rounds ?? settings.rounds, 2, 8, 5),
+      // Week mode: placement on the open day, then three firing days (§1.3) unless the teacher says otherwise.
+      rounds: mode === 'week' ? clampInt(body.rounds, 1, 8, WEEK_ROUNDS) : clampInt(body.rounds ?? settings.rounds, 2, 8, 5),
       round_cap_ms: clampInt(body.round_cap_s ?? settings.round_cap_s, 60, 600, 240) * 1000,
       placement_cap_ms: clampInt(settings.placement_cap_s, 30, 300, 120) * 1000,
-      answer_ms: clampInt(settings.answer_s, 20, 120, 60) * 1000
+      answer_ms: clampInt(settings.answer_s, 20, 120, 60) * 1000,
+      ...(mode === 'week' ? { cutoff: body.cutoff ?? (CUTOFF.test(settings.cutoff ?? '') ? settings.cutoff : '20:00'), tz: validZone(roster.cls.time_zone) ?? FLEET_TZ } : {})
     },
     // Random teams; "mixed by accuracy" balancing arrives with plan 4.
     pairing: fleet.pairTeams(joined, fleet.rng(seedFor(secret, 'teams'))),
@@ -85,6 +93,8 @@ async function openCampaign(store, lessonId, body, { k, roster, classId }, now) 
     revealed_at: null,
     closed_at: null
   };
+  // Week mode: every round's close, fixed at the open (placement first).
+  if (mode === 'week') campaign.schedule = weekCloses(now, campaign.settings.cutoff, campaign.settings.rounds, campaign.settings.tz);
   // The class pointer first, create-only (or over the closed one we read): a losing open writes nothing.
   const pointed = await store.setJSON(currentKey, { id, at: now }, held.data ? (held.etag ? { onlyIfMatch: held.etag } : {}) : { onlyIfNew: true });
   if (pointed?.modified === false) {
@@ -100,8 +110,8 @@ async function openCampaign(store, lessonId, body, { k, roster, classId }, now) 
 const flagged = (w) => !!w && (w.pastes > 0 || w.away > 0 || w.jumps > 0);
 
 /** The control room: real names, who has fired this round, owed reports, writing flags with their logs, standings. */
-async function campaignState(store, k, campaign, roster, now) {
-  const { state, clock } = await ensureResolved(store, k, campaign, now);
+async function campaignState(store, k, opened, roster, now) {
+  const { campaign, state, clock } = await ensureCampaign(store, k, opened, now);
   const shown = (campaign.revealed_at && (await read(store, k.campaignResolved(campaign.game_id, campaign.id, 'final')))) || state;
   const byId = new Map(roster.students.map((s) => [s.id, s]));
   const nameOf = (owner) => byId.get(campaign.students[owner])?.name ?? 'Unknown';
@@ -141,6 +151,7 @@ async function campaignState(store, k, campaign, roster, now) {
   return {
     campaign_id: campaign.id,
     mode: campaign.mode,
+    ...(campaign.mode === 'week' ? { cutoff: campaign.settings.cutoff, tz: campaign.settings.tz, schedule: list(campaign.schedule) } : {}),
     round: clock.round,
     rounds: roundsOf(campaign),
     closes_at: clock.closes_at,
@@ -194,16 +205,6 @@ async function rejectReport(store, k, campaign, body, now) {
   });
 }
 
-async function reveal(store, k, campaign, now) {
-  if (campaign.revealed_at) return campaign;
-  const { state } = await ensureResolved(store, k, campaign, now);
-  const finalKey = k.campaignResolved(campaign.game_id, campaign.id, 'final');
-  const settled = fleet.settleAll(state, reportInputs(await allReports(store, k, campaign)));
-  await store.setJSON(finalKey, settled, { onlyIfNew: true });
-  const { data } = await updateJSON(store, k.campaign(campaign.game_id, campaign.id), (c) => (c.revealed_at ? undefined : { ...c, revealed_at: now }));
-  return data;
-}
-
 async function close(store, k, campaign, now) {
   const { data } = await updateJSON(store, k.campaign(campaign.game_id, campaign.id), (c) => (c.closed_at ? undefined : { ...c, closed_at: now }));
   const currentKey = k.campaignCurrent(campaign.game_id, campaign.class_id);
@@ -229,7 +230,7 @@ export async function fleetTeacherAction(store, lessonId, body, { now = Date.now
   if (action === 'campaign_next') await nextRound(store, ctx.k, campaign);
   if (action === 'void_shot') await voidShot(store, ctx.k, campaign, body, now);
   if (action === 'reject_report') await rejectReport(store, ctx.k, campaign, body, now);
-  if (action === 'campaign_reveal') campaign = await reveal(store, ctx.k, campaign, now);
+  if (action === 'campaign_reveal') campaign = await revealCampaign(store, ctx.k, campaign, now);
   if (action === 'campaign_close') campaign = await close(store, ctx.k, campaign, now);
   return campaignState(store, ctx.k, campaign, ctx.roster, now);
 }

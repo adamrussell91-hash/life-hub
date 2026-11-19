@@ -1,5 +1,5 @@
 /**
- * Fleet week campaigns: storage, the lesson-mode clock and lazy round resolution
+ * Fleet week campaigns: storage, the lesson and week clocks and lazy round resolution
  * (spec docs/superpowers/specs/2026-11-19-fleet-week-design.md §1.3, §3.1–3.2;
  * plan docs/superpowers/plans/2026-11-19-fleet-week-1-engine.md, Task 4).
  *
@@ -40,6 +40,81 @@ export const seedFor = (secret, label) => createHmac('sha256', secret).update(la
 
 /** An opaque per-viewer id for an owner or a hit. Real owners and hit ids never leave the server. */
 export const aliasFor = (campaign, viewer, subject) => hashFor(campaign.secret)(`${viewer}>${subject}`).toString(36);
+
+// ---------------------------------------------------------------- the week clock (§1.3, §3.2)
+
+/** Classes carry no time zone yet, so every week-mode clock runs on Sydney time (as sydneyDay in markbook.mjs). */
+export const FLEET_TZ = 'Australia/Sydney';
+
+const zoneParts = new Map();
+/** Wall-clock parts of instant `t` in `tz`, as numbers. */
+function wallAt(tz, t) {
+  let f = zoneParts.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-AU', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
+    zoneParts.set(tz, f);
+  }
+  const p = Object.fromEntries(f.formatToParts(new Date(t)).filter((x) => x.type !== 'literal').map((x) => [x.type, Number(x.value)]));
+  return { y: p.year, m: p.month, d: p.day, hh: p.hour % 24, mm: p.minute, ss: p.second };
+}
+
+/** `tz`'s offset from UTC at instant `t`, in ms (wall time minus UTC). */
+function offsetAt(tz, t) {
+  const w = wallAt(tz, t);
+  return Date.UTC(w.y, w.m - 1, w.d, w.hh, w.mm, w.ss) - Math.floor(t / 1000) * 1000;
+}
+
+/**
+ * The instant a wall time happens in `tz` (pure; Intl only). On a day the
+ * clocks change, a wall time inside the skipped hour lands just after it, and
+ * one in the repeated hour takes the first of the two.
+ */
+export function zonedInstant(tz, y, m, d, hh, mm) {
+  const wall = Date.UTC(y, m - 1, d, hh, mm);
+  const HALF_DAY = 12 * 3600 * 1000;
+  const tries = [...new Set([wall - HALF_DAY, wall, wall + HALF_DAY].map((t) => wall - offsetAt(tz, t)))];
+  const exact = tries.filter((t) => {
+    const w = wallAt(tz, t);
+    return w.y === y && w.m === m && w.d === d && w.hh === hh && w.mm === mm;
+  });
+  return exact.length ? Math.min(...exact) : Math.max(...tries);
+}
+
+/** `tz`'s calendar day `n` days after the day of instant `t`, as { y, m, d }. */
+function dayAfter(tz, t, n) {
+  const w = wallAt(tz, t);
+  const shifted = new Date(Date.UTC(w.y, w.m - 1, w.d + n));
+  return { y: shifted.getUTCFullYear(), m: shifted.getUTCMonth() + 1, d: shifted.getUTCDate() };
+}
+
+/** A valid IANA zone name, or null. */
+export function validZone(tz) {
+  if (typeof tz !== 'string' || !tz) return null;
+  try {
+    new Intl.DateTimeFormat('en-AU', { timeZone: tz });
+    return tz;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Week mode's clock (§1.3): when each round closes, `[placement, firing 1, …, firing rounds]`.
+ * Placement runs from the open until the first cut-off: today's when the
+ * campaign opens before it, else tomorrow's. Each firing round then closes at
+ * the cut-off on the following days, in the class's time zone, so a round on
+ * a day the clocks change still closes at the cut-off on the wall clock.
+ * Pure: the same open time, cut-off, rounds and zone always give the same times.
+ */
+export function weekCloses(openedAt, cutoff, rounds, tz = FLEET_TZ) {
+  const [hh, mm] = String(cutoff).split(':').map(Number);
+  const today = dayAfter(tz, openedAt, 0);
+  const start = zonedInstant(tz, today.y, today.m, today.d, hh, mm) > openedAt ? 0 : 1;
+  return Array.from({ length: rounds + 1 }, (_, r) => {
+    const day = dayAfter(tz, openedAt, start + r);
+    return zonedInstant(tz, day.y, day.m, day.d, hh, mm);
+  });
+}
 
 /** The last firing round. */
 export const roundsOf = (campaign) => campaign.settings.rounds;
@@ -85,6 +160,8 @@ const heldOpen = (clock, now) => Object.values(obj(clock.open)).some((h) => h?.r
  */
 export function roundClosed(campaign, clock, now) {
   if (!roundOpen(campaign, clock)) return false;
+  // Week mode closes by the clock only: no early close and no Next round (§1.3).
+  if (campaign.mode === 'week') return now >= clock.closes_at && !heldOpen(clock, now);
   if (clock.round === 0) {
     if (roundClosing(clock, now)) return true;
     // Placement waits for the whole class: every rostered player in the pairing (never the ghost) must place.
@@ -98,8 +175,11 @@ export function roundClosed(campaign, clock, now) {
 
 export const capFor = (campaign, round) => (round === 0 ? campaign.settings.placement_cap_ms : campaign.settings.round_cap_ms);
 
+/** When round `round` closes if it opens at `now`: the cap in lesson mode, the schedule's cut-off in week mode. */
+export const closeFor = (campaign, round, now) => (campaign.mode === 'week' ? list(campaign.schedule)[round] ?? now : now + capFor(campaign, round));
+
 /** A fresh clock at placement. */
-export const firstClock = (campaign, now) => ({ round: 0, opened_at: now, closes_at: now + capFor(campaign, 0), seen: {}, fired: {}, open: {}, done: {} });
+export const firstClock = (campaign, now) => ({ round: 0, opened_at: now, closes_at: closeFor(campaign, 0, now), seen: {}, fired: {}, open: {}, done: {} });
 
 /** The state after the last resolved round (the empty state before placement resolves). */
 export async function stateBefore(store, k, campaign, round) {
@@ -177,14 +257,42 @@ export async function ensureResolved(store, k, campaign, now) {
       state = written?.modified === false ? await read(store, resolvedKey) : next;
     }
     const round = r + 1;
+    // Week mode catching up over missed rounds: each round opened when the one before it closed.
+    const openedAt = campaign.mode === 'week' ? Math.min(now, clock.closes_at) : now;
     const advanced = {
-      ...clock, round, opened_at: now, closes_at: round <= roundsOf(campaign) ? now + capFor(campaign, round) : null
+      ...clock, round, opened_at: openedAt, closes_at: round <= roundsOf(campaign) ? closeFor(campaign, round, now) : null
     };
     delete advanced.next;
     await store.setJSON(clockKey, advanced, held.etag ? { onlyIfMatch: held.etag } : {});
     // Won or lost the race, the loop re-reads the clock.
   }
   reject(409, 'retry', 'Please send it again.');
+}
+
+/**
+ * Open the reveal (§1.3, §3.5: the teacher can do it at any phase): settle every
+ * open hit and recall line from the last resolved state into resolved/final,
+ * then stamp `revealed_at`. Shots in a round still open are dropped. Idempotent.
+ */
+export async function revealCampaign(store, k, campaign, now) {
+  if (campaign.revealed_at) return campaign;
+  const { state } = await ensureResolved(store, k, campaign, now);
+  const finalKey = k.campaignResolved(campaign.game_id, campaign.id, 'final');
+  const settled = fleet.settleAll(state, reportInputs(await allReports(store, k, campaign)));
+  await store.setJSON(finalKey, settled, { onlyIfNew: true });
+  const { data } = await updateJSON(store, k.campaign(campaign.game_id, campaign.id), (c) => (c.revealed_at ? undefined : { ...c, revealed_at: now }));
+  return data;
+}
+
+/**
+ * ensureResolved, and in week mode the reveal too: it opens by itself once the
+ * last firing round has closed and resolved (§1.3). Returns the campaign as it
+ * now stands with the state and clock.
+ */
+export async function ensureCampaign(store, k, campaign, now) {
+  const resolved = await ensureResolved(store, k, campaign, now);
+  if (campaign.mode !== 'week' || campaign.revealed_at || campaign.closed_at || resolved.clock.round <= roundsOf(campaign)) return { campaign, ...resolved };
+  return { campaign: await revealCampaign(store, k, campaign, now), ...resolved };
 }
 
 /**
