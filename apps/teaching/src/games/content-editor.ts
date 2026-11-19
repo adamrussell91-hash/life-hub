@@ -67,6 +67,12 @@ const SETTINGS: Record<Game['kind'], SettingField[]> = {
     { key: 'answer_seconds', label: 'Seconds to answer', type: 'num', min: 5, max: 30 },
     { key: 'review_seconds', label: 'Review seconds', type: 'num', min: 30, max: 180 }
   ],
+  fleet_week: [
+    { key: 'rounds', label: 'Rounds', type: 'num', min: 2, max: 8 },
+    { key: 'round_cap_s', label: 'Seconds a round (lesson mode)', type: 'num', min: 60, max: 600 },
+    { key: 'placement_cap_s', label: 'Seconds to place ships', type: 'num', min: 30, max: 300 },
+    { key: 'answer_s', label: 'Seconds to answer', type: 'num', min: 20, max: 120 }
+  ],
   wager: [
     { key: 'start', label: 'Starting points', type: 'num', min: 10, max: 10_000 },
     { key: 'min_bet', label: 'Fewest points to commit', type: 'num', min: 1, max: 1000 },
