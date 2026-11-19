@@ -422,7 +422,7 @@ describe('meeting page', () => {
     const made = await opts.makeLinkedMeeting('reflecting', '2026-10-02');
     expect(made).toBe('meeting_new');
     expect(createMeeting).toHaveBeenCalledWith(expect.objectContaining({
-      title: 'Jo: lesson reflecting',
+      title: 'Jo Teacher – Observation Phase 3: Reflecting',
       // 6:00 pm Sydney, the same as this meeting, on the new day; same length.
       scheduled_start: '2026-10-02T08:00:00.000Z',
       scheduled_end: '2026-10-02T09:15:00.000Z',
@@ -434,10 +434,12 @@ describe('meeting page', () => {
     vi.mocked(listUniversalLinksForEntity).mockReset();
   });
 
-  it('linkedMeetingTitle swaps the phase word, else names the teacher', async () => {
+  it('linkedMeetingTitle names the teacher and the NESA phase', async () => {
     const { linkedMeetingTitle } = await import('@/views/meeting-page');
-    expect(linkedMeetingTitle('Observation Planning · Year 9', 'Jo Teacher', 'observing')).toBe('Observation Observing · Year 9');
-    expect(linkedMeetingTitle('Catch-up', 'Jo Teacher', 'reflecting')).toBe('Jo Teacher · observation reflecting');
+    expect(linkedMeetingTitle('Catch-up', 'Jo Teacher', 'observing')).toBe('Jo Teacher – Observation Phase 2: Observing');
+    expect(linkedMeetingTitle('Jo Teacher – Observation Phase 2: Observing', 'Jo Teacher', 'reflecting')).toBe('Jo Teacher – Observation Phase 3: Reflecting');
+    expect(linkedMeetingTitle('Year 9 – Observation Phase 1: Planning', '', 'observing')).toBe('Year 9 – Observation Phase 2: Observing');
+    expect(linkedMeetingTitle('Catch-up', ' ', 'reflecting')).toBe('Observation Phase 3: Reflecting');
   });
 
   it('End completes the meeting and opens the wrap-up', async () => {

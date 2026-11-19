@@ -97,15 +97,23 @@ export function saveGuideRun(runs: GuideRun[], run: GuideRun): { runs: GuideRun[
 }
 
 const PHASE_LABEL: Record<ObservationPhase, string> = { planning: 'Planning', observing: 'Observing', reflecting: 'Reflecting' };
+const PHASE_NUMBER: Record<ObservationPhase, number> = { planning: 1, observing: 2, reflecting: 3 };
 
-/** Title for the next observation meeting: this title with its phase word swapped, else `<teacher> · observation <phase>`. */
+/** 'Observation Phase 2: Observing', the NESA template's phase names. */
+export function observationPhaseName(phase: ObservationPhase): string {
+  return `Observation Phase ${PHASE_NUMBER[phase]}: ${PHASE_LABEL[phase]}`;
+}
+
+/**
+ * Title for the next observation meeting: `<teacher> – Observation Phase 2: Observing`.
+ * With no teacher name, the current title's phase name is swapped, else the phase name stands alone.
+ */
 export function linkedMeetingTitle(current: string, teacherName: string, next: ObservationPhase): string {
-  const label = PHASE_LABEL[next];
-  const phaseWord = /\b(planning|observing|reflecting)\b/i;
-  if (phaseWord.test(current)) {
-    return current.replace(phaseWord, (word) => (word[0] === word[0]!.toUpperCase() ? label : label.toLowerCase()));
-  }
-  return `${teacherName.trim() || current} · observation ${label.toLowerCase()}`;
+  const phase = observationPhaseName(next);
+  const teacher = teacherName.trim();
+  if (teacher) return `${teacher} – ${phase}`;
+  const named = /Observation Phase \d: (Planning|Observing|Reflecting)/;
+  return named.test(current) ? current.replace(named, phase) : phase;
 }
 
 /** The block the recording's kept lines go under, one per meeting. */
