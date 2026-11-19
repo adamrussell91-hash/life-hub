@@ -3,6 +3,7 @@ import type { PublicGame } from '@/games/core/schema';
 import type { FleetCampaignClient, FleetView } from '@/games/kinds/fleet-week/campaign-api';
 import { openFleetCampaign, type FleetCampaign } from '@/games/kinds/fleet-week/campaign';
 import { mountGameArcade } from '@/games/arcade';
+import { resetFleetSignals } from '@/games/kinds/fleet-week/signals';
 import type { GameClient } from '@/games/api';
 import type { PublishedLesson } from '@/schemas/published-lesson';
 
@@ -46,6 +47,7 @@ const cell = (root: HTMLElement, sq: number) => root.querySelector<HTMLButtonEle
 const byText = (root: HTMLElement, text: string) => [...root.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.trim() === text)!;
 
 afterEach(() => {
+  resetFleetSignals();
   open?.close();
   open = null;
   sessionStorage.clear();
@@ -140,6 +142,57 @@ describe('fleet week phone', () => {
     root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
     await flush();
     expect(client.report).toHaveBeenCalledWith('g_fleet', 'h_x', 'The lamp guides them home', expect.objectContaining({ pastes: 0 }));
+  });
+
+  it('marks duds and this round’s fired squares from the server, so they survive a reload', async () => {
+    const client = fakeClient(baseView({ phase: 'firing', round: 3, me: { sign: 'Captain Heron', ships: ['s0', 's3'], placed: true }, shots: { left: 2, returning: [], fired: [4, 9] }, rival: { signs: [], chart: {}, sunk: [], duds: [11] } }));
+    const root = start(client);
+    await flush();
+    expect(cell(root, 11).classList.contains('fw-cell--dud')).toBe(true);
+    expect(cell(root, 11).disabled).toBe(false);
+    expect(cell(root, 4).classList.contains('fw-cell--fired')).toBe(true);
+    expect(cell(root, 4).disabled).toBe(true);
+    expect(cell(root, 9).disabled).toBe(true);
+    expect(cell(root, 5).disabled).toBe(false);
+  });
+
+  it('tells a late joiner which round they join from', async () => {
+    const client = fakeClient(baseView({ phase: 'firing', round: 2, me: { sign: 'Captain Heron', ships: [], placed: true, joins_at: 3 }, shots: { left: 0, returning: [] } }));
+    const root = start(client);
+    await flush();
+    expect(root.querySelector('.fw-joins')?.textContent).toBe('You join the fleet from round 3.');
+    expect(root.textContent).not.toContain('Shells spent');
+  });
+
+  it('the reveal shows the class’s hardest squares, with no answers', async () => {
+    const reveal = {
+      names: { 'Captain Heron': 'Pat Example' },
+      fleets: { us: [], them: [] },
+      standings: null,
+      calibration: { right: 1, total: 2 },
+      class: {
+        squares: [],
+        hardest: [
+          { square: 7, label: 'B3', row: 'Loss', column: 'Quill', answered: 6, right: 1, accuracy: 1 / 6 },
+          { square: 0, label: 'A1', row: 'Pride', column: 'Mara', answered: 4, right: 2, accuracy: 0.5 }
+        ]
+      }
+    };
+    const root = start(fakeClient(baseView({ phase: 'reveal', reveal })));
+    await flush();
+    const items = [...root.querySelectorAll('.fw-hardest__item')].map((li) => li.textContent);
+    expect(items).toEqual(['B3Loss × Quill1 of 6 right', 'A1Pride × Mara2 of 4 right']);
+  });
+
+  it('shows signal toasts from the poll when the view changes', async () => {
+    const first = baseView({ phase: 'firing', round: 1, me: { sign: 'Captain Heron', ships: ['s0', 's3'], placed: true }, shots: { left: 0, returning: [] } });
+    const next = baseView({ phase: 'firing', round: 2, me: first.me, shots: { left: 4, returning: [] }, report: { round: 1, lines: [], pings: [] } });
+    const state = vi.fn().mockResolvedValueOnce(first).mockResolvedValue(next);
+    start(fakeClient(first, { state }));
+    await flush();
+    expect(document.querySelector('.fws-toast')).toBeNull();
+    await open!.refresh();
+    expect(document.querySelector('.fws-toast')?.textContent).toContain('Dawn report is in.');
   });
 
   it('waits for the teacher when there is no campaign', async () => {

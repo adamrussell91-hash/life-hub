@@ -1,0 +1,166 @@
+/* Fleet week signals (spec §2): the anchor badge, the toast, the ship and the smoke. See signals.ts.
+ * Transform and opacity only; calm (reduced motion) fades the toast and moves nothing else. */
+.fws-anchor {
+  --fws-deep: #0d2f57;
+  --fws-glow: #f2c14e;
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--fws-deep);
+  cursor: pointer;
+}
+.fws-anchor[hidden] { display: none; }
+.fws-anchor:disabled { cursor: default; opacity: 0.55; }
+.fws-anchor:focus-visible { outline: 3px solid var(--fws-glow); outline-offset: 2px; }
+.fws-anchor__glyph { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.fws-anchor__count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  color: var(--fws-deep);
+  background: var(--fws-glow);
+  box-shadow: 0 0 0 2px #fff;
+}
+.fws-anchor__count[hidden] { display: none; }
+.fws-anchor--waiting { color: var(--fws-glow); box-shadow: 0 0 0 2px var(--fws-glow), 0 0 14px 2px rgba(242, 193, 78, 0.55); }
+.fws-anchor--waiting::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  box-shadow: 0 0 18px 6px rgba(242, 193, 78, 0.5);
+  opacity: 0;
+  animation: fws-glow 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes fws-glow { 50% { opacity: 1; } }
+.fws-anchor--pulse { animation: fws-pulse 0.9s ease-out 2; }
+@keyframes fws-pulse { 40% { transform: scale(1.12); } }
+
+/* A hit: a short white-hot flash, then smoke rising off the anchor. */
+.fws-anchor--hit::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+  background: radial-gradient(circle, #fff 0%, #ffd27a 35%, rgba(212, 84, 79, 0) 70%);
+  opacity: 0;
+  animation: fws-flash 0.5s ease-out 1;
+  pointer-events: none;
+}
+@keyframes fws-flash { 15% { opacity: 1; } 100% { opacity: 0; } }
+.fws-smoke { position: absolute; left: 50%; top: 0; width: 0; height: 0; pointer-events: none; }
+.fws-smoke__puff {
+  position: absolute;
+  left: -8px;
+  top: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(120, 128, 140, 0.7);
+  opacity: 0;
+  animation: fws-smoke 1.5s ease-out forwards;
+}
+.fws-smoke__puff:nth-child(2) { animation-delay: 0.2s; left: -2px; }
+.fws-smoke__puff:nth-child(3) { animation-delay: 0.4s; left: -12px; }
+@keyframes fws-smoke {
+  0% { opacity: 0.8; transform: translateY(0) scale(0.5); }
+  100% { opacity: 0; transform: translateY(-34px) scale(1.6); }
+}
+
+/* The toast: bottom of the screen, inside a 16px gutter, above game overlays. */
+.fws-toast {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 100;
+  display: flex;
+  align-items: stretch;
+  max-width: 26rem;
+  margin: 0 auto;
+  border-radius: 14px;
+  color: #fff;
+  background: #0d2f57;
+  box-shadow: 0 12px 32px rgba(10, 21, 54, 0.35);
+  animation: fws-slide 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.fws-toast--calm { animation: fws-fade 0.2s linear both; }
+@keyframes fws-slide { from { opacity: 0; transform: translateY(120%); } to { opacity: 1; transform: none; } }
+@keyframes fws-fade { from { opacity: 0; } to { opacity: 1; } }
+.fws-toast__go {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px 8px 12px;
+  border: 0;
+  border-radius: 14px 0 0 14px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.fws-toast__go:focus-visible, .fws-toast__close:focus-visible { outline: 3px solid #f2c14e; outline-offset: -3px; }
+.fws-toast__mark { flex: 0 0 auto; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 999px; color: #0d2f57; background: #f2c14e; }
+.fws-toast__glyph { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.fws-toast__words { display: grid; min-width: 0; }
+.fws-toast__label { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #f2c14e; }
+.fws-toast__line { font-size: 16px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.fws-toast__close {
+  flex: 0 0 auto;
+  width: 48px;
+  min-height: 48px;
+  border: 0;
+  border-radius: 0 14px 14px 0;
+  font-size: 22px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* The ship that steams across the top of the page when a round opens. */
+.fws-ship {
+  position: fixed;
+  top: 6px;
+  left: 0;
+  z-index: 101;
+  width: 64px;
+  height: 32px;
+  color: #0d2f57;
+  pointer-events: none;
+  transform: translateX(-80px);
+  animation: fws-steam 4.5s linear forwards;
+}
+.fws-ship__glyph { width: 64px; height: 32px; fill: #fff; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+@keyframes fws-steam {
+  0% { transform: translateX(-80px) translateY(0); }
+  25% { transform: translateX(25vw) translateY(2px); }
+  50% { transform: translateX(50vw) translateY(0); }
+  75% { transform: translateX(75vw) translateY(2px); }
+  100% { transform: translateX(calc(100vw + 16px)) translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fws-toast { animation: fws-fade 0.2s linear both; }
+  .fws-ship, .fws-smoke { display: none; }
+  .fws-anchor--waiting::after, .fws-anchor--pulse, .fws-anchor--hit::before { animation: none; }
+}

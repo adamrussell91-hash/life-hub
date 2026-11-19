@@ -16,6 +16,7 @@ import { GRID, SHIP_IDS, SHIP_SIZES, colOf, rowOf, shipLine, squareLabel, type S
 import type { FleetCampaignClient, FleetLine, FleetOwed, FleetQuestion, FleetShip, FleetView } from './campaign-api';
 import { calm } from '../../motion/motion';
 import { createSea, type Sea, type SeaChart, type SeaMode } from './sea';
+import { SIGNAL_LINES, showFleetToasts, steamShip, type FleetSignal, type FleetSignalKind } from './signals';
 import './fleet-week.css';
 
 export type FleetCampaignOptions = {
@@ -26,6 +27,8 @@ export type FleetCampaignOptions = {
   onClose?: () => void;
   /** Poll interval in ms (tests). */
   pollMs?: number;
+  /** Opened from a signal: bring that part of the screen into view once it is drawn. */
+  go?: FleetSignalKind | null;
 };
 export type FleetCampaign = { close(): void; refresh(): Promise<void> };
 
@@ -40,6 +43,32 @@ type Cell = { cls: string[]; label: string; disabled?: boolean };
 /** The rendered sea under a chart: which one (kept across repaints), how it draws, and what it shows. */
 type SeaSpec = { key: string; mode: SeaMode; state: SeaChart };
 type Draft = { text: string; log: WritingLog | null };
+
+/**
+ * The signals (§2) a poll brings, from how the view changed: the game page shows the same
+ * toasts as the rest of the site without another request. Ids match the server's
+ * (`campaign:kind:round`), so a toast shown here isn't shown again on this device.
+ */
+export function viewSignals(prev: FleetView | null, next: FleetView, game: { gameId: string; lessonId: string }): FleetSignal[] {
+  if (!prev || prev.campaign !== next.campaign) return [];
+  const out: FleetSignal[] = [];
+  const add = (kind: FleetSignalKind, round: number | 'final') =>
+    out.push({ id: `${next.campaign}:${kind}:${round}`, kind, line: SIGNAL_LINES[kind], game_id: game.gameId, lesson_id: game.lessonId });
+  if (next.reveal && !prev.reveal) {
+    add('reveal', 'final');
+    return out;
+  }
+  const r = next.report;
+  if (r && r.round !== prev.report?.round) {
+    if (r.lines.some((l) => l.side === 'them' && l.outcome === 'hit')) add('hit', r.round);
+    add('report_ready', r.round);
+  }
+  const before = new Set(prev.owed.map((o) => o.hit));
+  const owed = next.owed.filter((o) => !before.has(o.hit));
+  if (owed.length) add('report_owed', Math.max(...owed.map((o) => o.due - 1)));
+  if (next.phase === 'firing' && next.shots.left > 0 && (prev.phase !== 'firing' || prev.round !== next.round)) add('round_open', next.round);
+  return out;
+}
 
 /** Ship segment classes: bow, mid, stern or solo, and the way it lies. */
 function shipParts(ships: FleetShip[]): Map<number, { cls: string[]; id: ShipId }> {
@@ -239,11 +268,23 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
     return b;
   }
 
+  /** A late joiner waits for their first firing round (§3.5). */
+  function joinsNote(v: FleetView): HTMLElement | null {
+    const at = v.me.joins_at;
+    // The server sends it only while they can't fire yet.
+    if (typeof at !== 'number' || (v.phase === 'firing' && at <= v.round)) return null;
+    const p = note(`You join the fleet from round ${at}.`, 'fw-note fw-note--wait fw-joins');
+    p.setAttribute('role', 'status');
+    return p;
+  }
+
   function placementScreen(v: FleetView): HTMLElement[] {
     const mine = v.me.ships;
     if (v.me.placed || !mine.length) {
+      const joins = joinsNote(v);
       return [
-        el('h3', 'fw-h', mine.length ? 'Your ships are at sea' : 'Your partner places the ships this time'),
+        ...(joins ? [joins] : []),
+        el('h3', 'fw-h', mine.length ? 'Your ships are at sea' : joins ? 'Your team’s ships are at sea' : 'Your partner places the ships this time'),
         note('Waiting for the rest of the class to place their ships.'),
         ourChart(v, 'Our fleet')
       ];
@@ -339,13 +380,15 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
   }
 
   function rivalCells(v: FleetView): (sq: number) => Cell {
-    const duds = new Set((v.report?.lines ?? []).filter((l) => l.side === 'us' && l.outcome === 'dud').map((l) => l.square));
+    // The server's lists survive a reload; the report's duds and this phone's shots fill in until it sends them.
+    const duds = new Set(v.rival.duds ?? (v.report?.lines ?? []).filter((l) => l.side === 'us' && l.outcome === 'dud').map((l) => l.square));
+    const shotHere = new Set([...(v.shots.fired ?? []), ...fired]);
     const back = new Set(v.shots.returning);
     return (sq) => {
       const mark = v.rival.chart[sq];
       if (mark === 'hit') return { cls: ['fw-cell--hit'], label: 'hit', disabled: true };
       if (mark === 'miss') return { cls: ['fw-cell--miss'], label: 'miss', disabled: true };
-      if (fired.has(sq)) return { cls: ['fw-fog', 'fw-cell--fired'], label: 'fired this round', disabled: true };
+      if (shotHere.has(sq)) return { cls: ['fw-fog', 'fw-cell--fired'], label: 'fired this round', disabled: true };
       if (back.has(sq)) return { cls: ['fw-fog', 'fw-cell--returning'], label: 'returning to you' };
       if (duds.has(sq)) return { cls: ['fw-fog', 'fw-cell--dud'], label: 'dud, still unknown' };
       return { cls: ['fw-fog'], label: 'unknown' };
@@ -359,6 +402,8 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
       selected = null;
     }
     const out: HTMLElement[] = [];
+    const joins = joinsNote(v);
+    if (joins) out.push(joins);
     out.push(el('h3', 'fw-h', 'Their waters'));
     const left = el('p', 'fw-shells', `${v.shots.left} shell${v.shots.left === 1 ? '' : 's'} left`);
     out.push(left);
@@ -388,6 +433,10 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
           },
           (e) => {
             message = errText(e, 'That shot didn’t go. Try again.');
+            if (errCode(e) === 'joins_next' || errCode(e) === 'fired') {
+              selected = null;
+              void refresh();
+            }
             repaint();
           }
         );
@@ -395,7 +444,7 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
       row.append(button('Sure', 'btn--primary fw-sure', () => fire(true)), button('Unsure', 'btn--secondary fw-unsure', () => fire(false)));
       bar.append(row);
       out.push(bar);
-    } else if (!canFire) out.push(note('Shells spent. The report comes when the round closes.'));
+    } else if (!canFire && !joins) out.push(note('Shells spent. The report comes when the round closes.'));
     out.push(errLine());
     out.push(reportBlock(v));
     const ours = el('details', 'fw-ours');
@@ -609,6 +658,20 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
     for (const [sign, name] of Object.entries(r.names)) names.append(el('li', '', `${sign} was ${name}`));
     out.push(el('h3', 'fw-h', 'Who was who'), names);
     out.push(note(`Your Sure shots: ${r.calibration.right} right out of ${r.calibration.total}.`));
+    const hardest = r.class?.hardest ?? [];
+    if (hardest.length) {
+      const box = el('section', 'fw-hardest');
+      box.append(el('h3', 'fw-h', 'The class’s hardest squares'), note('Squares the class found hardest this week. Worth another look before the next lesson.'));
+      const list = el('ol', 'fw-hardest__list');
+      for (const s of hardest) {
+        const li = el('li', 'fw-hardest__item');
+        const topic = [s.row, s.column].filter(Boolean).join(' × ');
+        li.append(el('span', 'fw-hardest__square', s.label), el('span', 'fw-hardest__topic', topic || 'Open square'), el('span', 'fw-hardest__count', `${s.right} of ${s.answered} right`));
+        list.append(li);
+      }
+      box.append(list);
+      out.push(box);
+    }
     const fleetChart = (ships: FleetShip[], marks: Record<string, 'hit' | 'miss'>, caption: string, key: string, tone: 'rival' | 'own') => {
       const parts = shipParts(ships);
       const hits = new Set(Object.entries(marks).filter(([, m]) => m === 'hit').map(([k]) => Number(k)));
@@ -678,6 +741,12 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
   }
 
   function show(next: FleetView): void {
+    showFleetToasts(viewSignals(view, next, { gameId: game.id, lessonId }), {
+      open: (e) => bringIntoView(e.kind),
+      after: (e) => {
+        if (e.kind === 'round_open') steamShip();
+      }
+    });
     view = next;
     waitingForTeacher = false;
     loadError = '';
@@ -735,7 +804,16 @@ export function openFleetCampaign(host: HTMLElement, options: FleetCampaignOptio
   }
   back.addEventListener('click', close);
 
+  /** The part of the screen a signal is about. */
+  function bringIntoView(kind: FleetSignalKind): void {
+    const sel = kind === 'report_ready' || kind === 'hit' ? '.fw-report' : kind === 'reveal' ? '.fw-reveal__title' : kind === 'report_owed' ? '.fw-partner-answer' : '.fw-chart';
+    const node = stage.querySelector<HTMLElement>(sel);
+    node?.scrollIntoView?.({ block: 'start', behavior: calm() ? 'auto' : 'smooth' });
+  }
+
   repaint();
-  void refresh();
+  void refresh().then(() => {
+    if (options.go) bringIntoView(options.go);
+  });
   return { close, refresh };
 }
