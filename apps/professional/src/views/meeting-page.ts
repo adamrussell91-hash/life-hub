@@ -366,6 +366,8 @@ export async function renderMeetingPage(
     }
   }
 
+  // Mark complete, Cancel, No show: their own group on the phase row, so the top row stays short.
+  const stateActions = el('div', 'meeting-page__state-actions');
   if (isOpenState(record.state)) {
     for (const [action, label] of [
       ['complete', 'Mark complete'],
@@ -376,7 +378,7 @@ export async function renderMeetingPage(
       button.type = 'button';
       button.dataset.stateAction = action;
       button.addEventListener('click', () => void endMeeting(action));
-      headActions.append(button);
+      stateActions.append(button);
     }
   }
 
@@ -394,7 +396,14 @@ export async function renderMeetingPage(
     switcher.append(button);
   }
   const phaseNote = el('p', 'comm-page__phase-note');
-  head.append(chips, facts, switcher, headActions, phaseNote, actionStatus);
+  // Two tidy rows: what and when on the left with the page buttons on the right, then the phase
+  // switcher with its one-line note beside it.
+  const meta = el('div', 'meeting-page__meta');
+  meta.append(chips, facts);
+  const phaseRow = el('div', 'meeting-page__phase-row');
+  phaseRow.append(switcher, phaseNote);
+  if (stateActions.childElementCount) phaseRow.append(stateActions);
+  head.append(meta, headActions, phaseRow, actionStatus);
   const followUpBar = mountNotesFollowUp({
     record,
     people: () => attendees.map((attendee) => ({ ref: attendee.ref, name: attendee.name })),
@@ -999,7 +1008,14 @@ export async function renderMeetingPage(
     });
   }
 
-  const observationBtn = el('button', 'btn btn--secondary', '◉ Classroom observation') as HTMLButtonElement;
+  // NESA's own words on the button, so it reads as the accreditation observation, not a generic note.
+  const observationBtn = el('button', 'btn btn--secondary meeting-page__obs-btn') as HTMLButtonElement;
+  observationBtn.append(
+    el('span', 'meeting-page__nesa-tag', 'NESA'),
+    el('span', 'meeting-page__obs-label', 'Classroom observation'),
+    el('span', 'meeting-page__obs-sub', 'Proficient Teacher')
+  );
+  observationBtn.title = 'NESA Observation Report: Planning, Observing, Reflecting against 2 to 4 Standard Descriptors';
   observationBtn.type = 'button';
   observationBtn.dataset.part = 'observation-start';
   observationBtn.addEventListener('click', () => openObservation());
