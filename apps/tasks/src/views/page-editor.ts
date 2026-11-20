@@ -80,7 +80,8 @@ function backLink(href: string, label: string): HTMLAnchorElement {
   return link;
 }
 
-function mountEngine(
+/** Block canvas plus its insert bar. Goal pages reuse it for their notes. */
+export function mountEngine(
   layout: HTMLElement,
   canvasHost: HTMLElement,
   blocks: Block[],

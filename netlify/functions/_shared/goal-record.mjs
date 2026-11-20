@@ -209,7 +209,8 @@ export function ensureGoalSphere(record, areasById) {
 export const GOAL_INPUT_KEYS = Object.freeze([
   'title', 'description', 'parent_area_id', 'parent_someday_id', 'sphere', 'status', 'structure',
   'frame', 'lead_measure', 'week_log', 'rest_weeks', 'if_then', 'next_start', 'due_date',
-  'milestones', 'tags', 'life_wall', 'term', 'term_history', 'life_area', 'current_source', 'signal', 'walkthru'
+  'milestones', 'tags', 'life_wall', 'term', 'term_history', 'life_area', 'current_source', 'signal', 'walkthru',
+  'page_blocks'
 ]);
 
 function normalizeCurrentSource(value) {
@@ -225,7 +226,7 @@ function normalizeSignal(value, sphere) {
 
 export function normalizeGoalRecord(record) {
   const sphere = SPHERES.has(record.sphere) ? record.sphere : 'life';
-  const { _sphere_derived, walkthru: _walkthru, ...rest } = record;
+  const { _sphere_derived, walkthru: _walkthru, page_blocks: rawBlocks, ...rest } = record;
   const walkthru = sphere === 'professional' ? normalizeWalkthru(record.walkthru) : null;
   return {
     ...rest,
@@ -247,6 +248,8 @@ export function normalizeGoalRecord(record) {
     life_area: normalizeLifeArea(record.life_area, sphere),
     current_source: normalizeCurrentSource(record.current_source),
     signal: normalizeSignal(record.signal, sphere),
-    ...(walkthru ? { walkthru } : {})
+    ...(walkthru ? { walkthru } : {}),
+    // Page blocks (notes, headings, callouts) share the Teaching block shape, as on tasks and projects.
+    ...(Array.isArray(rawBlocks) ? { page_blocks: rawBlocks.filter(isObject) } : {})
   };
 }

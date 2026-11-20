@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { patchOf } from './patch';
 import { LifeWallFieldSchema } from './life-wall';
+import { PageBlockSchema } from './page-block';
 import { schemaVersion } from './task';
 
 export const GoalStatusSchema = z.enum(['active', 'parked', 'achieved', 'dropped', 'archived']);
@@ -112,7 +113,9 @@ export const GoalSchema = z.object({
   signal: GoalSignalSchema.default(null),
   created_at: z.string(),
   updated_at: z.string(),
-  life_wall: LifeWallFieldSchema
+  life_wall: LifeWallFieldSchema,
+  /** Notes as page blocks, the same block shape tasks and projects use. */
+  page_blocks: z.array(PageBlockSchema).optional()
 });
 
 export type Goal = z.infer<typeof GoalSchema>;
