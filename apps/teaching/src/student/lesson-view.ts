@@ -20,6 +20,7 @@ import { carrySplitWork } from '@/student/split-carry';
 import { mountOrganiserEndCard } from '@/organiser/lesson-end-card';
 import { classForPlainLesson, mountInitialsToken, type InitialsTokenHandle } from '@/student/initials-token';
 import { setVoiceClass } from '@/blocks/voice-client';
+import { setLessonClass } from '@/blocks/lesson-pass';
 import { mountLecturePlayer } from '@/lecture/player';
 import { mountTutorialPlayer } from '@/tutorial/player';
 import { mountLabPlayer } from '@/lab/player';
@@ -398,6 +399,7 @@ export function mountStudentLessonView(
     // Written answers go to the teacher as they're typed, for the class this lesson was opened in.
     const workClass = extras?.cls?.id ?? extras?.quizClassId;
     setVoiceClass(workClass ?? null);
+    setLessonClass(workClass ?? null);
     if (workClass) work = mountWorkSync(content, { lessonId: lesson.lesson_id, classId: workClass });
     // The lesson end card, with previous and next under it. Neighbours come from the class's schedule when the lesson was opened from it.
     if (workClass) {

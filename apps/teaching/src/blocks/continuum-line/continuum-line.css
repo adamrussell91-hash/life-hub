@@ -859,3 +859,29 @@
   flex: 1;
   min-width: 0;
 }
+
+/* Teacher view only: the student's initials under their symbol, and beside a reason. */
+.cl-who {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.62rem;
+  font-weight: var(--weight-bold);
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.cl-who--inline {
+  position: static;
+  transform: none;
+  align-self: flex-start;
+  font-size: var(--text-xs);
+}

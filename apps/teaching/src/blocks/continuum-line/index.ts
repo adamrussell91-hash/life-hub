@@ -58,7 +58,7 @@ export function renderContinuumLine(given: ContinuumBlock, mode: RenderMode, ctx
     return root;
   }
   if (mode === 'teacher') {
-    root.append(mountTeacher(block, ctx.lessonId, renderStimulus(block.content.stimulus)));
+    root.append(mountTeacher(block, ctx.lessonId, renderStimulus(block.content.stimulus), ctx.display === true));
   } else {
     const corner = el('div', 'pf-corner');
     corner.hidden = true;

@@ -10,7 +10,8 @@ import { lineMarks, type Phase, type Scale } from './shared';
  * arcing over the row to where it went.
  */
 
-export type StageEntry = { symbol: string; pos?: number; new_pos?: number };
+/** `initials` is the teacher's view only: whose symbol it is, from the class initials claim. */
+export type StageEntry = { symbol: string; pos?: number; new_pos?: number; initials?: string | null };
 export type StageView = {
   /** Changes when the statement changes, so a new statement starts fresh. */
   key: string;
@@ -259,7 +260,19 @@ export function mountStage(onPick: (symbol: string | null) => void): Stage {
         items.delete(symbol);
       }
     }
-    for (const e of next.entries) if (!items.has(e.symbol)) add(e.symbol);
+    for (const e of next.entries) {
+      const it = items.get(e.symbol) ?? add(e.symbol);
+      let tag = it.node.querySelector<HTMLElement>('.cl-who');
+      if (!e.initials) tag?.remove();
+      else {
+        if (!tag) {
+          tag = document.createElement('span');
+          tag.className = 'cl-who';
+          it.node.append(tag);
+        }
+        if (tag.textContent !== e.initials) tag.textContent = e.initials;
+      }
+    }
     for (const it of items.values()) {
       it.node.classList.toggle('is-picked', it.symbol === next.picked);
       it.node.tabIndex = next.phase === 'collect' ? -1 : 0;

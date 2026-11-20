@@ -26,6 +26,11 @@
  * with no code and no round to start. One standing round (session "self")
  * that students join on their own; the teacher reveals later, as usual.
  *
+ * One code a day: a student types the lesson's code once (lesson-pass.mjs)
+ * and joins every later round in the lesson on their own until midnight.
+ * Joining notes whose symbol it is from the class initials claim; only the
+ * teacher's view asks for initials, never a student or the Display view.
+ *
  * What leaves the server is the safety: while a statement collects, the
  * teacher gets symbols only (the projector drifts them) and students get a
  * count. After a reveal students get the class's positions with no symbols
@@ -37,6 +42,7 @@ import { isDeletedRecord } from './record-liveness.mjs';
 import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
 import { flagText } from './peer-feedback-filter.mjs';
 import { claimedIds, claimSymbol } from './class-symbols.mjs';
+import { admit, ensureLessonPass, initialsFor, linkPastRound, noteWho } from './lesson-pass.mjs';
 import { groupReasons } from './continuum-line-groups.mjs';
 import { bringBackRound, listRounds, roundExpiry, saveRound } from './activity-rounds.mjs';
 
@@ -273,6 +279,7 @@ async function teacherAction(store, k, activity, setup, body, opts) {
     code: activity.code,
     open: activity.open,
     pace: setup.pace,
+    ...(body.initials === true ? { initials: await initialsFor(store, k.base, activity.session, joined) } : {}),
     replace: setup.replace,
     mode: setup.mode,
     current: Math.min(activity.current ?? 0, Math.max(0, setup.statements.length - 1)),
@@ -281,7 +288,7 @@ async function teacherAction(store, k, activity, setup, body, opts) {
   };
 }
 
-async function studentAction(store, k, activity, setup, body) {
+async function studentAction(store, k, activity, setup, body, lesson) {
   const action = body.action ?? 'status';
   if (!['status', 'join', 'place', 'move'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   if (body.session && body.session !== activity.session) reject(409, 'new_session', 'Your teacher started a new round. Join again.');
@@ -296,9 +303,14 @@ async function studentAction(store, k, activity, setup, body) {
   let id;
   if (action === 'join') {
     if (!activity.open) reject(409, 'closed', 'This activity has closed.');
-    if (setup.pace !== 'self' && String(body.code ?? '').replace(/\D/g, '') !== activity.code) reject(403, 'wrong_code', 'That code didn’t match. Check the board.');
+    if (setup.pace !== 'self') {
+      const door = await admit(store, lesson, activity, body.code, tokenHash);
+      if (door === 'need_code') reject(403, 'need_code', 'Type the code on the board.');
+      if (door === 'wrong_code') reject(403, 'wrong_code', 'That code didn’t match. Check the board.');
+    }
     id = await claimSymbol(store, k, tokenHash);
     if (!id) reject(409, 'full', 'This activity is full. Ask your teacher.');
+    await noteWho(store, k.base, activity.session, id, body);
   } else {
     id = (await read(store, k.token(tokenHash)))?.symbol;
     if (!id) reject(403, 'not_joined', 'Join the activity first.');
@@ -351,10 +363,10 @@ function selfRound() {
   return { session: SELF_SESSION, code: '', open: true, started_at: new Date().toISOString(), expires: roundExpiry(), current: 0, phases: {} };
 }
 
-function freshRound() {
+function freshRound(code) {
   return {
     session: randomBytes(16).toString('hex'),
-    code: String(randomInt(100000, 1000000)),
+    code: code ?? String(randomInt(100000, 1000000)),
     open: true,
     started_at: new Date().toISOString(),
     expires: roundExpiry(),
@@ -372,8 +384,15 @@ export async function continuumAction(store, lesson, block, body, opts = {}) {
   const { base, active: activeKey } = keys(lesson, block, '');
   let activity = await read(store, activeKey);
 
+  // Student: name a round this device joined, so the teacher's view can show who it was.
+  if (!teacher && body.action === 'link') {
+    if (!validToken(body.token)) reject(400, 'not_joined', 'Join the activity first.');
+    return { linked: await linkPastRound(store, base, body.session, hash(body.token), body) };
+  }
+  // Every round in the lesson today shares one code; a round left open past midnight takes the new day's.
+  const pass = teacher && setup.pace !== 'self' ? await ensureLessonPass(store, lesson) : null;
   if (teacher && body.action === 'start') {
-    activity = setup.pace === 'self' ? selfRound() : freshRound();
+    activity = setup.pace === 'self' ? selfRound() : freshRound(pass?.code);
     await saveRound(store, base, activity);
   }
   if (teacher && body.action === 'end' && activity) {
@@ -382,7 +401,7 @@ export async function continuumAction(store, lesson, block, body, opts = {}) {
   }
   if (teacher && body.action === 'rounds') return { rounds: await listRounds(store, base, activity, 'claims') };
   if (teacher && body.action === 'resume') {
-    activity = await bringBackRound(store, base, body.session, activity, (session) => ({ ...freshRound(), session }), { open: true });
+    activity = await bringBackRound(store, base, body.session, activity, (session) => ({ ...freshRound(pass?.code), session }), { open: true, ...(pass ? { code: pass.code } : {}) });
     if (!activity) reject(404, 'no_round', 'That round has nothing saved.');
   }
   if (setup.pace === 'self' && (!activity || activity.expires < Date.now())) {
@@ -390,9 +409,13 @@ export async function continuumAction(store, lesson, block, body, opts = {}) {
     await saveRound(store, base, activity);
   }
   if (!activity || activity.expires < Date.now()) return { phase: 'idle' };
+  if (pass && activity.open && activity.code !== pass.code) {
+    activity = { ...activity, code: pass.code };
+    await saveRound(store, base, activity);
+  }
 
   const k = keys(lesson, block, activity.session);
   const rest = ['start', 'end', 'resume'].includes(body.action) ? { ...body, action: 'status' } : body;
   const stimulusText = live.content?.stimulus?.kind === 'text' ? String(live.content.stimulus.text ?? '') : '';
-  return teacher ? teacherAction(store, k, activity, setup, rest, { ...opts, stimulusText }) : studentAction(store, k, activity, setup, body);
+  return teacher ? teacherAction(store, k, activity, setup, rest, { ...opts, stimulusText }) : studentAction(store, k, activity, setup, body, lesson);
 }

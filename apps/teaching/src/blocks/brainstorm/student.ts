@@ -1,5 +1,6 @@
 import { apiPost, ApiClientError } from '@/api/client';
 import { button, el, errorText, field, identityName, readJSON, token, writeJSON } from '@/blocks/peer-feedback-ui';
+import { classFields, hasPass, linkRounds, markPass, passFor, rememberRound } from '@/blocks/lesson-pass';
 import { mountBoard, type BoardGroup, type Layout } from './board';
 import { poller, type BrainstormBlock } from './shared';
 
@@ -51,6 +52,10 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
   root.append(body, alert, board.root);
 
   let device = readJSON<Device>(`${storage}:device`);
+  // A round joined before initials were kept: link it too.
+  rememberRound(storage, device);
+  let lastError = '';
+  let joining = false;
   let state = lastState.get(endpoint) ?? null;
   let view = '';
   let busy = false;
@@ -63,6 +68,12 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
   const showError = (text: string) => {
     alert.textContent = text;
     alert.hidden = false;
+  };
+  /** Joined: other activities in the lesson can now join on their own, and the teacher can learn who this was. */
+  const joinedOk = () => {
+    markPass(lessonId, true);
+    rememberRound(storage, device);
+    void linkRounds(endpoint, storage, true);
   };
   const forget = () => {
     device = null;
@@ -79,6 +90,7 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
     }
     try {
       const next = await apiPost<StudentState>(endpoint, { ...(device ?? {}), action, ...extra });
+      lastError = '';
       if (device && next.phase === 'live' && next.session !== device.session) forget();
       state = next;
       lastState.set(endpoint, state);
@@ -87,6 +99,7 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
       return true;
     } catch (error) {
       const code = error instanceof ApiClientError ? error.code : '';
+      lastError = code;
       if (code === 'new_session' || code === 'not_joined') {
         forget();
         view = '';
@@ -136,7 +149,7 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
     code.maxLength = 7;
     code.placeholder = '000 000';
     code.value = joinCode;
-    codeWrap.append(codeLabel, code, el('p', 'pf-field__hint block-secondary', 'You join with a code. Classmates see symbols and your name stays private.'));
+    codeWrap.append(codeLabel, code, el('p', 'pf-field__hint block-secondary', 'One code for the whole lesson today. Classmates see symbols and your name stays private.'));
     const join = button('Join', 'primary', function () {
       void doJoin(this);
     });
@@ -154,15 +167,17 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
     ready();
     async function doJoin(pressed: HTMLButtonElement): Promise<void> {
       if (!state || state.phase !== 'live') return;
-      const secret = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
-      const candidate = { session: state.session, token: secret };
-      if (!writeJSON(`${storage}:device`, candidate)) {
+      // One token for the whole lesson today: the code typed here lets every other activity in the lesson in too.
+      const pass = passFor(lessonId);
+      const candidate = pass ? { session: state.session, token: pass.token } : null;
+      if (!candidate || !writeJSON(`${storage}:device`, candidate)) {
         showError('Open a normal (not private) window to join here.');
         return;
       }
       device = candidate;
-      const ok = await send('join', { code: joinCode }, pressed);
-      if (!ok && device) forget();
+      const ok = await send('join', { code: joinCode, ...classFields() }, pressed);
+      if (ok) joinedOk();
+      else if (device) forget();
     }
     wrap.append(codeWrap, join);
     return wrap;
@@ -244,6 +259,12 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
     const s = state;
     paintCorner(s.symbol);
     const joined = !!device && !!s.joined;
+    if (!joined && s.open && hasPass(lessonId) && passTried !== s.session) {
+      void passJoin(s);
+      if (view !== 'joining') body.replaceChildren(waitPanel('Joining…', 'You typed today’s code already.'));
+      view = 'joining';
+      return;
+    }
     const key = !joined ? (s.open ? 'join' : 'closed') : JSON.stringify([s.open, (s.mine ?? []).length, s.per_student]);
     if (key !== view) {
       view = key;
@@ -272,9 +293,40 @@ export function mountStudent(block: BrainstormBlock, lessonId: string, corner: H
     }
   }
 
+  /** Today's code already typed in this lesson: join this round with the same token, no code. */
+  let passTried = '';
+  async function passJoin(s: Live): Promise<void> {
+    if (joining || passTried === s.session) return;
+    passTried = s.session;
+    joining = true;
+    try {
+      const pass = passFor(lessonId);
+      const candidate = pass ? { session: s.session, token: pass.token } : null;
+      if (!candidate || !writeJSON(`${storage}:device`, candidate)) return;
+      device = candidate;
+      // paint() runs inside send(), which is still busy: step out of it before joining.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (await send('join', classFields())) {
+        joinedOk();
+        return;
+      }
+      if (device) forget();
+      if (lastError === 'need_code') {
+        // A new day, or the pass wasn't taken: ask for the code.
+        markPass(lessonId, false);
+        alert.hidden = true;
+      }
+      view = '';
+      paint();
+    } finally {
+      joining = false;
+    }
+  }
+
   paint();
   poller(root, async () => {
     await send('status');
+    void linkRounds(endpoint, storage);
   });
   return root;
 }

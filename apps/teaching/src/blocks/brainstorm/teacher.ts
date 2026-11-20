@@ -3,6 +3,7 @@ import { button, el, errorText, isNotPublished, notLivePanel } from '@/blocks/pe
 import { mountBoard, type BoardGroup, type Layout } from './board';
 import { poller, formatCode, showCodeOverlay, type BrainstormBlock } from './shared';
 import { confirmBringBack, pastRounds } from '@/blocks/past-rounds';
+import { initialsToggle, showInitials } from '@/blocks/teacher-initials';
 
 type TeacherAnswer = { id: string; symbol: string; text: string; flagged: boolean; status: 'pending' | 'shown' | 'removed'; created_at: string };
 type TeacherState =
@@ -23,6 +24,8 @@ type TeacherState =
       joined: number;
       answers: TeacherAnswer[];
       groups: BoardGroup[] | null;
+      /** Symbol → initials. Only when this screen asks: never on the Display view. */
+      initials?: Record<string, string>;
     };
 type Live = Extract<TeacherState, { phase: 'live' }>;
 
@@ -72,7 +75,7 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string, display =
       pressed.textContent = action === 'group' ? 'Grouping…' : 'Working…';
     }
     try {
-      state = await apiPost<TeacherState>(endpoint, { action, ...extra });
+      state = await apiPost<TeacherState>(endpoint, { action, ...extra, ...(!display && showInitials() ? { initials: true } : {}) });
       lastState.set(endpoint, state);
       alert.hidden = true;
       paint();
@@ -107,7 +110,7 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string, display =
   }
 
   function paintControls(s: Live): void {
-    const sig = JSON.stringify([s.code, s.open, s.revealed, s.layout, s.students_see, s.show_symbols, s.symbols_on_cards, !!s.groups, s.safety]);
+    const sig = JSON.stringify([s.code, s.open, s.revealed, s.layout, s.students_see, s.show_symbols, s.symbols_on_cards, !!s.groups, s.safety, showInitials()]);
     if (sig === paintedControls) return;
     paintedControls = sig;
 
@@ -155,6 +158,7 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string, display =
         void send('symbols', { show: on })
       )
     );
+    if (!display) settings.append(initialsToggle(() => void send('status')));
     const round = el('div', 'bs-bar__round');
     round.append(
       s.open
@@ -172,7 +176,7 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string, display =
     if (display) return;
     const waiting = s.answers.filter((a) => a.status === 'pending');
     const removed = s.answers.filter((a) => a.status === 'removed');
-    const sig = JSON.stringify([waiting, removed]);
+    const sig = JSON.stringify([waiting, removed, s.initials ?? null]);
     if (sig === paintedQueue) return;
     paintedQueue = sig;
     if (!waiting.length && !removed.length) {
@@ -188,6 +192,8 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string, display =
     box.append(summary);
     const row = (a: TeacherAnswer, restore: boolean) => {
       const r = el('div', 'bs-queue__row');
+      const who = s.initials?.[a.symbol];
+      if (who) r.append(el('span', 'bs-who', who));
       r.append(el('p', 'bs-queue__text', a.text));
       if (a.flagged) r.append(el('span', 'pf-chip pf-chip--flag', 'Flagged'));
       const acts = el('div', 'bs-queue__actions');
@@ -223,7 +229,7 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string, display =
       board.root.hidden = true;
       idle.hidden = false;
       idle.replaceChildren(
-        el('p', 'pf-panel__text block-body', 'Students join on the lesson link with the code. No accounts, and they never pick or see a symbol.'),
+        el('p', 'pf-panel__text block-body', 'Students type the lesson’s code once a day; every activity in the lesson after that joins on its own. No accounts, and they never pick or see a symbol.'),
         button('Start brainstorm', 'primary', function () {
           void send('start', {}, this);
         }),
@@ -240,7 +246,7 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string, display =
       question: s.question,
       revealed: s.revealed,
       layout: s.layout,
-      answers: s.answers.filter((a) => a.status === 'shown').map(({ id, text, symbol }) => ({ id, text, symbol })),
+      answers: s.answers.filter((a) => a.status === 'shown').map(({ id, text, symbol }) => ({ id, text, symbol, initials: s.initials?.[symbol] ?? null })),
       symbolsOnCards: s.symbols_on_cards,
       groups: s.groups
     });
