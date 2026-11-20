@@ -150,7 +150,7 @@ function cleanGroups(groups, ids) {
 
 async function teacherAction(store, k, activity, setup, body, opts) {
   const action = body.action ?? 'status';
-  const allowed = ['status', 'reveal', 'hide', 'layout', 'students_see', 'symbols', 'symbols_on_cards', 'approve', 'remove', 'group', 'move', 'rename_group'];
+  const allowed = ['status', 'reveal', 'hide', 'layout', 'students_see', 'symbols', 'symbols_on_cards', 'approve', 'approve_all', 'remove', 'group', 'move', 'rename_group'];
   if (!allowed.includes(action)) reject(400, 'bad_action', 'Unknown action.');
 
   const patch = {};
@@ -175,6 +175,12 @@ async function teacherAction(store, k, activity, setup, body, opts) {
     const at = parseAnswerId(body.id);
     if (!at || !(await read(store, k.answer(at.symbol, at.n)))) reject(400, 'bad_request', 'Unknown answer.');
     await store.setJSON(k.moderation(body.id), { status: action === 'approve' ? 'shown' : 'removed' });
+  }
+
+  if (action === 'approve_all') {
+    // Flagged answers stay in the queue: the filter caught them, so they get a look of their own.
+    const waiting = (await allAnswers(store, k, setup.safety)).answers.filter((a) => a.status === 'pending' && !a.flagged);
+    await Promise.all(waiting.map((a) => store.setJSON(k.moderation(a.id), { status: 'shown' })));
   }
 
   const { joined, answers } = await allAnswers(store, k, setup.safety);

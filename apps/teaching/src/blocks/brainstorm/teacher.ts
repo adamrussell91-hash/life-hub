@@ -186,6 +186,15 @@ export function mountTeacher(block: BrainstormBlock, lessonId: string, display =
     const summary = el('summary', 'bs-queue__summary', `Waiting for you (${waiting.length})`);
     if (removed.length) summary.append(el('span', 'bs-queue__muted', ` · ${removed.length} removed`));
     box.append(summary);
+    const clean = waiting.filter((a) => !a.flagged).length;
+    if (clean > 1) {
+      const bulk = el('div', 'bs-queue__bulk');
+      bulk.append(button(`Show all ${clean}`, 'primary', function () {
+        void send('approve_all', {}, this);
+      }));
+      if (clean < waiting.length) bulk.append(el('span', 'bs-queue__muted', 'Flagged answers stay here for you to check.'));
+      box.append(bulk);
+    }
     const row = (a: TeacherAnswer, restore: boolean) => {
       const r = el('div', 'bs-queue__row');
       r.append(el('p', 'bs-queue__text', a.text));
