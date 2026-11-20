@@ -5,10 +5,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { gameKeys, prepareGamePublish, storeGameKeys } from '../../netlify/functions/_shared/games.mjs';
-import { findCode, foldRoom, joinRoom, listRooms, openRoom } from '../../netlify/functions/_shared/game-rooms.mjs';
+import { INVITE_LIFE_MS, findCode, foldRoom, inviteClass, joinRoom, listRooms, openRoom, readInvite } from '../../netlify/functions/_shared/game-rooms.mjs';
 import { roomCodeKey } from '../../netlify/functions/_shared/game-store.mjs';
 import { SIGNATURE_HEADER, initialState, reduce, roomStyle, signBody, verifyBody, verifyTicket } from '../../netlify/functions/_shared/game-room-core.mjs';
 import { createGameFoldHandler } from '../../netlify/functions/games-fold.mjs';
+import { createPublishedGameInviteHandler } from '../../netlify/functions/published-game-invite.mjs';
 import { organiserKey } from '../../netlify/functions/_shared/organiser.mjs';
 import { workOwner } from '../../netlify/functions/_shared/lesson-work.mjs';
 import { isPublicStudentApi } from '../../netlify/functions/_shared/public-student-routes.mjs';
@@ -216,4 +217,53 @@ test('fold refuses seats that aren’t this class’s students, and unknown room
 test('routes: join is on the public student route; the fold is not a student route', () => {
   assert.ok(isPublicStudentApi('POST', '/api/published/game/gl1'));
   assert.ok(!isPublicStudentApi('POST', '/api/games/fold'));
+});
+
+test('push invite: an open room\'s code reaches its class only, until the room closes or an hour passes', async () => {
+  const { store } = await setup();
+  const opened = await openRoom(store, 'gl1', { game_id: 'g_cross', class_id: 'class1' }, { env: ENV, fetchImpl: worker().fetchImpl, now: NOW });
+  assert.deepEqual(await readInvite(store, 'class1', { now: NOW }), { invite: null }, 'nothing until the teacher pushes');
+  const { invite } = await inviteClass(store, 'gl1', { game_id: 'g_cross', room: opened.room }, { now: NOW + 5000 });
+  assert.equal(invite.code, opened.code);
+  const seen = await readInvite(store, 'class1', { now: NOW + 6000 });
+  assert.deepEqual(seen, { invite: { room: opened.room, code: opened.code, lesson_id: 'gl1', game_id: 'g_cross', title: invite.title, sent_at: NOW + 5000 } });
+  assert.ok(invite.title);
+  assert.deepEqual(await readInvite(store, 'class2', { now: NOW + 6000 }), { invite: null }, 'another class sees nothing');
+  assert.deepEqual(await readInvite(store, '../class1', { now: NOW + 6000 }), { invite: null });
+  assert.deepEqual(await readInvite(store, 'class1', { now: NOW + 5000 + INVITE_LIFE_MS }), { invite: null }, 'an hour on, the toast stops');
+  // Pushing again re-shows it (a new sent_at) and restarts the hour.
+  await inviteClass(store, 'gl1', { game_id: 'g_cross', room: opened.room }, { now: NOW + INVITE_LIFE_MS });
+  assert.equal((await readInvite(store, 'class1', { now: NOW + INVITE_LIFE_MS + 1000 })).invite.sent_at, NOW + INVITE_LIFE_MS);
+  // The room folds (its code is freed): the invite goes with it.
+  await store.delete(roomCodeKey(opened.code));
+  assert.deepEqual(await readInvite(store, 'class1', { now: NOW + INVITE_LIFE_MS + 2000 }), { invite: null });
+});
+
+test('push invite refuses rooms that are closed, unknown or another lesson\'s', async () => {
+  const { store } = await setup();
+  const opened = await openRoom(store, 'gl1', { game_id: 'g_cross', class_id: 'class1' }, { env: ENV, fetchImpl: worker().fetchImpl, now: NOW });
+  await rejects(inviteClass(store, 'gl1', { game_id: 'g_cross', room: 'gr' + '0'.repeat(20) }, { now: NOW }), 'room_closed');
+  await rejects(inviteClass(store, 'gl1', { game_id: 'g_cross', room: 'nope' }, { now: NOW }), 'bad_room');
+  await rejects(inviteClass(store, 'gl1', { game_id: 'g_cross', room: opened.room }, { now: NOW + 7 * 3600_000 }), 'room_closed');
+  await rejects(inviteClass(store, 'nope', { game_id: 'g_cross', room: opened.room }, { now: NOW }), 'not_published');
+  const k = gameKeys('gl1');
+  const row = store.data.get(k.room('g_cross', opened.room));
+  store.data.set(k.room('g_cross', opened.room), { ...row, folded: true });
+  await rejects(inviteClass(store, 'gl1', { game_id: 'g_cross', room: opened.room }, { now: NOW }), 'room_closed');
+});
+
+test('push invite endpoint: public GET, cached a few seconds at the edge', async () => {
+  const { store } = await setup();
+  const opened = await openRoom(store, 'gl1', { game_id: 'g_cross', class_id: 'class1' }, { env: ENV, fetchImpl: worker().fetchImpl, now: NOW });
+  await inviteClass(store, 'gl1', { game_id: 'g_cross', room: opened.room }, { now: NOW });
+  assert.ok(isPublicStudentApi('GET', '/api/published/game-invite/class1'));
+  assert.ok(!isPublicStudentApi('POST', '/api/published/game-invite/class1'));
+  const handler = createPublishedGameInviteHandler({ env: ENV, getContentStore: async () => store, now: () => NOW + 1000 });
+  const res = await handler(new Request('https://hub.example.test/api/published/game-invite/class1'));
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('netlify-cdn-cache-control'), /s-maxage=4/);
+  const body = await res.json();
+  assert.equal(body.data.invite.code, opened.code);
+  const none = await (await handler(new Request('https://hub.example.test/api/published/game-invite/class2'))).json();
+  assert.equal(none.data.invite, null);
 });

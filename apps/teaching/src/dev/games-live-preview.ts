@@ -200,7 +200,7 @@ export function mountLivePreview(mount: HTMLElement, view: string): void {
     };
     const start = el('button', 'btn btn--primary', 'Open the board');
     start.type = 'button';
-    const go = () => openLiveBoard({ open, game: split.public, connect: { WebSocketImpl: FakeSocket, fetchImpl: () => Promise.reject(new Error('dev')) }, extraControls: [sim] });
+    const go = () => openLiveBoard({ open, game: split.public, connect: { WebSocketImpl: FakeSocket, fetchImpl: () => Promise.reject(new Error('dev')) }, extraControls: [sim], invite: () => new Promise((r) => setTimeout(r, 600)) });
     start.addEventListener('click', go);
     const help = el('p', 'gm-note', 'The board hosts the fake room in this tab. Open phones in other tabs (links below), then Start. Closing the board or reloading the tab keeps the room; ');
     const fresh = el('a', '', 'start a new room');

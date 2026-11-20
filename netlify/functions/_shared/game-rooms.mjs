@@ -9,6 +9,8 @@
  *           (every kind room-core can run: race, paced, or 'custom' with its own rules; `teams` only for team games, kept to the rules' range)
  *   rooms   teacher (operator gate)  {} → { rooms: [ … with fresh teacher and board tickets ] }  (resume from any device)
  *   join    student (public)         { game_id?, code, class_id, class_token } → { room, ticket, game_id, initials, ws_base, http_base }
+ *   invite  teacher (operator gate)  { game_id, room } → { invite }  (Push invite: every open class page shows a Join toast)
+ *   invite? student (public, GET)    /api/published/game-invite/{class} → { invite | null }  (edge-cached a few seconds)
  *   fold    Worker → POST /api/games/fold, signed (x-game-room-signature), idempotent by room
  *
  * Codes live here (`game-rooms/codes/{code}`), not on the Worker: a code is
@@ -26,7 +28,7 @@ import { identify } from './quiz.mjs';
 import { sendPiecesToBoxOne } from './organiser.mjs';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { publishedLessonKey } from './teaching-blobs.mjs';
-import { gameKeys, roomCodeKey } from './game-store.mjs';
+import { classInviteKey, gameKeys, roomCodeKey } from './game-store.mjs';
 import { rebuildSummary } from './games.mjs';
 import { eventsToEvidence, gameTotal, missedPieces, playScore } from './game-rules.mjs';
 import { ROOM_LIMITS, SIGNATURE_HEADER, roomStyle, roomTeams, signBody, signTicket } from './game-room-core.mjs';
@@ -145,6 +147,46 @@ export async function listRooms(store, lessonId, { env = process.env, now = Date
   }
   rooms.sort((a, b) => b.opened_at - a.opened_at);
   return { rooms, ...roomUrls(env) };
+}
+
+/** How long a pushed invite keeps showing on class pages: about a lesson. */
+export const INVITE_LIFE_MS = 60 * 60 * 1000;
+
+/**
+ * Teacher: Push invite. Every class page a student has open asks for this
+ * (readInvite) and shows a Join toast that opens the game with the code in.
+ * The room must be this lesson's and still open. Pushing again re-shows the
+ * toast to students who closed it (sent_at changes).
+ */
+export async function inviteClass(store, lessonId, body, { now = Date.now() } = {}) {
+  const { lesson, k } = await loadPublishedGames(store, lessonId);
+  const gameId = typeof body?.game_id === 'string' ? body.game_id : '';
+  const roomId = typeof body?.room === 'string' ? body.room : '';
+  if (!isSafeId(gameId) || !ROOM.test(roomId)) reject(400, 'bad_room', 'Unknown room.');
+  const room = await read(store, k.room(gameId, roomId));
+  if (!room || room.folded || expired(room.opened_at, now)) reject(409, 'room_closed', 'That game has ended. Open a new room.');
+  const held = await read(store, roomCodeKey(room.code));
+  if (held?.room !== roomId) reject(409, 'room_closed', 'That game has ended. Open a new room.');
+  const game = list(lesson.game?.games).find((g) => g.id === gameId);
+  const invite = { room: roomId, code: room.code, lesson_id: lessonId, game_id: gameId, class_id: room.class_id, title: String(game?.title || lesson.title || 'Live game').slice(0, 120), sent_at: now, opened_at: room.opened_at };
+  await store.setJSON(classInviteKey(room.class_id), invite);
+  return { invite };
+}
+
+/**
+ * Student: the class's pushed invite, while its room is still open and the
+ * push is under an hour old; else null. Class ids are in every student link
+ * and joining still needs the student's initials claim, so the code here
+ * gives a stranger nothing.
+ */
+export async function readInvite(store, classId, { now = Date.now() } = {}) {
+  if (!isSafeId(classId)) return { invite: null };
+  const invite = await read(store, classInviteKey(classId));
+  if (!invite || typeof invite.sent_at !== 'number' || invite.sent_at + INVITE_LIFE_MS <= now || expired(invite.opened_at, now)) return { invite: null };
+  const held = await read(store, roomCodeKey(invite.code));
+  if (!held || held.folded || held.room !== invite.room) return { invite: null };
+  const { room, code, lesson_id, game_id, title, sent_at } = invite;
+  return { invite: { room, code, lesson_id, game_id, title, sent_at } };
 }
 
 /**

@@ -42,6 +42,8 @@ export type LiveBoardOptions = {
   connect?: Partial<Pick<ConnectOptions, 'WebSocketImpl' | 'fetchImpl' | 'now' | 'httpBase'>>;
   /** Extra buttons for the control dock (the dev preview's Simulate class). */
   extraControls?: HTMLElement[];
+  /** Push invite: a Join toast on every class page the room's students have open (games.mjs `invite`). */
+  invite?(): Promise<void>;
   onClose?(): void;
 };
 
@@ -1041,11 +1043,41 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     return b;
   }
 
+  /** Push invite: idle → sending → sent (a few seconds) → Push again; a failure says so on the button. */
+  let inviteState: 'idle' | 'sending' | 'sent' | 'failed' = 'idle';
+  let invitedOnce = false;
+  let inviteTimer: ReturnType<typeof setTimeout> | null = null;
+  function inviteButton(): HTMLButtonElement | null {
+    const send = options.invite;
+    if (!send) return null;
+    const text = inviteState === 'sending' ? 'Sending…' : inviteState === 'sent' ? 'Invite sent' : inviteState === 'failed' ? 'Didn’t send. Try again' : invitedOnce ? 'Push again' : 'Push invite';
+    const b = btn(text, () => {
+      if (inviteState === 'sending') return;
+      inviteState = 'sending';
+      paintControls();
+      const settle = (next: 'sent' | 'failed') => {
+        if (inviteTimer) clearTimeout(inviteTimer);
+        inviteState = next;
+        if (next === 'sent') invitedOnce = true;
+        paintControls();
+        inviteTimer = setTimeout(() => {
+          inviteState = 'idle';
+          paintControls();
+        }, 4000);
+      };
+      send().then(() => settle('sent'), () => settle('failed'));
+    }, { label: 'Push invite: a Join button pops up on every student’s class page' });
+    b.dataset.invite = inviteState;
+    return b;
+  }
+
   function paintControls(): void {
     const v = view;
     const list: HTMLElement[] = [];
     if (v?.phase === 'lobby') {
       if (v.teams?.length) list.push(btn('Shuffle teams', () => control({ op: 'shuffle_teams' }), { label: 'Deal everyone into teams again at random' }));
+      const invite = inviteButton();
+      if (invite) list.push(invite);
       list.push(btn('Start game', () => control({ op: 'start' }), { primary: true, key: 'Space' }));
     } else if (v?.phase === 'playing' || v?.phase === 'paused') {
       list.push(v.phase === 'paused' ? btn('Resume', () => control({ op: 'resume' }), { primary: true, key: 'P' }) : btn('Pause', () => control({ op: 'pause' }), { key: 'P' }));
@@ -1073,6 +1105,11 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
       list.push(endButton());
     }
     const tools: HTMLElement[] = [];
+    // Mid-game, the invite sits with the tools: for latecomers.
+    if (v?.phase === 'playing' || v?.phase === 'paused') {
+      const invite = inviteButton();
+      if (invite) tools.push(invite);
+    }
     if (v && v.phase !== 'ended' && v.phase !== 'folded') tools.push(btn('Ranks', () => toggleRanks(), { key: 'T', pressed: ranksOpen, label: 'Every rank (teacher only)' }));
     tools.push(btn('Calm', () => {
       setCalm(!calmToggleOn());
@@ -1088,7 +1125,7 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     tools.push(btn('Close board', () => close(), { label: 'Close the board (the game keeps running)' }));
     // Rebuild only when a button changes: every move sends a delta, and a rebuilt
     // button loses a click in progress and the keyboard focus.
-    const sig = [...tools, ...list].map((b) => `${b.textContent}|${b.getAttribute('aria-pressed') ?? ''}|${b.className}|${b.dataset.kind ?? ''}`).join('/');
+    const sig = [...tools, ...list].map((b) => `${b.textContent}|${b.getAttribute('aria-pressed') ?? ''}|${b.className}|${b.dataset.kind ?? ''}|${b.dataset.invite ?? ''}`).join('/');
     if (sig === controlsSig) return;
     controlsSig = sig;
     const toolRow = el('div', 'gl-controls__tools');
@@ -1185,7 +1222,7 @@ export function openLiveBoard(options: LiveBoardOptions): LiveBoard {
     stopClock();
     disposeKind();
     pacedRing?.stop();
-    for (const t of [endArmed, idleTimer, toastTimer]) if (t) clearTimeout(t);
+    for (const t of [endArmed, idleTimer, toastTimer, inviteTimer]) if (t) clearTimeout(t);
     conn.close();
     document.removeEventListener('keydown', onKey);
     footObserver?.disconnect();
