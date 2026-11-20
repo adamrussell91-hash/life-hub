@@ -50,6 +50,21 @@ beforeEach(() => {
 });
 
 describe('goal page', () => {
+  it('renders a Notes card from page_blocks and saves block edits without repainting', async () => {
+    const note = {
+      id: 'block-1', type: 'block', block_type: 'rich_text', variant: 'medium', visibility: 'student_teacher',
+      content: { html: '<p>Example research note</p>' }, layout: {}, print: {}, settings: {},
+      created_at: '2026-11-20T00:00:00.000Z', updated_at: '2026-11-20T00:00:00.000Z', schema_version: 1
+    };
+    vi.mocked(tasksApi.getGoal).mockResolvedValue({ ...G, page_blocks: [note] } as never);
+    const canvas = document.createElement('div');
+    await renderGoalPage(canvas, 'g1', '2026-11-04');
+    const notes = canvas.querySelector<HTMLElement>('[data-slot="goal-notes"]');
+    expect(notes).not.toBeNull();
+    expect(notes?.querySelector('.block-canvas')?.textContent).toContain('Example research note');
+    expect(notes?.querySelector('.page-editor__add')).not.toBeNull();
+  });
+
   it('renders structure, lead strip, if-then, start, hosted projects and tasks, and mounts @ tags', async () => {
     const canvas = document.createElement('div');
     await renderGoalPage(canvas, 'g1', '2026-11-04');

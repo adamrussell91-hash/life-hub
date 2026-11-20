@@ -30,6 +30,8 @@ import { renderCardMenu } from '@/views/card-menu';
 import { mountLifeWallEditor } from '@/views/life-wall-editor';
 import { mountHammondPanel } from '@/views/hammond-goal';
 import { bindEditablePageTitle } from '@/shell/shell';
+import { mountEngine } from '@/views/page-editor';
+import type { Block } from '@/schemas/block';
 
 const STRUCTURES: Array<{ id: Goal['structure']; label: string }> = [
   { id: 'woop', label: 'WOOP' },
@@ -453,7 +455,10 @@ function paint(
   pair2.append(projectsCard(goal, projects, tasks, reload), tasksCard(goal, tasks, reload));
   main.append(pair2, milestonesCard(goal, save));
 
-  // 6. Tagged (@)
+  // 6. Notes — page blocks, saved quietly so editing never repaints the page.
+  main.append(notesCard(goal));
+
+  // 7. Tagged (@)
   const tagged = card('Tagged (@)');
   const tagHost = el('div');
   tagged.root.append(tagHost);
@@ -467,6 +472,42 @@ function paint(
   if (origin && headerTitle) {
     requestAnimationFrame(() => morphFromRect(origin, headerTitle));
   }
+}
+
+function notesCard(goal: Goal): HTMLElement {
+  const notes = card('Notes', 'glass-tile goal-card goal-notes');
+  notes.root.dataset.slot = 'goal-notes';
+  const layout = el('div', 'page-editor__layout');
+  const canvasHost = el('div', 'block-canvas');
+  const status = el('p', 'meta goal-notes__status');
+  status.setAttribute('role', 'status');
+  let saveTimer = 0;
+  let pending: Block[] | null = null;
+  const flush = () => {
+    if (!pending) return;
+    const blocks = pending;
+    pending = null;
+    void tasksApi
+      .updateGoal(goal.id, { page_blocks: blocks })
+      .then(() => {
+        status.textContent = 'Saved';
+      })
+      .catch((err) => {
+        status.textContent = `Could not save notes: ${errorMessage(err)}`;
+      });
+  };
+  try {
+    mountEngine(layout, canvasHost, Array.isArray(goal.page_blocks) ? goal.page_blocks : [], (blocks) => {
+      pending = blocks;
+      status.textContent = 'Saving…';
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(flush, 600);
+    });
+  } catch (err) {
+    layout.replaceChildren(el('p', 'empty-state', `Could not open notes: ${errorMessage(err)}`));
+  }
+  notes.root.append(layout, status);
+  return notes.root;
 }
 
 const CURRENT_SOURCE_LABEL: Record<GoalCurrentSource, string> = {
