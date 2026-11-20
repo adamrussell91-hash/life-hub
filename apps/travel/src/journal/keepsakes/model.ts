@@ -11,6 +11,7 @@ import {
   type KeepsakeKind,
 } from '@/journal/souvenirs';
 import type { JournalLeg, JournalMedia } from '@/journal/types';
+import { listPostcards, placeLine, type PostcardView } from '@/postcard/model';
 import type { TicketItem, Trip } from '@/types';
 
 export type { KeepsakeKind };
@@ -60,7 +61,27 @@ export interface StampKeepsake {
   date: string;
 }
 
-export type Keepsake = PhotoKeepsake | BookingKeepsake | StampKeepsake;
+/** A postcard posted from a stop, kept without any work. Read from the trip, never copied. */
+export interface PostcardKeepsake {
+  type: 'postcard';
+  /** `postcard_` and the check-in that carries it. */
+  id: string;
+  card: PostcardView;
+  /** Empty when no live leg is for the postcard's city. */
+  legId: string;
+  /** When it was posted, in the leg's time zone. */
+  localDate: string;
+  localTime: string;
+  /** "Jalan Alor, Kuala Lumpur" */
+  placeName: string;
+  /** A postcard is never linked to a moment. */
+  momentId?: undefined;
+}
+
+export type Keepsake = PhotoKeepsake | BookingKeepsake | StampKeepsake | PostcardKeepsake;
+
+/** The keepsakes that sit on a day of the story. */
+export type DayKeepsake = PhotoKeepsake | PostcardKeepsake;
 
 const liveLegs = (journal: JournalDocument): JournalLeg[] =>
   journal.legs.filter((leg) => leg.lifecycle === 'live').sort((a, b) => a.order - b.order);
@@ -112,14 +133,64 @@ function bookingKeepsake(item: TicketItem, legs: JournalLeg[]): BookingKeepsake 
   };
 }
 
+function validZone(tz: string | undefined): string {
+  if (!tz) return 'UTC';
+  try {
+    new Intl.DateTimeFormat('en-GB', { timeZone: tz }).format(new Date(0));
+    return tz;
+  } catch {
+    return 'UTC';
+  }
+}
+
+/** Date ("2027-03-04") and 24-hour time ("21:40") of an instant in a time zone. */
+export function localStamp(instant: string, tz: string | undefined): { date: string; time: string } {
+  const when = new Date(instant);
+  if (Number.isNaN(when.getTime())) return { date: '', time: '' };
+  const parts: Record<string, string> = {};
+  for (const part of new Intl.DateTimeFormat('en-GB', {
+    timeZone: validZone(tz),
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(when)) {
+    parts[part.type] = part.value;
+  }
+  const hour = parts.hour === '24' ? '00' : parts.hour;
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${hour}:${parts.minute}` };
+}
+
+/** The leg a postcard belongs to: its city's leg whose dates hold the posted day, else the first. */
+function postcardLeg(
+  journal: JournalDocument,
+  legs: JournalLeg[],
+  card: PostcardView,
+  trip: Trip,
+): { leg?: JournalLeg; date: string; time: string } {
+  const cityTz = trip.cities.find((c) => c.id === card.cityId)?.tz;
+  const candidates = legs.filter((leg) => leg.city_id === card.cityId);
+  for (const leg of candidates) {
+    const at = localStamp(card.at, leg.timezone || cityTz);
+    const start = legStart(journal, leg);
+    const end = leg.end_date ?? '';
+    if ((!start || at.date >= start) && (!end || at.date <= end)) return { leg, ...at };
+  }
+  const leg = candidates[0];
+  return { leg, ...localStamp(card.at, leg?.timezone || cityTz) };
+}
+
 function sortKey(k: Keepsake, legOrder: Map<string, number>): string {
   const leg = String(legOrder.get(k.legId) ?? 999).padStart(3, '0');
   if (k.type === 'stamp') return `${leg}|0|${k.date}`;
   if (k.type === 'booking') return `${leg}|${k.side === 'arrive' ? '1' : '3'}|${k.date}|${k.departTime}`;
+  if (k.type === 'postcard') return `${leg}|2|${k.localDate || '9999'}|${k.localTime || '99:99'}|${k.card.id}`;
   return `${leg}|2|${k.localDate || '9999'}|${k.localTime ?? '99:99'}|${k.title}`;
 }
 
-/** Every keepsake of the trip in story order: stamps, bookings and the ones photographed. */
+/** Every keepsake of the trip in story order: stamps, bookings, the ones photographed and postcards. */
 export function listKeepsakes(journal: JournalDocument, trip?: Trip): Keepsake[] {
   const legs = liveLegs(journal);
   const legIds = new Set(legs.map((leg) => leg.id));
@@ -166,15 +237,39 @@ export function listKeepsakes(journal: JournalDocument, trip?: Trip): Keepsake[]
     });
   }
 
+  if (trip) {
+    for (const card of listPostcards(trip)) {
+      const { leg, date, time } = postcardLeg(journal, legs, card, trip);
+      out.push({
+        type: 'postcard',
+        id: `postcard_${card.id}`,
+        card,
+        legId: leg?.id ?? '',
+        localDate: date,
+        localTime: time,
+        placeName: placeLine(trip, card),
+      });
+    }
+  }
+
   const legOrder = new Map(legs.map((leg, index) => [leg.id, index]));
   return out.sort((a, b) => sortKey(a, legOrder).localeCompare(sortKey(b, legOrder)));
 }
 
-/** The photographed keepsakes of one day, in time order. */
-export function keepsakesForDay(all: Keepsake[], legId: string, localDate: string): PhotoKeepsake[] {
+/** The photographed keepsakes and postcards of one day, in time order. */
+export function keepsakesForDay(all: Keepsake[], legId: string, localDate: string): DayKeepsake[] {
   return all.filter(
-    (k): k is PhotoKeepsake => k.type === 'photo' && k.legId === legId && k.localDate === localDate,
+    (k): k is DayKeepsake =>
+      (k.type === 'photo' || k.type === 'postcard') && k.legId === legId && k.localDate === localDate,
   );
+}
+
+/** Every postcard on the trip, in the order they were posted. */
+export function postcardsOf(all: Keepsake[]): PostcardView[] {
+  return all
+    .filter((k): k is PostcardKeepsake => k.type === 'postcard')
+    .map((k) => k.card)
+    .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
 }
 
 /** Keepsakes that count towards "3 keepsakes": everything but the arrival stamps. */
