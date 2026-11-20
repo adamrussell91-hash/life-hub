@@ -52,6 +52,19 @@ test('approve: every answer waits until approved', async () => {
   assert.equal((await learn(store, a)).mine[0].status, 'shown');
 });
 
+test('approve all: every waiting answer goes up at once, flagged ones still wait', async () => {
+  const store = storeFixture({ safety: 'approve' });
+  const { students: [a, b] } = await startWith(store, 2);
+  await submit(store, a, 'Nature mirrors him');
+  await submit(store, b, 'Guilt');
+  await submit(store, b, 'you idiot');
+  const before = await teach(store, {});
+  await teach(store, { action: 'remove', id: before.answers[1].id });
+  const t = await teach(store, { action: 'approve_all' });
+  assert.deepEqual(t.answers.map(x => [x.text, x.status]), [['Nature mirrors him', 'shown'], ['Guilt', 'removed'], ['you idiot', 'pending']]);
+  assert.equal((await learn(store, a)).mine[0].status, 'shown');
+});
+
 test('per-student cap comes from the block, and unlimited still stops at the hard cap', async () => {
   const store = storeFixture({ per_student: 3 });
   const { students: [a] } = await startWith(store, 1);
