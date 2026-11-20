@@ -293,3 +293,22 @@ test('sanitizeBlocksDeep drops unsafe explainer board links and keeps board even
   assert.equal(clean.content.board_start.elements[0].link, null);
   assert.equal(clean.content.recording.events.at(-1).element.link, 'https://example.org');
 });
+
+test('filterBlocksForStudent and sanitizeBlocksDeep keep the tabs block style (fold-outs)', () => {
+  const tabs = {
+    id: 'tabs_folds',
+    type: 'block',
+    block_type: 'tabs',
+    visibility: 'student_teacher',
+    content: {
+      style: 'folds',
+      tabs: [
+        { id: 't1', label: 'One', blocks: [{ id: 'r1', type: 'block', block_type: 'rich_text', visibility: 'student_teacher', content: { html: '<p>One</p>' } }] },
+        { id: 't2', label: 'Two', blocks: [] }
+      ]
+    }
+  };
+  const [out] = sanitizeBlocksDeep(filterBlocksForStudent([tabs]));
+  assert.equal(out.content.style, 'folds');
+  assert.deepEqual(out.content.tabs.map(t => t.label), ['One', 'Two']);
+});

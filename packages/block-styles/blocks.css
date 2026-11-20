@@ -1181,6 +1181,15 @@
   text-align: left;
   vertical-align: top;
 }
+@media (max-width: 40rem) {
+  .block-table:not(:has(tr > :nth-child(4))) {
+    table-layout: fixed;
+  }
+
+  .block-table:not(:has(tr > :nth-child(4))) :is(th, td) {
+    overflow-wrap: break-word;
+  }
+}
 
 .block-table th {
   background: rgba(20, 43, 81, 0.04);
@@ -1594,7 +1603,7 @@ button.block-reasoning__card--abductive:hover, .block-reasoning__card--abductive
   max-width: 100%;
   overflow-x: auto;
 }
-
+.block-tabs .block-tabs__tablist.hub-pills > .block-tabs__tab,
 .block-tabs__tablist > .block-tabs__tab {
   flex: 0 0 auto;
   white-space: nowrap;

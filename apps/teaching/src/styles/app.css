@@ -5918,6 +5918,18 @@ a.home-class-tile:hover {
   vertical-align: top;
 }
 
+/* On phones, tables of up to three columns split the width evenly and wrap, rather
+   than scroll a few pixels inside a narrow section. Wider tables keep their scroll box. */
+@media (max-width: 40rem) {
+  .block-table:not(:has(tr > :nth-child(4))) {
+    table-layout: fixed;
+  }
+
+  .block-table:not(:has(tr > :nth-child(4))) :is(th, td) {
+    overflow-wrap: break-word;
+  }
+}
+
 .block-table th {
   background: rgba(20, 43, 81, 0.04);
   font-weight: var(--weight-semibold);
@@ -6342,6 +6354,9 @@ button.block-reasoning__card--abductive:hover, .block-reasoning__card--abductive
   overflow-x: auto;
 }
 
+/* The kit's .hub-pills:not(.hub-pills--loose) > .hub-pills__btn rule (flex: 1 1 auto)
+   outranks a two-class selector, which let labels shrink and overlap on phones. */
+.block-tabs .block-tabs__tablist.hub-pills > .block-tabs__tab,
 .block-tabs__tablist > .block-tabs__tab {
   flex: 0 0 auto;
   white-space: nowrap;

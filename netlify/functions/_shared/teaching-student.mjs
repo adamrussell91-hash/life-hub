@@ -181,6 +181,7 @@ function filterBlocksForStudentInner(blocks, teacherOnlyIds) {
         return {
           ...block,
           content: {
+            ...block.content,
             tabs: (block.content?.tabs ?? []).map(panel => ({
               ...panel,
               blocks: filterBlocksForStudentInner(panel.blocks, teacherOnlyIds)
@@ -424,6 +425,7 @@ export function sanitizeBlocksDeep(blocks) {
       return {
         ...block,
         content: {
+          ...block.content,
           tabs: (block.content?.tabs ?? []).map(panel => ({
             ...panel,
             blocks: sanitizeBlocksDeep(panel.blocks)
