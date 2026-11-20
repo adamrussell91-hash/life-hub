@@ -28,12 +28,24 @@ import { registerRules, type KindControl, type RoomRules, type RulesCtx, type Ru
  *
  * Links tick themselves. An answer whose shadows mostly disagree is held
  * (no points) until the review settles it.
+ *
+ * After the first class trial (20 Nov): the game opens on a how-to-play
+ * walkthrough the teacher steps through; a writer's half-typed text goes in
+ * when time runs out, and so does a shadow's or a stealer's (a shadow only
+ * stands in for a writer who typed nothing, and scores nothing for it); a
+ * capture never takes a target off someone mid-guess (finish it: +5); a round
+ * ends early once every writer and shadow is in; steal guesses must be the
+ * right shape, and junk costs nothing but scores nothing.
  */
 
 export const CHAIN_ITEM = 'chain';
 export const GAP_MS = 3_000;
 export const REVEAL_STEP_MS = 1_800;
 export const CHECK_MS = 20_000;
+/** Once every writer and shadow is in, the round closes this soon after. */
+export const ALL_IN_MS = 5_000;
+/** Board slides in the how-to-play walkthrough before round 1. */
+export const HOWTO_STEPS = 6;
 export const LOCK_MS = 3_000;
 export const TRIES = 3;
 export const REVIEW_SHOW = 12;
@@ -41,7 +53,7 @@ export const REVIEW_FLAGS = 3;
 const Q_MAX = 140;
 const A_MAX = 30;
 
-export const POINTS = { link: 5, shadow: 3, capture: 10, captured_writer: 5, steal_link: 3, same_answer: 5, home: 5, predict: 5, fix_match: 3, fix_spot: 1, unclear: 2, star_match: 2, best_pair: 5 } as const;
+export const POINTS = { link: 5, shadow: 3, capture: 10, captured_writer: 5, same_answer: 5, also_cracked: 5, home: 5, predict: 5, fix_match: 3, fix_spot: 1, unclear: 2, star_match: 2, best_pair: 5 } as const;
 
 export type Job = 'write' | 'shadow' | 'steal' | 'predict';
 export type Shadow = { owner: string; text: string; wager: number; match?: boolean };
@@ -52,8 +64,8 @@ export type Link = {
   at: number;
   /** ok: counted; held: shadows mostly disagreed (review settles it); x: crossed (the review agreed it was wrong). */
   status: 'ok' | 'held' | 'x';
-  /** No writer in time: a teammate's shadow answer went in, or the backup line. */
-  stolen?: boolean;
+  /** The writer typed nothing in time: a teammate's shadow answer stood in (no points), or the backup line. */
+  standin?: boolean;
   backup?: boolean;
   shadows: Shadow[];
   captured?: { owner: string; team: number };
@@ -63,16 +75,22 @@ export type Chain = { team: number; order: string[]; shadows: Record<number, str
 export type StealCard = { team: number; i: number; tries: number; lock: number; result?: 'captured' | 'missed' | 'gone' };
 export type Notice = { seq: number; kind: 'captured' | 'stolen' | 'flash'; title: string; body: string; tone: 'good' | 'bad' | 'plain'; word?: string; team?: number };
 export type ReviewSub = { fix: Record<string, string>; unclear: string[]; star?: string };
-export type Phase = 'rounds' | 'gap' | 'reveal' | 'review' | 'check' | 'done';
+export type Phase = 'howto' | 'rounds' | 'gap' | 'reveal' | 'review' | 'check' | 'done';
 
 export type ChainState = {
   phase: Phase;
+  /** The how-to-play slide on the board (phase 'howto'). */
+  howto: number;
   round: number;
+  /** When this round's timer runs out. */
+  ends: number;
   links: number;
   start: string;
   chains: Record<number, Chain>;
   /** What each owner wrote or shadowed this round (round number). */
   done: Record<string, number>;
+  /** What a writer, shadow or stealer has typed but not sent: it counts if time runs out (nobody loses an answer mid-word). */
+  drafts: Record<string, { round: number; text: string; wager?: number }>;
   predict: Record<string, string>;
   /** This round's shadow answers, by team, until the round closes. */
   pending: Record<string, Shadow[]>;
@@ -109,7 +127,8 @@ export function chainSettings(settings: unknown): ChainSettings {
   const num = (v: unknown, lo: number, hi: number, d: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(hi, Math.max(lo, v))) : d);
   let links = num(s.links, 4, 12, 6);
   if (links % 2) links += 1; // a chain ends on an answer
-  return { links, question_seconds: num(s.question_seconds, 10, 60, 20), answer_seconds: num(s.answer_seconds, 5, 30, 10), review_seconds: num(s.review_seconds, 30, 180, 90) };
+  // At least 15 s to answer: 10 s was too short in class (20 Nov). Rounds end early once everyone is in.
+  return { links, question_seconds: num(s.question_seconds, 10, 90, 30), answer_seconds: num(s.answer_seconds, 15, 45, 20), review_seconds: num(s.review_seconds, 30, 180, 90) };
 }
 
 /* ── Matching ────────────────────────────────────────────────────── */
@@ -230,7 +249,7 @@ function stealable(k: ChainState, owner: string, team: number | undefined): Arra
   for (const c of Object.values(k.chains)) {
     if (c.team === team) continue;
     c.links.forEach((l, i) => {
-      if (l.type !== 'A' || i >= k.round || l.status === 'x' || l.captured || tried.has(`${c.team}:${i}`)) return;
+      if (l.type !== 'A' || i >= k.round || l.status === 'x' || l.captured || l.backup || l.standin || tried.has(`${c.team}:${i}`)) return;
       if (!c.links[i - 1] || c.links[i - 1]!.status === 'x') return;
       out.push({ team: c.team, i });
     });
@@ -268,8 +287,9 @@ function capture(ctx: RulesCtx, k: ChainState, owner: string, team: number, i: n
       team: thiefTeam
     });
   }
-  // Anyone else holding this target loses it.
-  for (const [o, card] of Object.entries(k.steal)) if (o !== owner && card && card.team === team && card.i === i && !card.result) card.result = 'gone';
+  // Anyone else holding this target keeps it: they can finish their guess (+5 if right).
+  for (const [o, card] of Object.entries(k.steal))
+    if (o !== owner && card && card.team === team && card.i === i && !card.result) notify(k, o, { kind: 'flash', title: `${ctx.seat(owner)?.initials ?? 'Someone'} got it first.`, body: `Finish your guess: right still scores +${POINTS.also_cracked}.`, tone: 'plain' });
   ctx.record(owner, { item: CHAIN_ITEM, move: 'guess', response: { text: link.text }, correct: null, extra: { act: 'capture', team, link: i } });
 }
 
@@ -284,30 +304,109 @@ function startRound(ctx: RulesCtx, k: ChainState, round: number): void {
     if (jobOf(k, ctx, seat.owner, round) === 'steal') deal(ctx, k, seat.owner);
     else k.steal[seat.owner] = null;
   }
-  ctx.setTimer(ctx.now + (typeOf(round) === 'Q' ? s.question_seconds : s.answer_seconds) * 1000);
+  k.ends = ctx.now + (typeOf(round) === 'Q' ? s.question_seconds : s.answer_seconds) * 1000;
+  ctx.setTimer(k.ends);
+}
+
+/** Chains are dealt when the game starts (so the walkthrough can show each phone its jobs) and again for any team whose players changed before round 1. */
+function begin(ctx: RulesCtx, k: ChainState): void {
+  for (const t of ctx.teams()) {
+    const members = ctx.members(t);
+    const had = k.chains[t];
+    if (!members.length) delete k.chains[t];
+    else if (!had || had.order.length !== members.length || had.order.some((o) => !members.includes(o))) k.chains[t] = plan(ctx, t, k.links);
+  }
+  startRound(ctx, k, 0);
+}
+
+/** Every writer has sent and every connected shadow is locked in: close the round soon, not at the full timer. */
+function allIn(ctx: RulesCtx, k: ChainState): boolean {
+  const r = k.round;
+  for (const chain of Object.values(k.chains)) {
+    if (!chain.links[r]) return false;
+    for (const o of chain.shadows[r] ?? []) if (ctx.seat(o)?.connected && k.done[o] !== r) return false;
+  }
+  return true;
+}
+function maybeCloseEarly(ctx: RulesCtx, k: ChainState): void {
+  if (k.phase !== 'rounds' || !allIn(ctx, k)) return;
+  const soon = ctx.now + ALL_IN_MS;
+  if (soon < k.ends) {
+    k.ends = soon;
+    ctx.setTimer(soon);
+  }
+}
+
+/** A written link, tidied: questions end in ?, answers are at most three words. An error when it can't go in. */
+function cleanLink(type: 'Q' | 'A', text: string): { text: string } | RulesError {
+  let clean = text.trim().replace(/\s+/g, ' ');
+  if (!clean) return err('empty', type === 'Q' ? 'Write your question.' : 'Write your answer.');
+  if (type === 'Q') {
+    if (clean.length > Q_MAX) return err('too_long', `Keep it under ${Q_MAX} characters.`);
+    if (!/[?]$/.test(clean)) clean += '?';
+  } else {
+    if (clean.length > A_MAX) return err('too_long', 'One word (or a short name).');
+    clean = clean.split(' ').slice(0, 3).join(' ');
+  }
+  return { text: clean };
 }
 
 function backupQuestion(prev: string): string {
   return prev ? `What links to “${prev}”?` : 'What is this topic about?';
 }
 
+/** Time's up: a shadow's or stealer's unsent text counts, as if they'd pressed the button. */
+function flushDrafts(ctx: RulesCtx, k: ChainState): void {
+  const r = k.round;
+  for (const [owner, d] of Object.entries(k.drafts)) {
+    if (d.round !== r || !d.text.trim() || k.done[owner] === r) continue;
+    const job = jobOf(k, ctx, owner, r);
+    const team = teamOf(ctx, owner);
+    if (job === 'shadow' && team !== undefined && k.chains[team]) {
+      (k.pending[String(team)] ??= []).push({ owner, text: d.text.trim().slice(0, A_MAX), wager: d.wager ?? 1 });
+      k.done[owner] = r;
+    } else if (job === 'steal') {
+      const card = k.steal[owner];
+      const target = card && !card.result ? k.chains[card.team]?.links[card.i] : undefined;
+      if (card && target && sameAnswer(d.text, target.text)) {
+        (k.tried[owner] ??= []).push(`${card.team}:${card.i}`);
+        if (target.captured) {
+          award(ctx, owner, POINTS.also_cracked);
+          notify(k, owner, { kind: 'flash', title: 'Cracked it!', body: `Your last guess “${target.text}” was right. +${POINTS.also_cracked}`, tone: 'good' });
+        } else capture(ctx, k, owner, card.team, card.i);
+        card.result = 'captured';
+      }
+    }
+  }
+  for (const o of Object.keys(k.drafts)) if (k.drafts[o]!.round <= r && jobOf(k, ctx, o, r) !== 'write') delete k.drafts[o];
+}
+
 function endRound(ctx: RulesCtx, k: ChainState): void {
   const r = k.round;
   const type = typeOf(r);
+  flushDrafts(ctx, k);
   for (const chain of Object.values(k.chains)) {
     let link = chain.links[r];
+    const writer = writerOf(chain, r) ?? '';
+    const draft = k.drafts[writer];
+    const typed = !link && draft && draft.round === r ? cleanLink(type, draft.text.slice(0, type === 'Q' ? Q_MAX : A_MAX)) : undefined;
+    if (!link && typed && !('error' in typed)) {
+      // Out of time mid-sentence: what the writer had typed is their link.
+      link = { type, text: typed.text, author: writer, at: ctx.now, status: 'ok', shadows: [] };
+      chain.links[r] = link;
+      ctx.record(writer, { item: CHAIN_ITEM, move: 'answer', response: { text: typed.text }, correct: null, extra: { act: 'write', type, link: r, timed_out: true } });
+      notify(k, writer, { kind: 'flash', title: 'Time’s up.', body: `What you’d typed went in: “${typed.text}”.`, tone: 'plain' });
+    }
     if (!link) {
       const prev = chain.links[r - 1]?.text ?? k.start;
       const first = type === 'A' ? k.pending[String(chain.team)]?.[0] : undefined;
       if (type === 'A' && first) {
-        // The stolen shadow is the link now, not a guess at it.
+        // The writer typed nothing: a shadow's answer stands in so the chain can go on. It scores nothing.
         k.pending[String(chain.team)] = (k.pending[String(chain.team)] ?? []).slice(1);
-        link = { type, text: first.text, author: first.owner, at: ctx.now, status: 'ok', stolen: true, shadows: [] };
-        award(ctx, first.owner, POINTS.steal_link);
-        notify(k, first.owner, { kind: 'flash', title: 'Your shadow went in', body: `The writer ran out of time, so “${first.text}” is in the chain. +${POINTS.steal_link}`, tone: 'good' });
+        link = { type, text: first.text, author: first.owner, at: ctx.now, status: 'ok', standin: true, shadows: [] };
+        notify(k, first.owner, { kind: 'flash', title: 'Stand-in', body: `${ctx.seat(writer)?.initials ?? 'Your writer'} didn’t write anything, so your answer “${first.text}” keeps the chain going.`, tone: 'plain' });
       } else {
-        const author = writerOf(chain, r) ?? '';
-        link = { type, text: type === 'Q' ? backupQuestion(prev) : chain.links[r - 2]?.text ?? k.start, author, at: ctx.now, status: 'ok', backup: true, shadows: [] };
+        link = { type, text: type === 'Q' ? backupQuestion(prev) : chain.links[r - 2]?.text ?? k.start, author: writer, at: ctx.now, status: 'ok', backup: true, shadows: [] };
       }
       chain.links[r] = link;
     }
@@ -321,10 +420,10 @@ function endRound(ctx: RulesCtx, k: ChainState): void {
         notify(k, sh.owner, sh.match ? { kind: 'flash', title: 'Shadow match!', body: `You and ${ctx.seat(link.author)?.initials ?? 'your writer'} both said “${link.text}”. +${POINTS.shadow * sh.wager}`, tone: 'good' } : { kind: 'flash', title: 'No match', body: `They wrote “${link.text}”. −${sh.wager}`, tone: 'bad' });
         ctx.record(sh.owner, { item: CHAIN_ITEM, move: 'answer', response: { text: sh.text }, correct: null, extra: { act: 'shadow', wager: sh.wager, match: !!sh.match, link: r } });
       }
-      if (!link.backup && !link.stolen && link.shadows.length >= 2 && hits / link.shadows.length < 0.5) link.status = 'held';
-      if (!link.backup && !link.stolen && link.shadows.length) notify(k, link.author, { kind: 'flash', title: 'Answer in', body: `${hits} of ${link.shadows.length} teammates matched you.`, tone: hits ? 'good' : 'plain' });
+      if (!link.backup && !link.standin && link.shadows.length >= 2 && hits / link.shadows.length < 0.5) link.status = 'held';
+      if (!link.backup && !link.standin && link.shadows.length) notify(k, link.author, { kind: 'flash', title: 'Answer in', body: `${hits} of ${link.shadows.length} teammates matched you.`, tone: hits ? 'good' : 'plain' });
     }
-    if (!link.backup && !link.stolen && link.status === 'ok' && !link.paid) {
+    if (!link.backup && !link.standin && link.status === 'ok' && !link.paid) {
       link.paid = true;
       award(ctx, link.author, POINTS.link);
     }
@@ -506,12 +605,15 @@ export const answerChainRules: RoomRules<ChainState> = {
   init(ctx) {
     const s = chainSettings(ctx.game.settings);
     return {
-      phase: 'rounds',
+      phase: 'howto',
+      howto: 0,
       round: -1,
+      ends: 0,
       links: s.links,
       start: chainContent(ctx.keys).start,
       chains: {},
       done: {},
+      drafts: {},
       predict: {},
       pending: {},
       steal: {},
@@ -528,7 +630,10 @@ export const answerChainRules: RoomRules<ChainState> = {
     k.links = chainSettings(ctx.game.settings).links;
     k.start = chainContent(ctx.keys).start || 'photosynthesis';
     for (const t of ctx.teams()) if (ctx.members(t).length) k.chains[t] = plan(ctx, t, k.links);
-    startRound(ctx, k, 0);
+    // How to play first: the teacher steps through it on the board (or skips it).
+    k.phase = 'howto';
+    k.howto = 0;
+    ctx.setTimer(undefined);
   },
   move(ctx, k, owner, e: SoloEvent): EventResult | RulesError {
     const r = (e.response ?? {}) as { act?: unknown; text?: unknown; wager?: unknown; fix?: unknown; unclear?: unknown; star?: unknown };
@@ -564,15 +669,27 @@ export const answerChainRules: RoomRules<ChainState> = {
       if (ctx.now < card.lock) return err('locked', 'Wait a moment, then guess again.');
       const target = k.chains[card.team]?.links[card.i];
       if (!target) return err('no_target', 'That link has gone.');
-      if (target.captured) {
-        card.result = 'gone';
-        return { ...ok, correct: false };
-      }
       if (!text) return err('empty', 'Type your guess.');
+      const hit = sameAnswer(text, target.text);
+      // A miss has to look like their answer (same number of words, about the same letters); anything else isn't a guess and uses nothing up.
+      const want = letterCounts(target.text);
+      const got = letterCounts(text.replace(/[^A-Za-z0-9 ]/g, ''));
+      const total = (l: number[]) => l.reduce((a, b) => a + b, 0);
+      if (!hit && (got.length !== want.length || Math.abs(total(got) - total(want)) > 1))
+        return err('wrong_shape', want.length > 1 ? `Their answer is ${want.length} words: ${want.join(' + ')} letters.` : `Their answer has ${want[0]} letters.`);
       const tried = (k.tried[owner] ??= []);
-      if (sameAnswer(text, target.text)) {
-        card.result = 'captured';
+      if (hit) {
         tried.push(`${card.team}:${card.i}`);
+        delete k.drafts[owner];
+        if (target.captured) {
+          // Someone else got there first; finishing still counts.
+          card.result = 'gone';
+          award(ctx, owner, POINTS.also_cracked);
+          notify(k, owner, { kind: 'flash', title: 'Cracked it!', body: `“${target.text}” was right. +${POINTS.also_cracked}`, tone: 'good' });
+          ctx.record(owner, { item: CHAIN_ITEM, move: 'guess', response: { text }, correct: null, extra: { act: 'steal', team: card.team, link: card.i, hit: true, second: true } });
+          return { ...ok, correct: true };
+        }
+        card.result = 'captured';
         capture(ctx, k, owner, card.team, card.i);
         return { ...ok, correct: true };
       }
@@ -594,20 +711,21 @@ export const answerChainRules: RoomRules<ChainState> = {
     if (!chain) return err('no_team', 'You’re not on a team yet.');
     if (k.done[owner] === k.round) return err('done', 'You’re locked in for this round.');
     const type = typeOf(k.round);
+    if (r.act === 'draft') {
+      if (job === 'predict') return err('not_now', 'Nothing to keep.');
+      const wager = r.wager === 2 || r.wager === 3 ? r.wager : 1;
+      k.drafts[owner] = { round: k.round, text: text.slice(0, Q_MAX), ...(job === 'shadow' ? { wager } : {}) };
+      return ok;
+    }
     if (r.act === 'write') {
       if (job !== 'write') return err('not_write', 'It’s not your turn to write.');
-      if (!text) return err('empty', type === 'Q' ? 'Write your question.' : 'Write your answer.');
-      let clean = text.replace(/\s+/g, ' ');
-      if (type === 'Q') {
-        if (clean.length > Q_MAX) return err('too_long', `Keep it under ${Q_MAX} characters.`);
-        if (!/[?]$/.test(clean)) clean += '?';
-      } else {
-        if (clean.length > A_MAX) return err('too_long', 'One word (or a short name).');
-        clean = clean.split(' ').slice(0, 3).join(' ');
-      }
-      chain.links[k.round] = { type, text: clean, author: owner, at: ctx.now, status: 'ok', shadows: [] };
+      const c = cleanLink(type, text);
+      if ('error' in c) return c;
+      chain.links[k.round] = { type, text: c.text, author: owner, at: ctx.now, status: 'ok', shadows: [] };
       k.done[owner] = k.round;
-      ctx.record(owner, { item: CHAIN_ITEM, move: 'answer', response: { text: clean }, correct: null, extra: { act: 'write', type, link: k.round } });
+      delete k.drafts[owner];
+      ctx.record(owner, { item: CHAIN_ITEM, move: 'answer', response: { text: c.text }, correct: null, extra: { act: 'write', type, link: k.round } });
+      maybeCloseEarly(ctx, k);
       return ok;
     }
     if (r.act === 'shadow') {
@@ -616,6 +734,7 @@ export const answerChainRules: RoomRules<ChainState> = {
       const wager = r.wager === 2 || r.wager === 3 ? r.wager : 1;
       (k.pending[String(chain.team)] ??= []).push({ owner, text: text.slice(0, A_MAX), wager });
       k.done[owner] = k.round;
+      maybeCloseEarly(ctx, k);
       return ok;
     }
     return err('bad_move', 'That move isn’t part of Answer chain.');
@@ -632,8 +751,19 @@ export const answerChainRules: RoomRules<ChainState> = {
       return err('not_allowed', 'Only the teacher can do that.');
     }
     switch (op.name) {
+      case 'prev':
+        if (k.phase !== 'howto') return err('not_now', 'Not in the walkthrough.');
+        k.howto = Math.max(0, k.howto - 1);
+        return;
+      case 'skip_howto':
+        if (k.phase !== 'howto') return err('not_now', 'Not in the walkthrough.');
+        begin(ctx, k);
+        return;
       case 'next':
-        if (k.phase === 'rounds') endRound(ctx, k);
+        if (k.phase === 'howto') {
+          if (k.howto < HOWTO_STEPS - 1) k.howto++;
+          else begin(ctx, k);
+        } else if (k.phase === 'rounds') endRound(ctx, k);
         else if (k.phase === 'gap') startRound(ctx, k, k.round + 1);
         else if (k.phase === 'reveal') revealNext(ctx, k);
         else if (k.phase === 'review') endReview(ctx, k);
@@ -698,6 +828,8 @@ export type ChainBoardView = {
   type: 'Q' | 'A';
   start: string;
   theme: string;
+  /** The how-to-play walkthrough before round 1. */
+  howto?: { step: number; of: number };
   seconds: { question: number; answer: number; review: number };
   chains: Array<{ team: number; links: BoardLink[]; home: boolean }>;
   /** Jobs this round: counts only. */
@@ -722,6 +854,7 @@ export type ChainPhoneView = {
   team?: number;
   start: string;
   plan: Job[];
+  howto?: { step: number; of: number };
   job?: Job;
   done: boolean;
   /** Write and shadow: the one link this student may see. */
@@ -795,6 +928,7 @@ function boardView(ctx: RulesCtx, k: ChainState, role: Role): ChainBoardView {
     captures: k.captures.slice(-6),
     matches: k.matches
   };
+  if (k.phase === 'howto') view.howto = { step: k.howto, of: HOWTO_STEPS };
   if (revealing) view.reveal = { team: teamOrder(k)[k.reveal.t] ?? 0, i: k.reveal.i, of: teamOrder(k).length };
   if (k.phase === 'review') {
     const asked = ctx.seats().filter((x) => (k.review.shown[x.owner]?.length ?? 0) > 0);
@@ -829,6 +963,7 @@ function phoneView(ctx: RulesCtx, k: ChainState, owner: string): ChainPhoneView 
     done: k.done[owner] === k.round,
     notices: (k.notices[owner] ?? []).slice(-3)
   };
+  if (k.phase === 'howto') return { ...base, howto: { step: k.howto, of: HOWTO_STEPS } };
   if (k.phase === 'gap') return { ...base, job: plan[round] };
   if (k.phase === 'rounds') {
     const job = plan[k.round] ?? 'steal';

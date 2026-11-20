@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { GameSchema } from '@/games/core/schema';
 import {
+  ALL_IN_MS,
   answerChainRules,
   chainSettings,
+  HOWTO_STEPS,
   jobOf,
   letterCounts,
   POINTS,
@@ -17,10 +19,11 @@ import { leaks, rulesHarness } from './games-rules-harness';
 // Invented class: teams deal round-robin, team 0 = AA CC EE GG, team 1 = BB DD FF HH.
 const SEATS = ['AA', 'BB', 'CC', 'DD', 'EE', 'FF', 'GG', 'HH'];
 
-function setup(settings: Record<string, unknown> = {}, seats = SEATS, teams = 2) {
+function setup(settings: Record<string, unknown> = {}, seats = SEATS, teams = 2, howto = false) {
   const game = GameSchema.parse({ id: 'ac1', kind: 'answer_chain', title: 'Plants', start_answer: 'photosynthesis', theme: 'Plants and energy', settings });
   const h = rulesHarness<ChainState>(answerChainRules, game, { seats, teams });
   h.start();
+  if (!howto) h.control('skip_howto');
   const ini = (owner: string) => owner.slice(2);
   const job = (owner: string, round = h.k.round) => jobOf(h.k, h.ctx, owner, round);
   const writer = (team: number, round = h.k.round) => writerOf(h.k.chains[team]!, round)!;
@@ -28,6 +31,7 @@ function setup(settings: Record<string, unknown> = {}, seats = SEATS, teams = 2)
   const write = (team: number, text: string) => h.move(ini(writer(team)), { item: 'chain', move: 'answer', response: { act: 'write', text } });
   const shadow = (owner: string, text: string, wager = 1) => h.move(ini(owner), { item: 'chain', move: 'answer', response: { act: 'shadow', text, wager } });
   const guess = (owner: string, text: string) => h.move(ini(owner), { item: 'chain', move: 'guess', response: { text } });
+  const typeDraft = (team: number, text: string) => h.move(ini(writer(team)), { item: 'chain', move: 'answer', response: { act: 'draft', text } });
   const phone = (owner: string) => h.view('student', owner) as ChainPhoneView;
   const board = () => h.view('board', 'board') as ChainBoardView;
   /** Ends the round, then the gap, landing on the next round. */
@@ -35,7 +39,7 @@ function setup(settings: Record<string, unknown> = {}, seats = SEATS, teams = 2)
     h.tick();
     if (h.k.phase === 'gap') h.tick();
   };
-  return { h, ini, job, writer, withJob, write, shadow, guess, phone, board, nextRound };
+  return { h, ini, job, writer, withJob, write, shadow, guess, typeDraft, phone, board, nextRound };
 }
 
 describe('Answer chain: matching', () => {
@@ -121,7 +125,7 @@ describe('Answer chain: shadows and timeouts', () => {
     expect(h.seats[w]!.score - before.w).toBe(POINTS.link);
     expect(h.k.chains[0]!.links[1]!.shadows.map((s) => s.match)).toEqual(s2 ? [true, false] : [true]);
   });
-  it('puts a shadow answer in when the writer runs out of time, and a backup question when nobody wrote one', () => {
+  it('lets a shadow stand in (for no points) only when the writer typed nothing, and a backup question when nobody wrote one', () => {
     const { h, shadow, withJob, write, nextRound } = setup();
     write(1, 'What gas do plants give off?');
     h.tick(); // team 0 wrote nothing
@@ -130,8 +134,8 @@ describe('Answer chain: shadows and timeouts', () => {
     const s = withJob(0, 'shadow')[0]!;
     shadow(s, 'chlorophyll');
     h.tick();
-    expect(h.k.chains[0]!.links[1]).toMatchObject({ text: 'chlorophyll', author: s, stolen: true });
-    expect(h.seats[s]!.score).toBe(POINTS.steal_link);
+    expect(h.k.chains[0]!.links[1]).toMatchObject({ text: 'chlorophyll', author: s, standin: true });
+    expect(h.seats[s]!.score).toBe(0);
     void nextRound;
   });
   it('holds an answer most shadows disagree with', () => {
@@ -189,23 +193,124 @@ describe('Answer chain: steal and capture', () => {
     const b = (h.view('board', 'board') as ChainBoardView).captures.at(-1)!;
     expect(b).toMatchObject({ team: 1, victim: 0, word: 'glucose' });
   });
-  it('lets a link be captured once; anyone else holding it sees it go', () => {
+  it('lets a link be captured once; anyone else holding it can still finish their guess for +5', () => {
     const { h, withJob, guess, phone } = toStealRound();
     const [a, b] = withJob(1, 'steal');
     expect(guess(a!, 'glucose')).toMatchObject({ correct: true });
+    expect(phone(b!).steal?.result).toBeUndefined();
+    const before = h.seats[b!]!.score;
+    expect(guess(b!, 'glucose')).toMatchObject({ correct: true });
     expect(phone(b!).steal?.result).toBe('gone');
-    expect(guess(b!, 'glucose')).toMatchObject({ error: { code: 'no_target' } });
+    expect(h.seats[b!]!.score - before).toBe(POINTS.also_cracked);
+    expect(h.k.chains[0]!.links[1]!.captured?.owner).toBe(a);
+  });
+  it('counts a stealer’s and a shadow’s unsent text when the round ends', () => {
+    const { h, withJob, ini, write, shadow, nextRound } = setup();
+    write(0, 'What do plants make in their leaves?');
+    write(1, 'What gas do plants give off?');
+    nextRound();
+    const sh = withJob(0, 'shadow')[0]!;
+    h.move(ini(sh), { item: 'chain', move: 'answer', response: { act: 'draft', text: 'glucose', wager: 2 } });
+    for (const s of withJob(1, 'shadow')) shadow(s, 'oxygen');
+    write(0, 'glucose');
+    write(1, 'oxygen');
+    h.tick();
+    expect(h.k.chains[0]!.links[1]!.shadows.find((x) => x.owner === sh)).toMatchObject({ text: 'glucose', wager: 2, match: true });
+    h.tick();
+    const thief = withJob(1, 'steal')[0]!;
+    h.move(ini(thief), { item: 'chain', move: 'answer', response: { act: 'draft', text: 'glucose' } });
+    h.tick();
+    expect(h.k.chains[0]!.links[1]!.captured?.owner).toBe(thief);
   });
   it('ends a card after three misses and deals the next on request', () => {
     const { h, withJob, guess, phone } = toStealRound();
     const t = withJob(1, 'steal')[0]!;
-    for (const g of ['a1', 'b2', 'c3']) {
+    for (const g of ['protein', 'sucrose', 'cellulo']) {
       guess(t, g);
       h.advance(3_000);
     }
     expect(phone(t).steal?.result).toBe('missed');
     expect(h.control('next_target', undefined, { owner: t, role: 'student' })).toBeUndefined();
     expect(phone(t).steal).toBeNull();
+  });
+});
+
+describe('Answer chain: after the first class trial (20 Nov)', () => {
+  it('opens on a how-to-play walkthrough the teacher steps through, then round 1', () => {
+    const { h, board, phone } = setup({}, SEATS, 2, true);
+    expect(h.k.phase).toBe('howto');
+    expect(h.timer).toBeUndefined();
+    expect(board().howto).toEqual({ step: 0, of: HOWTO_STEPS });
+    expect(phone('o_AA').howto).toEqual({ step: 0, of: HOWTO_STEPS });
+    expect(phone('o_AA').plan).toHaveLength(h.k.links);
+    expect(h.move('AA', { item: 'chain', move: 'answer', response: { act: 'predict', text: 'oxygen' } })).toMatchObject({ error: { code: 'not_now' } });
+    h.control('next');
+    h.control('prev');
+    expect(h.k.howto).toBe(0);
+    for (let i = 0; i < HOWTO_STEPS; i++) h.control('next');
+    expect(h.k.phase).toBe('rounds');
+    expect(h.k.round).toBe(0);
+  });
+  it('can skip the walkthrough, and deals a fresh chain for a team whose players changed', () => {
+    const { h } = setup({}, SEATS, 2, true);
+    h.seats.o_II = { owner: 'o_II', initials: 'II', connected: true, score: 0, team: 0 };
+    h.control('skip_howto');
+    expect(h.k.phase).toBe('rounds');
+    expect(h.k.chains[0]!.order).toContain('o_II');
+  });
+  it('puts in what the writer had typed when time runs out, so nobody takes their place', () => {
+    const { h, typeDraft, write, withJob, shadow } = setup();
+    typeDraft(0, 'What do plants make in their');
+    write(1, 'What gas do plants give off?');
+    h.tick();
+    expect(h.k.chains[0]!.links[0]).toMatchObject({ text: 'What do plants make in their?', author: h.k.chains[0]!.order[0] });
+    expect(h.k.chains[0]!.links[0]!.backup).toBeUndefined();
+    h.tick();
+    const s = withJob(0, 'shadow')[0]!;
+    shadow(s, 'mum');
+    typeDraft(0, 'gluc');
+    h.tick();
+    expect(h.k.chains[0]!.links[1]).toMatchObject({ text: 'gluc' });
+    expect(h.k.chains[0]!.links[1]!.standin).toBeUndefined();
+    expect(h.k.chains[0]!.links[1]!.shadows[0]).toMatchObject({ text: 'mum', match: false });
+  });
+  it('closes the round a few seconds after every writer and shadow is in', () => {
+    const { h, write } = setup();
+    const full = h.timer!;
+    write(0, 'What do plants make in their leaves?');
+    expect(h.timer).toBe(full);
+    write(1, 'What gas do plants give off?');
+    expect(h.timer).toBe(h.now + ALL_IN_MS);
+  });
+  it('refuses a steal guess that doesn’t fit the letters, without using a guess', () => {
+    const { h, write, shadow, withJob, guess, phone, nextRound } = setup();
+    write(0, 'What do plants make in their leaves?');
+    write(1, 'What gas do plants give off?');
+    nextRound();
+    for (const t of [0, 1]) for (const s of withJob(t, 'shadow')) shadow(s, 'x');
+    write(0, 'glucose');
+    write(1, 'oxygen');
+    nextRound();
+    const thief = withJob(1, 'steal')[0]!;
+    expect(guess(thief, 'i will get you')).toMatchObject({ error: { code: 'wrong_shape' } });
+    expect(guess(thief, 'mum')).toMatchObject({ error: { code: 'wrong_shape' } });
+    expect(phone(thief).steal?.tries).toBe(0);
+    expect(guess(thief, 'glucose')).toMatchObject({ correct: true });
+  });
+  it('never deals a backup or stand-in answer to steal', () => {
+    const { h, write, nextRound, withJob, phone } = setup();
+    write(1, 'What gas do plants give off?');
+    nextRound();
+    write(1, 'oxygen');
+    nextRound(); // team 0's answer is a backup (nobody wrote); team 1's is real
+    const thief = withJob(1, 'steal')[0]!;
+    expect(phone(thief).steal).toBeNull();
+    void h;
+  });
+  it('gives answers 15 s at least, 20 s by default', () => {
+    expect(chainSettings({ answer_seconds: 10 }).answer_seconds).toBe(15);
+    expect(chainSettings({}).answer_seconds).toBe(20);
+    expect(chainSettings({}).question_seconds).toBe(30);
   });
 });
 
