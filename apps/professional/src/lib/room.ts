@@ -76,6 +76,17 @@ export function indexDirectory<T extends Pick<RoomDirectoryRow, 'ref' | 'display
   return { byRef, byName };
 }
 
+/**
+ * How an attendee relates to you, for the recording's speaker check and write-up:
+ * "Adam’s student" for anyone on the Students list, else "works at <main organisation>".
+ */
+export function attendeeAbout(row: RoomDirectoryRow | null): string | null {
+  if (!row) return null;
+  if (row.person_type === 'student') return 'Adam’s student';
+  const org = currentOrganisations(row)[0];
+  return org ? `works at ${org.display_name}`.slice(0, 80) : null;
+}
+
 /** A person's current organisations, their main one first. */
 function currentOrganisations(row: RoomDirectoryRow): RoomOrganisation[] {
   const list: RoomOrganisation[] = [];

@@ -155,3 +155,16 @@ test('parsers take raw model text too (a local model replies with a string)', ()
   assert.equal(w.overview, 'You met.');
   assert.equal(speakerCheckPrompt(CTX, chunk).user, speakerCheckPrompt(CTX, chunk).content[0].text);
 });
+
+test('sentenceAround: a sentence split over lines stays together, capped', async () => {
+  const { sentenceAround } = await import('../../netlify/functions/_shared/meeting-recordings-store.mjs');
+  const transcript = { lines: [
+    { text: 'Right.' }, { text: 'So I will plan' }, { text: 'the next three lessons' }, { text: 'by Monday.' }, { text: 'Great.' }
+  ] };
+  assert.deepEqual(sentenceAround(transcript, 2), [1, 2, 3]);
+  assert.deepEqual(sentenceAround(transcript, 0), [0]);
+  assert.deepEqual(sentenceAround(transcript, 4), [4]);
+  assert.deepEqual(sentenceAround(transcript, 9), []);
+  const long = { lines: Array.from({ length: 20 }, () => ({ text: 'and then' })) };
+  assert.equal(sentenceAround(long, 10).length, 6);
+});

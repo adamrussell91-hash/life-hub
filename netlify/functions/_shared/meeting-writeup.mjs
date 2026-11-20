@@ -4,7 +4,7 @@
 //
 // ctx (both prompts): {
 //   title, kind: 'meeting' | 'event', when,
-//   attendees: [{ who: 'shared:person:…', name, role }], room: boolean,
+//   attendees: [{ who: 'shared:person:…', name, role, about }], room: boolean,
 //   taps: [{ who, at_ms }]
 // }
 // Prompt builders return { system, content: [{ type: 'text', text }], user: text, maxTokens, model, effort },
@@ -21,6 +21,12 @@ export const CONTEXT_LINES = 12;
 
 const PERSON_REF_RE = /^shared:person:[A-Za-z0-9_-]{1,120}$/;
 const LIMITS = { flow: 12, built: 30, picks: 15, points: 5, flowWho: 4 };
+
+const ROLES = [
+  'Each person may have an about: how they relate to Adam (for example "Adam\u2019s student", or where they work). Use it to decide who would say a thing and who will do a task.',
+  'Work belongs to the person whose role it is. When the other person is Adam\u2019s student, Adam is the one teaching: planning or designing lessons, setting or marking work, giving feedback, sending resources and chasing things up are Adam\u2019s; doing the work, asking for help and reporting how they went are the student\u2019s. Apply the same thinking to any other pair of roles.',
+  'Voice matching often puts a whole stretch, both sides of a back-and-forth, on one voice. When the meaning plainly fits the other person, trust the meaning over the label.'
+].join('\n');
 
 const HOUSE = [
   'You are Clare, Adam’s professional assistant. Adam recorded this meeting and is always "me"; he is never among the attendees.',
@@ -133,8 +139,8 @@ function nameFor(ctx, who, speaker) {
 }
 
 function peopleList(ctx) {
-  const people = [{ who: 'me', name: 'Adam (me)', role: null }];
-  for (const a of attendeesOf(ctx)) people.push({ who: a.who, name: line(a.name, 120), role: a.role ?? null });
+  const people = [{ who: 'me', name: 'Adam (me)', role: null, about: 'recorded this meeting' }];
+  for (const a of attendeesOf(ctx)) people.push({ who: a.who, name: line(a.name, 120), role: a.role ?? null, about: line(a.about, 80) || null });
   if (ctx?.room) people.push({ who: 'room', name: 'Someone in the audience', role: null });
   return people;
 }
@@ -185,6 +191,7 @@ export function speakerCheckPrompt(ctx, chunk) {
     HOUSE,
     'Task: check who said each line of this transcript. The voice labels came from voice matching, which often puts quick exchanges on the wrong person. Each line starts with the who its voice was given (from Adam tapping a name as someone started talking, or null when unnamed).',
     'Decide who said each line from meaning: a question and its answer come from different people; people answer what they were just asked; follow the turn-taking; think about who, given their role, would say it; use the taps (times Adam marked someone starting to talk).',
+    ROLES,
     'Read whole sentences; a sentence belongs to one person.',
     'List only lines whose who should change. Never list a line that is already right.',
     'who must be exactly one of the who values in people.',
@@ -280,6 +287,8 @@ export function writeupPrompt(ctx, transcript, notes, flags) {
     HOUSE,
     `Task: write up this ${kind} for Adam from its transcript, his own notes and the moments he flagged. Address Adam as "you" ("You agreed to…"). Every line id is the number in square brackets before a transcript line; give the id of the line where each thing was said.`,
     'who is always one of the who values in people, or null when nobody in people said it (an unnamed voice).',
+    ROLES,
+    'The names on transcript lines can still be wrong. Before putting a task in picks.mine or picks.others, ask who will actually do it, from what was said and their role; a task only Adam would do goes in picks.mine even if its line carries someone else\u2019s name, and the same for built and persons.',
     'overview: 3 to 5 sentences on the whole meeting. Plain text; you may wrap a few key words in <b></b>, no other markup.',
     'flow: the meeting split by topic, in order, at most 12. Each: the line id where the topic starts, mins it ran, a short title, one line on what was covered, and who led it.',
     `built: add to Adam's own note lines (notes, by index). For a note, add short lines on what was decided, what was said for and against, and who will do what, each with who said it and the line id. Use note_index null for things worth having that Adam did not note. At most 30.`,

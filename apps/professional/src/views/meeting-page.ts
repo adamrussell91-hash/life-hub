@@ -25,7 +25,7 @@ import { mountMinutesCard } from '@/views/meeting-minutes-card';
 import { askConfirm, createRecordingModel, mountRecordingStrip } from '@/views/meeting-recording-strip';
 import { mountRecordingCard } from '@/views/meeting-recording-card';
 import { mountRecordingUpload } from '@/views/meeting-recording-upload';
-import { directoryRowFor, groupRoom, indexDirectory, initialsFor, isSelfAttendee, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
+import { attendeeAbout, directoryRowFor, groupRoom, indexDirectory, initialsFor, isSelfAttendee, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
 import { fetchSelfPerson } from '@/api/network-ecology';
 import { createPillGroup } from '@/lib/pills';
 import { readNewPersonChoice, resetPickerDirectory, searchPickerPeopleOrNew, type NewPersonChoice } from '@/lib/person-picker';
@@ -456,7 +456,15 @@ export async function renderMeetingPage(
   root.append(head, followUpBar.el, editor, purpose, grid, full);
 
   // ── Recording: one strip and one card, kept across phase repaints like the notes ──
-  const recAttendees = () => attendees.map((attendee) => ({ ref: attendee.ref, name: attendee.name, role: attendee.role }));
+  const recAttendees = () => {
+    const index = indexDirectory(directory);
+    return attendees.map((attendee) => ({
+      ref: attendee.ref,
+      name: attendee.name,
+      role: attendee.role,
+      about: attendeeAbout(directoryRowFor(attendee, index.byRef, index.byName))
+    }));
+  };
   /** Your own note lines (not the lines kept from the recording). */
   const noteLines = () => blockPlainText((blockPage?.current() ?? record.blocks ?? []).filter((block) => (block as { id?: string }).id !== recordingBlockId))
     .split('\n').map((line) => line.trim()).filter(Boolean);

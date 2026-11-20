@@ -388,3 +388,87 @@ test('the write-up function takes the worker token or the cookie, nothing else',
   assert.equal((await post({ authorization: `Bearer ${TOKEN}` })).status, 202);
   assert.equal((await post({ cookie: 'life_hub_session=good' })).status, 202);
 });
+
+// ── Re-tagging both ways ──────────────────────────────────────────────────
+
+test('fixing one line moves what was said there: a pick becomes yours, ticks travel with it', async () => {
+  const t = setup();
+  await writtenUp(t, REPLY);
+  await t.call('PATCH', '?action=review', { body: { meeting_id: MEETING, built: { 0: 'kept' }, picks: { 'others:0': { state: 'done', note: 'Tracked' } } } });
+  // Line 1 ("I can draft the log") was really Adam, not Wren. Wren keeps her voice.
+  const res = await t.call('PATCH', '?action=speakers', { body: { meeting_id: MEETING, lines: { 1: 'me' } } });
+  assert.equal(res.status, 200, JSON.stringify(res.json));
+  const { writeup } = res.json.data;
+  assert.equal(writeup.built[0].who, 'me');
+  assert.equal(writeup.picks.others.length, 0);
+  assert.equal(writeup.picks.mine.length, 1);
+  assert.equal(writeup.picks.mine[0].text, 'Draft the log');
+  assert.deepEqual(writeup.review, { built: { 0: 'kept' }, picks: { 'mine:0': { state: 'done', note: 'Tracked' } } });
+  // The flow part covering line 1 re-reads who spoke from the transcript.
+  assert.ok(writeup.flow[0].who.includes('me'));
+  assert.ok(!writeup.flow[0].who.includes(P1));
+});
+
+test('"It was …" on a pick fixes the pick and its transcript sentence', async () => {
+  const t = setup();
+  await writtenUp(t, REPLY);
+  const res = await t.call('PATCH', '?action=item', { body: { meeting_id: MEETING, item: 'others:0', who: 'me' } });
+  assert.equal(res.status, 200, JSON.stringify(res.json));
+  const { transcript, writeup } = res.json.data;
+  assert.equal(transcript.lines[1].who_override, 'me');
+  assert.equal(transcript.lines[0].who_override ?? null, null);
+  assert.equal(writeup.picks.mine.length, 1);
+  assert.equal(writeup.picks.others.length, 0);
+  // The note on the same line follows too.
+  assert.equal(writeup.built[0].who, 'me');
+  const stored = (await t.call('GET', `?meeting_id=${MEETING}`)).json.data;
+  assert.equal(stored.transcript.lines[1].who_override, 'me');
+  assert.equal(stored.writeup.picks.mine[0].text, 'Draft the log');
+
+  assert.equal((await t.call('PATCH', '?action=item', { body: { meeting_id: MEETING, item: 'others:5', who: 'me' } })).status, 400);
+  assert.equal((await t.call('PATCH', '?action=item', { body: { meeting_id: MEETING, item: 'built:0', who: 'shared:person:person_stranger' } })).status, 400);
+  assert.equal((await t.call('PATCH', '?action=item', { body: { meeting_id: MEETING, item: 'nonsense', who: 'me' } })).status, 400);
+});
+
+test('"It was …" on a pick of yours hands it to someone else', async () => {
+  const t = setup();
+  const reply = { ...REPLY, picks: { mine: [{ text: 'Bring old copies', due: null, due_label: null, quote: 'I will bring the old copies.', line: 2 }], others: [], poi: [] } };
+  await writtenUp(t, reply);
+  const res = await t.call('PATCH', '?action=item', { body: { meeting_id: MEETING, item: 'mine:0', who: P2 } });
+  assert.equal(res.status, 200, JSON.stringify(res.json));
+  assert.deepEqual(res.json.data.writeup.picks.others.map((p) => [p.who, p.text]), [[P2, 'Bring old copies']]);
+  assert.equal(res.json.data.writeup.picks.mine.length, 0);
+});
+
+test('"It was …" on a person card moves their points and people-said', async () => {
+  const t = setup();
+  await writtenUp(t, REPLY);
+  const res = await t.call('PATCH', '?action=item', { body: { meeting_id: MEETING, item: 'person:0', who: P2 } });
+  assert.equal(res.status, 200, JSON.stringify(res.json));
+  const persons = res.json.data.writeup.persons;
+  assert.deepEqual(persons.map((p) => p.who), [P2]);
+  assert.equal(persons[0].points.length, 2);
+  assert.equal(t.store.map.has(peopleSaidKey(P1, MEETING)), false);
+  assert.ok(t.store.map.has(peopleSaidKey(P2, MEETING)));
+});
+
+test('a rebuild can run on a finished write-up, keeps ticks on items that come back, and takes attendee context', async () => {
+  const t = setup();
+  await writtenUp(t, REPLY);
+  await t.call('PATCH', '?action=review', { body: { meeting_id: MEETING, built: { 0: 'kept' }, picks: { 'others:0': { state: 'x', note: '' } } } });
+  const redo = await t.call('POST', '?action=writeup', { body: { meeting_id: MEETING, attendees: [{ who: P2, about: 'Adam’s student' }, { who: 'shared:person:person_stranger', about: 'x' }] } });
+  assert.equal(redo.status, 202, JSON.stringify(redo.json));
+  const rec = redo.json.data.recording;
+  assert.equal(rec.attendees.find((a) => a.who === P2).about, 'Adam’s student');
+  assert.equal(rec.attendees.length, 2);
+  const calls = [];
+  const complete = async (input) => {
+    calls.push(input);
+    return input.maxTokens === 16000 ? REPLY : { changes: [], unsure: [] };
+  };
+  assert.equal(await runMeetingWriteup(t.store, MEETING, t.invoked.at(-1).run_id, { complete, now: t.now }), 'done');
+  assert.match(calls[0].user, /Adam’s student/);
+  assert.match(calls[1].system, /Adam is the one teaching/);
+  const got = (await t.call('GET', `?meeting_id=${MEETING}`)).json.data.writeup;
+  assert.deepEqual(got.review, { built: { 0: 'kept' }, picks: { 'others:0': { state: 'x', note: '' } } });
+});
