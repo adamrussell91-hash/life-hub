@@ -9,7 +9,8 @@ import { cloudWords } from './cloud';
  */
 
 export type Layout = 'grid' | 'cloud' | 'groups';
-export type BoardAnswer = { id: string; text: string; symbol?: string | null };
+/** `initials` is the teacher's view only: whose symbol it is, from the class initials claim. */
+export type BoardAnswer = { id: string; text: string; symbol?: string | null; initials?: string | null };
 export type BoardGroup = { id: string; name: string; answer_ids: string[] };
 export type BoardView = {
   question: string;
@@ -120,6 +121,20 @@ export function mountBoard(actions: BoardActions = {}): { root: HTMLElement; upd
     return t;
   }
 
+  /** Teacher only: the student's initials under their orbiting shape. */
+  function whoOn(node: HTMLElement, initials: string | null | undefined): void {
+    let tag = node.querySelector<HTMLElement>('.bs-who');
+    if (!initials) {
+      tag?.remove();
+      return;
+    }
+    if (!tag) {
+      tag = el('span', 'bs-who bs-who--orbit');
+      node.append(tag);
+    }
+    if (tag.textContent !== initials) tag.textContent = initials;
+  }
+
   /** Orbit ids: a student's symbol-only orbit, real answers, or placeholders when only a count is known. */
   function orbitAnswers(view: BoardView): BoardAnswer[] {
     if (view.orbit) return view.orbit.map((o) => ({ id: o.id, text: '', symbol: o.symbol }));
@@ -139,8 +154,13 @@ export function mountBoard(actions: BoardActions = {}): { root: HTMLElement; upd
     const W = orbit.clientWidth || 600;
     const H = orbit.clientHeight || 400;
     for (const a of answers) {
-      if (items.has(a.id)) continue;
+      const held = items.get(a.id);
+      if (held) {
+        whoOn(held.node, a.initials);
+        continue;
+      }
       const node = shape(a.symbol);
+      whoOn(node, a.initials);
       node.classList.add('bs-orbit__item');
       const start = from?.get(a.id) ?? { x: W / 2, y: H + 24 };
       node.style.transform = `translate(${start.x}px, ${start.y}px)`;
@@ -157,6 +177,7 @@ export function mountBoard(actions: BoardActions = {}): { root: HTMLElement; upd
     c.dataset.id = a.id;
     if (!shownIds.has(a.id) && painted) c.classList.add('bs-card--new');
     if (view.symbolsOnCards && a.symbol) c.append(token(a.symbol, 'sm'));
+    if (a.initials) c.append(el('span', 'bs-who', a.initials));
     c.append(el('p', 'bs-card__text', a.text));
     if (actions.move && groups) {
       c.draggable = true;

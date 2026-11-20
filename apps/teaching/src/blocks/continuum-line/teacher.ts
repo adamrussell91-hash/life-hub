@@ -2,6 +2,7 @@ import { apiPost } from '@/api/client';
 import { button, el, errorText, identityName, isNotPublished, notLivePanel, token } from '@/blocks/peer-feedback-ui';
 import { poller, formatCode, showCodeOverlay } from '@/blocks/brainstorm/shared';
 import { confirmBringBack, pastRounds } from '@/blocks/past-rounds';
+import { initialsToggle, showInitials } from '@/blocks/teacher-initials';
 import { mountStage } from './stage';
 import { liveStatements, type ContinuumBlock, type Phase } from './shared';
 
@@ -21,13 +22,26 @@ type StatementState = {
 };
 type TeacherState =
   | { phase: 'idle' }
-  | { phase: 'live'; session: string; code: string; open: boolean; pace: 'teacher' | 'student' | 'self'; replace: boolean; current: number; joined: number; statements: StatementState[] };
+  | {
+      phase: 'live';
+      session: string;
+      code: string;
+      open: boolean;
+      pace: 'teacher' | 'student' | 'self';
+      replace: boolean;
+      current: number;
+      joined: number;
+      statements: StatementState[];
+      /** Symbol → initials. Only when this screen asks: never on the Display view. */
+      initials?: Record<string, string>;
+    };
 type Live = Extract<TeacherState, { phase: 'live' }>;
 type Panel = 'none' | 'all' | 'groups' | 'moved';
 
 const lastState = new Map<string, TeacherState>();
 
-export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: HTMLElement): HTMLElement {
+/** `display`: the class Display view, which never asks for initials. */
+export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: HTMLElement, display = false): HTMLElement {
   const endpoint = `/api/lessons/${encodeURIComponent(lessonId)}/continuum/${encodeURIComponent(block.id)}`;
   const statements = liveStatements(block);
   const root = el('div', 'cl-run');
@@ -85,7 +99,7 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
       pressed.textContent = action === 'group' ? 'Sorting…' : 'Working…';
     }
     try {
-      state = await apiPost<TeacherState>(endpoint, { action, ...extra });
+      state = await apiPost<TeacherState>(endpoint, { action, ...extra, ...(!display && showInitials() ? { initials: true } : {}) });
       lastState.set(endpoint, state);
       alert.hidden = true;
       paint();
@@ -108,6 +122,8 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
     }
   }
 
+  /** The student's initials for a symbol: teacher view only, when the switch is on and they're known. */
+  const whoOf = (symbol: string): string | null => (state?.phase === 'live' ? state.initials?.[symbol] ?? null : null);
   const statementAt = (s: Live) => s.statements.find((x) => x.id === statements[viewing]?.id) ?? null;
 
   function go(index: number, s: Live): void {
@@ -121,7 +137,7 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
   }
 
   function paintRound(s: Live): void {
-    const sig = JSON.stringify([s.code, s.open]);
+    const sig = JSON.stringify([s.code, s.open, showInitials()]);
     if (sig === paintedRound) return;
     paintedRound = sig;
     const code = el('div', 'pf-code');
@@ -140,6 +156,7 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
             else if (confirm('Start a new round? Every line clears and students join again.')) void send('start', {}, this);
           })
     );
+    if (!display) right.append(initialsToggle(() => void send('status')));
     round.replaceChildren(code, right, past);
   }
 
@@ -278,6 +295,8 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
       paintStage();
     });
     c.append(token(e.symbol, 'sm'));
+    const who = whoOf(e.symbol);
+    if (who) c.append(el('span', 'cl-who cl-who--inline', who));
     const body = el('div', 'cl-reason__body');
     const moved = st.moves_shown && e.new_pos != null;
     if (focus === 'why' && moved) {
@@ -292,7 +311,7 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
   }
 
   function paintPanel(st: StatementState): void {
-    const sig = JSON.stringify([panelMode, st.id, st.phase, st.moves_shown, st.entries, st.groups, [...shown]]);
+    const sig = JSON.stringify([panelMode, st.id, st.phase, st.moves_shown, st.entries, st.groups, [...shown], state?.phase === 'live' ? state.initials ?? null : null]);
     if (sig === paintedPanel) return;
     paintedPanel = sig;
     if (st.phase === 'collect' || panelMode === 'none') {
@@ -344,7 +363,8 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
       return;
     }
     const headLine = el('div', 'cl-card__head');
-    headLine.append(token(e.symbol, 'sm'), el('span', '', identityName(e.symbol)));
+    const who = whoOf(e.symbol);
+    headLine.append(token(e.symbol, 'sm'), el('span', '', who ? `${who} · ${identityName(e.symbol)}` : identityName(e.symbol)));
     const close = button('×', 'ghost', () => {
       picked = null;
       paintStage();
@@ -396,7 +416,7 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
       snap: !!statements[viewing]?.snap,
       phase: st.phase,
       movesShown: st.moves_shown,
-      entries: st.entries,
+      entries: st.entries.map((e) => ({ ...e, initials: whoOf(e.symbol) })),
       picked,
       answer: st.answer_shown ? st.answer ?? null : null
     });
@@ -418,7 +438,7 @@ export function mountTeacher(block: ContinuumBlock, lessonId: string, stimulus: 
       paintedRound = '';
       paintedKey = '';
       idle.replaceChildren(
-        el('p', 'pf-panel__text block-body', 'Students join on the lesson link with the code. No accounts. Each gets a colour-and-shape symbol to place on the line.'),
+        el('p', 'pf-panel__text block-body', 'Students type the lesson’s code once a day; every activity in the lesson after that joins on its own. No accounts. Each gets a colour-and-shape symbol to place on the line.'),
         button('Start the line', 'primary', function () {
           void send('start', {}, this);
         }),

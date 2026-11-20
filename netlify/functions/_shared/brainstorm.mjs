@@ -20,6 +20,11 @@
  * the board and has revealed it, and their cards never carry symbols. Ids a
  * student sees are salted hashes, so neither a card nor an orbiting shape
  * can be traced back to a symbol.
+ *
+ * One code a day: a student types the lesson's code once (lesson-pass.mjs)
+ * and joins every later round in the lesson on their own until midnight.
+ * Joining notes whose symbol it is from the class initials claim; only the
+ * teacher's view asks for initials, never a student or the Display view.
  */
 import { randomBytes, randomInt, createHash } from 'node:crypto';
 import { isSafeId } from './class-examples.mjs';
@@ -28,6 +33,7 @@ import { draftLessonKey, publishedLessonKey } from './teaching-blobs.mjs';
 import { flagText } from './peer-feedback-filter.mjs';
 import { IDENTITIES, claimedIds, claimSymbol } from './class-symbols.mjs';
 import { groupAnswers } from './brainstorm-groups.mjs';
+import { admit, ensureLessonPass, initialsFor, linkPastRound, noteWho } from './lesson-pass.mjs';
 import { bringBackRound, listRounds, roundExpiry, saveRound } from './activity-rounds.mjs';
 
 const STRONG = { type: 'json', consistency: 'strong' };
@@ -234,12 +240,13 @@ async function teacherAction(store, k, activity, setup, body, opts) {
     show_symbols: !!activity.show_symbols,
     symbols_on_cards: activity.symbols_on_cards !== false,
     joined,
+    ...(body.initials === true ? { initials: await initialsFor(store, k.base, activity.session, await claimedIds(store, k.claim)) } : {}),
     answers: answers.map(({ id, symbol, text, flagged, status, created_at }) => ({ id, symbol, text, flagged: !!flagged, status, created_at })),
     groups: groups ? cleanGroups(groups, answers.filter((a) => a.status === 'shown').map((a) => a.id)) : null
   };
 }
 
-async function studentAction(store, k, activity, setup, body) {
+async function studentAction(store, k, activity, setup, body, lesson) {
   const action = body.action ?? 'status';
   if (!['status', 'join', 'submit'].includes(action)) reject(400, 'bad_action', 'Unknown action.');
   if (body.session && body.session !== activity.session) reject(409, 'new_session', 'Your teacher started a new round. Join again.');
@@ -254,9 +261,12 @@ async function studentAction(store, k, activity, setup, body) {
   let id;
   if (action === 'join') {
     if (!activity.open) reject(409, 'closed', 'This brainstorm has closed.');
-    if (String(body.code ?? '').replace(/\D/g, '') !== activity.code) reject(403, 'wrong_code', 'That code didn’t match. Check the board.');
+    const door = await admit(store, lesson, activity, body.code, tokenHash);
+    if (door === 'need_code') reject(403, 'need_code', 'Type the code on the board.');
+    if (door === 'wrong_code') reject(403, 'wrong_code', 'That code didn’t match. Check the board.');
     id = await claimSymbol(store, k, tokenHash);
     if (!id) reject(409, 'full', 'This activity is full. Ask your teacher.');
+    await noteWho(store, k.base, activity.session, id, body);
   } else {
     id = (await read(store, k.token(tokenHash)))?.symbol;
     if (!id) reject(403, 'not_joined', 'Join the activity first.');
@@ -306,11 +316,11 @@ async function studentAction(store, k, activity, setup, body) {
   return state;
 }
 
-function freshRound(setup) {
+function freshRound(setup, code) {
   return {
     session: randomBytes(16).toString('hex'),
     salt: randomBytes(16).toString('hex'),
-    code: String(randomInt(100000, 1000000)),
+    code: code ?? String(randomInt(100000, 1000000)),
     open: true,
     started_at: new Date().toISOString(),
     expires: roundExpiry(),
@@ -330,8 +340,15 @@ export async function brainstormAction(store, lesson, block, body, opts = {}) {
   const { base, active: activeKey } = keys(lesson, block, '');
   let activity = await read(store, activeKey);
 
+  // Student: name a round this device joined, so the teacher's view can show who it was.
+  if (!teacher && body.action === 'link') {
+    if (!validToken(body.token)) reject(400, 'not_joined', 'Join the activity first.');
+    return { linked: await linkPastRound(store, base, body.session, hash(body.token), body) };
+  }
+  // Every round in the lesson today shares one code; a round left open past midnight takes the new day's.
+  const pass = teacher ? await ensureLessonPass(store, lesson) : null;
   if (teacher && body.action === 'start') {
-    activity = freshRound(setup);
+    activity = freshRound(setup, pass?.code);
     await saveRound(store, base, activity);
   }
   if (teacher && body.action === 'end' && activity) {
@@ -340,12 +357,16 @@ export async function brainstormAction(store, lesson, block, body, opts = {}) {
   }
   if (teacher && body.action === 'rounds') return { rounds: await listRounds(store, base, activity, 'claims') };
   if (teacher && body.action === 'resume') {
-    activity = await bringBackRound(store, base, body.session, activity, (session) => ({ ...freshRound(setup), session }), { open: true });
+    activity = await bringBackRound(store, base, body.session, activity, (session) => ({ ...freshRound(setup, pass?.code), session }), { open: true, ...(pass ? { code: pass.code } : {}) });
     if (!activity) reject(404, 'no_round', 'That round has nothing saved.');
   }
   if (!activity || activity.expires < Date.now()) return { phase: 'idle' };
+  if (pass && activity.open && activity.code !== pass.code) {
+    activity = { ...activity, code: pass.code };
+    await saveRound(store, base, activity);
+  }
 
   const k = keys(lesson, block, activity.session);
   const rest = ['start', 'end', 'resume'].includes(body.action) ? { ...body, action: 'status' } : body;
-  return teacher ? teacherAction(store, k, activity, setup, rest, opts) : studentAction(store, k, activity, setup, body);
+  return teacher ? teacherAction(store, k, activity, setup, rest, opts) : studentAction(store, k, activity, setup, body, lesson);
 }
