@@ -17,6 +17,7 @@ import {
   MAX_PARTS,
   MAX_PART_BYTES,
   applySpeakerEdits,
+  changedLines,
   audioPartKey,
   buildQueue,
   createWorkerGate,
@@ -24,6 +25,7 @@ import {
   deleteAudio,
   deleteMeetingRecording,
   expireStaleWriteup,
+  followTranscript,
   isRecordingId,
   isRecordingMeetingId,
   listRecordings,
@@ -41,9 +43,11 @@ import {
   sanitizeNotes,
   sanitizeTaps,
   sanitizeTranscript,
+  setItemWho,
   startWriteup,
   storedPartIndices,
   transcriptKey,
+  withReviewKept,
   workerTokenMatches,
   writePeopleSaid,
   writeRecording,
@@ -105,6 +109,7 @@ export async function handleBrowser(request, { store, now = Date.now, invokeWrit
     'POST stop': stop,
     'POST notes': notes,
     'PATCH speakers': speakers,
+    'PATCH item': itemWho,
     'POST writeup': redoWriteup,
     'PATCH review': review,
     'POST retry': retry
@@ -258,12 +263,38 @@ async function speakers(store, input) {
   await setJSON(store, rec.transcript_key, edited.transcript);
   let writeup = await readWriteup(store, rec.meeting_id);
   if (writeup && writeup.status !== 'failed') {
-    writeup = relabelWriteup(writeup, edited.relabel);
+    // Names that moved wholesale relabel everything; then anything said on a line whose
+    // who changed (a single line, or part of a voice) follows that line.
+    const changed = changedLines(transcript, edited.transcript);
+    writeup = withReviewKept(relabelWriteup(writeup, edited.relabel), (draft, move) => followTranscript(draft, edited.transcript, changed, move));
     await writeWriteup(store, rec.meeting_id, writeup);
     const meta = await meetingMeta(store, rec.meeting_id, rec.started_at);
     await writePeopleSaid(store, writeup, edited.transcript, rec, meta);
   }
   return okResponse(200, { transcript: edited.transcript, writeup: writeup ?? null });
+}
+
+/** "It was …" on a note, pick or person card: fixes the item and the transcript sentence it came from. */
+async function itemWho(store, input) {
+  const loaded = await loadFor(store, input.meeting_id);
+  if (loaded.error) return loaded.error;
+  const rec = loaded.rec;
+  const transcript = await readTranscript(store, rec);
+  if (!transcript) return conflict('no_transcript', 'There is no transcript yet.');
+  const writeup = await readWriteup(store, rec.meeting_id);
+  if (!writeup || writeup.status === 'failed') return notFound('There is no write-up yet.');
+  let out;
+  try {
+    out = setItemWho(transcript, writeup, rec, input.item, input.who);
+  } catch (error) {
+    if (error?.status === 400) return bad(error.message, error.code);
+    throw error;
+  }
+  await setJSON(store, rec.transcript_key, out.transcript);
+  await writeWriteup(store, rec.meeting_id, out.writeup);
+  const meta = await meetingMeta(store, rec.meeting_id, rec.started_at);
+  await writePeopleSaid(store, out.writeup, out.transcript, rec, meta);
+  return okResponse(200, out);
 }
 
 async function redoWriteup(store, input, { now, invoke }) {
@@ -274,6 +305,12 @@ async function redoWriteup(store, input, { now, invoke }) {
   if (!rec.transcript_key || !(await readTranscript(store, rec))) return conflict('no_transcript', 'There is no transcript yet.');
   expireStaleWriteup(rec, now());
   if (rec.writeup_status === 'running') return conflict('writeup_running', 'The write-up is already running.');
+  // The page sends how each attendee relates to Adam now, so a rebuild of an older
+  // recording gets it too. Only people already on the recording are updated.
+  for (const a of Array.isArray(input.attendees) ? input.attendees : []) {
+    const known = (rec.attendees ?? []).find((x) => x.who === a?.who);
+    if (known) known.about = typeof a.about === 'string' ? a.about.replace(/\s+/g, ' ').trim().slice(0, 80) || null : null;
+  }
   await startWriteup(store, rec, { invoke, now });
   return okResponse(202, { recording: rec });
 }

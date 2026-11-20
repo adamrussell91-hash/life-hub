@@ -9,6 +9,7 @@ import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { completeJson } from './_shared/clare-comms-model.mjs';
 import { defaultGetProfessionalStore, setJSON } from './_shared/professional-blobs.mjs';
 import {
+  carryReview,
   createWorkerGate,
   isRecordingMeetingId,
   meetingMeta,
@@ -111,6 +112,8 @@ export async function runMeetingWriteup(store, meetingId, runId, { complete, now
     return finish('failed');
   }
   if (!(await stillCurrent(store, meetingId, runId))) return 'skipped';
+  // A rebuild keeps the ✓/✕ and pick states of items that came back the same.
+  writeup = carryReview(await readWriteup(store, meetingId), writeup);
   await writeWriteup(store, meetingId, writeup);
   await writePeopleSaid(store, writeup, transcript, rec, meta);
   log('meeting-writeup done', { meeting_id: meetingId, lines: transcript.lines.length, status: writeup.status });

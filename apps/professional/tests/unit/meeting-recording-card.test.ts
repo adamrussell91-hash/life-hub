@@ -7,7 +7,8 @@ vi.mock('@/api/meeting-recordings', () => ({
     writeup: { ...writeup, review: { built: { ...(body.built ?? {}) }, picks: { ...(body.picks ?? {}) } } }
   })),
   patchSpeakers: vi.fn(async () => ({ transcript, writeup })),
-  rerunWriteup: vi.fn(),
+  patchItemWho: vi.fn(async () => ({ transcript, writeup })),
+  rerunWriteup: vi.fn(async () => ({ recording: { ...recording, status: 'writing_up', writeup_status: 'running' } })),
   retryRecording: vi.fn(),
   saveRecordingNotes: vi.fn(),
   stopRecording: vi.fn(),
@@ -17,10 +18,10 @@ vi.mock('@/api/meeting-recordings', () => ({
   startRecording: vi.fn()
 }));
 
-import { cardState, groupBuilt, mountRecordingCard, NO_LOCAL, overviewHtml, plainText } from '@/views/meeting-recording-card';
+import { cardState, groupBuilt, mountRecordingCard, NO_LOCAL, overviewHtml, plainText, voicesInRange } from '@/views/meeting-recording-card';
 import { createRecordingModel } from '@/views/meeting-recording-strip';
 import { findLines, groupLines } from '@/views/meeting-transcript-drawer';
-import { patchReview } from '@/api/meeting-recordings';
+import { patchItemWho, patchReview, patchSpeakers, rerunWriteup } from '@/api/meeting-recordings';
 import { __resetRecorderRegistry } from '@/lib/meeting-recorder';
 
 const MEETING = 'meeting_00000000-0000-4000-8000-0000000000bb';
@@ -88,7 +89,7 @@ function mount(deps: Partial<Parameters<typeof mountRecordingCard>[0]['deps']> =
   const card = mountRecordingCard({
     meetingId: MEETING,
     kind: 'meeting',
-    people: () => [{ ref: IRIS, name: 'Iris Calloway', role: 'chair' }, { ref: THEO, name: 'Theo Marsh', role: null }],
+    people: () => [{ ref: IRIS, name: 'Iris Calloway', role: 'chair' }, { ref: THEO, name: 'Theo Marsh', role: null, about: 'Adam’s student' }],
     room: false,
     model,
     deps: { appendToNotes, createTask, trackIt, ...deps }
@@ -199,6 +200,48 @@ describe('done card', () => {
     expect(drawer!.textContent).toContain('Unnamed voice 3');
     drawer!.querySelector<HTMLButtonElement>('[data-part="drawer-close"]')!.click();
     expect(document.querySelector('[data-part="transcript-drawer"]')).toBeNull();
+  });
+});
+
+describe('re-tagging from the write-up', () => {
+  it('"It was…" on a pick sends the new who for that item', async () => {
+    const { card } = mount();
+    const pick = card.el.querySelector<HTMLElement>('[data-pick="others:0"]')!;
+    pick.querySelector<HTMLButtonElement>('[data-part="rec-it-was"]')!.click();
+    const me = pick.querySelector<HTMLButtonElement>('[data-part="rec-it-was-to"][data-who="me"]')!;
+    expect(me.disabled).toBe(false);
+    me.click();
+    await vi.waitFor(() => expect(patchItemWho).toHaveBeenCalledWith({ meeting_id: MEETING, item: 'others:0', who: 'me' }));
+    // The current who can't be picked again.
+    const built = card.el.querySelector<HTMLElement>('[data-built="0"]')!;
+    expect(built.querySelector<HTMLButtonElement>(`[data-part="rec-it-was-to"][data-who="${IRIS}"]`)!.disabled).toBe(true);
+  });
+
+  it('"Who spoke?" on a timeline part renames one voice for that part only', async () => {
+    const { card } = mount();
+    const seg = card.el.querySelectorAll<HTMLElement>('.rec-seg')[0]!;
+    seg.querySelector<HTMLButtonElement>('[data-part="rec-seg-who"]')!.click();
+    const select = seg.querySelector<HTMLSelectElement>('.rec-seg__fix select')!;
+    select.value = THEO;
+    select.dispatchEvent(new Event('change'));
+    // Part 1 starts at line 0 and has no next placed part: every S2 line from 0 on.
+    await vi.waitFor(() => expect(patchSpeakers).toHaveBeenCalledWith({ meeting_id: MEETING, lines: { 0: THEO, 1: THEO } }));
+  });
+
+  it('Rebuild asks first, then sends how each attendee relates to you', async () => {
+    const { card } = mount();
+    card.el.querySelector<HTMLButtonElement>('[data-part="rec-rebuild"]')!.click();
+    document.querySelector<HTMLButtonElement>('[data-part="confirm-yes"]')!.click();
+    await vi.waitFor(() => expect(rerunWriteup).toHaveBeenCalledWith(MEETING, [{ who: IRIS, about: null }, { who: THEO, about: 'Adam’s student' }]));
+  });
+
+  it('voicesInRange lists each voice once, loudest first, with who most of its lines are', () => {
+    expect(voicesInRange(transcript, 0, 4)).toEqual([
+      { key: 'S2', lines: [0, 1], who: IRIS },
+      { key: 'S1', lines: [2], who: 'me' },
+      { key: 'S3', lines: [3], who: null }
+    ]);
+    expect(voicesInRange(transcript, 2, 3)).toEqual([{ key: 'S1', lines: [2], who: 'me' }]);
   });
 });
 

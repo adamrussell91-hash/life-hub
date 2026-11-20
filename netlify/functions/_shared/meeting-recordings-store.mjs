@@ -146,7 +146,8 @@ export function sanitizeAttendees(raw) {
     if (out.length >= CAPS.attendees) break;
     if (!isPersonRef(a?.who) || out.some((x) => x.who === a.who)) continue;
     const role = a.role === 'chair' || a.role === 'minute_taker' ? a.role : null;
-    out.push({ who: a.who, name: line(a.name, 120), role });
+    // How they relate to Adam ("Adam's student", "works at …"), so the checks can tell who would say what.
+    out.push({ who: a.who, name: line(a.name, 120), role, about: line(a.about, 80) || null });
   }
   return out;
 }
@@ -436,21 +437,212 @@ export function relabelWriteup(writeup, relabel) {
     const who = map(item.who);
     item.who = who === 'me' ? null : who ?? null;
   }
-  const persons = [];
-  for (const person of next.persons ?? []) {
-    const who = map(person.who);
+  next.persons = mergePersons((next.persons ?? []).map((person) => ({ ...person, who: map(person.who) })));
+  return next;
+}
+
+/** Indices of lines whose who differs between two versions of a transcript. */
+export function changedLines(before, after) {
+  const out = new Set();
+  const count = Math.max(before?.lines?.length ?? 0, after?.lines?.length ?? 0);
+  for (let i = 0; i < count; i += 1) if (lineWho(before, i) !== lineWho(after, i)) out.add(i);
+  return out;
+}
+
+const ENDS_SENTENCE = /[.?!…]["”’')\]]*\s*$/;
+
+/**
+ * The line and the rest of its sentence (a sentence belongs to one person): back while
+ * the line before doesn't end a sentence, forward while this one doesn't. At most 6 lines.
+ */
+export function sentenceAround(transcript, index, cap = 6) {
+  const lines = transcript?.lines ?? [];
+  if (!lines[index]) return [];
+  let from = index;
+  let to = index;
+  while (from > 0 && to - from + 1 < cap && !ENDS_SENTENCE.test(lines[from - 1].text ?? '')) from -= 1;
+  while (to < lines.length - 1 && to - from + 1 < cap && !ENDS_SENTENCE.test(lines[to].text ?? '')) to += 1;
+  const out = [];
+  for (let i = from; i <= to; i += 1) out.push(i);
+  return out;
+}
+
+/** Up to four people who spoke most (by words) in lines [from, to). */
+export function flowSpeakers(transcript, from, to) {
+  const talk = new Map();
+  for (let i = Math.max(0, from); i < Math.min(to, transcript?.lines?.length ?? 0); i += 1) {
+    const who = lineWho(transcript, i);
     if (!who) continue;
-    const same = persons.find((p) => p.who === who);
+    talk.set(who, (talk.get(who) ?? 0) + String(transcript.lines[i].text ?? '').split(/\s+/).filter(Boolean).length);
+  }
+  return [...talk.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([who]) => who);
+}
+
+const PICK_KINDS = ['mine', 'others', 'poi'];
+
+/**
+ * Change a write-up while keeping each item's ✓/✕ and pick state with the item itself,
+ * even when it moves list or position. `mutate(next, move)`: call `move(old, replacement)`
+ * when an item is swapped for a new object so its review state follows.
+ */
+export function withReviewKept(writeup, mutate) {
+  const next = structuredClone(writeup);
+  const review = next.review ?? { built: {}, picks: {} };
+  const state = new Map();
+  (next.built ?? []).forEach((item, i) => { const s = review.built?.[String(i)]; if (s) state.set(item, s); });
+  for (const kind of PICK_KINDS) {
+    (next.picks?.[kind] ?? []).forEach((item, i) => { const s = review.picks?.[`${kind}:${i}`]; if (s) state.set(item, s); });
+  }
+  mutate(next, (old, replacement) => { if (state.has(old)) state.set(replacement, state.get(old)); });
+  next.review = { built: {}, picks: {} };
+  (next.built ?? []).forEach((item, i) => { if (state.has(item)) next.review.built[String(i)] = state.get(item); });
+  for (const kind of PICK_KINDS) {
+    (next.picks?.[kind] ?? []).forEach((item, i) => { if (state.has(item)) next.review.picks[`${kind}:${i}`] = state.get(item); });
+  }
+  return next;
+}
+
+/**
+ * Give a pick to someone else, moving it to the list that fits: Adam → "For you to do",
+ * a person → "Others said they'd do", the room → points of interest. A point of
+ * interest stays one (Adam can't be its who, so it becomes null).
+ */
+function repick(next, kind, item, who, move) {
+  const list = next.picks[kind];
+  const at = list.indexOf(item);
+  if (at < 0) return;
+  if (kind === 'poi') {
+    item.who = who === 'me' ? null : who ?? null;
+    return;
+  }
+  const target = who === 'me' ? 'mine' : isPersonRef(who) ? 'others' : who === 'room' ? 'poi' : kind;
+  if (target === kind) {
+    if (kind === 'others') item.who = who;
+    return;
+  }
+  const base = { text: item.text, quote: item.quote ?? '', start_ms: item.start_ms ?? null, line: item.line ?? null };
+  const replacement = target === 'mine'
+    ? { ...base, due: item.due ?? null, due_label: item.due_label ?? null }
+    : target === 'others' ? { who, ...base, due: item.due ?? null } : { who, ...base };
+  list.splice(at, 1);
+  next.picks[target].push(replacement);
+  move(item, replacement);
+}
+
+/** Who said each flow part: re-read from the transcript for parts holding a changed line. */
+function refreshFlow(next, transcript, changed) {
+  const flow = next.flow ?? [];
+  const total = transcript?.lines?.length ?? 0;
+  flow.forEach((seg, i) => {
+    if (!Number.isInteger(seg.line)) return;
+    const following = flow.slice(i + 1).find((s) => Number.isInteger(s.line) && s.line > seg.line);
+    const to = following ? following.line : total;
+    let touched = false;
+    for (const index of changed) if (index >= seg.line && index < to) { touched = true; break; }
+    if (touched) seg.who = flowSpeakers(transcript, seg.line, to);
+  });
+}
+
+/**
+ * After names change in the transcript: every note, pick and flow part whose line now has
+ * a different who follows it (a pick moves list when it becomes yours or someone else's).
+ * Mutates `next` (inside withReviewKept). `skip` holds items already set by hand.
+ */
+export function followTranscript(next, transcript, changed, move, skip = new Set()) {
+  if (!changed.size) return next;
+  const moved = (item) => !skip.has(item) && Number.isInteger(item.line) && changed.has(item.line);
+  for (const item of next.built ?? []) if (moved(item)) item.who = lineWho(transcript, item.line);
+  for (const kind of PICK_KINDS) {
+    for (const item of [...(next.picks?.[kind] ?? [])].filter(moved)) {
+      const who = lineWho(transcript, item.line);
+      if (who) repick(next, kind, item, who, move);
+    }
+  }
+  refreshFlow(next, transcript, changed);
+  return next;
+}
+
+/** Fold person cards that now name the same who into one (points capped at 5, one star). */
+function mergePersons(list) {
+  const persons = [];
+  for (const person of list) {
+    if (!person.who) continue;
+    const same = persons.find((p) => p.who === person.who);
     if (same) {
       same.points = [...same.points, ...person.points].slice(0, 5);
-      if (same.points.filter((p) => p.star).length > 1) {
-        let seen = false;
-        for (const p of same.points) { if (p.star && seen) p.star = false; if (p.star) seen = true; }
-      }
-    } else persons.push({ ...person, who });
+      let seen = false;
+      for (const p of same.points) { if (p.star && seen) p.star = false; if (p.star) seen = true; }
+    } else persons.push(person);
   }
-  next.persons = persons;
-  return next;
+  return persons;
+}
+
+const ITEM_RE = /^(built|mine|others|poi|person):(\d{1,3})$/;
+
+/**
+ * "It was …" on one write-up item: the item moves to that person, and so does the sentence
+ * of the transcript it came from (as a fix of Adam's), and everything else on those lines
+ * follows. Returns { transcript, writeup }. Throws a 400 for an unknown item or who.
+ */
+export function setItemWho(transcript, writeup, recording, itemKey, rawWho) {
+  const match = ITEM_RE.exec(typeof itemKey === 'string' ? itemKey : '');
+  const kind = match?.[1];
+  const index = match ? Number(match[2]) : -1;
+  const list = kind === 'built' ? writeup.built : kind === 'person' ? writeup.persons : writeup.picks?.[kind];
+  const item = list?.[index];
+  if (!item) throw badRequest(`Unknown item ${itemKey}.`, 'invalid_item');
+  const ctx = recordingContext(recording);
+  const who = checkWho(ctx, rawWho);
+  if (!who || who !== rawWho) throw badRequest('Pick Me or someone in this meeting.', 'invalid_who');
+
+  const lines = {};
+  if (Number.isInteger(item.line)) for (const i of sentenceAround(transcript, item.line)) lines[String(i)] = who;
+  const edited = Object.keys(lines).length ? applySpeakerEdits(transcript, recording, { lines }) : { transcript };
+  const changed = changedLines(transcript, edited.transcript);
+
+  const next = withReviewKept(writeup, (draft, move) => {
+    const mine = kind === 'built' ? draft.built[index] : kind === 'person' ? draft.persons[index] : draft.picks[kind][index];
+    if (kind === 'built') mine.who = who;
+    else if (kind === 'person') {
+      mine.who = who;
+      draft.persons = mergePersons(draft.persons);
+    } else repick(draft, kind, mine, who, move);
+    followTranscript(draft, edited.transcript, changed, move, new Set([mine]));
+  });
+  return { transcript: edited.transcript, writeup: next };
+}
+
+/**
+ * A rebuilt write-up keeps the ✓/✕ and pick states of items that came back with the same
+ * words (and, for notes, under the same note line).
+ */
+export function carryReview(previous, rebuilt) {
+  const review = { built: {}, picks: {} };
+  if (!previous?.review) return { ...rebuilt, review };
+  const norm = (text) => String(text ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const builtState = new Map();
+  (previous.built ?? []).forEach((item, i) => {
+    const state = previous.review.built?.[String(i)];
+    if (state) builtState.set(`${item.note_index ?? ''}|${norm(item.text)}`, state);
+  });
+  (rebuilt.built ?? []).forEach((item, i) => {
+    const state = builtState.get(`${item.note_index ?? ''}|${norm(item.text)}`);
+    if (state) review.built[String(i)] = state;
+  });
+  const pickState = new Map();
+  for (const kind of PICK_KINDS) {
+    (previous.picks?.[kind] ?? []).forEach((item, i) => {
+      const state = previous.review.picks?.[`${kind}:${i}`];
+      if (state) pickState.set(norm(item.text), state);
+    });
+  }
+  for (const kind of PICK_KINDS) {
+    (rebuilt.picks?.[kind] ?? []).forEach((item, i) => {
+      const state = pickState.get(norm(item.text));
+      if (state) review.picks[`${kind}:${i}`] = state;
+    });
+  }
+  return { ...rebuilt, review };
 }
 
 // ── Write-up ───────────────────────────────────────────────────────────────

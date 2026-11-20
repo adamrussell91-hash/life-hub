@@ -10,6 +10,7 @@ import { personRoute } from '@/app/router';
 import {
   deleteRecording,
   fetchRecordingPart,
+  patchItemWho,
   patchReview,
   patchSpeakers,
   rerunWriteup,
@@ -22,7 +23,8 @@ import {
   type PickReview,
   type RecordingBundle,
   type RecordingKind,
-  type WriteupBuilt
+  type WriteupBuilt,
+  type WriteupItemKey
 } from '@/api/meeting-recordings';
 import {
   capNotes,
@@ -49,7 +51,7 @@ import {
   type RecordingAttendeeInput,
   type RecordingModel
 } from '@/views/meeting-recording-strip';
-import { openTranscriptDrawer, type DrawerHandle } from '@/views/meeting-transcript-drawer';
+import { lineWho, openTranscriptDrawer, type DrawerHandle } from '@/views/meeting-transcript-drawer';
 
 // ───────────────────────────── Pure ─────────────────────────────
 
@@ -107,6 +109,29 @@ export function cardState(bundle: RecordingBundle | null, local: LocalView): Car
       if (bundle?.writeup && (bundle.writeup.status === 'done' || bundle.writeup.status === 'unchecked')) return 'done';
       return 'no_writeup';
   }
+}
+
+/**
+ * The voices heard in transcript lines [from, to): each with its lines there and who most
+ * of those lines are credited to now. Loudest first.
+ */
+export function voicesInRange(transcript: MeetingTranscript, from: number, to: number): Array<{ key: string; lines: number[]; who: string | null }> {
+  const byVoice = new Map<string, { lines: number[]; words: number; credit: Map<string, number> }>();
+  for (let index = Math.max(0, from); index < Math.min(to, transcript.lines.length); index += 1) {
+    const line = transcript.lines[index]!;
+    const entry = byVoice.get(line.speaker) ?? { lines: [], words: 0, credit: new Map<string, number>() };
+    entry.lines.push(index);
+    entry.words += line.text.split(/\s+/).filter(Boolean).length;
+    const who = lineWho(transcript, line) ?? '';
+    entry.credit.set(who, (entry.credit.get(who) ?? 0) + 1);
+    byVoice.set(line.speaker, entry);
+  }
+  return [...byVoice.entries()]
+    .sort((a, b) => b[1].words - a[1].words)
+    .map(([key, entry]) => {
+      const top = [...entry.credit.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+      return { key, lines: entry.lines, who: top || null };
+    });
 }
 
 /** `2 hours ago`, `3 min ago`, `just now`. */
@@ -586,12 +611,16 @@ export function mountRecordingCard(options: {
           minis.append(mini);
         }
         who.append(minis);
+        let fixHost: HTMLElement | null = null;
         if (seg.line !== null && seg.line !== undefined) {
           const words = button('words', 'rec-link', 'rec-seg-words');
           words.addEventListener('click', () => openDrawerAt(seg.line));
           who.append(words);
+          const next = writeup.flow.slice(index + 1).find((s) => s.line !== null && s.line !== undefined && s.line > seg.line!);
+          if (bundle.transcript) fixHost = flowWhoControl(bundle.transcript, seg.line, next?.line ?? bundle.transcript.lines.length, who);
         }
         card.append(when, el('b', undefined, seg.title), el('p', undefined, seg.text), who);
+        if (fixHost) card.append(fixHost);
         strip.append(card);
       });
       out.push(bar, strip);
@@ -614,7 +643,7 @@ export function mountRecordingCard(options: {
     if (writeup.persons.length) {
       out.push(sectionHead('Who said what'));
       const grid = el('div', 'rec-persons');
-      for (const entry of writeup.persons) grid.append(personCard(entry, all, recording));
+      writeup.persons.forEach((entry, index) => grid.append(personCard(entry, index, all, recording)));
       out.push(grid);
     }
     const unnamed = (bundle.transcript?.voices ?? []).filter((voice) => !voice.who);
@@ -635,7 +664,7 @@ export function mountRecordingCard(options: {
       check.disabled = busy;
       check.hidden = recording.private;
       check.addEventListener('click', () => void act(async () => {
-        const res = await rerunWriteup(options.meetingId);
+        const res = await rerunWriteup(options.meetingId, attendeeAbout());
         options.model.patch({ recording: res.recording });
       }));
       const note = el('span');
@@ -643,10 +672,112 @@ export function mountRecordingCard(options: {
       foot.append(note, check);
     } else {
       foot.append(el('span', undefined, 'Lines the check moved are marked in the transcript. Check wording there before quoting anyone.'));
+      if (!recording.private) {
+        const again = button(busy ? 'Starting…' : '↻ Rebuild from transcript', 'btn btn--secondary btn--sm', 'rec-rebuild');
+        again.disabled = busy;
+        again.title = 'Write this up again from the transcript as it is now, with your name fixes';
+        again.addEventListener('click', () => void rebuild());
+        foot.append(again);
+      }
     }
     if (bundle.transcript) foot.append(drawerButton());
     out.push(...notice(), foot);
     return out;
+  }
+
+  /** How each attendee relates to you, sent with a rebuild so older recordings get it too. */
+  function attendeeAbout(): Array<{ who: string; about: string | null }> {
+    return options.people().map((person) => ({ who: person.ref, about: person.about ?? null }));
+  }
+
+  async function rebuild(): Promise<void> {
+    const yes = await askConfirm({
+      title: 'Rebuild from the transcript?',
+      body: 'Clare writes this up again from the transcript as it is now. Your name fixes stay, and she re-checks the lines you haven’t fixed. Ticks carry over where an item comes back the same; anything already in your notes or made into a task stays there. It takes a minute or two.',
+      confirm: 'Rebuild'
+    });
+    if (!yes) return;
+    await act(async () => {
+      const res = await rerunWriteup(options.meetingId, attendeeAbout());
+      options.model.patch({ recording: res.recording });
+    });
+  }
+
+  /**
+   * "It was…": pick who really said (or will do) this. The item moves, and so does the
+   * sentence of the transcript it came from, so profiles and the transcript agree.
+   */
+  function itWasControl(item: WriteupItemKey, current: string | null, label = 'It was…'): HTMLElement {
+    const wrap = el('span', 'rec-itwas');
+    const toggle = button(label, 'rec-link rec-itwas__btn', 'rec-it-was');
+    toggle.title = 'Wrong person? Pick who it was. The transcript is fixed too.';
+    toggle.setAttribute('aria-expanded', 'false');
+    const menu = el('div', 'rec-fixmenu');
+    menu.hidden = true;
+    toggle.addEventListener('click', () => {
+      menu.hidden = !menu.hidden;
+      toggle.setAttribute('aria-expanded', String(!menu.hidden));
+    });
+    for (const person of people()) {
+      const pick = button(person.short, `rec-fixmenu__btn${person.who === current ? ' is-on' : ''}`, 'rec-it-was-to');
+      pick.dataset.who = person.who;
+      pick.disabled = busy || person.who === current;
+      pick.addEventListener('click', () => void act(async () => {
+        const out = await patchItemWho({ meeting_id: options.meetingId, item, who: person.who });
+        options.model.patch({ transcript: out.transcript, writeup: out.writeup });
+        message = `Moved to ${person.who === 'me' ? 'you' : person.short}, and fixed in the transcript.`;
+      }));
+      menu.append(pick);
+    }
+    wrap.append(toggle, menu);
+    return wrap;
+  }
+
+  /** "Who spoke here?" on a timeline part: name each voice for these lines only. */
+  function flowWhoControl(transcript: MeetingTranscript, from: number, to: number, whoRow: HTMLElement): HTMLElement {
+    const panel = el('div', 'rec-seg__fix');
+    panel.hidden = true;
+    const toggle = button('Who spoke?', 'rec-link', 'rec-seg-who');
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.addEventListener('click', () => {
+      panel.hidden = !panel.hidden;
+      toggle.setAttribute('aria-expanded', String(!panel.hidden));
+    });
+    whoRow.append(toggle);
+    const all = people();
+    const voices = voicesInRange(transcript, from, to);
+    voices.forEach((voice, n) => {
+      const row = el('label', 'rec-seg__voice');
+      const sample = transcript.lines[voice.lines[0]!]?.text ?? '';
+      row.append(el('span', 'rec-seg__sample', `Voice ${n + 1} · ${voice.lines.length} line${voice.lines.length === 1 ? '' : 's'} · “${sample.slice(0, 50)}${sample.length > 50 ? '…' : ''}”`));
+      const select = el('select', 'rec-select') as HTMLSelectElement;
+      select.setAttribute('aria-label', `Who is voice ${n + 1} in this part?`);
+      const blank = el('option', undefined, 'Who is this?');
+      blank.value = '';
+      select.append(blank);
+      for (const person of all) {
+        const option = el('option', undefined, person.who === 'me' ? 'Me' : person.name);
+        option.value = person.who;
+        option.selected = person.who === voice.who;
+        select.append(option);
+      }
+      select.disabled = busy;
+      select.addEventListener('change', () => {
+        if (!select.value) return;
+        const lines: Record<string, string> = {};
+        for (const index of voice.lines) lines[String(index)] = select.value;
+        void act(async () => {
+          const out = await patchSpeakers({ meeting_id: options.meetingId, lines });
+          options.model.patch({ transcript: out.transcript, ...(out.writeup ? { writeup: out.writeup } : {}) });
+          message = 'Fixed for this part. The notes and transcript follow.';
+        });
+      });
+      row.append(select);
+      panel.append(row);
+    });
+    if (!voices.length) panel.append(el('p', 'muted', 'No lines in this part.'));
+    else panel.append(el('p', 'muted rec-seg__hint', 'Only this part changes. Two people on one voice? Open the words and fix the lines there.'));
+    return panel;
   }
 
   function sectionHead(text: string): HTMLElement {
@@ -700,6 +831,7 @@ export function mountRecordingCard(options: {
       drop.setAttribute('aria-label', 'Drop');
       drop.addEventListener('click', () => void decideBuilt([index], 'gone'));
       acts.append(keep, drop);
+      src.append(' ', itWasControl(`built:${index}`, item.who));
       row.append(text, acts);
       rows.set(index, row);
       return row;
@@ -803,6 +935,8 @@ export function mountRecordingCard(options: {
     const q = el('div', 'rec-pk__quote');
     if (quote) q.append(`“${quote.replace(/^[“"]|[”"]$/g, '')}” `);
     q.append(timeButton(startMs, line));
+    const itemIndex = Number(keyName.split(':')[1]);
+    q.append(' ', itWasControl(`${kind}:${itemIndex}`, kind === 'mine' ? 'me' : who));
     const acts = el('div', 'rec-pk__acts');
     const result = el('div', 'rec-pk__result');
     const isPerson = Boolean(person && person.who.startsWith('shared:'));
@@ -871,7 +1005,7 @@ export function mountRecordingCard(options: {
     return node;
   }
 
-  function personCard(entry: MeetingWriteup['persons'][number], all: RecPerson[], recording: MeetingRecording): HTMLElement {
+  function personCard(entry: MeetingWriteup['persons'][number], index: number, all: RecPerson[], recording: MeetingRecording): HTMLElement {
     const person = personFor(all, entry.who, recording.attendees.find((a) => a.who === entry.who)?.name);
     const node = el('div', 'rec-person');
     const top = el('div', 'rec-person__top');
@@ -908,7 +1042,7 @@ export function mountRecordingCard(options: {
     }
     node.append(top, list);
     if (quoteEl) node.append(quoteEl);
-    node.append(foot);
+    node.append(foot, itWasControl(`person:${index}`, entry.who, 'These were someone else’s?'));
     return node;
   }
 

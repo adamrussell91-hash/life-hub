@@ -15,7 +15,8 @@ export type WriteupStatus = 'none' | 'running' | 'done' | 'unchecked' | 'failed'
 
 export interface RecordingTap { who: string; at_ms: number }
 export interface RecordingFlag { kind: 'task' | 'poi'; at_ms: number }
-export interface RecordingAttendee { who: string; name: string; role: string | null }
+/** `about`: how they relate to you ("Adam’s student", "works at …"), so the speaker check can tell who would say what. */
+export interface RecordingAttendee { who: string; name: string; role: string | null; about?: string | null }
 
 export interface MeetingRecording {
   id: string;
@@ -203,8 +204,17 @@ export function patchSpeakers(body: {
   return apiPatch(`${BASE}?action=speakers`, { voices: {}, lines: {}, ...body });
 }
 
-export function rerunWriteup(meetingId: string): Promise<{ recording: MeetingRecording }> {
-  return apiPost(`${BASE}?action=writeup`, { meeting_id: meetingId });
+/** Write it up again from the transcript as it stands now (your name fixes kept). */
+export function rerunWriteup(meetingId: string, attendees?: Array<{ who: string; about: string | null }>): Promise<{ recording: MeetingRecording }> {
+  return apiPost(`${BASE}?action=writeup`, { meeting_id: meetingId, ...(attendees ? { attendees } : {}) });
+}
+
+/** `built:3`, `mine:0`, `others:1`, `poi:2` or `person:0`. */
+export type WriteupItemKey = `${'built' | 'mine' | 'others' | 'poi' | 'person'}:${number}`;
+
+/** "It was …": the item goes to `who`, and so does the transcript sentence it came from. */
+export function patchItemWho(body: { meeting_id: string; item: WriteupItemKey; who: string }): Promise<{ transcript: MeetingTranscript; writeup: MeetingWriteup }> {
+  return apiPatch(`${BASE}?action=item`, body);
 }
 
 export function patchReview(body: {

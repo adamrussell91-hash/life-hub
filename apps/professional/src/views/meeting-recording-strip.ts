@@ -46,7 +46,7 @@ export function button(label: string, className = 'btn btn--secondary', part?: s
   return node;
 }
 
-export type RecordingAttendeeInput = { ref: string; name: string; role: string | null };
+export type RecordingAttendeeInput = { ref: string; name: string; role: string | null; about?: string | null };
 
 export type RecPerson = { who: string; name: string; short: string; role: string | null; colour: string };
 
@@ -654,7 +654,7 @@ export function mountRecordingStrip(options: {
       consent_confirmed: true as const,
       private: isPrivate,
       kind: options.kind,
-      attendees: options.people().map((person) => ({ who: person.ref, name: person.name, role: person.role })),
+      attendees: options.people().map((person) => ({ who: person.ref, name: person.name, role: person.role, about: person.about ?? null })),
       room: options.room
     };
     try {
