@@ -1,5 +1,9 @@
-import type { BookingKeepsake, Keepsake, PhotoKeepsake, StampKeepsake } from '@/journal/keepsakes/model';
+import { setApiImageSrc } from '@/api/config';
+import { travelPhotoUrl } from '@/api/travel';
+import type { BookingKeepsake, Keepsake, PhotoKeepsake, PostcardKeepsake, StampKeepsake } from '@/journal/keepsakes/model';
 import { configureJournalImage } from '@/journal/media-loading';
+import { postcardFacts, type PostcardTrip } from '@/postcard/model';
+import { postmarkSvg } from '@/postcard/stamp';
 import { el } from '@/journal/story/dom';
 import { clock12 } from '@/journal/trip-days';
 import type { JournalMedia } from '@/journal/types';
@@ -10,6 +14,8 @@ export interface DrawKeepsakeOptions {
   /** Ink colour for an arrival stamp, usually the city's accent. */
   stampInk?: string;
   eager?: boolean;
+  /** The trip, for a postcard's postmark. */
+  trip?: PostcardTrip;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -26,6 +32,7 @@ export function ticketDate(localDate: string): string {
 export function keepsakeLabel(k: Keepsake): string {
   if (k.type === 'stamp') return `Arrival stamp, ${k.city}`;
   if (k.type === 'booking') return `${k.carrier} ${k.number}, ${k.fromName} to ${k.toName}`;
+  if (k.type === 'postcard') return `Postcard from ${k.placeName}`;
   return k.title;
 }
 
@@ -84,6 +91,36 @@ function drawPhoto(k: PhotoKeepsake, options: DrawKeepsakeOptions): HTMLElement 
   return root;
 }
 
+/** The front of a postcard: the photo in a white border, with the postmark across a corner. */
+function drawPostcard(k: PostcardKeepsake, options: DrawKeepsakeOptions): HTMLElement {
+  const root = el('span', 'keepsake keepsake--postcard');
+  // A photo from before postcards does not say its shape: read it off the image.
+  root.dataset.orient = k.card.orientation ?? 'landscape';
+  const inner = el('span', 'keepsake__in');
+  const img = el('img', 'keepsake__postcard-photo');
+  img.alt = '';
+  img.decoding = 'async';
+  if (!options.eager) img.loading = 'lazy';
+  if (!k.card.orientation) {
+    img.addEventListener('load', () => {
+      if (img.naturalWidth && img.naturalHeight) {
+        root.dataset.orient = img.naturalWidth >= img.naturalHeight ? 'landscape' : 'portrait';
+      }
+    });
+  }
+  setApiImageSrc(img, travelPhotoUrl(k.card.photoId));
+  inner.append(img);
+  if (options.trip) {
+    const facts = postcardFacts(options.trip, k.card);
+    const mark = el('span', 'keepsake__postmark');
+    mark.style.setProperty('--keepsake-ink', facts.accent.ink);
+    mark.innerHTML = postmarkSvg(facts);
+    inner.append(mark);
+  }
+  root.append(inner);
+  return root;
+}
+
 /**
  * A keepsake as an object: a photo cut to its shape, a drawn ticket, or an ink stamp.
  * Sized in em, so one font-size on the parent scales the whole thing. It is a picture:
@@ -91,7 +128,13 @@ function drawPhoto(k: PhotoKeepsake, options: DrawKeepsakeOptions): HTMLElement 
  */
 export function drawKeepsake(k: Keepsake, options: DrawKeepsakeOptions): HTMLElement {
   const node =
-    k.type === 'booking' ? drawBooking(k) : k.type === 'stamp' ? drawStamp(k, options.stampInk) : drawPhoto(k, options);
+    k.type === 'booking'
+      ? drawBooking(k)
+      : k.type === 'stamp'
+        ? drawStamp(k, options.stampInk)
+        : k.type === 'postcard'
+          ? drawPostcard(k, options)
+          : drawPhoto(k, options);
   node.setAttribute('aria-hidden', 'true');
   node.setAttribute('data-keepsake-type', k.type);
   return node;

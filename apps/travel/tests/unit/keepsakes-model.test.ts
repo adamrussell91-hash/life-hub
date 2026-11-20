@@ -92,7 +92,7 @@ describe('listKeepsakes', () => {
       kind: 'ticket', title: 'Tram ticket', legId: 'leg_lplisbon01', localDate: '2027-03-04', localTime: '09:05',
     });
     const day = keepsakesForDay(listKeepsakes(journal, trip), 'leg_lplisbon01', '2027-03-04');
-    expect(day.map((k) => k.title)).toEqual(['Tram ticket', 'Fado poster']);
+    expect(day.map((k) => (k.type === 'photo' ? k.title : k.id))).toEqual(['Tram ticket', 'Fado poster']);
     expect(keepsakesForDay(listKeepsakes(journal, trip), 'leg_lpporto001', '2027-03-04')).toEqual([]);
   });
 

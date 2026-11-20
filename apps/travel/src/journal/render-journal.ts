@@ -70,11 +70,14 @@ import {
   hideBookingKeepsake,
   keepsakesForDay,
   listKeepsakes,
+  postcardsOf,
+  type PostcardKeepsake,
   removeKeepsake,
   type BookingKeepsake,
   type Keepsake,
 } from '@/journal/keepsakes/model';
 import { renderStoryKeep } from '@/journal/keepsakes/story-keep';
+import { openPostcardViewer } from '@/postcard/viewer';
 import { showHubToast } from '../../design-kit/js/hub-feedback.js';
 import {
   filterMomentsForPerspectiveDisplay,
@@ -1036,6 +1039,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     drawKeepsake(k, {
       tripId: liveFixture.trip_id,
       mediaById,
+      trip: liveTrip,
       stampInk: k.type === 'stamp' ? liveTrip?.cities.find((c) => c.id === legsById().get(k.legId)?.city_id)?.accent.color : undefined,
     });
 
@@ -1070,7 +1074,7 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
   /** Where a keepsake lives in the story: its moment, its day, or its city. */
   function keepsakeHome(k: Keepsake): string {
     if (k.type === 'photo' && k.momentId) return k.momentId;
-    const date = k.type === 'photo' ? k.localDate : k.date;
+    const date = k.type === 'photo' || k.type === 'postcard' ? k.localDate : k.date;
     const day = liveFixture.days.find((d) => d.lifecycle === 'live' && d.leg_id === k.legId && d.local_date === date);
     return day?.id ?? k.legId;
   }
@@ -1082,13 +1086,13 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
       return [n > 0 ? `Day ${n}` : '', longDate(k.date), clock12(k.departTime)].filter(Boolean).join(' · ');
     }
     const n = k.localDate ? dayNo(k.localDate) : 0;
-    return [n > 0 ? `Day ${n}` : '', k.localDate ? longDate(k.localDate) : '', clock12(k.localTime), k.placeName ?? '']
+    return [n > 0 ? `Day ${n}` : '', k.localDate ? longDate(k.localDate) : '', clock12(k.localTime), k.placeName || '']
       .filter(Boolean)
       .join(' · ');
   }
 
   function removeKept(k: Keepsake): void {
-    if (k.type === 'stamp') return;
+    if (k.type === 'stamp' || k.type === 'postcard') return;
     const next =
       k.type === 'booking'
         ? hideBookingKeepsake(journalDoc(), k.itemId, `${k.carrier} ${k.number}`)
@@ -1102,7 +1106,29 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
     );
   }
 
+  /** A postcard opens as itself: the same view followers have, without Remove. */
+  function openPostcardKeepsake(k: PostcardKeepsake): void {
+    if (!liveTrip) return;
+    swap('keepsake', null);
+    let slot: { destroy(): void } | null = null;
+    const handle = openPostcardViewer({
+      trip: liveTrip,
+      cards: postcardsOf(keepsakes),
+      startId: k.card.id,
+      label: 'Postcards',
+      onClose: () => {
+        if (overlays.keepsake === slot) overlays.keepsake = null;
+      },
+    });
+    slot = { destroy: () => handle.close() };
+    overlays.keepsake = slot;
+  }
+
   function openKeepsake(k: Keepsake, _from: HTMLElement): void {
+    if (k.type === 'postcard') {
+      openPostcardKeepsake(k);
+      return;
+    }
     const home = keepsakeHome(k);
     swap(
       'keepsake',
@@ -1133,7 +1159,9 @@ export function renderJournal(canvas: HTMLElement, opts: RenderJournalOptions): 
         ? 'Kept automatically from your booking'
         : k.type === 'photo'
           ? [clock12(k.localTime), k.placeName ?? ''].filter(Boolean).join(' · ')
-          : '';
+          : k.type === 'postcard'
+            ? [clock12(k.localTime), k.card.title].filter(Boolean).join(' · ')
+            : '';
     return renderStoryKeep({
       keepsake: k,
       drawn: draw(k),

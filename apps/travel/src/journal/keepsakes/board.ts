@@ -25,9 +25,16 @@ export function boardCountLine(keepsakes: Keepsake[]): string {
   const kept = countKept(keepsakes);
   if (kept === 0) return 'Nothing kept yet';
   const booked = keepsakes.filter((k) => k.type === 'booking').length;
-  if (booked === 0) return `${kept} kept`;
-  if (booked === kept) return `${kept} kept, all from your bookings`;
-  return `${kept} kept, ${booked} of them from your bookings`;
+  const posted = keepsakes.filter((k) => k.type === 'postcard').length;
+  const postcards = posted === 1 ? '1 postcard' : `${posted} postcards`;
+  if (posted === 0) {
+    if (booked === 0) return `${kept} kept`;
+    if (booked === kept) return `${kept} kept, all from your bookings`;
+    return `${kept} kept, ${booked} of them from your bookings`;
+  }
+  if (posted === kept) return `${postcards} kept`;
+  if (booked === 0) return `${kept} kept, ${postcards}`;
+  return `${kept} kept, ${booked} from your bookings, ${postcards}`;
 }
 
 function itemButton(keepsake: Keepsake, index: number, options: KeepsakeBoardOptions): HTMLButtonElement {

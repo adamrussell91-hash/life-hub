@@ -2,7 +2,7 @@
 
 Date: 18 November 2026
 Hub: Travel
-Status: built, except the journal keepsake (the second build)
+Status: built. The journal keepsake (the second build) is in `2026-11-21-travel-journal-postcard-keepsake-design.md`
 Mockup: `docs/mockups/travel-postcard.html`
 Plan: `docs/superpowers/plans/2026-11-18-travel-postcard-1-server.md` for the server. The card, the view and the sheet were built straight from this spec.
 
@@ -145,7 +145,7 @@ Changes elsewhere: `api/travel.ts` gains the calls above; `views/day-list.ts` sw
 
 ## Not in this build
 
-- The journal keepsake.
+- The journal keepsake (built separately; see the second build).
 - Telling followers a new postcard has arrived.
 - A postcard without a stop, or from the "I'm safe" button on Today.
 - Editing a postcard after posting. Remove it and send it again.
@@ -193,4 +193,4 @@ Changes elsewhere: `api/travel.ts` gains the calls above; `views/day-list.ts` sw
 
 ## Second build: journal keepsake
 
-`listKeepsakes(journal, trip)` already derives flight tickets and arrival stamps from the trip. It gains a `postcard` keepsake built from `listPostcards(trip)`, the board draws it with the same small card, and tapping it opens the same view. Nothing is copied into the journal. It gets its own spec when it starts.
+`listKeepsakes(journal, trip)` already derives flight tickets and arrival stamps from the trip. It gains a `postcard` keepsake built from `listPostcards(trip)`, the board draws it with the same small card, and tapping it opens the same view. Nothing is copied into the journal. Its own spec: `docs/superpowers/specs/2026-11-21-travel-journal-postcard-keepsake-design.md`.
