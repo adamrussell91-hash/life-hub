@@ -10,6 +10,7 @@ import { gameGlyph, modeChips } from './glyphs';
 import { hasPlayer } from './solo/registry';
 import { openSoloPlayer } from './solo/shell';
 import { openLivePhone } from './live/phone';
+import { GAME_INVITE_EVENT, markGameRoomJoined } from '@/student/game-invite';
 import { liveStyle } from './live/board-parts';
 import './kinds';
 import './games.css';
@@ -158,23 +159,79 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
     return true;
   }
 
+  /** The live phone for one game; with a code it joins straight away (phone.ts). */
+  function openLive(g: PublicGame, code: string | undefined): void {
+    if (nudgeInitials() || !client?.join || livePhone) return;
+    livePhone = openLivePhone({
+      game: g,
+      // In the room by any route: a pushed invite for it stops showing (student/game-invite.ts).
+      join: (gameId, c) =>
+        client.join!(gameId, c).then((reply) => {
+          markGameRoomJoined(reply.room);
+          return reply;
+        }),
+      code,
+      onClose: () => {
+        livePhone = null;
+      }
+    });
+  }
+
   /** Join live game: the six-box code, then the live phone (games/live/phone.ts). */
   function liveButton(g: PublicGame): HTMLButtonElement {
     const b = el('button', `btn ${g.solo ? 'btn--secondary' : 'btn--primary'} gm-card__live`, 'Join live game');
     b.type = 'button';
-    b.addEventListener('click', () => {
-      if (nudgeInitials() || !client?.join) return;
-      livePhone = openLivePhone({
-        game: g,
-        join: (gameId, code) => client.join!(gameId, code),
-        code: joinCode,
-        onClose: () => {
-          livePhone = null;
-        }
-      });
-    });
+    b.addEventListener('click', () => openLive(g, joinCode));
     return b;
   }
+
+  /**
+   * Push invite (`?join=…&game=…`, or Join on the toast while already here):
+   * open that game's phone with the code in, once the student has initials.
+   * Until then the initials box is nudged and the game waits.
+   */
+  let invited: { gameId: string; code: string } | null = (() => {
+    try {
+      const gameId = new URLSearchParams(location.search).get('game') ?? '';
+      return joinCode && gameId ? { gameId, code: joinCode } : null;
+    } catch {
+      return null;
+    }
+  })();
+  function takeInvite(): void {
+    if (!invited || disposed || !client || !arcade) return;
+    const g = games.find((x) => x.id === invited!.gameId);
+    if (!g) {
+      invited = null;
+      return;
+    }
+    if (arcade.identity.need === 'initials') {
+      nudgeInitials();
+      return;
+    }
+    if (arcade.identity.need) {
+      invited = null;
+      return;
+    }
+    const code = invited.code;
+    invited = null;
+    // Drop `game` from the link so a refresh doesn't join again; `join` stays for Join live game.
+    try {
+      const url = new URL(location.href);
+      url.searchParams.delete('game');
+      history.replaceState(history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      // Not worth stopping the join for.
+    }
+    openLive(g, code);
+  }
+  const onInvite = (e: Event) => {
+    const d = (e as CustomEvent<{ game_id?: string; code?: string }>).detail;
+    if (!d?.game_id || !/^\d{6}$/.test(d.code ?? '')) return;
+    invited = { gameId: d.game_id, code: d.code! };
+    takeInvite();
+  };
+  window.addEventListener(GAME_INVITE_EVENT, onInvite);
 
   function paint(): void {
     head.replaceChildren();
@@ -230,6 +287,7 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
     if (next.identity.need === 'class') gateMessage('Open these games from your class page.');
     else if (next.identity.need === 'initials') gateMessage('Type your initials to keep your scores.', true);
     paint();
+    takeInvite();
   }
 
   paint();
@@ -242,6 +300,7 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
   return {
     dispose() {
       disposed = true;
+      window.removeEventListener(GAME_INVITE_EVENT, onInvite);
       void soloShell?.close();
       livePhone?.close();
       host.replaceChildren();

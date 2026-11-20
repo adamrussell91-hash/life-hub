@@ -150,6 +150,8 @@ export type GameTeacherApi = {
   open?(gameId: string, classId: string, opts?: { teams?: number }): Promise<LiveOpen>;
   /** Rooms still open for this lesson (so a refreshed board can reconnect). */
   rooms?(): Promise<{ rooms: LiveRoomInfo[] }>;
+  /** Push invite: a Join toast on every class page this room's class has open. */
+  invite?(gameId: string, room: string): Promise<{ invite: { code: string; sent_at: number } }>;
 };
 
 /**
@@ -183,6 +185,7 @@ export function gameTeacherApi(lessonId: string): GameTeacherApi {
     pushToMarkbook: (class_id, game_id, title) => call('markbook_push', { class_id, game_id, ...(title ? { title } : {}) }),
     sources: () => call<UnitSources>('sources'),
     open: (game_id, class_id, opts) => call<LiveOpen>('open', { game_id, class_id, ...(opts?.teams ? { teams: opts.teams } : {}) }),
-    rooms: () => call<{ rooms: LiveRoomInfo[] }>('rooms')
+    rooms: () => call<{ rooms: LiveRoomInfo[] }>('rooms'),
+    invite: (game_id, room) => call<{ invite: { code: string; sent_at: number } }>('invite', { game_id, room })
   };
 }

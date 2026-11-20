@@ -23,6 +23,9 @@ export const gameKeys = (lesson) => ({
 /** A live room's join code → where it is. Freed when the room folds, or once it is 6 h old. */
 export const roomCodeKey = (code) => `game-rooms/codes/${code}`;
 
+/** A class's pushed live-game invite (game-rooms.mjs inviteClass): one per class, the latest push wins. */
+export const classInviteKey = (cls) => `game-rooms/invites/${cls}`;
+
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
 /**

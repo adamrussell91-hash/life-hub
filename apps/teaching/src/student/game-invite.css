@@ -1,0 +1,97 @@
+/* Push invite: the Join toast on every class page (game-invite.ts). Tokens only. */
+.gi-toast {
+  position: fixed;
+  z-index: 900;
+  left: 50%;
+  bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(30rem, calc(100vw - 2 * var(--space-4)));
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--shadow-card, var(--shadow));
+  animation: gi-toast-in 220ms ease-out;
+}
+
+.gi-toast__text {
+  min-width: 0;
+}
+
+.gi-toast__title,
+.gi-toast__sub {
+  margin: 0;
+}
+
+.gi-toast__title {
+  font-weight: 700;
+}
+
+.gi-toast__sub {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gi-toast__join {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.gi-toast__close {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.gi-toast__close:hover {
+  color: var(--ink);
+}
+
+.gi-toast__close:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--accent));
+  outline-offset: 2px;
+}
+
+@keyframes gi-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gi-toast {
+    animation: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .gi-toast {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .gi-toast__join {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+  }
+
+  .gi-toast__close {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}

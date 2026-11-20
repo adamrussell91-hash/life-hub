@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LiveOpen } from '@/games/api';
 import type { PublicGame } from '@/games/core/schema';
 import type { RoomView, Seat } from '@/games/core/room-protocol';
@@ -18,10 +18,10 @@ const OPEN: LiveOpen = { room: 'room_test_0001', code: '482913', teacher_ticket:
 const INITIALS = ['AB', 'CD', 'EF', 'GH', 'IJ', 'KL', 'MN', 'OP'];
 const seats = (n: number, over: Partial<Seat> = {}): Seat[] => INITIALS.slice(0, n).map((initials, k) => ({ owner: `own_${initials.toLowerCase()}`, initials, connected: true, score: 8 - k, ...over }));
 
-function board(open: LiveOpen = OPEN) {
+function board(open: LiveOpen = OPEN, invite?: () => Promise<void>) {
   const host = document.createElement('div');
   document.body.append(host);
-  const b = openLiveBoard({ open, host, connect: { WebSocketImpl: FakeWS, fetchImpl: undefined } });
+  const b = openLiveBoard({ open, host, connect: { WebSocketImpl: FakeWS, fetchImpl: undefined }, ...(invite ? { invite } : {}) });
   const ws = FakeWS.last();
   ws.open();
   let seq = 1;
@@ -40,6 +40,29 @@ beforeEach(() => {
 afterEach(() => document.body.replaceChildren());
 
 describe('live board', () => {
+  it('Push invite: in the lobby next to Start, then with the tools mid-game; says sent, then Push again', async () => {
+    const invite = vi.fn(async () => undefined);
+    const { root, snap } = board(OPEN, invite);
+    snap({ seats: [] });
+    const find = () => [...root.querySelectorAll<HTMLButtonElement>('.gl-controls button')].find((b) => /Push|Invite|Sending/.test(b.textContent ?? ''));
+    expect(find()?.textContent).toBe('Push invite');
+    expect(find()?.closest('.gl-controls__main')).toBeTruthy();
+    find()!.click();
+    expect(find()?.textContent).toBe('Sending…');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(invite).toHaveBeenCalledTimes(1);
+    expect(find()?.textContent).toBe('Invite sent');
+    snap({ phase: 'playing', seats: seats(2) });
+    expect(find()?.closest('.gl-controls__tools')).toBeTruthy();
+  });
+
+  it('no Push invite without an invite hook (dev preview, old callers)', () => {
+    const { root, snap } = board();
+    snap({ seats: [] });
+    expect(root.querySelector('.gl-controls')?.textContent).not.toMatch(/Push invite/);
+  });
+
   it('lobby: the QR opens this lesson for the class with the code; typing it at the class site lands there too', () => {
     const { root, snap } = board({ ...OPEN, join_url: undefined, lesson_id: 'lesson_t1', class_id: 'class_t1' });
     snap({ seats: [] });

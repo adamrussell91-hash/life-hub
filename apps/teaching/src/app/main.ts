@@ -366,6 +366,7 @@ function railCreateClassHandler(
 
 import { absolutePublicUrl, type PublicEntityKind } from '@/teacher/public-link';
 import { withTeacherPreview } from '@/quiz/teacher-preview';
+import { syncGameInviteWatch } from '@/student/game-invite';
 
 function studentShareForTeacherPath(pathname: string): string | null {
   const match = pathname.match(/^\/(lessons|units|classes)\/([^/]+)\/?$/);
@@ -1265,6 +1266,14 @@ async function handleRoute(match: RouteMatch): Promise<void> {
 
   showPageName(match, token);
   renderRoute(match, token);
+  syncGameInviteWatch(inviteClassFor(match));
+}
+
+/** Push invite: class pages watch their class; other student pages the class last opened here; teacher and share pages none. */
+function inviteClassFor(match: RouteMatch): string | null | false {
+  if (match.name === 'student-class' || match.name === 'student-class-lesson' || match.name === 'student-profile') return match.params.classId;
+  if (match.name === 'student-lesson' || match.name === 'student-unit' || match.name === 'student-feedback') return null;
+  return false;
 }
 
 /** Names the tab now, then again once the curriculum can name a lesson, unit or class. */

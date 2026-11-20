@@ -122,6 +122,7 @@ import { createRotationHandler } from '../../../netlify/functions/rotation.mjs';
 import { createGamesHandler } from '../../../netlify/functions/games.mjs';
 import { createPublishedGamesHandler } from '../../../netlify/functions/published-games.mjs';
 import { createGameFoldHandler } from '../../../netlify/functions/games-fold.mjs';
+import { createPublishedGameInviteHandler } from '../../../netlify/functions/published-game-invite.mjs';
 import { createAnthologyKnowledgeHandler } from '../../../netlify/functions/anthology-knowledge.mjs';
 import { createPublishedAnthologyKnowledgeHandler } from '../../../netlify/functions/published-anthology-knowledge.mjs';
 import { createOrganiserHandler } from '../../../netlify/functions/organiser.mjs';
@@ -4338,6 +4339,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
         ? createGamesHandler(deps)
       : path.startsWith('/api/published/game/')
         ? createPublishedGamesHandler(deps)
+      : path.startsWith('/api/published/game-invite/')
+        ? createPublishedGameInviteHandler(deps)
       : /^\/api\/lessons\/[^/]+\/case$/.test(path)
         ? createCaseHandler(deps)
       : /^\/api\/lessons\/[^/]+\/case-practice$/.test(path)
@@ -4516,6 +4519,7 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       /^\/api\/published\/rotation\/[^/]+$/.test(path) ||
       /^\/api\/lessons\/[^/]+\/game$/.test(path) ||
       /^\/api\/published\/game\/[^/]+$/.test(path) ||
+      (method === 'GET' && /^\/api\/published\/game-invite\/[^/]+$/.test(path)) ||
       /^\/api\/units\/[^/]+\/organiser$/.test(path) ||
       /^\/api\/published\/organiser\/[^/]+$/.test(path) ||
       /^\/api\/units\/[^/]+\/anthology-knowledge$/.test(path) ||

@@ -22,7 +22,7 @@ export type LiveLauncherOptions = {
   games: Game[];
   classId: string | null;
   className?: string;
-  api: Pick<GameTeacherApi, 'open' | 'rooms'> | null;
+  api: Pick<GameTeacherApi, 'open' | 'rooms' | 'invite'> | null;
 };
 
 const errText = (e: unknown, fallback: string) => (e instanceof Error && e.message ? e.message : fallback);
@@ -55,7 +55,14 @@ export function liveLauncher(o: LiveLauncherOptions): HTMLElement {
   };
   const open = o.api?.open;
   const launch = (reply: LiveOpen, gameId?: string) => {
-    openLiveBoard({ open: reply, game: boardGame(reply, o.games, gameId) });
+    const room = reply.room;
+    const game = reply.game_id ?? gameId;
+    const invite = o.api?.invite;
+    openLiveBoard({
+      open: reply,
+      game: boardGame(reply, o.games, gameId),
+      ...(invite && game ? { invite: () => invite(game, room).then(() => undefined) } : {})
+    });
   };
   for (const g of live) {
     const row = el('div', 'gl-launch__row');
