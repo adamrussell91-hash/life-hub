@@ -27,6 +27,7 @@ import { prepareRotationPublish, storeRotationConfig } from './_shared/rotation.
 import { prepareGamePublish, storeGameKeys } from './_shared/games.mjs';
 import { prepareSprintPublish, sprintPublishProblems, storeSprintConfig } from './_shared/sprint.mjs';
 import { SprintSettingsSchema } from './_shared/sprint-schema.mjs';
+import { prepareLabPublish, storeLabConfig } from './_shared/lab.mjs';
 
 export const config = { path: '/api/lessons/:id/publish' };
 
@@ -278,6 +279,29 @@ export async function publishLessonDraft(store, id, { env, deps = {} } = {}) {
       game: games.snapshot
     });
     await setJSON(store, draftLessonKey(id), { ...draft, published_at: publishedAt, updated_at: publishedAt });
+    return { ok: true, student_path: `/s/lessons/${id}` };
+  }
+
+  // A lab: the public lines and the Explain block go in the snapshot; the full settings (texts, control, pairs, debrief) are stored apart (lab.mjs).
+  if (draft.pedagogical_mode === 'lab') {
+    const lab = prepareLabPublish(draft);
+    if (lab.problems.length > 0) return fail(400, 'validation_error', lab.problems[0], false);
+    await storeLabConfig(store, id, lab.config);
+    await setJSON(store, publishedLessonKey(id), {
+      lesson_id: id,
+      title,
+      unit_id,
+      blocks: sanitizeBlocksDeep(lab.blocks),
+      published_at: publishedAt,
+      schema_version: 1,
+      ...(draft.cover ? { cover: draft.cover } : {}),
+      ...(outcomeIds.length > 0 ? { outcome_ids: outcomeIds } : {}),
+      ...(draft.feedback_off === true ? { feedback_off: true } : {}),
+      pedagogical_mode: 'lab',
+      lab: lab.snapshot
+    });
+    // The draft keeps the Explain block too, so marking finds the same block the students answered.
+    await setJSON(store, draftLessonKey(id), { ...draft, blocks: lab.draftBlocks, published_at: publishedAt, updated_at: publishedAt });
     return { ok: true, student_path: `/s/lessons/${id}` };
   }
 

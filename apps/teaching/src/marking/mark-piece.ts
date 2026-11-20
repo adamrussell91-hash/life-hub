@@ -9,6 +9,8 @@ import { drawPick, pickCaption, pickMark, placedPick, stepHead, type StepPick } 
 import type { Rubric } from './rubric-model';
 import { mountRubricPanel, type RubricAiRead, type RubricPanel, type RubricSetup } from './rubric-panel';
 import { changesSheet } from './draft-diff';
+import { isLabExplain, labRecordAside } from '@/lab/mark-record';
+import type { LabStudentRecord } from '@/lab/api';
 import './marking.css';
 
 type Criterion = { id: string; label: string; outcomes: string[]; concepts: string[]; skill?: string };
@@ -112,6 +114,8 @@ export type MarkPieceOptions = {
   rubricMarks?: { max: number; value?: number | null; ai?: number | null };
   /** Handed-in writing only: offers Return for a redraft. */
   redraft?: boolean;
+  /** Reads a student's lab record for a lab's explanation. Test seam; left out, it asks the lab's own route. */
+  labRecord?: (lessonId: string, studentId: string) => Promise<LabStudentRecord>;
 };
 
 export function markPieceView(d: MarkPieceData, act: MarkPieceActions, o: MarkPieceOptions = {}): HTMLElement {
@@ -230,6 +234,8 @@ export function openMarkPiece(d: MarkPieceData, act: MarkPieceActions, o: MarkPi
     rubric.append(row);
   }
   if (o.aside) side.append(o.aside);
+  // A lab's explanation is marked with the student's lab notes, prediction and trial beside it.
+  if (d.column.piece && isLabExplain(d.column.piece)) side.append(labRecordAside(d.column.piece.lesson_id, d.student.id, o.labRecord));
   let panel: RubricPanel | null = null;
   if (o.rubric) {
     const seeded = linked.flatMap((c) => (steps[c.id] ? [[c.skill!, steps[c.id]!] as const] : []));

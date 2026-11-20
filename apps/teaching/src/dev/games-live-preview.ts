@@ -120,6 +120,7 @@ const LESSON: { games: Game[] } = {
       ...tagless
     },
     { id: 'g_wager', kind: 'wager', title: 'Wager on the Lantern House', items: LANTERN_MCQ },
+    { id: 'g_chain', kind: 'answer_chain', title: 'Answer chain: plants', start_answer: 'photosynthesis', theme: 'Plants and energy', settings: { links: 6, question_seconds: 20, answer_seconds: 10, review_seconds: 60 }, ...tagless },
     {
       id: 'g_artic', kind: 'articulate', title: 'Articulate: techniques',
       items: [

@@ -1,0 +1,60 @@
+name: Deploy game rooms Worker
+
+# Live game rooms run on a Cloudflare Worker (workers/game-rooms) that builds
+# in netlify/functions/_shared/game-room-core.mjs when it deploys. Netlify
+# updates on every merge; without this job the Worker kept its old engine
+# and new game kinds refused to open. Deploy whenever either side changes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/game-rooms/**'
+      - 'netlify/functions/_shared/game-room-core.mjs'
+      - '.github/workflows/game-rooms-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; a newer pending run replaces an older pending one,
+# and it deploys main as it stands.
+concurrency:
+  group: game-rooms-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check the Cloudflare secrets are set
+        if: env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == ''
+        run: |
+          echo "::warning::CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is not set, so the game rooms Worker was not deployed."
+      - uses: actions/checkout@v4
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+      - uses: actions/setup-node@v4
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        with:
+          node-version: 22
+      # Restore only: the Pages workflow is the one that saves this cache.
+      - uses: actions/cache/restore@v4
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+      # The bundled engine imports zod from the repo root, so the root
+      # packages go in first (at the lockfile's versions), then the Worker's.
+      - name: Install root packages
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: npm ci --ignore-scripts --prefer-offline
+      - name: Install Worker packages
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: npm ci --ignore-scripts --prefer-offline --prefix workers/game-rooms
+      - name: Deploy
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        working-directory: workers/game-rooms
+        run: npx wrangler deploy --message "main ${GITHUB_SHA::7}"

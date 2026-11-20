@@ -24,6 +24,7 @@ import { keepMinutesDecisions, saveMinutesReview } from '@/lib/meeting-minutes';
 import { mountMinutesCard } from '@/views/meeting-minutes-card';
 import { askConfirm, createRecordingModel, mountRecordingStrip } from '@/views/meeting-recording-strip';
 import { mountRecordingCard } from '@/views/meeting-recording-card';
+import { mountRecordingUpload } from '@/views/meeting-recording-upload';
 import { directoryRowFor, groupRoom, indexDirectory, initialsFor, isSelfAttendee, type RoomCluster, type RoomDirectoryRow, type RoomPerson } from '@/lib/room';
 import { fetchSelfPerson } from '@/api/network-ecology';
 import { createPillGroup } from '@/lib/pills';
@@ -96,15 +97,23 @@ export function saveGuideRun(runs: GuideRun[], run: GuideRun): { runs: GuideRun[
 }
 
 const PHASE_LABEL: Record<ObservationPhase, string> = { planning: 'Planning', observing: 'Observing', reflecting: 'Reflecting' };
+const PHASE_NUMBER: Record<ObservationPhase, number> = { planning: 1, observing: 2, reflecting: 3 };
 
-/** Title for the next observation meeting: this title with its phase word swapped, else `<teacher> · observation <phase>`. */
+/** 'Observation Phase 2: Observing', the NESA template's phase names. */
+export function observationPhaseName(phase: ObservationPhase): string {
+  return `Observation Phase ${PHASE_NUMBER[phase]}: ${PHASE_LABEL[phase]}`;
+}
+
+/**
+ * Title for the next observation meeting: `<teacher> – Observation Phase 2: Observing`.
+ * With no teacher name, the current title's phase name is swapped, else the phase name stands alone.
+ */
 export function linkedMeetingTitle(current: string, teacherName: string, next: ObservationPhase): string {
-  const label = PHASE_LABEL[next];
-  const phaseWord = /\b(planning|observing|reflecting)\b/i;
-  if (phaseWord.test(current)) {
-    return current.replace(phaseWord, (word) => (word[0] === word[0]!.toUpperCase() ? label : label.toLowerCase()));
-  }
-  return `${teacherName.trim() || current} · observation ${label.toLowerCase()}`;
+  const phase = observationPhaseName(next);
+  const teacher = teacherName.trim();
+  if (teacher) return `${teacher} – ${phase}`;
+  const named = /Observation Phase \d: (Planning|Observing|Reflecting)/;
+  return named.test(current) ? current.replace(named, phase) : phase;
 }
 
 /** The block the recording's kept lines go under, one per meeting. */
@@ -365,6 +374,8 @@ export async function renderMeetingPage(
     }
   }
 
+  // Mark complete, Cancel, No show: their own group on the phase row, so the top row stays short.
+  const stateActions = el('div', 'meeting-page__state-actions');
   if (isOpenState(record.state)) {
     for (const [action, label] of [
       ['complete', 'Mark complete'],
@@ -375,7 +386,7 @@ export async function renderMeetingPage(
       button.type = 'button';
       button.dataset.stateAction = action;
       button.addEventListener('click', () => void endMeeting(action));
-      headActions.append(button);
+      stateActions.append(button);
     }
   }
 
@@ -393,7 +404,14 @@ export async function renderMeetingPage(
     switcher.append(button);
   }
   const phaseNote = el('p', 'comm-page__phase-note');
-  head.append(chips, facts, switcher, headActions, phaseNote, actionStatus);
+  // Two tidy rows: what and when on the left with the page buttons on the right, then the phase
+  // switcher with its one-line note beside it.
+  const meta = el('div', 'meeting-page__meta');
+  meta.append(chips, facts);
+  const phaseRow = el('div', 'meeting-page__phase-row');
+  phaseRow.append(switcher, phaseNote);
+  if (stateActions.childElementCount) phaseRow.append(stateActions);
+  head.append(meta, headActions, phaseRow, actionStatus);
   const followUpBar = mountNotesFollowUp({
     record,
     people: () => attendees.map((attendee) => ({ ref: attendee.ref, name: attendee.name })),
@@ -444,6 +462,7 @@ export async function renderMeetingPage(
     .split('\n').map((line) => line.trim()).filter(Boolean);
   const recModel = createRecordingModel(id);
   const recStrip = mountRecordingStrip({ meetingId: id, kind: 'meeting', people: recAttendees, room: false, notes: noteLines, model: recModel });
+  const recUpload = mountRecordingUpload({ meetingId: id, kind: 'meeting', people: recAttendees, room: false, notes: noteLines, model: recModel });
   const recCard = mountRecordingCard({
     meetingId: id,
     kind: 'meeting',
@@ -997,7 +1016,14 @@ export async function renderMeetingPage(
     });
   }
 
-  const observationBtn = el('button', 'btn btn--secondary', '◉ Classroom observation') as HTMLButtonElement;
+  // NESA's own words on the button, so it reads as the accreditation observation, not a generic note.
+  const observationBtn = el('button', 'btn btn--secondary meeting-page__obs-btn') as HTMLButtonElement;
+  observationBtn.append(
+    el('span', 'meeting-page__nesa-tag', 'NESA'),
+    el('span', 'meeting-page__obs-label', 'Classroom observation'),
+    el('span', 'meeting-page__obs-sub', 'Proficient Teacher')
+  );
+  observationBtn.title = 'NESA Observation Report: Planning, Observing, Reflecting against 2 to 4 Standard Descriptors';
   observationBtn.type = 'button';
   observationBtn.dataset.part = 'observation-start';
   observationBtn.addEventListener('click', () => openObservation());
@@ -1153,7 +1179,7 @@ export async function renderMeetingPage(
   }
 
   function paintDuring(): void {
-    main.append(liveStrip(), recStrip.below, minutesCard(), actions, mentions);
+    main.append(liveStrip(), recStrip.below, minutesCard(), recUpload.el, actions, mentions);
     full.append(notesCard(
       'Notes',
       'Start a line with »me to log something you owe, »Name for something they owe, ✓ for a decision, @Name for who said what.'
@@ -1165,7 +1191,7 @@ export async function renderMeetingPage(
   function paintAfter(): void {
     // Still recording after the meeting moved to After: the controls stay in reach.
     if (recStrip.isActive()) main.append(liveStrip(), recStrip.below);
-    main.append(recCard.el, minutesCard());
+    main.append(recCard.el, minutesCard(), recUpload.el);
     if (record.purpose) main.append(purposeCheckCard());
     main.append(wrapUpCard(), actions, mentions);
     full.append(notesCard('Notes', 'Your notes from the meeting. Still editable.'));

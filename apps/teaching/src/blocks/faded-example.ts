@@ -3,7 +3,7 @@ import type { RenderMode } from '@/blocks/render';
 import { loadActivityState, saveActivityState, storageKey } from '@/blocks/learning-activity';
 import { emitAnswered } from '@/lecture/answered';
 import { fadedContent, fadedStepKey, fadedWritingSteps, type FadedContent, type FadedStep } from '@/schemas/faded';
-import { checkAttempt } from '@/blocks/faded-attempt';
+import { checkAttempt, firstEmpty } from '@/blocks/faded-attempt';
 
 export type FadedExampleBlock = Extract<Block, { block_type: 'faded_example' }>;
 
@@ -123,6 +123,16 @@ function loadWork(block: FadedExampleBlock, c: FadedContent, step: FadedStep): S
   return fresh;
 }
 
+/** Over this many words the extract is a passage: reading size, beside the boxes on a wide screen. */
+const LONG_WORDS = 25;
+export const isLongExtract = (text: string): boolean => text.trim().split(/\s+/).filter(Boolean).length > LONG_WORDS;
+
+/** The student header: "Worked example" or "Your turn", and where they are. */
+export function fadedHeadText(step: FadedStep, index: number, total: number): string {
+  const kind = step.blanks.length ? 'Your turn' : 'Worked example';
+  return total > 1 ? `${kind} · ${index + 1} of ${total}` : kind;
+}
+
 export function renderFadedExample(block: FadedExampleBlock, mode: RenderMode, opts: Opts = {}): HTMLElement {
   const root = el('div', 'block-faded');
   root.dataset.blockId = block.id;
@@ -141,45 +151,52 @@ export function renderFadedExample(block: FadedExampleBlock, mode: RenderMode, o
   const isDone = (i: number): boolean => works[i]!.stage === 'model';
   const isOpenable = (i: number): boolean => !!opts.unlocked || works.slice(0, i).every((_, j) => isDone(j));
   const save = (i: number): void => saveActivityState(storageKey('local', fadedStepKey(block, c.steps[i]!)), works[i]);
-  const criteriaFor = (step: FadedStep, p: number): string[] => c.criteria[c.part_labels[p] ?? ''] ?? [];
-  const allTicked = (i: number): boolean =>
-    c.steps[i]!.blanks.every((p) => criteriaFor(c.steps[i]!, p).every((_, n) => works[i]!.ticks.includes(tickId(p, n))));
+  const criteriaFor = (p: number): string[] => c.criteria[c.part_labels[p] ?? ''] ?? [];
+  const allTicked = (i: number): boolean => c.steps[i]!.blanks.every((p) => criteriaFor(p).every((_, n) => works[i]!.ticks.includes(tickId(p, n))));
+  /** Phone only: the student folded the long passage away to keep the boxes on screen. */
+  let passageHidden = false;
 
   let open = Math.max(0, works.findIndex((_, i) => !isDone(i)));
   if (works.every((_, i) => isDone(i))) open = last;
 
-  const panel = el('section', 'block-faded__step');
-  panel.tabIndex = -1;
+  const head = el('div', 'block-faded__head');
+  const headText = el('p', 'block-faded__where');
+  head.append(headText);
   const rail = c.steps.length > 1 ? el('div', 'block-faded-rail') : null;
-  const marks: Array<{ button: HTMLButtonElement; num: HTMLElement }> = [];
+  const marks: HTMLButtonElement[] = [];
   if (rail) {
     rail.setAttribute('role', 'group');
-    rail.setAttribute('aria-label', 'Steps');
+    rail.setAttribute('aria-label', 'Examples');
     c.steps.forEach((step, i) => {
       const button = el('button', 'block-faded-rail__mark');
       button.type = 'button';
-      const num = el('b');
-      button.append(num, el('span', undefined, fadedModeText(step, c.part_labels)));
       button.addEventListener('click', () => {
         open = i;
+        passageHidden = false;
         repaint(true);
       });
       rail.append(button);
-      marks.push({ button, num });
+      marks.push(button);
     });
-    root.append(rail);
+    head.append(rail);
   }
-  root.append(panel);
+  const panel = el('section', 'block-faded__step');
+  panel.tabIndex = -1;
+  root.append(head, panel);
 
   const syncRail = (): void => {
+    headText.textContent = fadedHeadText(c.steps[open]!, open, c.steps.length);
     marks.forEach((m, i) => {
-      const done = isDone(i) && i !== open;
-      m.button.disabled = !isOpenable(i);
-      m.button.classList.toggle('block-faded-rail__mark--on', i === open);
-      m.button.classList.toggle('block-faded-rail__mark--done', done);
-      if (i === open) m.button.setAttribute('aria-current', 'step');
-      else m.button.removeAttribute('aria-current');
-      m.num.textContent = done ? '✓' : String(i + 1);
+      const done = isDone(i);
+      m.disabled = !isOpenable(i);
+      m.classList.toggle('block-faded-rail__mark--on', i === open);
+      m.classList.toggle('block-faded-rail__mark--done', done && i !== open);
+      m.textContent = String(i + 1);
+      const what = fadedModeText(c.steps[i]!, c.part_labels);
+      m.setAttribute('aria-label', `Example ${i + 1} of ${c.steps.length}: ${what}${done ? ', done' : m.disabled ? ', opens when you finish the one before' : ''}`);
+      m.title = m.disabled ? 'Finish the one before first' : `Example ${i + 1}`;
+      if (i === open) m.setAttribute('aria-current', 'step');
+      else m.removeAttribute('aria-current');
     });
   };
 
@@ -200,54 +217,119 @@ export function renderFadedExample(block: FadedExampleBlock, mode: RenderMode, o
       save(i);
     }
     open = Math.min(i + 1, last);
+    passageHidden = false;
     repaint(true);
   };
 
   const nextButton = (i: number): HTMLButtonElement => {
-    const go = el('button', 'btn btn--primary block-faded__next', i === last ? 'Done' : `On to step ${i + 2}`);
+    const go = el('button', 'btn btn--primary block-faded__next', i === last ? 'Done' : 'Next example');
     go.type = 'button';
     go.addEventListener('click', () => goNext(i));
     return go;
   };
 
+  /** The extract, at reading size and with a fold on phones when it is a whole passage. */
+  const extractBox = (step: FadedStep): HTMLElement => {
+    const box = el('div', 'block-faded__source');
+    const quote = extractQuote(step);
+    if (!isLongExtract(step.extract)) {
+      box.append(quote);
+      return box;
+    }
+    quote.classList.add('block-faded__extract--long');
+    quote.hidden = passageHidden;
+    const fold = el('button', 'block-faded__fold', passageHidden ? 'Show the passage' : 'Hide the passage');
+    fold.type = 'button';
+    fold.setAttribute('aria-expanded', String(!passageHidden));
+    fold.addEventListener('click', () => {
+      passageHidden = !passageHidden;
+      quote.hidden = passageHidden;
+      fold.textContent = passageHidden ? 'Show the passage' : 'Hide the passage';
+      fold.setAttribute('aria-expanded', String(!passageHidden));
+    });
+    box.append(fold, quote);
+    return box;
+  };
+
   const paintStep = (i: number): void => {
     const step = c.steps[i]!;
     const work = works[i]!;
-    const writing = step.blanks.length > 0;
+    const isWriting = step.blanks.length > 0;
     panel.replaceChildren();
-    panel.append(chip(step, c, i));
-    const prompt = promptLine(step, c);
-    if (prompt) panel.append(prompt);
-    panel.append(extractQuote(step));
+    panel.classList.toggle('block-faded__step--long', isLongExtract(step.extract));
+    // The block's question is said once, on the first example; a step's own wording always shows.
+    const own = step.prompt?.trim();
+    const promptText = own || (i === 0 ? c.prompt : '');
+    if (promptText) panel.append(el('p', 'block-faded__prompt', promptText));
+    panel.append(extractBox(step));
 
+    const work_ = el('div', 'block-faded__work');
     const nudge = el('p', 'block-faded__nudge');
     nudge.setAttribute('aria-live', 'polite');
     const actions = el('div', 'block-faded__actions');
+
+    const tickSet = (p: number, partLabel: string): HTMLFieldSetElement | null => {
+      const items = criteriaFor(p);
+      if (!items.length) return null;
+      const set = el('fieldset', 'block-faded__ticks');
+      set.append(el('legend', 'block-faded__ticks-head', `Does your ${partLabel.toLowerCase()} do ${items.length > 1 ? 'these' : 'this'}?`));
+      items.forEach((text, n) => {
+        const label = el('label', 'block-faded__tick');
+        const box = el('input');
+        box.type = 'checkbox';
+        box.disabled = work.stage === 'model';
+        box.checked = work.ticks.includes(tickId(p, n));
+        box.addEventListener('change', () => {
+          const id = tickId(p, n);
+          work.ticks = box.checked ? [...work.ticks.filter((t) => t !== id), id] : work.ticks.filter((t) => t !== id);
+          save(i);
+          syncButtons();
+        });
+        label.append(box, el('span', undefined, text));
+        set.append(label);
+      });
+      return set;
+    };
 
     const list = el('dl', 'block-faded__parts');
     c.part_labels.forEach((label, p) => {
       const term = el('dt', undefined, label);
       const value = el('dd');
-      if (step.blanks.includes(p)) {
+      if (!step.blanks.includes(p)) {
+        value.textContent = step.answers[p] ?? '';
+      } else if (work.stage === 'write') {
         const input = el('textarea', 'block-faded__input');
-        input.rows = 2;
+        input.rows = (step.answers[p] ?? '').trim().split(/\s+/).length <= 3 ? 1 : 2;
         input.value = work.texts[p] ?? '';
-        input.readOnly = work.stage !== 'write';
+        input.dataset.part = String(p);
         input.setAttribute('aria-label', `Your ${label.toLowerCase()}`);
         input.addEventListener('input', () => {
           work.texts[p] = input.value;
+          input.removeAttribute('aria-invalid');
+          nudge.textContent = '';
           save(i);
         });
         value.append(input);
-        if (work.stage === 'model') value.append(el('p', 'block-faded__model', `Model: ${step.answers[p] ?? ''}`));
       } else {
-        value.textContent = step.answers[p] ?? '';
+        const pair = el('div', 'block-faded__yours');
+        const mine = el('div', 'block-faded__answer');
+        mine.append(el('span', 'block-faded__who', 'Yours'), el('span', undefined, (work.texts[p] ?? '').trim()));
+        pair.append(mine);
+        if (work.stage === 'model') {
+          const model = el('div', 'block-faded__answer block-faded__answer--model');
+          model.append(el('span', 'block-faded__who', 'Model'), el('span', 'block-faded__model', step.answers[p] ?? ''));
+          pair.append(model);
+        }
+        value.append(pair);
+        // Each tick sits under the answer it checks, so there is one list per box and no extra headings.
+        const ticks = tickSet(p, label);
+        if (ticks) value.append(ticks);
       }
       list.append(term, value);
     });
-    panel.append(list);
+    work_.append(list);
 
-    if (!writing) {
+    if (!isWriting) {
       const q = step.question;
       if (q && q.prompt) {
         const box = el('div', 'block-faded__question');
@@ -271,49 +353,26 @@ export function renderFadedExample(block: FadedExampleBlock, mode: RenderMode, o
               paintStep(i);
               panel.querySelector<HTMLButtonElement>('.block-faded__next')?.focus();
             } else {
+              button.classList.add('block-faded__choice--wrong');
               nudge.textContent = 'Look again and choose another.';
             }
           });
           group.append(button);
         });
         box.append(group);
-        panel.append(box);
+        work_.append(box);
         if (solved) nudge.textContent = 'Yes.';
-        panel.append(nudge);
+        work_.append(nudge);
         if (solved && !(i === last && isDone(i))) actions.append(nextButton(i));
       } else {
-        panel.append(nudge);
+        work_.append(nudge);
         if (!(i === last && isDone(i))) actions.append(nextButton(i));
       }
     } else {
-      if (work.stage === 'tick' || work.stage === 'model') {
-        const locked = work.stage === 'model';
-        for (const p of step.blanks) {
-          const items = criteriaFor(step, p);
-          if (!items.length) continue;
-          const set = el('fieldset', 'block-faded__ticks');
-          set.append(el('legend', 'block-faded__ticks-head', `Does your ${c.part_labels[p]!.toLowerCase()} do these?`));
-          items.forEach((text, n) => {
-            const label = el('label', 'block-faded__tick');
-            const box = el('input');
-            box.type = 'checkbox';
-            box.disabled = locked;
-            box.checked = work.ticks.includes(tickId(p, n));
-            box.addEventListener('change', () => {
-              const id = tickId(p, n);
-              work.ticks = box.checked ? [...work.ticks.filter((t) => t !== id), id] : work.ticks.filter((t) => t !== id);
-              save(i);
-              syncButtons();
-            });
-            label.append(box, el('span', undefined, text));
-            set.append(label);
-          });
-          panel.append(set);
-        }
-      }
-      panel.append(nudge);
+      if (work.stage === 'tick' && step.blanks.some((p) => criteriaFor(p).length)) nudge.textContent = 'Tick what yours does. Then see the model, or improve yours first.';
+      work_.append(nudge);
       if (work.stage === 'write') {
-        const check = el('button', 'btn btn--primary block-faded__check', 'Check');
+        const check = el('button', 'btn btn--primary block-faded__check', 'Check my answer');
         check.type = 'button';
         let lastOdd = '';
         check.addEventListener('click', () => {
@@ -321,13 +380,17 @@ export function renderFadedExample(block: FadedExampleBlock, mode: RenderMode, o
           const texts = fields.map((f) => f.value);
           const verdict = checkAttempt(texts);
           const joined = texts.join('\n');
-          if (verdict === 'short') {
-            nudge.textContent = 'Write a full sentence in each box, then check it.';
+          if (verdict === 'empty') {
+            const field = fields[firstEmpty(texts)]!;
+            const label = c.part_labels[Number(field.dataset.part)] ?? '';
+            field.setAttribute('aria-invalid', 'true');
+            nudge.textContent = `Write something under “${label}” first. One word is fine if that's the answer.`;
+            field.focus();
             return;
           }
           if (verdict === 'odd' && joined !== lastOdd) {
             lastOdd = joined;
-            nudge.textContent = 'Is that what you meant to write?';
+            nudge.textContent = 'Is that what you meant to write? Check it again, or press Check my answer to go on.';
             return;
           }
           step.blanks.forEach((p, n) => (work.texts[p] = texts[n] ?? ''));
@@ -365,8 +428,9 @@ export function renderFadedExample(block: FadedExampleBlock, mode: RenderMode, o
         actions.append(nextButton(i));
       }
     }
-    panel.append(actions);
-    if (i === last && isDone(i) && c.steps.length > 1) panel.append(finishView());
+    work_.append(actions);
+    if (i === last && isDone(i) && c.steps.length > 1) work_.append(finishView());
+    panel.append(work_);
   };
   let syncButtons = (): void => {};
 
@@ -376,12 +440,8 @@ export function renderFadedExample(block: FadedExampleBlock, mode: RenderMode, o
     if (w < 0) return box;
     const step = c.steps[w]!;
     const allBlank = c.part_labels.every((_, p) => step.blanks.includes(p));
-    box.append(el('p', 'block-faded__finish-head', allBlank ? 'You wrote the whole answer yourself' : "That's the last step"));
-    const list = el('dl', 'block-faded__parts');
-    c.part_labels.forEach((label, p) => {
-      list.append(el('dt', undefined, label), el('dd', undefined, step.blanks.includes(p) ? (works[w]!.texts[p] ?? '').trim() : (step.answers[p] ?? '')));
-    });
-    box.append(list);
+    box.append(el('p', 'block-faded__finish-head', allBlank ? 'You wrote the whole answer yourself' : "That's the last one"));
+    box.append(el('p', 'block-faded__finish-note', 'Tap any number above to look back at an example.'));
     return box;
   };
 

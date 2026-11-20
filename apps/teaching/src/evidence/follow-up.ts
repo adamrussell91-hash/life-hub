@@ -73,12 +73,16 @@ export class FollowUpStartError extends Error {
   }
 }
 
-/** Starts Ann on a lesson. A job already running for it counts as started. */
-export async function startAnn(lessonId: string, brief: string, deps: FollowUpDeps = httpFollowUpDeps): Promise<void> {
+/**
+ * Starts Ann on a lesson. `busy` means a job was already running for it, so
+ * this brief was not sent; callers that only need Ann working treat it as started.
+ */
+export async function startAnn(lessonId: string, brief: string, deps: FollowUpDeps = httpFollowUpDeps): Promise<'started' | 'busy'> {
   try {
     await deps.startJob({ lesson_id: lessonId, agent: 'ann', scope: 'lesson', message: brief });
+    return 'started';
   } catch (e) {
-    if (e instanceof AiJobConflictError) return;
+    if (e instanceof AiJobConflictError) return 'busy';
     throw new FollowUpStartError(lessonId, e instanceof Error && e.message ? e.message : 'Try again.');
   }
 }

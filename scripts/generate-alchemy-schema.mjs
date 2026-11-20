@@ -55,6 +55,18 @@ await build({
   banner: {js:'// Generated from apps/teaching/src/tutorial/schema.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
 });
 await build({
+  entryPoints: ['apps/teaching/src/lab/schema.ts'],
+  outfile: 'netlify/functions/_shared/lab-schema.mjs',
+  bundle: true, platform: 'node', format: 'esm', external: ['zod'],
+  banner: {js:'// Generated from apps/teaching/src/lab/schema.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});
+await build({
+  entryPoints: ['apps/teaching/src/lab/model.ts'],
+  outfile: 'netlify/functions/_shared/lab-model.mjs',
+  bundle: true, platform: 'node', format: 'esm', external: ['zod'],
+  banner: {js:'// Generated from apps/teaching/src/lab/model.ts; regenerate with scripts/generate-alchemy-schema.mjs.'}
+});
+await build({
   entryPoints: ['apps/teaching/src/case-study/schema.ts'],
   outfile: 'netlify/functions/_shared/case-study-schema.mjs',
   bundle: true, platform: 'node', format: 'esm', external: ['zod'],

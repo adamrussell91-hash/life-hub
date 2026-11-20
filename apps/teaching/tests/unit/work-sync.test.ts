@@ -274,6 +274,25 @@ describe('mountWorkSync: the lesson footer’s handle', () => {
     sync.dispose();
   });
 
+  it('a fresh hand-in asks again which blocks are marked: a lab’s column is made after the page opens', async () => {
+    localStorage.setItem(answersKey, JSON.stringify({ q1: 'One' }));
+    let marked: string[] = [];
+    const sent: string[] = [];
+    const call: WorkCall = async (action) => {
+      sent.push(action);
+      return action === 'handin' ? { need: null, handed_in_at: '2026-11-19T01:00:00Z' } : { need: null, initials: 'BB', ...(marked.length ? { handin_blocks: marked } : {}) };
+    };
+    const sync = mountWorkSync(host(), { lessonId: lesson, classId: 'class1', call, delayMs: 0 });
+    await settle();
+    // The teacher starts the round, which makes the column, after this device loaded the lesson.
+    marked = ['qset1'];
+    expect(await sync.handInAll()).toBe(true);
+    expect(sent).not.toContain('handin');
+    expect(await sync.handInAll(true)).toBe(true);
+    expect(sent.filter((a) => a === 'handin').length).toBe(1);
+    sync.dispose();
+  });
+
   it('says it couldn’t hand in while the device still needs initials', async () => {
     const server = fakeServer('initials');
     const sync = mountWorkSync(host(), { lessonId: lesson, classId: 'class1', call: server.call, delayMs: 0 });

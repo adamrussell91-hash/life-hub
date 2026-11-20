@@ -3,6 +3,7 @@ import { buildAiLessonContext, buildAiStaticPrompt } from '@/ai/context';
 import { emptySearchPack, type SearchPack } from '@/ai/search-pack';
 import { validateMutatingProposal } from '@/ai/validate-proposal';
 import { quizProposalIssues, type TagLists } from '@/ai/quiz-proposal';
+import { fleetDraftGameIssue, fleetDraftStage } from '@/ai/fleet-grid-draft';
 import { findBlockById } from '@/blocks/find-block';
 import { visitBlocks } from '@/blocks/walk-blocks';
 import type { AiJob } from '@/ai/jobs';
@@ -221,7 +222,21 @@ export function isBigBuild(proposal: AiProposal): boolean {
   return blocks > BIG_BUILD.blocks || quizQuestions > BIG_BUILD.quizQuestions;
 }
 
+/**
+ * A Fleet week grid draft is always priced and confirmed first, whatever its
+ * size and even when the teacher says to go ahead: a draft proposal is only
+ * shown when this message answers Ann's plan for the editor's brief.
+ */
+export function fleetDraftAllowed(job: Pick<AiJob, 'history' | 'message'>): boolean {
+  return fleetDraftStage(job) === 'answer';
+}
+
+export const FLEET_PLAN_NEEDED = `A Fleet week grid draft needs a confirmed plan with its price. Do not build yet: reply without any tool call with a short plan headed "${PLAN_MARKER}" (the labels you will use, where each row's questions come from in the unit material, and the cost estimate given in the brief) and wait for the teacher's answer.`;
+
 function planStatus(job: AiJob): string {
+  const fleet = fleetDraftStage(job);
+  if (fleet === 'brief') return `[Plan status: no plan confirmed yet. ${FLEET_PLAN_NEEDED}]`;
+  if (fleet === 'answer') return '[Plan status: the teacher has answered your Fleet week plan. Build to it with propose_fleet_grid_draft, applying any changes they asked for, from the unit material in the brief only.]';
   return planConfirmed(job)
     ? '[Plan status: the teacher has answered your plan or said to go ahead. Build to it, applying any changes they asked for.]'
     : `[Plan status: no plan confirmed yet. If this is a big build (more than ${BIG_BUILD.quizQuestions} quiz questions or ${BIG_BUILD.blocks} blocks), do not research or build yet: reply with the plan, headed "${PLAN_MARKER}", and stop.]`;
@@ -305,7 +320,8 @@ export function checkProposalCall(name: string, input: unknown, lesson: Lesson, 
     : [checked.error.startsWith(MEDIA_PREFIX)
       ? `Links and media must be ones already in the lesson or that came up in your searches or tool results. Remove these links and name the source in words instead: ${checked.error.slice(MEDIA_PREFIX.length)}`
       : checked.error];
-  const problems = [...publish, ...quiz, ...anchorIssues(parsed, lesson)];
+  const fleet = parsed.kind === 'fleet_grid_draft' ? fleetDraftGameIssue(parsed.game_id, lesson) : null;
+  const problems = [...publish, ...quiz, ...anchorIssues(parsed, lesson), ...(fleet ? [fleet] : [])];
   return problems.length ? truncate(problems.join('\n')) : parsed;
 }
 
@@ -351,7 +367,11 @@ function totalCost(usage: TurnUsage[]): number {
 export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLessonJobResult> {
   const { job, lesson } = input;
   const models = { ...TEACHING_AI_MODELS, ...input.models };
-  const research = Boolean(input.webSearch || input.tools?.length);
+  // A Fleet week draft works from the unit pack in the brief only: no notes, lessons or web.
+  const fleetJob = fleetDraftStage(job) !== null;
+  const extraTools = fleetJob ? [] : (input.tools ?? []);
+  const webSearch = fleetJob ? false : Boolean(input.webSearch);
+  const research = Boolean(webSearch || extraTools.length);
   const staticPrompt = buildAiStaticPrompt({ agentName: input.agentName, protocol: input.protocol });
   const lessonContext = buildAiLessonContext({
     agentName: input.agentName,
@@ -375,15 +395,15 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
   ];
   const toolsFor = (tier: ModelTier): ToolDefinition[] => [
     ...(AI_TOOLS as unknown as ToolDefinition[]),
-    ...(input.tools ?? []),
-    ...(input.webSearch ? [webSearchTool(tier)] : [])
+    ...extraTools,
+    ...(webSearch ? [webSearchTool(tier)] : [])
   ];
-  const clientTools = new Set((input.tools ?? []).map((tool) => tool.name));
+  const clientTools = new Set(extraTools.map((tool) => tool.name));
 
   const messages: ModelMessage[] = openingMessages(job);
   const usage: TurnUsage[] = [];
   // Conversions start on the fast model and move up after a failed proposal.
-  let tier: ModelTier = pickLane(job) === 'fast' ? 'fast' : 'standard';
+  let tier: ModelTier = !fleetJob && pickLane(job) === 'fast' ? 'fast' : 'standard';
   let failedProposals = 0;
   let lastProblem = 'The agent could not produce a usable answer.';
   let lastText = '';
@@ -469,9 +489,11 @@ export async function runLessonAiJob(input: RunLessonJobInput): Promise<RunLesso
         }
         const parsedCall = checkProposalCall(call.name, call.input, lesson, sightings);
         const checked =
-          typeof parsedCall !== 'string' && isBigBuild(parsedCall) && !planConfirmed(job)
-            ? `This is a big build and the teacher has not confirmed a plan. Do not build yet: reply without any tool call with a short plan headed "${PLAN_MARKER}" and wait for their answer.`
-            : parsedCall;
+          typeof parsedCall !== 'string' && parsedCall.kind === 'fleet_grid_draft' && !fleetDraftAllowed(job)
+            ? FLEET_PLAN_NEEDED
+            : typeof parsedCall !== 'string' && isBigBuild(parsedCall) && !planConfirmed(job)
+              ? `This is a big build and the teacher has not confirmed a plan. Do not build yet: reply without any tool call with a short plan headed "${PLAN_MARKER}" and wait for their answer.`
+              : parsedCall;
         if (typeof checked === 'string') {
           failedProposals += 1;
           checks.push(`Turn ${turns}: ${checked}`);

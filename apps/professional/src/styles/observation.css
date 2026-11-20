@@ -276,3 +276,30 @@ button.obs-series__step:hover { background: var(--obs-paper); }
 .obs-partial { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; font-size: 12px; color: var(--obs-muted); cursor: pointer; }
 .obs-partial input { margin: 0; }
 @media (max-width: 720px) { .obs-extra__cells { grid-template-columns: 1fr; } }
+
+/* NESA header: the report's own name and this phase's purpose, above the series strip. */
+.obs-nesa-head { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: var(--obs-r-md);
+  background: var(--obs-navy-tint); border-left: 4px solid var(--obs-navy); }
+.obs-nesa-head__tag { flex: none; font-size: 11px; font-weight: 800; letter-spacing: .1em; color: #fff; background: var(--obs-navy);
+  border-radius: 6px; padding: 3px 7px; margin-top: 1px; }
+.obs-nesa-head__words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.obs-nesa-head__words b { font-size: var(--text-md, 17px); color: var(--obs-navy); }
+.obs-nesa-head__words span { font-size: var(--text-sm, 13px); line-height: 1.45; color: var(--obs-muted); max-width: 70ch; }
+
+/* Series strip: each part sits at the top of its cell; this meeting is marked, not flooded navy. */
+.obs-series__step { justify-content: flex-start; padding: 12px 14px; }
+.obs-series__step b { font-size: var(--text-base, 15px); }
+.obs-series__step.is-now { background: var(--obs-navy-tint); color: var(--obs-navy); box-shadow: inset 0 3px 0 var(--obs-navy); }
+.obs-series__step.is-now .obs-series__sub { color: var(--obs-navy); opacity: .8; }
+.obs-series__book { margin-top: 8px; }
+.obs-series__book .obs-input, .obs-series__book .obs-btn { min-height: 32px; }
+.obs-window { padding: 0 2px; }
+
+/* Card headings match the page's card titles; the questions in a three-column row line up. */
+.obs-card h3 { font-size: var(--text-md, 17px); color: var(--obs-navy); margin-bottom: 12px; }
+.obs-grid3 > .obs-stack > .obs-field > .obs-ask:first-child { min-height: 2.7em; }
+.obs-grid2 > .obs-stack > b.obs-small { font-size: var(--text-sm, 13px); color: var(--obs-navy); text-transform: uppercase; letter-spacing: .05em; }
+@media (max-width: 900px) {
+  .obs-grid3 > .obs-stack > .obs-field > .obs-ask:first-child { min-height: 0; }
+  .obs-series__step.is-now { box-shadow: inset 3px 0 0 var(--obs-navy); }
+}

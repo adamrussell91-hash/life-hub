@@ -9,6 +9,791 @@ function rulesFor(kind) {
   return registry.get(kind);
 }
 
+// apps/teaching/src/games/kinds/answer-chain/rules.ts
+var CHAIN_ITEM = "chain";
+var GAP_MS = 3e3;
+var REVEAL_STEP_MS = 1800;
+var CHECK_MS = 2e4;
+var LOCK_MS = 3e3;
+var TRIES = 3;
+var REVIEW_SHOW = 12;
+var REVIEW_FLAGS = 3;
+var Q_MAX = 140;
+var A_MAX = 30;
+var POINTS = { link: 5, shadow: 3, capture: 10, captured_writer: 5, steal_link: 3, same_answer: 5, home: 5, predict: 5, fix_match: 3, fix_spot: 1, unclear: 2, star_match: 2, best_pair: 5 };
+var err = (code, message) => ({ error: { code, message } });
+function chainContent(keys) {
+  const c = keys.live?.chain;
+  return { start: c?.start ?? "", theme: c?.theme ?? "" };
+}
+function chainSettings(settings) {
+  const s = settings ?? {};
+  const num = (v, lo, hi, d) => typeof v === "number" && Number.isFinite(v) ? Math.round(Math.min(hi, Math.max(lo, v))) : d;
+  let links = num(s.links, 4, 12, 6);
+  if (links % 2) links += 1;
+  return { links, question_seconds: num(s.question_seconds, 10, 60, 20), answer_seconds: num(s.answer_seconds, 5, 30, 10), review_seconds: num(s.review_seconds, 30, 180, 90) };
+}
+var SYN = { sugar: "glucose", sugars: "glucose", co2: "carbon dioxide", leaves: "leaf", sun: "sunlight" };
+function norm(s) {
+  let t = String(s ?? "").toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+  t = SYN[t] ?? t;
+  if (t.length > 4 && t.endsWith("s") && !t.endsWith("ss") && !t.endsWith("sis") && !t.endsWith("us")) t = t.slice(0, -1);
+  return t;
+}
+function lev(a, b) {
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min((prev[j] ?? 0) + 1, (cur[j - 1] ?? 0) + 1, (prev[j - 1] ?? 0) + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length] ?? 0;
+}
+function sameAnswer(a, b) {
+  const x = norm(a);
+  const y = norm(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const len = Math.max(x.length, y.length);
+  const d = lev(x, y);
+  return len >= 5 && d <= 1 || len >= 9 && d <= 2;
+}
+var letterCounts = (text) => text.trim().split(/\s+/).filter(Boolean).map((w) => w.length);
+var typeOf = (i) => i % 2 === 0 ? "Q" : "A";
+var pairId = (team, i) => `p${team}_${i}`;
+function parsePair(id) {
+  const m = /^p(\d+)_(\d+)$/.exec(id);
+  return m ? { team: Number(m[1]), i: Number(m[2]) } : null;
+}
+function shuffle(ctx, list) {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(ctx.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+var teamOf = (ctx, owner) => ctx.seat(owner)?.team;
+function award(ctx, owner, points) {
+  if (!points) return;
+  ctx.addScore(owner, points);
+  const t = teamOf(ctx, owner);
+  if (t !== void 0) ctx.addTeamScore(t, points);
+}
+function notify(k, owner, n) {
+  const list = k.notices[owner] ??= [];
+  list.push({ ...n, seq: ++k.seq });
+  if (list.length > 6) list.splice(0, list.length - 6);
+}
+function plan(ctx, team, links) {
+  const order2 = shuffle(ctx, ctx.members(team));
+  const n = order2.length;
+  const shadows = {};
+  const count = {};
+  const aRounds = Array.from({ length: links }, (_, i) => i).filter((i) => i % 2 === 1);
+  const slots = Math.max(n, aRounds.length);
+  aRounds.forEach((r, idx) => {
+    const per = Math.floor(slots / aRounds.length) + (idx < slots % aRounds.length ? 1 : 0);
+    const writer = order2[r % n];
+    const asker = order2[(r - 1) % n];
+    const pick2 = order2.filter((o) => o !== writer && o !== asker).sort((a, b) => (count[a] ?? 0) - (count[b] ?? 0) || order2.indexOf(a) - order2.indexOf(b)).slice(0, per);
+    shadows[r] = pick2;
+    for (const o of pick2) count[o] = (count[o] ?? 0) + 1;
+  });
+  return { team, order: order2, shadows, links: [] };
+}
+function writerOf(chain, round) {
+  return chain.order.length ? chain.order[round % chain.order.length] : void 0;
+}
+function jobOf(k, ctx, owner, round) {
+  const team = teamOf(ctx, owner);
+  const chain = team === void 0 ? void 0 : k.chains[team];
+  if (!chain) return round <= 1 ? "predict" : "steal";
+  if (writerOf(chain, round) === owner) return "write";
+  if (chain.shadows[round]?.includes(owner)) return "shadow";
+  return round <= 1 ? "predict" : "steal";
+}
+function stealable(k, owner, team) {
+  const tried = new Set(k.tried[owner] ?? []);
+  const out = [];
+  for (const c of Object.values(k.chains)) {
+    if (c.team === team) continue;
+    c.links.forEach((l, i) => {
+      if (l.type !== "A" || i >= k.round || l.status === "x" || l.captured || tried.has(`${c.team}:${i}`)) return;
+      if (!c.links[i - 1] || c.links[i - 1].status === "x") return;
+      out.push({ team: c.team, i });
+    });
+  }
+  const top = Math.max(-1, ...out.map((o) => o.i));
+  return out.filter((o) => o.i === top);
+}
+function deal(ctx, k, owner) {
+  const pool = stealable(k, owner, teamOf(ctx, owner));
+  const pick2 = pool.length ? pool[Math.floor(ctx.random() * pool.length)] : void 0;
+  k.steal[owner] = pick2 ? { team: pick2.team, i: pick2.i, tries: 0, lock: 0 } : null;
+}
+function capture(ctx, k, owner, team, i) {
+  const chain = k.chains[team];
+  const link = chain?.links[i];
+  const q = chain?.links[i - 1];
+  if (!chain || !link || !q) return;
+  const thiefTeam = teamOf(ctx, owner) ?? -1;
+  link.captured = { owner, team: thiefTeam };
+  award(ctx, owner, POINTS.capture);
+  award(ctx, q.author, POINTS.captured_writer);
+  k.captures.push({ seq: ++k.seq, thief: ctx.seat(owner)?.initials ?? "", team: thiefTeam, victim: team, i, word: link.text });
+  if (k.captures.length > 30) k.captures.splice(0, k.captures.length - 30);
+  ctx.ticker(`captured \u201C${link.text}\u201D`, ctx.seat(owner)?.initials);
+  notify(k, owner, { kind: "captured", title: "CAPTURED!!", body: `+${POINTS.capture}`, tone: "good", word: link.text, team });
+  for (const m of ctx.members(team)) {
+    notify(k, m, {
+      kind: "stolen",
+      title: "STOLEN!",
+      body: m === q.author ? `Your question was clear enough to crack \xB7 +${POINTS.captured_writer}` : `${ctx.seat(owner)?.initials ?? "Someone"} cracked your team\u2019s answer.`,
+      tone: "bad",
+      word: link.text,
+      team: thiefTeam
+    });
+  }
+  for (const [o, card] of Object.entries(k.steal)) if (o !== owner && card && card.team === team && card.i === i && !card.result) card.result = "gone";
+  ctx.record(owner, { item: CHAIN_ITEM, move: "guess", response: { text: link.text }, correct: null, extra: { act: "capture", team, link: i } });
+}
+function startRound(ctx, k, round) {
+  k.phase = "rounds";
+  k.round = round;
+  k.pending = {};
+  const s = chainSettings(ctx.game.settings);
+  for (const seat of ctx.seats()) {
+    if (jobOf(k, ctx, seat.owner, round) === "steal") deal(ctx, k, seat.owner);
+    else k.steal[seat.owner] = null;
+  }
+  ctx.setTimer(ctx.now + (typeOf(round) === "Q" ? s.question_seconds : s.answer_seconds) * 1e3);
+}
+function backupQuestion(prev) {
+  return prev ? `What links to \u201C${prev}\u201D?` : "What is this topic about?";
+}
+function endRound(ctx, k) {
+  const r = k.round;
+  const type = typeOf(r);
+  for (const chain of Object.values(k.chains)) {
+    let link = chain.links[r];
+    if (!link) {
+      const prev = chain.links[r - 1]?.text ?? k.start;
+      const first = type === "A" ? k.pending[String(chain.team)]?.[0] : void 0;
+      if (type === "A" && first) {
+        k.pending[String(chain.team)] = (k.pending[String(chain.team)] ?? []).slice(1);
+        link = { type, text: first.text, author: first.owner, at: ctx.now, status: "ok", stolen: true, shadows: [] };
+        award(ctx, first.owner, POINTS.steal_link);
+        notify(k, first.owner, { kind: "flash", title: "Your shadow went in", body: `The writer ran out of time, so \u201C${first.text}\u201D is in the chain. +${POINTS.steal_link}`, tone: "good" });
+      } else {
+        const author = writerOf(chain, r) ?? "";
+        link = { type, text: type === "Q" ? backupQuestion(prev) : chain.links[r - 2]?.text ?? k.start, author, at: ctx.now, status: "ok", backup: true, shadows: [] };
+      }
+      chain.links[r] = link;
+    }
+    if (type === "A") {
+      link.shadows = k.pending[String(chain.team)] ?? [];
+      let hits = 0;
+      for (const sh of link.shadows) {
+        sh.match = sameAnswer(sh.text, link.text);
+        if (sh.match) hits++;
+        award(ctx, sh.owner, sh.match ? POINTS.shadow * sh.wager : -sh.wager);
+        notify(k, sh.owner, sh.match ? { kind: "flash", title: "Shadow match!", body: `You and ${ctx.seat(link.author)?.initials ?? "your writer"} both said \u201C${link.text}\u201D. +${POINTS.shadow * sh.wager}`, tone: "good" } : { kind: "flash", title: "No match", body: `They wrote \u201C${link.text}\u201D. \u2212${sh.wager}`, tone: "bad" });
+        ctx.record(sh.owner, { item: CHAIN_ITEM, move: "answer", response: { text: sh.text }, correct: null, extra: { act: "shadow", wager: sh.wager, match: !!sh.match, link: r } });
+      }
+      if (!link.backup && !link.stolen && link.shadows.length >= 2 && hits / link.shadows.length < 0.5) link.status = "held";
+      if (!link.backup && !link.stolen && link.shadows.length) notify(k, link.author, { kind: "flash", title: "Answer in", body: `${hits} of ${link.shadows.length} teammates matched you.`, tone: hits ? "good" : "plain" });
+    }
+    if (!link.backup && !link.stolen && link.status === "ok" && !link.paid) {
+      link.paid = true;
+      award(ctx, link.author, POINTS.link);
+    }
+  }
+  if (type === "A") {
+    const teams = Object.values(k.chains);
+    for (let a = 0; a < teams.length; a++)
+      for (let b = a + 1; b < teams.length; b++) {
+        const la = teams[a].links[r];
+        const lb = teams[b].links[r];
+        if (!la || !lb || la.backup || lb.backup || !sameAnswer(la.text, lb.text)) continue;
+        award(ctx, la.author, POINTS.same_answer);
+        award(ctx, lb.author, POINTS.same_answer);
+        k.matches.push({ a: teams[a].team, b: teams[b].team, i: r, word: la.text });
+      }
+  }
+  for (const o of Object.keys(k.steal)) k.steal[o] = null;
+  if (r + 1 >= k.links) {
+    finishChains(ctx, k);
+    return;
+  }
+  k.phase = "gap";
+  ctx.setTimer(ctx.now + GAP_MS);
+}
+function finishChains(ctx, k) {
+  for (const chain of Object.values(k.chains)) {
+    const last = chain.links[k.links - 1];
+    if (last && !last.backup && sameAnswer(last.text, k.start)) {
+      chain.home = true;
+      for (const a of new Set(chain.links.filter((l) => !l.backup).map((l) => l.author))) award(ctx, a, POINTS.home);
+    }
+    const t = chain.team;
+    for (const m of ctx.members(t)) {
+      const guess = k.predict[m];
+      if (guess && last && sameAnswer(guess, last.text)) {
+        award(ctx, m, POINTS.predict);
+        notify(k, m, { kind: "flash", title: "Called it!", body: `Your chain landed on \u201C${last.text}\u201D. +${POINTS.predict}`, tone: "good" });
+      }
+    }
+  }
+  k.phase = "reveal";
+  k.reveal = { t: 0, i: -1 };
+  ctx.setTimer(ctx.now + REVEAL_STEP_MS);
+}
+function teamOrder(k) {
+  return Object.keys(k.chains).map(Number).sort((a, b) => a - b);
+}
+function revealNext(ctx, k, skipChain = false) {
+  const order2 = teamOrder(k);
+  if (!skipChain && k.reveal.i < k.links - 1) k.reveal.i++;
+  else if (k.reveal.t < order2.length - 1) k.reveal = { t: k.reveal.t + 1, i: -1 };
+  else {
+    startReview(ctx, k);
+    return;
+  }
+  ctx.setTimer(ctx.now + (k.reveal.i === k.links - 1 ? REVEAL_STEP_MS * 2 : REVEAL_STEP_MS));
+}
+function startReview(ctx, k) {
+  const pairs = [];
+  for (const c of Object.values(k.chains))
+    for (let i = 1; i < c.links.length; i += 2) {
+      const q = c.links[i - 1];
+      const a = c.links[i];
+      if (q && a && !q.backup && !a.backup) pairs.push(pairId(c.team, i));
+    }
+  k.review.pairs = pairs;
+  for (const s of ctx.seats()) k.review.shown[s.owner] = showFor(ctx, k, s.owner);
+  k.phase = "review";
+  ctx.setTimer(ctx.now + chainSettings(ctx.game.settings).review_seconds * 1e3);
+}
+function linkAt(k, id) {
+  const p = parsePair(id);
+  const c = p ? k.chains[p.team] : void 0;
+  const q = c?.links[(p?.i ?? 0) - 1];
+  const a = c?.links[p?.i ?? -1];
+  return p && q && a ? { q, a, team: p.team, i: p.i } : null;
+}
+function showFor(ctx, k, owner) {
+  const mine = k.review.pairs.filter((id) => {
+    const l = linkAt(k, id);
+    return l && l.q.author !== owner && l.a.author !== owner;
+  });
+  return shuffle(ctx, mine).slice(0, REVIEW_SHOW);
+}
+function tally(k) {
+  const out = {};
+  for (const id of k.review.pairs) out[id] = { seen: 0, flags: 0, unclear: 0, stars: 0, fixes: [] };
+  const fixMaps = {};
+  for (const [owner, sub] of Object.entries(k.review.subs)) {
+    for (const id of k.review.shown[owner] ?? []) if (out[id]) out[id].seen++;
+    for (const [id, text] of Object.entries(sub.fix)) {
+      const t = out[id];
+      if (!t) continue;
+      t.flags++;
+      const m = fixMaps[id] ??= /* @__PURE__ */ new Map();
+      const key = [...m.keys()].find((x) => sameAnswer(x, text)) ?? text.trim().toLowerCase();
+      m.set(key, (m.get(key) ?? 0) + 1);
+    }
+    for (const id of sub.unclear) if (out[id]) out[id].unclear++;
+    if (sub.star && out[sub.star]) out[sub.star].stars++;
+  }
+  for (const [id, m] of Object.entries(fixMaps)) if (out[id]) out[id].fixes = [...m.entries()].sort((a, b) => b[1] - a[1]);
+  return out;
+}
+var over = (n, seen) => n >= REVIEW_FLAGS && seen > 0 && n / seen >= 0.2;
+var flagged = (t) => !!t && over(t.flags, t.seen);
+var unclearFlagged = (t) => !!t && over(t.unclear, t.seen);
+function endReview(ctx, k) {
+  k.phase = "check";
+  ctx.setTimer(ctx.now + CHECK_MS);
+}
+function sendFeedback(ctx, k) {
+  if (k.review.sent) return;
+  k.review.sent = true;
+  ctx.setTimer(void 0);
+  const t = tally(k);
+  const agreed = (id) => k.review.decisions[id] !== "overrule";
+  for (const id of k.review.pairs) {
+    const l = linkAt(k, id);
+    if (!l) continue;
+    if (flagged(t[id]) && agreed(id)) {
+      if (l.a.paid) {
+        l.a.paid = false;
+        award(ctx, l.a.author, -POINTS.link);
+      }
+      l.a.status = "x";
+    } else if (l.a.status === "held") {
+      l.a.status = "ok";
+      if (!l.a.paid) {
+        l.a.paid = true;
+        award(ctx, l.a.author, POINTS.link);
+      }
+    }
+  }
+  for (const [owner, sub] of Object.entries(k.review.subs)) {
+    for (const [id, text] of Object.entries(sub.fix)) {
+      if (!flagged(t[id]) || !agreed(id)) continue;
+      const top = t[id].fixes[0]?.[0];
+      award(ctx, owner, top && sameAnswer(top, text) ? POINTS.fix_match : POINTS.fix_spot);
+    }
+    for (const id of sub.unclear) if (unclearFlagged(t[id]) && agreed(id)) award(ctx, owner, POINTS.unclear);
+  }
+  const best = [...k.review.pairs].sort((a, b) => (t[b]?.stars ?? 0) - (t[a]?.stars ?? 0))[0];
+  if (best && (t[best]?.stars ?? 0) > 0) {
+    k.review.best = best;
+    const l = linkAt(k, best);
+    if (l) {
+      award(ctx, l.q.author, POINTS.best_pair);
+      if (l.a.author !== l.q.author) award(ctx, l.a.author, POINTS.best_pair);
+    }
+    for (const [owner, sub] of Object.entries(k.review.subs)) if (sub.star === best) award(ctx, owner, POINTS.star_match);
+  }
+  for (const [owner, sub] of Object.entries(k.review.subs))
+    ctx.record(owner, { item: CHAIN_ITEM, move: "judge", response: { fixes: Object.keys(sub.fix).length, unclear: sub.unclear.length, star: !!sub.star }, correct: null, extra: { act: "review" } });
+  k.phase = "done";
+}
+var answerChainRules = {
+  kind: "answer_chain",
+  teams: { min: 2, max: 6, default: 4 },
+  init(ctx) {
+    const s = chainSettings(ctx.game.settings);
+    return {
+      phase: "rounds",
+      round: -1,
+      links: s.links,
+      start: chainContent(ctx.keys).start,
+      chains: {},
+      done: {},
+      predict: {},
+      pending: {},
+      steal: {},
+      tried: {},
+      notices: {},
+      seq: 0,
+      captures: [],
+      matches: [],
+      reveal: { t: 0, i: -1 },
+      review: { pairs: [], shown: {}, subs: {}, decisions: {}, panel: false, sent: false }
+    };
+  },
+  start(ctx, k) {
+    k.links = chainSettings(ctx.game.settings).links;
+    k.start = chainContent(ctx.keys).start || "photosynthesis";
+    for (const t of ctx.teams()) if (ctx.members(t).length) k.chains[t] = plan(ctx, t, k.links);
+    startRound(ctx, k, 0);
+  },
+  move(ctx, k, owner, e) {
+    const r = e.response ?? {};
+    const ok = { item: CHAIN_ITEM };
+    if (e.move === "judge") {
+      if (k.phase !== "review") return err("not_now", "The review isn\u2019t open.");
+      if (k.review.subs[owner]) return err("done", "You\u2019ve already sent your review.");
+      const shown2 = new Set(k.review.shown[owner] ?? []);
+      const fix = {};
+      if (r.fix && typeof r.fix === "object")
+        for (const [id, v] of Object.entries(r.fix)) {
+          if (!shown2.has(id) || typeof v !== "string" || !v.trim()) continue;
+          fix[id] = v.trim().slice(0, A_MAX);
+        }
+      const unclear = Array.isArray(r.unclear) ? [...new Set(r.unclear.filter((x) => typeof x === "string" && shown2.has(x) && !(x in fix)))] : [];
+      if (Object.keys(fix).length + unclear.length > REVIEW_FLAGS) return err("too_many", `Fix or flag up to ${REVIEW_FLAGS}.`);
+      const star = typeof r.star === "string" && shown2.has(r.star) && !(r.star in fix) && !unclear.includes(r.star) ? r.star : void 0;
+      k.review.subs[owner] = { fix, unclear, ...star ? { star } : {} };
+      ctx.ticker("sent a review", ctx.seat(owner)?.initials);
+      const waiting = ctx.seats().filter((s) => s.connected && (k.review.shown[s.owner]?.length ?? 0) > 0 && !k.review.subs[s.owner]);
+      if (!waiting.length) endReview(ctx, k);
+      return ok;
+    }
+    if (k.phase !== "rounds") return err("not_now", "Wait for the next round.");
+    const team = teamOf(ctx, owner);
+    const chain = team === void 0 ? void 0 : k.chains[team];
+    const job = jobOf(k, ctx, owner, k.round);
+    const text = typeof r.text === "string" ? r.text.trim() : "";
+    if (e.move === "guess") {
+      if (job !== "steal") return err("not_steal", "You\u2019re not stealing this round.");
+      const card = k.steal[owner];
+      if (!card || card.result) return err("no_target", "Nothing to steal right now.");
+      if (ctx.now < card.lock) return err("locked", "Wait a moment, then guess again.");
+      const target = k.chains[card.team]?.links[card.i];
+      if (!target) return err("no_target", "That link has gone.");
+      if (target.captured) {
+        card.result = "gone";
+        return { ...ok, correct: false };
+      }
+      if (!text) return err("empty", "Type your guess.");
+      const tried = k.tried[owner] ??= [];
+      if (sameAnswer(text, target.text)) {
+        card.result = "captured";
+        tried.push(`${card.team}:${card.i}`);
+        capture(ctx, k, owner, card.team, card.i);
+        return { ...ok, correct: true };
+      }
+      card.tries++;
+      if (card.tries >= TRIES) {
+        card.result = "missed";
+        tried.push(`${card.team}:${card.i}`);
+      } else card.lock = ctx.now + LOCK_MS;
+      ctx.record(owner, { item: CHAIN_ITEM, move: "guess", response: { text }, correct: null, extra: { act: "steal", team: card.team, link: card.i, hit: false } });
+      return { ...ok, correct: false };
+    }
+    if (e.move !== "answer") return err("bad_move", "That move isn\u2019t part of Answer chain.");
+    if (r.act === "predict") {
+      if (job !== "predict") return err("not_now", "Predictions are closed.");
+      if (!text) return err("empty", "Type your prediction.");
+      k.predict[owner] = text.slice(0, A_MAX);
+      return ok;
+    }
+    if (!chain) return err("no_team", "You\u2019re not on a team yet.");
+    if (k.done[owner] === k.round) return err("done", "You\u2019re locked in for this round.");
+    const type = typeOf(k.round);
+    if (r.act === "write") {
+      if (job !== "write") return err("not_write", "It\u2019s not your turn to write.");
+      if (!text) return err("empty", type === "Q" ? "Write your question." : "Write your answer.");
+      let clean = text.replace(/\s+/g, " ");
+      if (type === "Q") {
+        if (clean.length > Q_MAX) return err("too_long", `Keep it under ${Q_MAX} characters.`);
+        if (!/[?]$/.test(clean)) clean += "?";
+      } else {
+        if (clean.length > A_MAX) return err("too_long", "One word (or a short name).");
+        clean = clean.split(" ").slice(0, 3).join(" ");
+      }
+      chain.links[k.round] = { type, text: clean, author: owner, at: ctx.now, status: "ok", shadows: [] };
+      k.done[owner] = k.round;
+      ctx.record(owner, { item: CHAIN_ITEM, move: "answer", response: { text: clean }, correct: null, extra: { act: "write", type, link: k.round } });
+      return ok;
+    }
+    if (r.act === "shadow") {
+      if (job !== "shadow") return err("not_shadow", "You\u2019re not shadowing this round.");
+      if (!text) return err("empty", "Type your answer.");
+      const wager = r.wager === 2 || r.wager === 3 ? r.wager : 1;
+      (k.pending[String(chain.team)] ??= []).push({ owner, text: text.slice(0, A_MAX), wager });
+      k.done[owner] = k.round;
+      return ok;
+    }
+    return err("bad_move", "That move isn\u2019t part of Answer chain.");
+  },
+  control(ctx, k, op, from) {
+    if (from.role === "student") {
+      if (op.name === "next_target") {
+        if (k.phase !== "rounds" || jobOf(k, ctx, from.owner, k.round) !== "steal") return err("not_now", "You\u2019re not stealing this round.");
+        const card = k.steal[from.owner];
+        if (card && !card.result) (k.tried[from.owner] ??= []).push(`${card.team}:${card.i}`);
+        deal(ctx, k, from.owner);
+        return;
+      }
+      return err("not_allowed", "Only the teacher can do that.");
+    }
+    switch (op.name) {
+      case "next":
+        if (k.phase === "rounds") endRound(ctx, k);
+        else if (k.phase === "gap") startRound(ctx, k, k.round + 1);
+        else if (k.phase === "reveal") revealNext(ctx, k);
+        else if (k.phase === "review") endReview(ctx, k);
+        else if (k.phase === "check") sendFeedback(ctx, k);
+        else if (k.phase === "done") ctx.end();
+        return;
+      case "next_chain":
+        if (k.phase !== "reveal") return err("not_now", "Not revealing.");
+        revealNext(ctx, k, true);
+        return;
+      case "teacher_panel":
+        if (k.phase !== "check") return err("not_now", "The check opens after the review.");
+        k.review.panel = !k.review.panel;
+        return;
+      case "decide": {
+        if (k.phase !== "check") return err("not_now", "The check opens after the review.");
+        const d = op.data ?? {};
+        if (typeof d.id !== "string" || !k.review.pairs.includes(d.id) || d.decision !== "agree" && d.decision !== "overrule") return err("bad_decision", "Pick agree or overrule.");
+        k.review.decisions[d.id] = d.decision;
+        return;
+      }
+      case "send":
+        if (k.phase === "check" || k.phase === "review") sendFeedback(ctx, k);
+        return;
+      case "final":
+        ctx.end();
+        return;
+      default:
+        return err("bad_control", "Unknown control.");
+    }
+  },
+  tick(ctx, k) {
+    if (k.phase === "rounds") endRound(ctx, k);
+    else if (k.phase === "gap") startRound(ctx, k, k.round + 1);
+    else if (k.phase === "reveal") revealNext(ctx, k);
+    else if (k.phase === "review") endReview(ctx, k);
+    else if (k.phase === "check") sendFeedback(ctx, k);
+  },
+  finish(ctx, k) {
+    if (k.phase === "review" || k.phase === "check") sendFeedback(ctx, k);
+  },
+  seatChanged(ctx, k, owner) {
+    if (k.phase === "rounds" && ctx.seat(owner) && k.steal[owner] === void 0 && jobOf(k, ctx, owner, k.round) === "steal") deal(ctx, k, owner);
+    if (k.phase === "review" && ctx.seat(owner) && !k.review.shown[owner]) k.review.shown[owner] = showFor(ctx, k, owner);
+  },
+  view(ctx, k, role, owner) {
+    return role === "student" ? phoneView(ctx, k, owner) : boardView(ctx, k, role);
+  },
+  bot(ctx, k, owner) {
+    return botMove(ctx, k, owner);
+  }
+};
+function rows(ctx, k) {
+  const t = tally(k);
+  return k.review.pairs.map((id) => {
+    const l = linkAt(k, id);
+    const p = t[id];
+    const hot = flagged(p) || unclearFlagged(p);
+    return { id, team: l.team, q: l.q.text, a: l.a.text, flags: p.flags, seen: p.seen, fix: p.fixes[0]?.[0] ?? "", unclear: p.unclear, stars: p.stars, ...k.review.decisions[id] ? { decision: k.review.decisions[id] } : {}, hot };
+  }).sort((a, b) => Number(b.hot) - Number(a.hot) || b.flags + b.unclear - (a.flags + a.unclear));
+}
+function boardView(ctx, k, role) {
+  const s = chainSettings(ctx.game.settings);
+  const c = chainContent(ctx.keys);
+  const revealing = k.phase === "reveal";
+  const seen = (team, i) => {
+    if (k.phase === "review" || k.phase === "check" || k.phase === "done") return true;
+    if (!revealing) return false;
+    const order2 = teamOrder(k);
+    const at = order2.indexOf(team);
+    return at < k.reveal.t || at === k.reveal.t && i <= k.reveal.i;
+  };
+  const jobs = { write: 0, shadow: 0, steal: 0, predict: 0 };
+  if (k.phase === "rounds" || k.phase === "gap") for (const seat of ctx.seats()) jobs[jobOf(k, ctx, seat.owner, k.phase === "gap" ? k.round + 1 : k.round)]++;
+  const view2 = {
+    who: "board",
+    phase: k.phase,
+    round: k.round,
+    links: k.links,
+    type: typeOf(Math.max(0, k.round)),
+    start: k.start,
+    theme: c.theme,
+    seconds: { question: s.question_seconds, answer: s.answer_seconds, review: s.review_seconds },
+    chains: teamOrder(k).map((team) => {
+      const chain = k.chains[team];
+      return {
+        team,
+        home: !!chain.home && (k.phase !== "reveal" || seen(team, k.links - 1)),
+        links: Array.from({ length: k.links }, (_, i) => {
+          const l = chain.links[i];
+          const out = { type: typeOf(i), filled: !!l, writing: !l && k.phase === "rounds" && i === k.round };
+          if (l) {
+            if (l.status === "x") out.status = "x";
+            if (l.captured) out.captured = l.captured.team;
+            if (l.backup) out.backup = true;
+            if (seen(team, i)) {
+              out.text = l.text;
+              out.initials = ctx.seat(l.author)?.initials ?? "";
+            }
+          }
+          return out;
+        })
+      };
+    }),
+    jobs,
+    captures: k.captures.slice(-6),
+    matches: k.matches
+  };
+  if (revealing) view2.reveal = { team: teamOrder(k)[k.reveal.t] ?? 0, i: k.reveal.i, of: teamOrder(k).length };
+  if (k.phase === "review") {
+    const asked = ctx.seats().filter((x) => (k.review.shown[x.owner]?.length ?? 0) > 0);
+    view2.review = { in: asked.filter((x) => k.review.subs[x.owner]).length, of: asked.length };
+  }
+  if (k.phase === "check") {
+    const all = rows(ctx, k);
+    view2.check = { open: k.review.panel, flagged: all.filter((r) => r.hot).length, held: Object.values(k.chains).reduce((n, ch) => n + ch.links.filter((l) => l.status === "held").length, 0), ...k.review.panel ? { rows: all.filter((r) => r.hot) } : {} };
+  }
+  if (k.phase === "done" && k.review.best) {
+    const l = linkAt(k, k.review.best);
+    if (l) view2.best = { q: l.q.text, a: l.a.text, stars: tally(k)[k.review.best]?.stars ?? 0 };
+  }
+  if (role === "teacher" && k.review.pairs.length) view2.teacher = { rows: rows(ctx, k) };
+  return view2;
+}
+function phoneView(ctx, k, owner) {
+  const team = teamOf(ctx, owner);
+  const chain = team === void 0 ? void 0 : k.chains[team];
+  const round = k.phase === "gap" ? k.round + 1 : k.round;
+  const plan2 = Array.from({ length: k.links }, (_, r) => jobOf(k, ctx, owner, r));
+  const base3 = {
+    who: "phone",
+    phase: k.phase,
+    round: k.round,
+    links: k.links,
+    type: typeOf(Math.max(0, round)),
+    ...team !== void 0 ? { team } : {},
+    start: k.start,
+    plan: plan2,
+    done: k.done[owner] === k.round,
+    notices: (k.notices[owner] ?? []).slice(-3)
+  };
+  if (k.phase === "gap") return { ...base3, job: plan2[round] };
+  if (k.phase === "rounds") {
+    const job = plan2[k.round] ?? "steal";
+    base3.job = job;
+    const steals = plan2.map((j, r) => j === "steal" ? r : -1).filter((r) => r >= 0);
+    if (job === "steal") base3.steals = { now: steals.indexOf(k.round) + 1, of: steals.length };
+    if (job === "write") base3.prompt = k.round === 0 ? k.start : chain?.links[k.round - 1]?.text ?? k.start;
+    if (job === "shadow") {
+      base3.prompt = chain?.links[k.round - 1]?.text ?? "";
+      base3.writer = chain ? ctx.seat(writerOf(chain, k.round) ?? "")?.initials ?? "" : "";
+    }
+    if (job === "predict" && k.predict[owner]) base3.predicted = k.predict[owner];
+    if (job === "steal") {
+      const card = k.steal[owner];
+      const target = card ? k.chains[card.team]?.links[card.i] : void 0;
+      const q = card ? k.chains[card.team]?.links[card.i - 1] : void 0;
+      base3.steal = card && target && q ? {
+        team: card.team,
+        question: q.text,
+        letters: letterCounts(target.text),
+        tries: card.tries,
+        tries_max: TRIES,
+        lock: card.lock,
+        ...card.result ? { result: card.result } : {},
+        ...card.result ? { word: target.text } : {},
+        ...card.result === "gone" && target.captured ? { by: ctx.seat(target.captured.owner)?.initials ?? "" } : {}
+      } : null;
+    }
+    return base3;
+  }
+  if (k.phase === "review") {
+    const ids = k.review.shown[owner] ?? [];
+    return {
+      ...base3,
+      review: {
+        sent: !!k.review.subs[owner],
+        flags_max: REVIEW_FLAGS,
+        pairs: ids.map((id) => {
+          const l = linkAt(k, id);
+          return { id, q: l?.q.text ?? "", a: l?.a.text ?? "" };
+        })
+      }
+    };
+  }
+  if (k.phase === "done") return { ...base3, feedback: feedbackFor(k, owner) };
+  return base3;
+}
+function feedbackFor(k, owner) {
+  const t = tally(k);
+  const ok = (id) => k.review.decisions[id] !== "overrule";
+  const own = [];
+  for (const id of k.review.pairs) {
+    const l = linkAt(k, id);
+    const p = t[id];
+    if (!l || !p) continue;
+    if (l.q.author === owner) own.push({ kind: "question", q: l.q.text, a: l.a.text, verdict: unclearFlagged(p) && ok(id) ? "unclear" : "clear", n: p.unclear, seen: p.seen });
+    if (l.a.author === owner) {
+      const fixed = flagged(p) && ok(id);
+      own.push({ kind: "answer", q: l.q.text, a: l.a.text, verdict: fixed ? "fixed" : "stood", n: p.flags, seen: p.seen, ...fixed && p.fixes[0] ? { fix: p.fixes[0][0] } : {} });
+    }
+  }
+  const sub = k.review.subs[owner];
+  const review = [];
+  if (sub) {
+    for (const [id, mine] of Object.entries(sub.fix)) {
+      const l = linkAt(k, id);
+      const p = t[id];
+      if (!l || !p) continue;
+      const top = p.fixes[0]?.[0];
+      const verdict = !flagged(p) ? "Not enough classmates thought it was wrong." : !ok(id) ? "Your teacher said the answer stands." : top && sameAnswer(top, mine) ? `The class agreed and said \u201C${top}\u201D too.` : `The class agreed it was wrong, but most said \u201C${top ?? "?"}\u201D.`;
+      review.push({ kind: "fix", q: l.q.text, a: l.a.text, mine, verdict, good: flagged(p) && ok(id) });
+    }
+    for (const id of sub.unclear) {
+      const l = linkAt(k, id);
+      const p = t[id];
+      if (!l || !p) continue;
+      const good = unclearFlagged(p) && ok(id);
+      review.push({ kind: "unclear", q: l.q.text, a: l.a.text, verdict: good ? "The class agreed it was unclear." : "Most classmates found it clear.", good });
+    }
+    if (sub.star) {
+      const l = linkAt(k, sub.star);
+      const best = k.review.best ? linkAt(k, k.review.best) : null;
+      if (l) review.push({ kind: "star", q: l.q.text, a: l.a.text, verdict: sub.star === k.review.best ? "The class favourite too." : best ? `Class favourite: \u201C${best.q.text}\u201D \u2192 ${best.a.text}` : "No class favourite.", good: sub.star === k.review.best });
+    }
+  }
+  return { own, review };
+}
+var BOT_QUESTIONS = {
+  photosynthesis: ["What process do plants use to make food?", "Which process gives off oxygen as a waste product?"],
+  oxygen: ["What gas do plants release in sunlight?", "Which gas do we need for respiration?"],
+  glucose: ["What sugar do plants make in their leaves?", "What do cells break down to release energy?"],
+  chlorophyll: ["What green pigment absorbs light?", "Why do most leaves look green?"],
+  light: ["What does chlorophyll absorb?", "What energy source powers photosynthesis?"],
+  water: ["What do roots take up from the soil?", "What liquid travels up the xylem?"],
+  starch: ["What do plants store glucose as?", "What does iodine turn blue-black?"]
+};
+var BOT_ANSWERS = [
+  [/green|pigment/i, ["chlorophyll", "chlorophyll", "chloroplast"]],
+  [/gas|breathe|oxygen|respiration\?$/i, ["oxygen", "oxygen", "carbon dioxide"]],
+  [/sugar|energy|break down|make in/i, ["glucose", "glucose", "sugar"]],
+  [/absorb|light|power/i, ["light", "sunlight", "light"]],
+  [/store|iodine/i, ["starch", "starch", "glucose"]],
+  [/roots|soil|xylem/i, ["water", "water", "minerals"]],
+  [/process|make food/i, ["photosynthesis", "photosynthesis", "respiration"]]
+];
+function botAnswer(ctx, q) {
+  const hit = BOT_ANSWERS.find(([re]) => re.test(q));
+  const list = hit ? hit[1] : ["glucose", "photosynthesis", "oxygen"];
+  return list[Math.floor(ctx.random() * list.length)] ?? "glucose";
+}
+function botQuestion(ctx, a) {
+  const list = BOT_QUESTIONS[norm(a)] ?? [`What links to \u201C${a}\u201D?`];
+  return list[Math.floor(ctx.random() * list.length)] ?? list[0];
+}
+function botMove(ctx, k, owner) {
+  if (k.phase === "review") {
+    if (k.review.subs[owner]) return null;
+    const ids = k.review.shown[owner] ?? [];
+    const fix = {};
+    const unclear = [];
+    for (const id of ids) {
+      const l = linkAt(k, id);
+      if (!l) continue;
+      const right = botAnswer(ctx, l.q.text);
+      if (Object.keys(fix).length + unclear.length < REVIEW_FLAGS && !sameAnswer(right, l.a.text) && ctx.random() < 0.7) fix[id] = right;
+      else if (Object.keys(fix).length + unclear.length < REVIEW_FLAGS && /links to/.test(l.q.text) && ctx.random() < 0.5) unclear.push(id);
+    }
+    const star = ids.find((id) => !(id in fix) && !unclear.includes(id) && ctx.random() < 0.4);
+    return { move: { item: CHAIN_ITEM, move: "judge", response: { fix, unclear, ...star ? { star } : {} } } };
+  }
+  if (k.phase !== "rounds" || ctx.random() < 0.6) return null;
+  const job = jobOf(k, ctx, owner, k.round);
+  const team = teamOf(ctx, owner);
+  const chain = team === void 0 ? void 0 : k.chains[team];
+  if (job === "predict") return k.predict[owner] ? null : { move: { item: CHAIN_ITEM, move: "answer", response: { act: "predict", text: ["photosynthesis", "glucose", "oxygen"][Math.floor(ctx.random() * 3)] } } };
+  if (k.done[owner] === k.round) return null;
+  if (job === "write" && chain) {
+    const prev = k.round === 0 ? k.start : chain.links[k.round - 1]?.text ?? k.start;
+    return { move: { item: CHAIN_ITEM, move: "answer", response: { act: "write", text: typeOf(k.round) === "Q" ? botQuestion(ctx, prev) : botAnswer(ctx, prev) } } };
+  }
+  if (job === "shadow" && chain) {
+    const q = chain.links[k.round - 1]?.text ?? "";
+    return { move: { item: CHAIN_ITEM, move: "answer", response: { act: "shadow", text: botAnswer(ctx, q), wager: 1 + Math.floor(ctx.random() * 3) } } };
+  }
+  if (job === "steal") {
+    const card = k.steal[owner];
+    if (!card) return null;
+    if (card.result) return { control: { name: "next_target" } };
+    if (ctx.now < card.lock) return null;
+    const q = k.chains[card.team]?.links[card.i - 1]?.text ?? "";
+    return { move: { item: CHAIN_ITEM, move: "guess", response: { text: botAnswer(ctx, q) } } };
+  }
+  return null;
+}
+registerRules(answerChainRules);
+
 // apps/teaching/src/games/kinds/articulate/rules.ts
 var ARTICULATE_KIND = "articulate";
 function articulateSettings(s) {
@@ -28,7 +813,7 @@ function cardsOf(keys) {
   return out.filter((c) => c.term);
 }
 var cardMap = (keys) => new Map(cardsOf(keys).map((c) => [c.id, c]));
-function shuffle(list, random) {
+function shuffle2(list, random) {
   const out = [...list];
   for (let i = out.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
@@ -44,7 +829,7 @@ function membersOf(ctx, team) {
   if (ctx.teams().length) return ctx.members(team).filter((o) => ctx.seat(o));
   return ctx.seats().map((s) => s.owner);
 }
-var teamOf = (ctx, owner) => ctx.teams().length ? ctx.seat(owner)?.team : 0;
+var teamOf2 = (ctx, owner) => ctx.teams().length ? ctx.seat(owner)?.team : 0;
 function captainOf(ctx, team) {
   const list = membersOf(ctx, team);
   return list.find((o) => ctx.seat(o)?.connected) ?? list[0];
@@ -61,10 +846,10 @@ function nextDescriber(ctx, k, team) {
 }
 var isCaptainAgainst = (ctx, k, owner) => {
   if (!k.turn || k.phase !== "turn" || !ctx.teams().length) return false;
-  const team = teamOf(ctx, owner);
+  const team = teamOf2(ctx, owner);
   return team !== void 0 && team !== k.turn.team && captainOf(ctx, team) === owner;
 };
-var err = (code, message) => ({ error: { code, message } });
+var err2 = (code, message) => ({ error: { code, message } });
 function draw(ctx, k) {
   const next = k.deck.shift() ?? null;
   k.current = next;
@@ -85,12 +870,12 @@ function endTurn(ctx, k, why) {
   ctx.ticker(got ? `+${got} card${got === 1 ? "" : "s"}` : "no cards this time");
 }
 function startTurn(ctx, k) {
-  if (k.phase !== "ready") return err("not_now", "Wait for the next turn.");
+  if (k.phase !== "ready") return err2("not_now", "Wait for the next turn.");
   const team = k.order[k.at] ?? 0;
   const describer = nextDescriber(ctx, k, team);
-  if (!describer) return err("no_describer", "This team has nobody to describe.");
+  if (!describer) return err2("no_describer", "This team has nobody to describe.");
   if (!k.deck.length) k.deck = refill(ctx, k);
-  if (!k.deck.length) return err("deck_empty", "The deck is empty.");
+  if (!k.deck.length) return err2("deck_empty", "The deck is empty.");
   k.phase = "turn";
   k.turn = { team, describer, cards: [], passes: 0 };
   ctx.setTimer(ctx.now + articulateSettings(ctx.game.settings).seconds * 1e3);
@@ -100,7 +885,7 @@ function refill(ctx, k) {
   const all = cardsOf(ctx.keys).map((c) => c.id);
   const got = new Set(k.log.filter((t) => t.round === k.round).flatMap((t) => t.cards.filter((c) => c.result === "got").map((c) => c.item)));
   const left = all.filter((id) => !got.has(id));
-  return shuffle(left.length ? left : all, ctx.random);
+  return shuffle2(left.length ? left : all, ctx.random);
 }
 function resolve(ctx, k, result, by) {
   if (!k.turn || !k.current) return;
@@ -134,19 +919,19 @@ function buildCheck(ctx, k) {
     if (askable(c) && !picks.includes(c)) picks.push(c);
   }
   if (picks.length < 3) {
-    for (const c of shuffle(cards, ctx.random)) if (picks.length < 3 && askable(c) && !picks.includes(c)) picks.push(c);
+    for (const c of shuffle2(cards, ctx.random)) if (picks.length < 3 && askable(c) && !picks.includes(c)) picks.push(c);
   }
   const out = [];
   for (const c of picks) {
     if (out.length >= s.quick_check_items) break;
     const kind = c.definition ? "definition" : "example";
     const right = kind === "definition" ? c.definition : c.example;
-    const others = shuffle(
+    const others = shuffle2(
       cards.filter((o) => o.id !== c.id && (kind === "definition" ? o.definition : o.example) && (kind === "definition" ? o.definition : o.example) !== right),
       ctx.random
     ).slice(0, 3);
     if (others.length < 2) continue;
-    const pool = shuffle([{ card: c.id, text: right }, ...others.map((o) => ({ card: o.id, text: kind === "definition" ? o.definition : o.example }))], ctx.random);
+    const pool = shuffle2([{ card: c.id, text: right }, ...others.map((o) => ({ card: o.id, text: kind === "definition" ? o.definition : o.example }))], ctx.random);
     const options = pool.map((p, i) => ({ id: OPTION_IDS[i], text: p.text }));
     const from = Object.fromEntries(pool.map((p, i) => [OPTION_IDS[i], p.card]));
     const why = kind === "definition" ? c.example : c.definition;
@@ -179,7 +964,7 @@ var articulateRules = {
   },
   start(ctx, k) {
     k.order = teamsOf(ctx);
-    k.deck = shuffle(
+    k.deck = shuffle2(
       cardsOf(ctx.keys).map((c) => c.id),
       ctx.random
     );
@@ -187,15 +972,15 @@ var articulateRules = {
   },
   move(ctx, k, owner, e) {
     if (e.move === "answer") {
-      if (k.phase !== "check" || !k.check) return err("not_now", "The quick check isn\u2019t open.");
+      if (k.phase !== "check" || !k.check) return err2("not_now", "The quick check isn\u2019t open.");
       const index = k.check.questions.findIndex((q2) => q2.item === e.item);
       const q = k.check.questions[index];
-      if (!q) return err("bad_item", "That isn\u2019t in this quick check.");
+      if (!q) return err2("bad_item", "That isn\u2019t in this quick check.");
       const mine = k.check.answers[owner] ??= {};
       if (mine[index]) return { item: e.item, correct: mine[index].correct };
       const option = typeof e.response?.option === "string" ? e.response.option : "";
       const picked = q.from[option];
-      if (!picked) return err("bad_option", "Pick one of the answers.");
+      if (!picked) return err2("bad_option", "Pick one of the answers.");
       const pickedTerm = cardMap(ctx.keys).get(picked)?.term ?? "";
       const marked = ctx.mark(owner, { item: q.item, move: "answer", response: { text: pickedTerm }, ...e.time_ms !== void 0 ? { time_ms: e.time_ms } : {}, extra: { check: q.kind, option, ...picked !== q.item ? { picked } : {} } }, "live_solo");
       if ("error" in marked) return marked;
@@ -208,11 +993,11 @@ var articulateRules = {
       return { item: q.item, correct };
     }
     if (e.move === "describe" || e.move === "pass") {
-      if (k.phase !== "turn" || !k.turn) return err("not_now", "Wait for your turn.");
-      if (k.turn.describer !== owner) return err("not_describer", "Only the describer can do that.");
-      if (!k.current || e.item !== k.current) return err("stale", "That card has changed.");
+      if (k.phase !== "turn" || !k.turn) return err2("not_now", "Wait for your turn.");
+      if (k.turn.describer !== owner) return err2("not_describer", "Only the describer can do that.");
+      if (!k.current || e.item !== k.current) return err2("stale", "That card has changed.");
       const result = e.move === "pass" ? "pass" : e.response?.result === "pass" ? "pass" : "got";
-      if (result === "pass" && k.turn.passes >= articulateSettings(ctx.game.settings).passes) return err("no_passes", "No passes left this turn.");
+      if (result === "pass" && k.turn.passes >= articulateSettings(ctx.game.settings).passes) return err2("no_passes", "No passes left this turn.");
       resolve(ctx, k, result);
       return { item: e.item };
     }
@@ -220,7 +1005,7 @@ var articulateRules = {
       const out = buzz(ctx, k, { owner, role: "student" }, e.item);
       return out ? out : { item: e.item };
     }
-    return err("bad_move", "That move isn\u2019t part of Articulate.");
+    return err2("bad_move", "That move isn\u2019t part of Articulate.");
   },
   control(ctx, k, op, from) {
     const staff = from.role === "teacher" || from.role === "board";
@@ -228,17 +1013,17 @@ var articulateRules = {
       const item = typeof op.data?.item === "string" ? op.data.item : void 0;
       return buzz(ctx, k, from, item) ?? void 0;
     }
-    if (!staff) return err("not_allowed", "Only your teacher can do that.");
+    if (!staff) return err2("not_allowed", "Only your teacher can do that.");
     switch (op.name) {
       case "start_turn":
         return startTurn(ctx, k);
       case "end_turn":
-        if (k.phase !== "turn") return err("not_now", "No turn is running.");
+        if (k.phase !== "turn") return err2("not_now", "No turn is running.");
         endTurn(ctx, k, "ended");
         return;
       case "next":
       case "next_turn": {
-        if (k.phase !== "end") return err("not_now", "Finish this turn first.");
+        if (k.phase !== "end") return err2("not_now", "Finish this turn first.");
         if (k.at + 1 >= k.order.length) return startCheck(ctx, k);
         k.at += 1;
         k.turn = null;
@@ -246,24 +1031,24 @@ var articulateRules = {
         return;
       }
       case "check":
-        if (k.phase !== "ready" && k.phase !== "end" && k.phase !== "turn") return err("not_now", "The quick check is already open.");
+        if (k.phase !== "ready" && k.phase !== "end" && k.phase !== "turn") return err2("not_now", "The quick check is already open.");
         startCheck(ctx, k);
         return;
       case "reveal":
       case "reveal_check":
-        if (k.phase !== "check" || !k.check) return err("not_now", "Open the quick check first.");
+        if (k.phase !== "check" || !k.check) return err2("not_now", "Open the quick check first.");
         k.check.revealed = true;
         k.phase = "checked";
         return;
       case "next_round": {
-        if (k.phase !== "checked") return err("not_now", "Finish the quick check first.");
+        if (k.phase !== "checked") return err2("not_now", "Finish the quick check first.");
         k.round += 1;
         k.at = 0;
         k.turn = null;
         k.seen = [];
         k.check = null;
         k.order = teamsOf(ctx);
-        if (!k.deck.length) k.deck = shuffle(cardsOf(ctx.keys).map((c) => c.id), ctx.random);
+        if (!k.deck.length) k.deck = shuffle2(cardsOf(ctx.keys).map((c) => c.id), ctx.random);
         k.phase = "ready";
         return;
       }
@@ -271,7 +1056,7 @@ var articulateRules = {
         ctx.end();
         return;
       default:
-        return err("bad_control", "Unknown control.");
+        return err2("bad_control", "Unknown control.");
     }
   },
   tick(ctx, k) {
@@ -307,9 +1092,9 @@ function articulateBot(ctx, k, owner) {
 }
 function buzz(ctx, k, from, item) {
   const staff = from.role === "teacher" || from.role === "board";
-  if (!staff && !isCaptainAgainst(ctx, k, from.owner)) return err("not_allowed", "Only the other teams\u2019 captains can buzz.");
-  if (k.phase !== "turn" || !k.current) return err("not_now", "No card to buzz.");
-  if (item && item !== k.current) return err("stale", "That card has gone.");
+  if (!staff && !isCaptainAgainst(ctx, k, from.owner)) return err2("not_allowed", "Only the other teams\u2019 captains can buzz.");
+  if (k.phase !== "turn" || !k.current) return err2("not_now", "No card to buzz.");
+  if (item && item !== k.current) return err2("stale", "That card has gone.");
   resolve(ctx, k, "buzz", staff ? "teacher" : "captain");
   return null;
 }
@@ -368,7 +1153,7 @@ function articulateView(ctx, k, role, owner) {
     }
     return view3;
   }
-  const myTeam = teamOf(ctx, owner);
+  const myTeam = teamOf2(ctx, owner);
   const describing = k.phase === "turn" && k.turn?.describer === owner;
   const captain = isCaptainAgainst(ctx, k, owner);
   const myRole = describing ? "describer" : captain ? "captain" : myTeam === team ? "team" : "watch";
@@ -585,12 +1370,12 @@ function judgeFit(comparisons, theta) {
   return Object.fromEntries(Object.entries(sums).map(([judge, r]) => [judge, { infit: r.info > 0 ? r.res / r.info : 0, n: r.n }]));
 }
 function flagMisfits(fit, { minN = 3 } = {}) {
-  const rows = Object.entries(fit ?? {}).filter(([, r]) => r.n >= minN);
-  if (rows.length < 3) return /* @__PURE__ */ new Set();
-  const values = rows.map(([, r]) => r.infit);
+  const rows2 = Object.entries(fit ?? {}).filter(([, r]) => r.n >= minN);
+  if (rows2.length < 3) return /* @__PURE__ */ new Set();
+  const values = rows2.map(([, r]) => r.infit);
   const m = mean(values);
   const sd = Math.sqrt(values.reduce((a, x) => a + (x - m) ** 2, 0) / values.length);
-  return new Set(rows.filter(([, r]) => r.infit > m + 2 * sd).map(([judge]) => judge));
+  return new Set(rows2.filter(([, r]) => r.infit > m + 2 * sd).map(([judge]) => judge));
 }
 function contestedPair(comparisons, theta) {
   const known = theta ?? {};
@@ -644,10 +1429,10 @@ function computeScale(round, config, judges, rng = Math.random) {
   }
   let fit = fitBradleyTerry(ids, comparisons);
   let infit = judgeFit(comparisons, fit.theta);
-  const flagged = flagMisfits(infit);
+  const flagged2 = flagMisfits(infit);
   let used = comparisons;
-  if (config.downweight_misfits && flagged.size) {
-    used = comparisons.map((c) => flagged.has(c.judge) ? { ...c, weight: c.weight * 0.5 } : c);
+  if (config.downweight_misfits && flagged2.size) {
+    used = comparisons.map((c) => flagged2.has(c.judge) ? { ...c, weight: c.weight * 0.5 } : c);
     fit = fitBradleyTerry(ids, used);
     infit = judgeFit(comparisons, fit.theta);
   }
@@ -656,8 +1441,8 @@ function computeScale(round, config, judges, rng = Math.random) {
   const reliability = { ...reliabilitySignal({ ssr: s, splitHalf: half, comparisons: comparisons.length, items: ids.length }), ssr: s, split_half: half };
   const order2 = [...ids].sort((a, b) => fit.theta[b] - fit.theta[a] || (a < b ? -1 : 1));
   const studentOrder = order2.filter((id) => round.pool[id].kind === "student");
-  const weights = Object.fromEntries([...judges.keys()].map((key) => [key, weightOf(key) * (config.downweight_misfits && flagged.has(key) ? 0.5 : 1)]));
-  return { ids, fit, comparisons, judgements, infit, flagged, reliability, order: order2, studentOrder, weights };
+  const weights = Object.fromEntries([...judges.keys()].map((key) => [key, weightOf(key) * (config.downweight_misfits && flagged2.has(key) ? 0.5 : 1)]));
+  return { ids, fit, comparisons, judgements, infit, flagged: flagged2, reliability, order: order2, studentOrder, weights };
 }
 function gamePool(answers) {
   const pool = {};
@@ -675,7 +1460,7 @@ var MIN_ANSWERS = 6;
 var ROUNDS = 5;
 var RELIABLE = 0.7;
 var DRAFT_MAX = POOL_TEXT_MAX;
-var err2 = (code, message) => ({ error: { code, message } });
+var err3 = (code, message) => ({ error: { code, message } });
 var words = (s) => (s.trim().match(/\S+/g) ?? []).length;
 var judgingPoints = (gap) => Math.round(60 + 40 * Math.max(0, 1 - Math.abs(gap) / 3));
 function battleContent(keys) {
@@ -711,7 +1496,7 @@ function counts(k) {
     }
   return out;
 }
-function deal(ctx, k, owner) {
+function deal2(ctx, k, owner) {
   const done = k.judgements[owner]?.length ?? 0;
   if (done >= k.rounds) {
     k.pairs[owner] = null;
@@ -750,7 +1535,7 @@ function startBattles(ctx, k) {
   k.phase = "battle";
   k.screen = "main";
   k.rounds = Math.min(ROUNDS, (n - 1) * (n - 2) / 2);
-  for (const s of ctx.seats()) deal(ctx, k, s.owner);
+  for (const s of ctx.seats()) deal2(ctx, k, s.owner);
 }
 function randomPair(ctx, k, not) {
   const ids = Object.keys(k.pool);
@@ -800,12 +1585,12 @@ function results(ctx, k) {
   const { chips } = battleContent(ctx.keys);
   const won = {};
   for (const id of s.order.slice(0, 3)) {
-    const tally = /* @__PURE__ */ new Map();
+    const tally2 = /* @__PURE__ */ new Map();
     for (const j of all) {
       if (j.winner !== id) continue;
-      for (const c of j.chips[j.winner === j.left ? "left" : "right"]) tally.set(c, (tally.get(c) ?? 0) + 1);
+      for (const c of j.chips[j.winner === j.left ? "left" : "right"]) tally2.set(c, (tally2.get(c) ?? 0) + 1);
     }
-    won[id] = [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]).slice(0, 2).map(([c, n]) => [chips[c] ?? "", n]).filter(([label]) => label);
+    won[id] = [...tally2.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]).slice(0, 2).map(([c, n]) => [chips[c] ?? "", n]).filter(([label]) => label);
   }
   k.final = { order: s.order, theta: s.theta, reliability: s.reliability, reliable: s.reliability >= RELIABLE, judges, chips: won };
   k.phase = "results";
@@ -827,25 +1612,25 @@ var battlesRules = {
     ctx.setTimer(k.ends);
   },
   move(ctx, k, owner, e) {
-    if (k.phase === "no_list") return err2("no_list", "Battles needs a class list.");
+    if (k.phase === "no_list") return err3("no_list", "Battles needs a class list.");
     if (e.move === "answer") {
-      if (k.phase !== "write") return err2("not_now", "Writing has closed.");
+      if (k.phase !== "write") return err3("not_now", "Writing has closed.");
       const r = e.response ?? {};
-      if (typeof r.text !== "string") return err2("bad_answer", "Write your answer first.");
-      if (r.text.length > DRAFT_MAX) return err2("too_long", `Keep it under ${DRAFT_MAX} characters.`);
+      if (typeof r.text !== "string") return err3("bad_answer", "Write your answer first.");
+      if (r.text.length > DRAFT_MAX) return err3("too_long", `Keep it under ${DRAFT_MAX} characters.`);
       const was = k.drafts[owner];
       const handIn = r.hand_in === true ? true : r.hand_in === false ? false : was?.in ?? false;
-      if (handIn && !r.text.trim()) return err2("empty", "Write your answer first.");
+      if (handIn && !r.text.trim()) return err3("empty", "Write your answer first.");
       k.drafts[owner] = { text: r.text, words: words(r.text), in: handIn, at: ctx.now };
       if (handIn && !was?.in) ctx.ticker("handed in", ctx.seat(owner)?.initials);
       return { item: BATTLES_ITEM };
     }
     if (e.move === "judge") {
-      if (k.phase !== "battle") return err2("not_now", "The battles aren\u2019t running.");
+      if (k.phase !== "battle") return err3("not_now", "The battles aren\u2019t running.");
       const pair = k.pairs[owner];
       const r = e.response ?? {};
-      if (!pair || r.left !== pair.left || r.right !== pair.right) return err2("bad_pair", "That pair has changed.");
-      if (r.winner !== pair.left && r.winner !== pair.right) return err2("bad_winner", "Pick one of the two answers.");
+      if (!pair || r.left !== pair.left || r.right !== pair.right) return err3("bad_pair", "That pair has changed.");
+      if (r.winner !== pair.left && r.winner !== pair.right) return err3("bad_winner", "Pick one of the two answers.");
       const n = battleContent(ctx.keys).chips.length;
       const clean = (v) => Array.isArray(v) ? [...new Set(v.filter((i) => Number.isInteger(i) && i >= 0 && i < n))].sort((a, b) => a - b) : [];
       const j = { left: pair.left, right: pair.right, winner: r.winner, chips: { left: clean(r.chips?.left), right: clean(r.chips?.right) }, at: ctx.now };
@@ -855,16 +1640,16 @@ var battlesRules = {
       ctx.setProgress(owner, { done, total: k.rounds });
       if (done >= k.rounds) ctx.ticker("judged every pair", ctx.seat(owner)?.initials);
       refit(ctx, k);
-      deal(ctx, k, owner);
+      deal2(ctx, k, owner);
       return { item: BATTLES_ITEM };
     }
-    return err2("bad_move", "That move isn\u2019t part of Short-answer battles.");
+    return err3("bad_move", "That move isn\u2019t part of Short-answer battles.");
   },
   control(ctx, k, op, from) {
-    if (from.role !== "teacher" && from.role !== "board") return err2("not_allowed", "Only the teacher can do that.");
+    if (from.role !== "teacher" && from.role !== "board") return err3("not_allowed", "Only the teacher can do that.");
     switch (op.name) {
       case "more_time":
-        if (k.phase !== "write") return err2("not_now", "Writing has closed.");
+        if (k.phase !== "write") return err3("not_now", "Writing has closed.");
         k.ends = Math.max(ctx.now, k.ends) + 6e4;
         ctx.setTimer(k.ends);
         return;
@@ -875,7 +1660,7 @@ var battlesRules = {
         return;
       case "spotlight":
       case "next_pair":
-        if (k.phase === "write" || k.phase === "no_list") return err2("not_now", "Spotlight opens once the writing closes.");
+        if (k.phase === "write" || k.phase === "no_list") return err3("not_now", "Spotlight opens once the writing closes.");
         spotlight(ctx, k);
         return;
       case "show_split":
@@ -890,14 +1675,14 @@ var battlesRules = {
         return;
       case "judges":
       case "teacher":
-        if (k.phase !== "results") return err2("not_now", "Results first.");
+        if (k.phase !== "results") return err3("not_now", "Results first.");
         k.screen = op.name;
         return;
       case "final":
         ctx.end();
         return;
       default:
-        return err2("bad_control", "Unknown control.");
+        return err3("bad_control", "Unknown control.");
     }
   },
   tick(ctx, k) {
@@ -908,16 +1693,16 @@ var battlesRules = {
     if (k.phase === "battle") results(ctx, k);
   },
   seatChanged(ctx, k, owner) {
-    if (k.phase === "battle" && ctx.seat(owner) && k.pairs[owner] === void 0) deal(ctx, k, owner);
+    if (k.phase === "battle" && ctx.seat(owner) && k.pairs[owner] === void 0) deal2(ctx, k, owner);
   },
   view(ctx, k, role, owner) {
-    return role === "student" ? phoneView(ctx, k, owner) : boardView(ctx, k, role);
+    return role === "student" ? phoneView2(ctx, k, owner) : boardView2(ctx, k, role);
   },
   bot(ctx, k, owner) {
-    return botMove(ctx, k, owner);
+    return botMove2(ctx, k, owner);
   }
 };
-var BOT_ANSWERS = [
+var BOT_ANSWERS2 = [
   "The storm is described as howling at the shutters, so the weather mirrors Mira\u2019s fear and the house seems to attack her.",
   "Short sentences slow the reader down before Mira climbs the stairs, which builds tension and makes every sound feel like a threat.",
   "The house is personified as watching her from every window, so the reader feels she is never safe, even at home.",
@@ -935,13 +1720,13 @@ var BOT_ANSWERS = [
   "Doctor Hask\u2019s calm voice is creepy because he speaks about fear like an illness he wants to cut out.",
   "The writer makes it scary with spooky words."
 ];
-function botMove(ctx, k, owner) {
+function botMove2(ctx, k, owner) {
   if (k.phase === "write") {
     const d = k.drafts[owner];
     if (d?.in) return null;
-    const taken = new Set(Object.entries(k.drafts).filter(([o]) => o !== owner).map(([, x]) => BOT_ANSWERS.findIndex((a) => x.text && a.startsWith(x.text))));
-    const mine = d?.text ? BOT_ANSWERS.findIndex((a) => a.startsWith(d.text)) : -1;
-    const full = BOT_ANSWERS[mine >= 0 ? mine : BOT_ANSWERS.findIndex((_, i) => !taken.has(i))] ?? BOT_ANSWERS[0] ?? "";
+    const taken = new Set(Object.entries(k.drafts).filter(([o]) => o !== owner).map(([, x]) => BOT_ANSWERS2.findIndex((a) => x.text && a.startsWith(x.text))));
+    const mine = d?.text ? BOT_ANSWERS2.findIndex((a) => a.startsWith(d.text)) : -1;
+    const full = BOT_ANSWERS2[mine >= 0 ? mine : BOT_ANSWERS2.findIndex((_, i) => !taken.has(i))] ?? BOT_ANSWERS2[0] ?? "";
     const all = full.split(" ");
     const have = d?.words ?? 0;
     if (have >= all.length) return { move: { item: BATTLES_ITEM, move: "answer", response: { text: full, hand_in: true } } };
@@ -965,7 +1750,7 @@ var initialsOf2 = (ctx, owner) => ctx.seat(owner)?.initials ?? "";
 function judgeRows(ctx, k) {
   return Object.entries(k.final?.judges ?? {}).filter(([o]) => ctx.seat(o)).map(([o, j]) => ({ owner: o, initials: initialsOf2(ctx, o), points: j.points, agreed: j.agree.filter(Boolean).length, judged: j.agree.length })).sort((a, b) => b.points - a.points || b.agreed - a.agreed || (a.initials < b.initials ? -1 : 1));
 }
-function boardView(ctx, k, role) {
+function boardView2(ctx, k, role) {
   const c = battleContent(ctx.keys);
   const base3 = { who: "board", phase: k.phase, screen: k.screen, prompt: c.prompt, criterion: c.criterion, minutes: battlesSettings(ctx.game.settings).write_minutes };
   if (k.phase === "no_list") return base3;
@@ -980,9 +1765,9 @@ function boardView(ctx, k, role) {
   if (k.screen === "spotlight" && k.spot && k.pool[k.spot.a] && k.pool[k.spot.b]) {
     const all = Object.values(k.judgements).flat().filter((j) => pairKey(j.left, j.right) === pairKey(k.spot.a, k.spot.b));
     const sideChips = (id) => {
-      const tally = /* @__PURE__ */ new Map();
-      for (const j of all) if (j.winner === id) for (const ch of j.chips[j.left === id ? "left" : "right"]) tally.set(ch, (tally.get(ch) ?? 0) + 1);
-      return [...tally.entries()].sort((x, y) => y[1] - x[1]).slice(0, 2).map(([i]) => c.chips[i] ?? "").filter(Boolean);
+      const tally2 = /* @__PURE__ */ new Map();
+      for (const j of all) if (j.winner === id) for (const ch of j.chips[j.left === id ? "left" : "right"]) tally2.set(ch, (tally2.get(ch) ?? 0) + 1);
+      return [...tally2.entries()].sort((x, y) => y[1] - x[1]).slice(0, 2).map(([i]) => c.chips[i] ?? "").filter(Boolean);
     };
     out.spot = {
       a: k.pool[k.spot.a].text,
@@ -1016,19 +1801,19 @@ function boardView(ctx, k, role) {
     out.top = f.order.slice(0, 3).map((id) => ({ text: k.pool[id]?.text ?? "", chips: f.chips[id] ?? [] }));
     if (k.screen === "judges" || k.screen === "teacher") out.judges = judgeRows(ctx, k).map(({ owner: _o, ...r }) => r);
     if (role === "teacher") {
-      const rows = judgeRows(ctx, k);
-      const bins = Array.from({ length: k.rounds + 1 }, (_, n) => rows.filter((r) => r.agreed === n).length);
+      const rows2 = judgeRows(ctx, k);
+      const bins = Array.from({ length: k.rounds + 1 }, (_, n) => rows2.filter((r) => r.agreed === n).length);
       out.teacher = {
         scale: f.order.map((id) => ({ text: (k.pool[id]?.text ?? "").slice(0, 140), theta: Math.round((f.theta[id] ?? 0) * 100) / 100 })),
         bins,
-        low: rows.filter((r) => r.judged && r.agreed / r.judged <= 0.4).map((r) => r.initials),
-        perfect: rows.filter((r) => r.judged && r.agreed === r.judged).map((r) => r.initials)
+        low: rows2.filter((r) => r.judged && r.agreed / r.judged <= 0.4).map((r) => r.initials),
+        perfect: rows2.filter((r) => r.judged && r.agreed === r.judged).map((r) => r.initials)
       };
     }
   }
   return out;
 }
-function phoneView(ctx, k, owner) {
+function phoneView2(ctx, k, owner) {
   const c = battleContent(ctx.keys);
   const base3 = { who: "phone", phase: k.phase, prompt: c.prompt, criterion: c.criterion, minutes: battlesSettings(ctx.game.settings).write_minutes, chips: c.chips };
   if (k.phase === "write") {
@@ -1047,7 +1832,7 @@ function phoneView(ctx, k, owner) {
     };
   }
   if (k.phase === "results" && k.final) {
-    const rows = judgeRows(ctx, k);
+    const rows2 = judgeRows(ctx, k);
     const mine = k.final.judges[owner];
     const own = k.own[owner];
     const at = own ? k.final.order.indexOf(own) : -1;
@@ -1056,8 +1841,8 @@ function phoneView(ctx, k, owner) {
       result: {
         agree: mine?.agree ?? [],
         points: mine?.points ?? 0,
-        place: Math.max(1, rows.findIndex((r) => r.owner === owner) + 1),
-        of: Math.max(rows.length, 1),
+        place: Math.max(1, rows2.findIndex((r) => r.owner === owner) + 1),
+        of: Math.max(rows2.length, 1),
         wrote: !!own,
         ...k.final.reliable && at >= 0 ? { third: thirdOf(at, k.final.order.length) } : {}
       }
@@ -1121,7 +1906,7 @@ function singleChoice(item, key) {
 // apps/teaching/src/games/kinds/jeopardy/rules.ts
 var WAGER_SECONDS = 30;
 var MIN_WAGER = 100;
-var err3 = (code, message) => ({ error: { code, message } });
+var err4 = (code, message) => ({ error: { code, message } });
 function content(ctx) {
   return { items: ctx.keys.live?.items ?? [], jeopardy: ctx.keys.live?.jeopardy };
 }
@@ -1215,12 +2000,12 @@ function backToBoard(ctx, k) {
   }
 }
 function pick(ctx, k, tileId) {
-  if (k.phase !== "pick") return err3("not_now", "Pick when the board is showing.");
+  if (k.phase !== "pick") return err4("not_now", "Pick when the board is showing.");
   const t = tileOf(ctx, tileId);
-  if (!t) return err3("bad_tile", "That tile isn\u2019t on the board.");
-  if (k.used[t.id]) return err3("used", "That tile has been played.");
+  if (!t) return err4("bad_tile", "That tile isn\u2019t on the board.");
+  if (k.used[t.id]) return err4("used", "That tile has been played.");
   const team = pickingTeam(ctx, k);
-  if (team === null) return err3("no_team", "No team is ready to pick.");
+  if (team === null) return err4("no_team", "No team is ready to pick.");
   k.aim = null;
   k.cur = { tile: t.id, item: t.item, cat: t.cat, value: t.value, double: t.double, team, answers: {} };
   if (t.double) {
@@ -1281,12 +2066,12 @@ function revealFinalNext(ctx, k) {
 }
 function answer(ctx, k, owner, e) {
   const seat = ctx.seat(owner);
-  if (!seat || seat.team === void 0) return err3("no_seat", "Join a team first.");
+  if (!seat || seat.team === void 0) return err4("no_seat", "Join a team first.");
   const final = k.phase === "final_clue";
-  if (k.phase !== "clue" && !final) return err3("closed", "Answers are closed.");
+  if (k.phase !== "clue" && !final) return err4("closed", "Answers are closed.");
   const itemId = final ? k.final?.item : k.cur?.item;
   const answers = final ? k.final?.answers : k.cur?.answers;
-  if (!itemId || !answers || e.item !== itemId) return err3("bad_item", "That clue isn\u2019t open.");
+  if (!itemId || !answers || e.item !== itemId) return err4("bad_item", "That clue isn\u2019t open.");
   if (answers[owner]) return { item: itemId };
   const opened = (final ? k.final?.opened_at : k.cur?.opened_at) ?? ctx.now;
   const t = k.cur ? tileOf(ctx, k.cur.tile) : void 0;
@@ -1314,7 +2099,7 @@ var jeopardyRules = {
     if (k.phase === "final_wager") startFinal(ctx, k);
   },
   move(ctx, k, owner, e) {
-    if (e.move !== "answer") return err3("bad_move", "Answer the clue on your phone.");
+    if (e.move !== "answer") return err4("bad_move", "Answer the clue on your phone.");
     return answer(ctx, k, owner, e);
   },
   control(ctx, k, op, from) {
@@ -1323,13 +2108,13 @@ var jeopardyRules = {
     switch (op.name) {
       case "aim":
       case "pick": {
-        if (typeof data.tile !== "string") return err3("bad_tile", "Pick a tile.");
+        if (typeof data.tile !== "string") return err4("bad_tile", "Pick a tile.");
         if (!staff) {
           const team = pickingTeam(ctx, k);
-          if (team === null || captainOf2(ctx, k, team) !== from.owner) return err3("not_captain", "Your captain picks this turn.");
+          if (team === null || captainOf2(ctx, k, team) !== from.owner) return err4("not_captain", "Your captain picks this turn.");
         }
         if (op.name === "aim") {
-          if (k.phase !== "pick" || !tileOf(ctx, data.tile) || k.used[data.tile]) return err3("bad_tile", "Pick a tile still on the board.");
+          if (k.phase !== "pick" || !tileOf(ctx, data.tile) || k.used[data.tile]) return err4("bad_tile", "Pick a tile still on the board.");
           k.aim = data.tile;
           return;
         }
@@ -1337,23 +2122,23 @@ var jeopardyRules = {
       }
       case "wager": {
         if (k.phase === "wager" && k.cur) {
-          if (!staff && captainOf2(ctx, k, k.cur.team) !== from.owner) return err3("not_captain", "Your captain wagers.");
+          if (!staff && captainOf2(ctx, k, k.cur.team) !== from.owner) return err4("not_captain", "Your captain wagers.");
           k.cur.wager = clampWager(data.amount, k.cur.max_wager ?? MIN_WAGER);
           openClue(ctx, k);
           return;
         }
         if (k.phase === "final_wager" && k.final) {
           const team = staff ? Number(data.team) : ctx.seat(from.owner)?.team;
-          if (team === void 0 || !Number.isInteger(team) || !order(ctx, k).includes(team)) return err3("bad_team", "No such team.");
-          if (!staff && captainOf2(ctx, k, team) !== from.owner) return err3("not_captain", "Your captain wagers.");
+          if (team === void 0 || !Number.isInteger(team) || !order(ctx, k).includes(team)) return err4("bad_team", "No such team.");
+          if (!staff && captainOf2(ctx, k, team) !== from.owner) return err4("not_captain", "Your captain wagers.");
           k.final.wagers[team] = clampWager(data.amount, finalMax(ctx, team), 0);
           if (finalWagersIn(ctx, k)) openFinal(ctx, k);
           return;
         }
-        return err3("not_now", "No wager is open.");
+        return err4("not_now", "No wager is open.");
       }
       case "close":
-        if (!staff) return err3("teacher_only", "Only the teacher can do that.");
+        if (!staff) return err4("teacher_only", "Only the teacher can do that.");
         if (k.phase === "wager" && k.cur) {
           k.cur.wager = clampWager(k.cur.wager ?? MIN_WAGER, k.cur.max_wager ?? MIN_WAGER);
           openClue(ctx, k);
@@ -1361,26 +2146,26 @@ var jeopardyRules = {
         else close(ctx, k);
         return;
       case "reveal":
-        if (!staff) return err3("teacher_only", "Only the teacher can do that.");
+        if (!staff) return err4("teacher_only", "Only the teacher can do that.");
         if (k.phase === "clue" || k.phase === "closed") reveal(ctx, k);
         else if (k.phase === "final_clue" || k.phase === "final_closed" || k.phase === "final_reveal") revealFinalNext(ctx, k);
         return;
       case "next":
       case "back":
-        if (!staff) return err3("teacher_only", "Only the teacher can do that.");
+        if (!staff) return err4("teacher_only", "Only the teacher can do that.");
         if (k.phase === "revealed") backToBoard(ctx, k);
         else if (k.phase === "clue" || k.phase === "closed") reveal(ctx, k);
         else if (k.phase.startsWith("final_")) revealFinalNext(ctx, k);
         else if (k.phase === "done") ctx.end();
         return;
       case "final":
-        if (!staff) return err3("teacher_only", "Only the teacher can do that.");
-        if (k.phase !== "pick" && k.phase !== "done") return err3("not_now", "Finish this tile first.");
-        if (!content(ctx).jeopardy?.final) return err3("no_final", "This game has no Final.");
+        if (!staff) return err4("teacher_only", "Only the teacher can do that.");
+        if (k.phase !== "pick" && k.phase !== "done") return err4("not_now", "Finish this tile first.");
+        if (!content(ctx).jeopardy?.final) return err4("no_final", "This game has no Final.");
         startFinal(ctx, k);
         return;
       default:
-        return err3("bad_control", "That isn\u2019t a Jeopardy control.");
+        return err4("bad_control", "That isn\u2019t a Jeopardy control.");
     }
   },
   tick(ctx, k) {
@@ -1757,7 +2542,7 @@ function questionProblems(q) {
       unique(q.options.map((o) => o.id), "options");
       const ids = new Set(q.options.map((o) => o.id));
       if (!q.correct.length || q.correct.some((id) => !ids.has(id))) out.push("Tick the right answer.");
-      if (new Set(q.options.map((o) => norm(o.text))).size !== q.options.length) out.push("Two options say the same thing.");
+      if (new Set(q.options.map((o) => norm2(o.text))).size !== q.options.length) out.push("Two options say the same thing.");
       break;
     }
     case "find_it": {
@@ -1770,7 +2555,7 @@ function questionProblems(q) {
     case "spot_technique": {
       unique(q.options.map((o) => o.id), "techniques");
       unique(q.targets.map((t) => t.id), "answers");
-      if (new Set(q.options.map((o) => norm(o.text))).size !== q.options.length) out.push("Two techniques say the same thing.");
+      if (new Set(q.options.map((o) => norm2(o.text))).size !== q.options.length) out.push("Two techniques say the same thing.");
       const ids = new Set(q.options.map((o) => o.id));
       for (const target of q.targets) {
         if (!locateQuote(q.passage, target.quote)) out.push(`\u201C${target.quote}\u201D isn\u2019t in the passage. Copy the words exactly.`);
@@ -1790,7 +2575,7 @@ function questionProblems(q) {
       break;
     case "matching":
       unique(q.pairs.map((p) => p.id), "pairs");
-      if (new Set(q.pairs.map((p) => norm(p.right))).size !== q.pairs.length) out.push("Two pairs have the same right-hand side.");
+      if (new Set(q.pairs.map((p) => norm2(p.right))).size !== q.pairs.length) out.push("Two pairs have the same right-hand side.");
       break;
     case "ordering":
       unique(q.items.map((i) => i.id), "items");
@@ -1804,7 +2589,7 @@ function questionProblems(q) {
     }
     case "label_image":
       unique(q.pins.map((p) => p.id), "pins");
-      if (new Set(q.pins.map((p) => norm(p.label))).size !== q.pins.length) out.push("Two pins have the same label.");
+      if (new Set(q.pins.map((p) => norm2(p.label))).size !== q.pins.length) out.push("Two pins have the same label.");
       break;
     default:
       break;
@@ -1838,7 +2623,7 @@ function passageWords(passage) {
   return words3;
 }
 function wordKey(word) {
-  return norm(word).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+  return norm2(word).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
 }
 function locateQuote(passage, quote) {
   const words3 = passageWords(passage);
@@ -1916,7 +2701,7 @@ var QuizSettingsSchema = z2.object({
   /** Teacher only: an earlier quiz to show before-and-after against. */
   compare_with: z2.string().max(64).optional()
 });
-function norm(value, caseSensitive = false) {
+function norm2(value, caseSensitive = false) {
   const cleaned = String(value ?? "").normalize("NFKC").replace(/[‘’‛′]/g, "'").replace(/[“”‟″]/g, '"').replace(/[‐-―−]/g, "-").replace(/\s+/g, " ").trim().replace(/^["']+|["'.,!?;:]+$/g, "").trim();
   return caseSensitive ? cleaned : cleaned.toLowerCase();
 }
@@ -1935,9 +2720,9 @@ function editDistance(a, b) {
   return prev[b.length];
 }
 function matchText(given, accepted, caseSensitive = false) {
-  const g = norm(given, caseSensitive);
+  const g = norm2(given, caseSensitive);
   if (!g) return "wrong";
-  const options = accepted.map((a) => norm(a, caseSensitive));
+  const options = accepted.map((a) => norm2(a, caseSensitive));
   if (options.includes(g)) return "exact";
   const near = options.some((a) => a.length >= 5 && editDistance(g, a) <= (a.length >= 10 ? 2 : 1));
   return near ? "near" : "wrong";
@@ -2103,7 +2888,9 @@ var GAME_KINDS = [
   "connections",
   "articulate",
   "pictionary",
-  "who_said_it"
+  "who_said_it",
+  "answer_chain",
+  "fleet_week"
 ];
 var GameKindSchema = z3.enum(GAME_KINDS);
 var GAME_LIMITS = {
@@ -2128,12 +2915,16 @@ var GAME_LIMITS = {
   category: 40,
   /** Letters in a Wheel puzzle (A–Z only). */
   wheelLetters: 60,
+  fleetLabel: 40,
   wheelText: 120,
   message: 40,
   prompt: 1e3,
   criterion: 200,
   chips: 6,
-  chip: 60
+  chip: 60,
+  /** Answer chain: the answer every chain starts from, and the topic line. */
+  startAnswer: 40,
+  theme: 120
 };
 var GAME_COUNTS = {
   crossword: { min: 6, max: 30 },
@@ -2303,6 +3094,22 @@ var BattlesSchema = z3.object({
   settings: z3.object({ write_minutes: z3.number().int().min(2).max(8).default(4) }).prefault({}),
   ...ItemTagsShape
 });
+var AnswerChainSchema = z3.object({
+  ...base2,
+  kind: z3.literal("answer_chain"),
+  /** The answer every team's chain starts from (one word or a short name). */
+  start_answer: Text2(GAME_LIMITS.startAnswer),
+  /** Optional: keeps every link on topic ("The water cycle"). */
+  theme: Text2(GAME_LIMITS.theme),
+  settings: z3.object({
+    /** Links per chain: question, answer, question… always even, so a chain ends on an answer. */
+    links: z3.number().int().min(4).max(12).default(6),
+    question_seconds: z3.number().int().min(10).max(60).default(20),
+    answer_seconds: z3.number().int().min(5).max(30).default(10),
+    review_seconds: z3.number().int().min(30).max(180).default(90)
+  }).prefault({}),
+  ...ItemTagsShape
+});
 var WagerSchema = z3.object({
   ...base2,
   kind: z3.literal("wager"),
@@ -2343,6 +3150,25 @@ var WhoSaidItSchema = z3.object({
   items: z3.array(QuoteItemSchema).max(GAME_COUNTS.who_said_it.max).default([]),
   settings: z3.object({ seconds: Seconds(10, 60, 20) }).prefault({})
 });
+var FLEET_SIZE = 5;
+var FleetSquareSchema = z3.object({ variants: z3.array(QuestionItemSchema).max(2).default([]) });
+var FleetWeekSchema = z3.object({
+  ...base2,
+  kind: z3.literal("fleet_week"),
+  columns: z3.array(z3.string().max(GAME_LIMITS.fleetLabel)).max(FLEET_SIZE).default([]),
+  rows: z3.array(z3.string().max(GAME_LIMITS.fleetLabel)).max(FLEET_SIZE).default([]),
+  /** Row-major, index = row * 5 + col. */
+  squares: z3.array(FleetSquareSchema).max(FLEET_SIZE * FLEET_SIZE).default([]),
+  /** recall[i] is ship s{i}'s line (sizes 3, 2, 2, 1). */
+  recall: z3.array(QuestionItemSchema).max(4).default([]),
+  settings: z3.object({
+    rounds: z3.number().int().min(2).max(8).default(5),
+    round_cap_s: z3.number().int().min(60).max(600).default(240),
+    placement_cap_s: z3.number().int().min(30).max(300).default(120),
+    answer_s: z3.number().int().min(20).max(120).default(60),
+    cutoff: z3.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default("20:00")
+  }).prefault({})
+});
 var GameSchema = z3.discriminatedUnion("kind", [
   CrosswordSchema,
   FindAWordSchema,
@@ -2355,7 +3181,9 @@ var GameSchema = z3.discriminatedUnion("kind", [
   ConnectionsSchema,
   ArticulateSchema,
   PictionarySchema,
-  WhoSaidItSchema
+  WhoSaidItSchema,
+  AnswerChainSchema,
+  FleetWeekSchema
 ]);
 var GameLessonSchema = z3.object({
   games: z3.array(GameSchema).max(GAME_LIMITS.games).default([]),
@@ -2396,7 +3224,10 @@ var PublicGameSchema = z3.object({
   cast: z3.array(CastMemberSchema.pick({ id: true, name: true, emblem: true, image_url: true })).optional(),
   message: z3.object({ length: z3.number().int(), question: z3.record(z3.string(), z3.unknown()).optional() }).optional(),
   /** Crossword and find-a-word: the grid, built at publish. */
-  grid: PublicGridSchema.optional()
+  grid: PublicGridSchema.optional(),
+  /** Fleet week: the grid's axis labels (the questions stay on the server). */
+  columns: z3.array(z3.string()).optional(),
+  rows: z3.array(z3.string()).optional()
 });
 var PublicGameLessonSchema = z3.object({
   games: z3.array(PublicGameSchema).max(GAME_LIMITS.games),
@@ -2415,14 +3246,14 @@ function lineBetween(from, to) {
   const sy = Math.sign(dy);
   return Array.from({ length: n + 1 }, (_, i) => [from[0] + sx * i, from[1] + sy * i]);
 }
-function readSelection(rows, from, to) {
-  const size = rows.length;
+function readSelection(rows2, from, to) {
+  const size = rows2.length;
   const cells = lineBetween(from, to);
   if (!cells) return null;
   let out = "";
   for (const [x, y] of cells) {
     if (x < 0 || y < 0 || x >= size || y >= size) return null;
-    out += rows[y]?.[x] ?? "";
+    out += rows2[y]?.[x] ?? "";
   }
   return out;
 }
@@ -2443,7 +3274,7 @@ function fullLine(size, p) {
 
 // apps/teaching/src/games/core/model.ts
 function normaliseAnswer(value) {
-  return norm(String(value ?? "")).normalize("NFD").replace(/\p{M}+/gu, "").replace(/^(?:a|an|the)\s+/, "").replace(/[\s\-‐-―_]+/g, "");
+  return norm2(String(value ?? "")).normalize("NFD").replace(/\p{M}+/gu, "").replace(/^(?:a|an|the)\s+/, "").replace(/[\s\-‐-―_]+/g, "");
 }
 function gameTotal(keys) {
   return Object.values(keys.items).reduce((n, key) => n + (key.shape === "wall" ? key.groups.length : 1), 0);
@@ -2562,7 +3393,7 @@ function promptsOf(keys) {
   }
   return out;
 }
-function lev(a, b) {
+function lev2(a, b) {
   if (Math.abs(a.length - b.length) > 3) return 99;
   const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
   for (let j = 1; j <= b.length; j++) d[0][j] = j;
@@ -2581,10 +3412,10 @@ function judgeGuess(p, raw) {
     const n = normaliseAnswer(a);
     if (!n) continue;
     if (n === g) return { right: a, close: false };
-    if (p.shape === "term" && n.length >= 4 && lev(n, g) <= (n.length >= 8 ? 2 : 1)) return { right: a, close: false };
+    if (p.shape === "term" && n.length >= 4 && lev2(n, g) <= (n.length >= 8 ? 2 : 1)) return { right: a, close: false };
   }
   const gw = new Set(words2(raw));
-  if (p.shape === "quote" && p.key.length && p.key.every((k) => gw.has(k) || [...gw].some((w) => w.length >= 5 && lev(w, k) <= 1))) return { right: p.answers[1] ?? p.answers[0] ?? "", close: false };
+  if (p.shape === "quote" && p.key.length && p.key.every((k) => gw.has(k) || [...gw].some((w) => w.length >= 5 && lev2(w, k) <= 1))) return { right: p.answers[1] ?? p.answers[0] ?? "", close: false };
   const pool = /* @__PURE__ */ new Set([...p.answers.flatMap(keyWords), ...p.key]);
   const close2 = [...gw].some((w) => pool.has(w) || w.length >= 6 && [...pool].some((k) => k.startsWith(w.slice(0, 6))));
   return { right: null, close: close2 };
@@ -2595,7 +3426,7 @@ function blanksOf(p, hinted) {
   const ws = p.blanks.split(/\s+/).filter(Boolean).map((w) => w.replace(/[^\p{L}\p{N}'’-]/gu, ""));
   return { lengths: ws.map((w) => w.length), ...hinted ? { first: ws.map((w) => (w[0] ?? "").toUpperCase()) } : {} };
 }
-function shuffle2(list, random) {
+function shuffle3(list, random) {
   const out = [...list];
   for (let i = out.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
@@ -2603,7 +3434,7 @@ function shuffle2(list, random) {
   }
   return out;
 }
-var err4 = (code, message) => ({ error: { code, message } });
+var err5 = (code, message) => ({ error: { code, message } });
 var pointCount = (r) => r.strokes.reduce((a, s) => a + s.p.length / 2, 0);
 function applyStroke(r, data) {
   const d = data ?? {};
@@ -2647,13 +3478,13 @@ function nextDrawer(ctx, k) {
   k.drawn = [];
   return pool[0]?.owner;
 }
-function startRound(ctx, k) {
-  if (k.phase === "draw") return err4("not_now", "A round is running.");
+function startRound2(ctx, k) {
+  if (k.phase === "draw") return err5("not_now", "A round is running.");
   const prompts = promptsOf(ctx.keys);
   const item = k.deck.shift();
-  if (!item || !prompts.has(item)) return err4("deck_empty", "Every prompt has been drawn.");
+  if (!item || !prompts.has(item)) return err5("deck_empty", "Every prompt has been drawn.");
   const drawer = k.teacher_next ? "teacher" : nextDrawer(ctx, k);
-  if (!drawer) return err4("no_drawer", "Nobody is here to draw.");
+  if (!drawer) return err5("no_drawer", "Nobody is here to draw.");
   k.teacher_next = false;
   if (drawer !== "teacher") k.drawn.push(drawer);
   const s = pictionarySettings(ctx.game.settings, 0);
@@ -2720,29 +3551,29 @@ var pictionaryRules = {
     return { phase: "ready", deck: [], round: null, drawn: [], gallery: [], speed: [], teacher_next: false };
   },
   start(ctx, k) {
-    k.deck = shuffle2([...promptsOf(ctx.keys).keys()], ctx.random);
+    k.deck = shuffle3([...promptsOf(ctx.keys).keys()], ctx.random);
     k.phase = "ready";
   },
   move(ctx, k, owner, e) {
     const r = k.round;
     if (e.move === "draw") {
-      if (k.phase !== "draw" || !r) return err4("not_now", "The round is over.");
-      if (r.drawer !== owner) return err4("not_drawer", "Only the drawer can draw.");
-      if (e.item !== r.item) return err4("stale", "That round has finished.");
+      if (k.phase !== "draw" || !r) return err5("not_now", "The round is over.");
+      if (r.drawer !== owner) return err5("not_drawer", "Only the drawer can draw.");
+      if (e.item !== r.item) return err5("stale", "That round has finished.");
       const bad = applyStroke(r, e.response);
-      return bad ? err4(bad, bad === "too_much" ? "That drawing is full." : "That stroke didn\u2019t go through.") : { item: e.item };
+      return bad ? err5(bad, bad === "too_much" ? "That drawing is full." : "That stroke didn\u2019t go through.") : { item: e.item };
     }
     if (e.move === "guess" || e.move === "answer") {
-      if (k.phase !== "draw" || !r) return err4("not_now", "Wait for the next drawing.");
-      if (r.drawer === owner) return err4("not_guesser", "You\u2019re drawing this one.");
-      if (e.item !== r.item) return err4("stale", "That drawing has finished.");
+      if (k.phase !== "draw" || !r) return err5("not_now", "Wait for the next drawing.");
+      if (r.drawer === owner) return err5("not_guesser", "You\u2019re drawing this one.");
+      if (e.item !== r.item) return err5("stale", "That drawing has finished.");
       const g = r.guessers[owner] ??= { tries: [] };
       if (g.ms !== void 0) return { item: e.item, correct: true };
       const raw = typeof e.response?.text === "string" ? e.response.text.slice(0, 120) : "";
-      if (!raw.trim()) return err4("empty", "Type a guess.");
-      if (g.tries.length >= 60) return err4("slow_down", "That\u2019s a lot of guesses. Watch the drawing.");
+      if (!raw.trim()) return err5("empty", "Type a guess.");
+      if (g.tries.length >= 60) return err5("slow_down", "That\u2019s a lot of guesses. Watch the drawing.");
       const p = promptsOf(ctx.keys).get(r.item);
-      if (!p) return err4("bad_item", "That isn\u2019t in this game.");
+      if (!p) return err5("bad_item", "That isn\u2019t in this game.");
       r.guesses += 1;
       const verdict = judgeGuess(p, raw);
       if (!verdict.right) {
@@ -2759,47 +3590,47 @@ var pictionaryRules = {
       if (r.order.length >= guesserOwners(ctx, r).length) closeRound(ctx, k, "all");
       return { item: e.item, correct: true };
     }
-    return err4("bad_move", "That move isn\u2019t part of Pictionary.");
+    return err5("bad_move", "That move isn\u2019t part of Pictionary.");
   },
   control(ctx, k, op, from) {
     const staff = from.role === "teacher" || from.role === "board";
     if (op.name === "stroke") {
-      if (!staff || k.round?.drawer !== "teacher" || k.phase !== "draw") return err4("not_drawer", "Only the drawer can draw.");
+      if (!staff || k.round?.drawer !== "teacher" || k.phase !== "draw") return err5("not_drawer", "Only the drawer can draw.");
       const bad = applyStroke(k.round, op.data);
-      return bad ? err4(bad, "That stroke didn\u2019t go through.") : void 0;
+      return bad ? err5(bad, "That stroke didn\u2019t go through.") : void 0;
     }
-    if (!staff) return err4("not_allowed", "Only your teacher can do that.");
+    if (!staff) return err5("not_allowed", "Only your teacher can do that.");
     switch (op.name) {
       case "next":
       case "next_round":
-        return startRound(ctx, k);
+        return startRound2(ctx, k);
       case "teacher_draws":
-        if (k.phase === "draw") return err4("not_now", "A round is running.");
+        if (k.phase === "draw") return err5("not_now", "A round is running.");
         k.teacher_next = true;
-        return startRound(ctx, k);
+        return startRound2(ctx, k);
       case "end_round":
       case "reveal":
-        if (k.phase !== "draw") return err4("not_now", "No round is running.");
+        if (k.phase !== "draw") return err5("not_now", "No round is running.");
         closeRound(ctx, k, "time");
         return;
       case "disqualify":
-        if (k.phase !== "draw") return err4("not_now", "No round is running.");
+        if (k.phase !== "draw") return err5("not_now", "No round is running.");
         closeRound(ctx, k, "void");
         return;
       case "more_time":
-        if (k.phase !== "draw" || !k.round) return err4("not_now", "No round is running.");
+        if (k.phase !== "draw" || !k.round) return err5("not_now", "No round is running.");
         k.round.seconds += 15;
         arm(ctx, k.round);
         return;
       case "standings":
-        if (k.phase !== "reveal") return err4("not_now", "Finish the round first.");
+        if (k.phase !== "reveal") return err5("not_now", "Finish the round first.");
         k.phase = "standings";
         return;
       case "final":
         ctx.end();
         return;
       default:
-        return err4("bad_control", "Unknown control.");
+        return err5("bad_control", "Unknown control.");
     }
   },
   tick(ctx, k) {
@@ -2821,10 +3652,10 @@ var pictionaryRules = {
     return pictionaryView(ctx, k, role, owner);
   },
   bot(ctx, k, owner) {
-    return botMove2(ctx, k, owner);
+    return botMove3(ctx, k, owner);
   }
 };
-function botMove2(ctx, k, owner) {
+function botMove3(ctx, k, owner) {
   const r = k.round;
   if (k.phase !== "draw" || !r) return null;
   const p = promptsOf(ctx.keys).get(r.item);
@@ -2981,7 +3812,7 @@ var UPGRADE_INFO = {
   streak: { name: "Streak bonus", costs: [250, 700, 1500], max: 3 },
   ins: { name: "Insurance", costs: [200], max: 1 }
 };
-function shuffle3(xs, random) {
+function shuffle4(xs, random) {
   const a = [...xs];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
@@ -2990,7 +3821,7 @@ function shuffle3(xs, random) {
   return a;
 }
 function newRunner(items, random) {
-  return { queue: shuffle3(items, random), qi: 0, answered: 0, back: [], cur: null, points: 0, earned: 0, streak: 0, best: 0, up: { mult: 0, streak: 0, ins: 0 }, bought: 0, rec: {} };
+  return { queue: shuffle4(items, random), qi: 0, answered: 0, back: [], cur: null, points: 0, earned: 0, streak: 0, best: 0, up: { mult: 0, streak: 0, ins: 0 }, bought: 0, rec: {} };
 }
 var multiplier = (r) => r.up.mult + 1;
 function nextItem(r, items, random, now) {
@@ -3008,7 +3839,7 @@ function nextItem(r, items, random, now) {
     back = true;
   } else {
     const prev = r.cur?.item;
-    r.queue = shuffle3(items, random);
+    r.queue = shuffle4(items, random);
     if (r.queue.length > 1 && r.queue[0] === prev) r.queue.push(r.queue.shift());
     r.qi = 0;
     item = r.queue[r.qi++];
@@ -3083,7 +3914,7 @@ function autoGoal(seats, minutes) {
 var MILESTONES = [25, 50, 75, 100];
 
 // apps/teaching/src/games/kinds/points-rush/rules.ts
-var err5 = (code, message) => ({ error: { code, message } });
+var err6 = (code, message) => ({ error: { code, message } });
 var classEarned = (k) => Object.values(k.runners).reduce((n, r) => n + r.earned, 0);
 function runner(ctx, k, owner) {
   if (!k.runners[owner]) {
@@ -3124,16 +3955,16 @@ var pointsRushRules = {
     }
   },
   move(ctx, k, owner, event) {
-    if (k.over || k.started_at === void 0) return err5("closed", "Time\u2019s up.");
+    if (k.over || k.started_at === void 0) return err6("closed", "Time\u2019s up.");
     if (k.ends_at !== void 0 && ctx.now >= k.ends_at) {
       finishRush(ctx, k);
       ctx.end();
-      return err5("closed", "Time\u2019s up.");
+      return err6("closed", "Time\u2019s up.");
     }
     const r = runner(ctx, k, owner);
-    if (!r) return err5("no_seat", "Join the game first.");
+    if (!r) return err6("no_seat", "Join the game first.");
     if (!r.cur) nextItem(r, k.items, () => ctx.random(), ctx.now);
-    if (event.move !== "answer" || !r.cur || event.item !== r.cur.item) return err5("stale", "That question has moved on.");
+    if (event.move !== "answer" || !r.cur || event.item !== r.cur.item) return err6("stale", "That question has moved on.");
     const back = r.cur.back;
     const marked = ctx.mark(owner, { item: event.item, move: "answer", response: event.response, time_ms: Math.max(0, ctx.now - r.cur.shown_at), extra: { back, n: r.cur.n } });
     if ("error" in marked) return marked;
@@ -3162,20 +3993,20 @@ var pointsRushRules = {
   },
   control(ctx, k, op, from) {
     if (op.name === "buy") {
-      if (from.role !== "student") return err5("not_allowed", "Only players can buy upgrades.");
-      if (k.over) return err5("closed", "Time\u2019s up.");
+      if (from.role !== "student") return err6("not_allowed", "Only players can buy upgrades.");
+      if (k.over) return err6("closed", "Time\u2019s up.");
       const r = runner(ctx, k, from.owner);
       const key = op.data?.up;
-      if (!r || typeof key !== "string" || !UPGRADES.includes(key)) return err5("bad_upgrade", "That isn\u2019t an upgrade.");
-      if (!buy(r, key)) return err5("cant_buy", "Not enough points for that yet.");
+      if (!r || typeof key !== "string" || !UPGRADES.includes(key)) return err6("bad_upgrade", "That isn\u2019t an upgrade.");
+      if (!buy(r, key)) return err6("cant_buy", "Not enough points for that yet.");
       k.upgrades += 1;
       ctx.setScore(from.owner, r.points);
       return;
     }
-    if (from.role === "student") return err5("not_allowed", "Only the teacher can do that.");
+    if (from.role === "student") return err6("not_allowed", "Only the teacher can do that.");
     if (op.name === "goal") {
       const goal = Math.round(Number(op.data?.goal));
-      if (!Number.isFinite(goal) || goal < 100 || goal > 1e6) return err5("bad_goal", "Pick a goal between 100 and 1,000,000.");
+      if (!Number.isFinite(goal) || goal < 100 || goal > 1e6) return err6("bad_goal", "Pick a goal between 100 and 1,000,000.");
       k.goal = goal;
       k.goal_set = true;
       k.milestones = MILESTONES.filter((m) => classEarned(k) / goal * 100 >= m);
@@ -3183,7 +4014,7 @@ var pointsRushRules = {
     }
     if (op.name === "show") {
       const v = op.data?.view;
-      if (v !== "race" && v !== "insight" && v !== "anon") return err5("bad_view", "That view isn\u2019t part of Points rush.");
+      if (v !== "race" && v !== "insight" && v !== "anon") return err6("bad_view", "That view isn\u2019t part of Points rush.");
       k.board = v;
       return;
     }
@@ -3198,7 +4029,7 @@ var pointsRushRules = {
       ctx.end();
       return;
     }
-    return err5("unknown", "That control isn\u2019t part of Points rush.");
+    return err6("unknown", "That control isn\u2019t part of Points rush.");
   },
   tick(ctx, k) {
     if (!k.over && k.ends_at !== void 0 && ctx.now >= k.ends_at) {
@@ -3310,7 +4141,7 @@ function ordinal(n) {
 
 // apps/teaching/src/games/kinds/team-match/rules.ts
 var OPTIONS = 12;
-var err6 = (code, message) => ({ error: { code, message } });
+var err7 = (code, message) => ({ error: { code, message } });
 var promptOf = (item) => {
   if (item.shape === "term") return item.clues[0]?.text ?? "";
   if (item.shape === "quote") return item.text;
@@ -3332,7 +4163,7 @@ function cardsOf2(ctx) {
   }
   return out;
 }
-function shuffle4(list, random) {
+function shuffle5(list, random) {
   const a = [...list];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
@@ -3359,15 +4190,15 @@ function buildOptions(card, all, random) {
     pick2.push(text.trim());
   };
   for (const l of card.lures) add(l);
-  for (const c of shuffle4(all, random)) add(c.answer);
+  for (const c of shuffle5(all, random)) add(c.answer);
   const used = /* @__PURE__ */ new Set();
-  const opts = shuffle4(pick2, random).map((text) => ({ id: freshId(random, used), text }));
+  const opts = shuffle5(pick2, random).map((text) => ({ id: freshId(random, used), text }));
   const right = opts.find((o) => o.text === card.answer.trim())?.id;
   return { opts, right };
 }
 function dealHands(opts, right, lures, members, random) {
   if (!members.length) return {};
-  const order2 = shuffle4(members, random);
+  const order2 = shuffle5(members, random);
   const hands = Object.fromEntries(order2.map((m) => [m, []]));
   const holder = order2[0];
   hands[holder].push(right);
@@ -3380,7 +4211,7 @@ function dealHands(opts, right, lures, members, random) {
     const min = order2.reduce((best, m) => hands[m].length < hands[best].length ? m : best, order2[0]);
     hands[min].push(o.id);
   }
-  for (const m of order2) hands[m] = shuffle4(hands[m], random);
+  for (const m of order2) hands[m] = shuffle5(hands[m], random);
   return hands;
 }
 var live = (ctx, team) => ctx.members(team).filter((o) => ctx.seat(o)?.connected);
@@ -3390,7 +4221,7 @@ function nextCard(ctx, race, cards) {
   race.queue = race.queue.filter((id2) => ids.has(id2));
   if (race.qi >= race.queue.length) {
     const last = race.queue[race.queue.length - 1];
-    let q = shuffle4(cards.map((c) => c.item), ctx.random);
+    let q = shuffle5(cards.map((c) => c.item), ctx.random);
     if (q.length > 1 && q[0] === last) q = [...q.slice(1), q[0]];
     race.queue = q;
     race.qi = 0;
@@ -3398,7 +4229,7 @@ function nextCard(ctx, race, cards) {
   const id = race.queue[race.qi++];
   return cards.find((c) => c.item === id);
 }
-function deal2(ctx, k, team) {
+function deal3(ctx, k, team) {
   const race = k.teams[team];
   if (!race) return;
   const cards = cardsOf2(ctx);
@@ -3434,16 +4265,16 @@ function feed(ctx, k, team, text, tone) {
 }
 function tap(ctx, k, owner, e) {
   const seat = ctx.seat(owner);
-  if (!seat || seat.team === void 0) return err6("no_seat", "Join a team first.");
-  if (k.phase !== "race") return err6("over", "The race is over.");
+  if (!seat || seat.team === void 0) return err7("no_seat", "Join a team first.");
+  if (k.phase !== "race") return err7("over", "The race is over.");
   const team = seat.team;
   const race = k.teams[team];
-  if (!race || race.place !== null) return err6("finished", "Your team has finished. Watch the board.");
+  if (!race || race.place !== null) return err7("finished", "Your team has finished. Watch the board.");
   const round = race.round;
-  if (!round || e.item !== round.item) return err6("stale", "That question has moved on.");
+  if (!round || e.item !== round.item) return err7("stale", "That question has moved on.");
   const option = e.response?.option;
   const mine = round.hands[owner] ?? [];
-  if (typeof option !== "string" || !mine.includes(option)) return err6("stale", "That question has moved on.");
+  if (typeof option !== "string" || !mine.includes(option)) return err7("stale", "That question has moved on.");
   const opt = round.opts.find((o) => o.id === option);
   const rightOpt = round.opts.find((o) => o.id === round.right);
   const holderOwner = Object.entries(round.hands).find(([, h]) => h.includes(round.right))?.[0] ?? null;
@@ -3507,13 +4338,13 @@ function tap(ctx, k, owner, e) {
       k.phase = "done";
       ctx.end();
     }
-  } else deal2(ctx, k, team);
+  } else deal3(ctx, k, team);
   return { item: round.item, correct };
 }
 function startTeam(ctx, k, team) {
   if (k.teams[team]) return;
   k.teams[team] = { step: 0, place: null, queue: [], qi: 0, round: null, last: null, crashes: 0, rounds: 0 };
-  deal2(ctx, k, team);
+  deal3(ctx, k, team);
 }
 var teamMatchRules = {
   kind: "team_match",
@@ -3536,11 +4367,11 @@ var teamMatchRules = {
     for (const t of ctx.teams()) startTeam(ctx, k, t);
   },
   move(ctx, k, owner, e) {
-    if (e.move !== "tap") return err6("bad_move", "Tap one of your answers.");
+    if (e.move !== "tap") return err7("bad_move", "Tap one of your answers.");
     return tap(ctx, k, owner, e);
   },
   control(ctx, k, op, from) {
-    if (from.role === "student") return err6("teacher_only", "Only the teacher can do that.");
+    if (from.role === "student") return err7("teacher_only", "Only the teacher can do that.");
     if (op.name === "wrong_tap") {
       const mode = op.data?.mode;
       const next = typeof mode === "string" && WRONG_TAPS.includes(mode) ? mode : k.mode === "back3" ? "start" : "back3";
@@ -3549,12 +4380,12 @@ var teamMatchRules = {
     }
     if (op.name === "skip") {
       const team = Number(op.data?.team);
-      if (!k.teams[team] || k.teams[team]?.place !== null) return err6("bad_team", "No such team racing.");
-      deal2(ctx, k, team);
+      if (!k.teams[team] || k.teams[team]?.place !== null) return err7("bad_team", "No such team racing.");
+      deal3(ctx, k, team);
       return;
     }
     if (op.name === "next" || op.name === "reveal") return;
-    return err6("bad_control", "That isn\u2019t a team match control.");
+    return err7("bad_control", "That isn\u2019t a team match control.");
   },
   seatChanged(ctx, k, owner) {
     if (k.phase !== "race") return;
@@ -3562,7 +4393,7 @@ var teamMatchRules = {
     if (team === void 0) return;
     if (!k.teams[team]) startTeam(ctx, k, team);
     else if (k.teams[team]?.round) redeal(ctx, k, team);
-    else if (k.teams[team]?.place === null) deal2(ctx, k, team);
+    else if (k.teams[team]?.place === null) deal3(ctx, k, team);
   },
   view(ctx, k, role, owner) {
     return teamMatchView(ctx, k, role, owner);
@@ -3636,7 +4467,7 @@ function wagerSettings(s) {
 var finalBonus = (k) => k.s.house_bonus * 2;
 var isFinal = (k) => k.index === k.order.length - 1;
 var bonusRate = (k) => isFinal(k) && k.s.final_all_in ? finalBonus(k) : k.s.house_bonus;
-var err7 = (code, message) => ({ error: { code, message } });
+var err8 = (code, message) => ({ error: { code, message } });
 function shown(ctx, id) {
   if (!id) return null;
   return shownItem(contentItems(ctx.game, ctx.keys).find((i) => i.id === id));
@@ -3787,12 +4618,12 @@ function step(ctx, k) {
   }
 }
 function calibrationOf(ctx, k) {
-  return Object.entries(k.calibration).filter(([, rows]) => rows.length).map(([owner, rows]) => ({
+  return Object.entries(k.calibration).filter(([, rows2]) => rows2.length).map(([owner, rows2]) => ({
     initials: ctx.seat(owner)?.initials ?? "?",
-    confidence: round2(rows.reduce((n, r) => n + (r.held ? r.bet / r.held : 0), 0) / rows.length),
-    accuracy: round2(rows.filter((r) => r.correct).length / rows.length),
-    rounds: rows.length,
-    big_wrong: rows.filter((r) => !r.correct && r.held && r.bet / r.held >= 0.5).length
+    confidence: round2(rows2.reduce((n, r) => n + (r.held ? r.bet / r.held : 0), 0) / rows2.length),
+    accuracy: round2(rows2.filter((r) => r.correct).length / rows2.length),
+    rounds: rows2.length,
+    big_wrong: rows2.filter((r) => !r.correct && r.held && r.bet / r.held >= 0.5).length
   })).sort((a, b) => a.initials.localeCompare(b.initials));
 }
 function confidentMisconceptions(ctx, k) {
@@ -3822,20 +4653,20 @@ var wagerRules = {
   },
   move(ctx, k, owner, event) {
     const item = k.order[k.index];
-    if (k.stage !== "open" || !item) return err7("closed", "Answers are closed for this question.");
-    if (event.item !== item || event.move !== "answer") return err7("bad_item", "That isn\u2019t the question on the board.");
-    if (k.ends_at !== void 0 && ctx.now > k.ends_at + 500) return err7("closed", "Time\u2019s up for this question.");
+    if (k.stage !== "open" || !item) return err8("closed", "Answers are closed for this question.");
+    if (event.item !== item || event.move !== "answer") return err8("bad_item", "That isn\u2019t the question on the board.");
+    if (k.ends_at !== void 0 && ctx.now > k.ends_at + 500) return err8("closed", "Time\u2019s up for this question.");
     ensure(ctx, k, owner);
-    if (!(owner in k.points)) return err7("no_seat", "Join the game first.");
+    if (!(owner in k.points)) return err8("no_seat", "Join the game first.");
     const it = shown(ctx, item);
     const choice = choiceOf(event.response);
-    if (it && (it.mode === "choice" || it.mode === "truefalse") && !(choice && optionsOf(it).some((o) => o.id === choice))) return err7("bad_answer", "Pick one of the answers.");
+    if (it && (it.mode === "choice" || it.mode === "truefalse") && !(choice && optionsOf(it).some((o) => o.id === choice))) return err8("bad_answer", "Pick one of the answers.");
     const bet = clampBet(k.s, k.points[owner], event.extra?.bet);
     k.picks[owner] = { response: event.response, choice, bet, ...event.time_ms !== void 0 ? { time_ms: Math.max(0, Math.round(event.time_ms)) } : {} };
     return { item };
   },
   control(ctx, k, op, from) {
-    if (from.role === "student") return err7("not_allowed", "Only the teacher can do that.");
+    if (from.role === "student") return err8("not_allowed", "Only the teacher can do that.");
     if (op.name === "next") return void step(ctx, k);
     if (op.name === "close") return void closeAnswers(ctx, k);
     if (op.name === "reveal") return void reveal2(ctx, k);
@@ -3847,7 +4678,7 @@ var wagerRules = {
       ctx.setTimer(k.ends_at);
       return;
     }
-    return err7("unknown", "That control isn\u2019t part of Wager.");
+    return err8("unknown", "That control isn\u2019t part of Wager.");
   },
   tick(ctx, k) {
     if (k.stage === "open" && k.ends_at !== void 0 && ctx.now >= k.ends_at) closeAnswers(ctx, k);
@@ -3928,13 +4759,13 @@ function standings(ctx, k) {
   return rankBy(k.points).slice(0, 5).map((o, i) => ({ initials: ctx.seat(o)?.initials ?? "?", before: before[o] ?? 0, after: k.points[o], climbed: was.indexOf(o) > i }));
 }
 function studentSummary(k, owner) {
-  const rows = k.calibration[owner] ?? [];
+  const rows2 = k.calibration[owner] ?? [];
   const t = k.tally[owner] ?? { right: 0, answered: 0 };
   return {
     right: t.right,
     of: k.order.length,
-    confidence: rows.length ? round2(rows.reduce((n, r) => n + (r.held ? r.bet / r.held : 0), 0) / rows.length) : null,
-    accuracy: rows.length ? round2(rows.filter((r) => r.correct).length / rows.length) : null
+    confidence: rows2.length ? round2(rows2.reduce((n, r) => n + (r.held ? r.bet / r.held : 0), 0) / rows2.length) : null,
+    accuracy: rows2.length ? round2(rows2.filter((r) => r.correct).length / rows2.length) : null
   };
 }
 registerRules(wagerRules);
@@ -3994,7 +4825,7 @@ function puzzlesOf(keys) {
   });
 }
 var publicItem = (keys, id) => keys.live?.items.find((i) => i.id === id);
-var err8 = (code, message) => ({ error: { code, message } });
+var err9 = (code, message) => ({ error: { code, message } });
 var tk = (t) => String(t);
 function vowelCost(ctx) {
   const v = Number(ctx.game.settings?.vowel_cost);
@@ -4006,7 +4837,7 @@ function lockMs(ctx) {
 }
 var puzzle = (ctx, k) => puzzlesOf(ctx.keys)[k.p];
 var teamNow = (k) => k.order[k.turn % Math.max(1, k.order.length)] ?? 0;
-var teamOf2 = (ctx, owner) => ctx.seat(owner)?.team;
+var teamOf3 = (ctx, owner) => ctx.seat(owner)?.team;
 var studentSeats = (ctx) => ctx.seats().filter((s) => s.owner !== "teacher" && s.owner !== "board");
 function setTimer(ctx, k, ms) {
   k.ends_at = ms === void 0 ? void 0 : ctx.now + ms;
@@ -4098,18 +4929,18 @@ function closeLetterQuestion(ctx, k) {
 }
 function callLetter(ctx, k, raw) {
   const pz = puzzle(ctx, k);
-  if (!pz) return err8("no_puzzle", "No puzzle is open.");
+  if (!pz) return err9("no_puzzle", "No puzzle is open.");
   const letter = typeof raw === "string" ? raw.trim().toUpperCase() : "";
-  if (letter.length !== 1 || !ALPHABET.includes(letter)) return err8("bad_letter", "Pick a letter A to Z.");
-  if (k.used.includes(letter)) return err8("used", `${letter} has been called already.`);
+  if (letter.length !== 1 || !ALPHABET.includes(letter)) return err9("bad_letter", "Pick a letter A to Z.");
+  if (k.used.includes(letter)) return err9("used", `${letter} has been called already.`);
   const vowel = VOWELS.includes(letter);
   const t = tk(teamNow(k));
   if (vowel) {
-    if (k.stage !== "turn" && k.stage !== "letter") return err8("not_now", "Buy a vowel on your turn.");
+    if (k.stage !== "turn" && k.stage !== "letter") return err9("not_now", "Buy a vowel on your turn.");
     const cost = vowelCost(ctx);
-    if ((k.round[t] ?? 0) < cost) return err8("short", `A vowel costs ${cost} round points.`);
+    if ((k.round[t] ?? 0) < cost) return err9("short", `A vowel costs ${cost} round points.`);
     k.round[t] = (k.round[t] ?? 0) - cost;
-  } else if (k.stage !== "letter") return err8("not_now", "Earn a letter first: spin and answer.");
+  } else if (k.stage !== "letter") return err9("not_now", "Earn a letter first: spin and answer.");
   const count = lettersOf(pz.board).filter((ch) => ch === letter).length;
   const won = vowel ? 0 : count * (k.value ?? 0);
   k.used = [...k.used, letter];
@@ -4120,7 +4951,7 @@ function callLetter(ctx, k, raw) {
 }
 function solvedMoment(ctx, k) {
   delete k.pending;
-  const team = k.first ? teamOf2(ctx, k.first) : void 0;
+  const team = k.first ? teamOf3(ctx, k.first) : void 0;
   const bank = team === void 0 ? 0 : Math.max(0, k.round[tk(team)] ?? 0) + WHEEL.solveBonus;
   if (team !== void 0) {
     k.bank[tk(team)] = (k.bank[tk(team)] ?? 0) + bank;
@@ -4202,14 +5033,14 @@ var SOLVING = /* @__PURE__ */ new Set(["turn", "spinning", "landed", "question",
 var DEFER = /* @__PURE__ */ new Set(["spinning", "landed", "qclosed", "revealing"]);
 function solve(ctx, k, owner, e) {
   const pz = puzzle(ctx, k);
-  if (!pz || e.item !== pz.id) return err8("bad_item", "That isn\u2019t the puzzle on the board.");
-  if (!SOLVING.has(k.stage)) return err8("closed", "Solving is closed for this quote.");
+  if (!pz || e.item !== pz.id) return err9("bad_item", "That isn\u2019t the puzzle on the board.");
+  if (!SOLVING.has(k.stage)) return err9("closed", "Solving is closed for this quote.");
   if (k.solves[owner]) return { item: pz.id, correct: true, again: true };
   const until = k.locks[owner] ?? 0;
-  if (until > ctx.now) return err8("locked", `Solve is locked for ${Math.ceil((until - ctx.now) / 1e3)} s.`);
+  if (until > ctx.now) return err9("locked", `Solve is locked for ${Math.ceil((until - ctx.now) / 1e3)} s.`);
   const r = e.response;
   const text = typeof r?.text === "string" ? r.text.slice(0, 200) : "";
-  if (!solveForm(text)) return err8("empty", "Type the whole line.");
+  if (!solveForm(text)) return err9("empty", "Type the whole line.");
   const shown2 = shownCount(pz.board, k.used);
   const total = lettersOf(pz.board).length;
   const ms = Math.max(0, ctx.now - k.opened_at);
@@ -4233,8 +5064,8 @@ function solve(ctx, k, owner, e) {
 }
 function answer2(ctx, k, owner, e) {
   const q = k.q;
-  if (!q || q.closed || e.item !== q.item) return err8("closed", "That question isn\u2019t open.");
-  if (q.kind === "letter" && !q.asked.includes(owner)) return err8("not_yours", "This one is for the spinning team.");
+  if (!q || q.closed || e.item !== q.item) return err9("closed", "That question isn\u2019t open.");
+  if (q.kind === "letter" && !q.asked.includes(owner)) return err9("not_yours", "This one is for the spinning team.");
   if (q.answers[owner]) return { item: q.item };
   const solved = k.solves[owner];
   const extra = q.kind === "explain" ? { solved: !!solved, ...solved ? { letters_pct: Math.round(solved.pct * 100), early: solved.pct < 0.5 && !solved.outlier } : {} } : { letter_question: true, ...k.value ? { value: k.value } : {} };
@@ -4345,7 +5176,7 @@ function view(ctx, k, role, owner) {
     const mine = k.solves[owner];
     const a = q?.answers[owner];
     out.you = {
-      ...teamOf2(ctx, owner) !== void 0 ? { team: teamOf2(ctx, owner) } : {},
+      ...teamOf3(ctx, owner) !== void 0 ? { team: teamOf3(ctx, owner) } : {},
       captain: k.captain === owner,
       ...mine ? { solve: { shown: mine.shown, total: mine.total, pct: mine.pct, outlier: mine.outlier } } : {},
       ...(k.locks[owner] ?? 0) > now ? { locked_until: k.locks[owner] } : {},
@@ -4378,10 +5209,10 @@ var wheelRules = {
     openPuzzle(ctx, k, 0);
   },
   move(ctx, k, owner, e) {
-    if (!ctx.seat(owner)) return err8("no_seat", "Join the room first.");
+    if (!ctx.seat(owner)) return err9("no_seat", "Join the room first.");
     if (e.move === "solve") return solve(ctx, k, owner, e);
     if (e.move === "answer") return answer2(ctx, k, owner, e);
-    return err8("bad_move", "That move isn\u2019t part of this game.");
+    return err9("bad_move", "That move isn\u2019t part of this game.");
   },
   control(ctx, k, op, from) {
     const teacher = from.role === "teacher" || from.role === "board";
@@ -4389,20 +5220,20 @@ var wheelRules = {
     const data = op.data ?? {};
     switch (op.name) {
       case "spin":
-        if (k.stage !== "turn") return err8("not_now", "Not time to spin.");
-        if (!teacher && !captain) return err8("not_captain", "Only the captain spins.");
+        if (k.stage !== "turn") return err9("not_now", "Not time to spin.");
+        if (!teacher && !captain) return err9("not_captain", "Only the captain spins.");
         return spin(ctx, k, Number(data.power ?? 0.6));
       case "letter":
-        if (!teacher && !captain) return err8("not_captain", "Only the captain calls a letter.");
+        if (!teacher && !captain) return err9("not_captain", "Only the captain calls a letter.");
         return callLetter(ctx, k, data.letter);
       case "skip":
-        if (!teacher) return err8("teacher_only", "Only the teacher can skip a turn.");
+        if (!teacher) return err9("teacher_only", "Only the teacher can skip a turn.");
         if (k.stage === "turn" || k.stage === "letter") return nextTurn(ctx, k);
         return;
       default:
         break;
     }
-    if (!teacher) return err8("teacher_only", "That\u2019s a teacher control.");
+    if (!teacher) return err9("teacher_only", "That\u2019s a teacher control.");
     switch (op.name) {
       case "next":
         return advance(ctx, k);
@@ -4425,7 +5256,7 @@ var wheelRules = {
         if (k.stage === "totals") return nextPuzzle(ctx, k);
         return;
       default:
-        return err8("bad_control", "Unknown control.");
+        return err9("bad_control", "Unknown control.");
     }
   },
   tick(ctx, k) {
@@ -4482,10 +5313,10 @@ var wheelRules = {
     return view(ctx, k, role, owner);
   },
   bot(ctx, k, owner) {
-    return botMove3(ctx, k, owner);
+    return botMove4(ctx, k, owner);
   }
 };
-function botMove3(ctx, k, owner) {
+function botMove4(ctx, k, owner) {
   const pz = puzzle(ctx, k);
   if (!pz) return null;
   const r = ctx.random();
@@ -4791,11 +5622,11 @@ function shuffleTeams(s) {
 function rulesCtx(s, now, fx, random) {
   const write = fx !== null;
   const keys = keysOf(s);
-  const teamOf3 = (owner) => s.seats[owner]?.team ?? s.kicked?.[owner]?.team;
+  const teamOf4 = (owner) => s.seats[owner]?.team ?? s.kicked?.[owner]?.team;
   const store = (owner, event) => {
     const history = s.history[owner] ??= [];
     if (history.length >= PLAY_EVENTS_MAX) return false;
-    const team = teamOf3(owner);
+    const team = teamOf4(owner);
     history.push({ ...event, ...team !== void 0 ? { team: String(team) } : {}, seq: history.length });
     return true;
   };
@@ -4892,11 +5723,11 @@ function raceProgress(s, owner) {
       if (e.correct === true && typeof e.extra?.group === "string" && !found.includes(e.extra.group)) found.push(e.extra.group);
       if (e.correct === false) wrong.set(e.item, (wrong.get(e.item) ?? 0) + 1);
     }
-    const over = walls.every(([id, w]) => (wrong.get(id) ?? 0) >= limit || w.groups.every((g) => found.includes(g.id)));
+    const over2 = walls.every(([id, w]) => (wrong.get(id) ?? 0) >= limit || w.groups.every((g) => found.includes(g.id)));
     return {
       progress: { done: found.length, total, mistakes: wrong.get(lastWall) ?? 0, mistakes_max: limit, groups: found.map((g) => groupDifficulty(keys, g)) },
       score: found.length,
-      done: walls.length > 0 && over
+      done: walls.length > 0 && over2
     };
   }
   const solved = new Set(events.filter((e) => e.correct === true).map((e) => e.item));
@@ -5028,10 +5859,10 @@ function sharedOf(s) {
   const shared = { seq: s.seq, all, rank, leaderboard: all.slice(0, ROOM_LIMITS.leaderboardTop).map((x) => ({ initials: x.initials, score: x.score, rank: rank.get(x.owner) ?? 0 })) };
   const count = teamCount(s);
   if (count) {
-    const rows = Array.from({ length: count }, (_, team) => ({ team, name: teamName2(team), score: s.team_scores?.[team] ?? 0, members: all.filter((x) => x.team === team).sort((a, b) => a.initials.localeCompare(b.initials)).map((x) => x.initials), rank: 0 }));
-    const sorted = rows.slice().sort((a, b) => b.score - a.score || a.team - b.team);
+    const rows2 = Array.from({ length: count }, (_, team) => ({ team, name: teamName2(team), score: s.team_scores?.[team] ?? 0, members: all.filter((x) => x.team === team).sort((a, b) => a.initials.localeCompare(b.initials)).map((x) => x.initials), rank: 0 }));
+    const sorted = rows2.slice().sort((a, b) => b.score - a.score || a.team - b.team);
     sorted.forEach((r, i) => r.rank = i > 0 && sorted[i - 1].score === r.score ? sorted[i - 1].rank : i + 1);
-    shared.teams = rows;
+    shared.teams = rows2;
     shared.leaderboard = sorted.map((r) => ({ initials: r.name, score: r.score, rank: r.rank, team: r.team }));
   }
   sharedCache.set(s, shared);
@@ -5340,8 +6171,8 @@ function onControl(s, owner, role, conn, rid, op, now, fx) {
   const no = (code, message) => (fail(fx, owner, conn, rid, code, message), false);
   const paced = s.config.style === "paced";
   if (s.config.style === "custom" && (op.op === "kind" || op.op === "next" || op.op === "reveal")) {
-    const err9 = kindControl(s, owner, role, op, now, fx);
-    return err9 ? no(err9.error.code, err9.error.message) : ok();
+    const err10 = kindControl(s, owner, role, op, now, fx);
+    return err10 ? no(err10.error.code, err10.error.message) : ok();
   }
   switch (op.op) {
     case "start":

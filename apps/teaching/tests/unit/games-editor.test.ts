@@ -58,7 +58,7 @@ describe('game editor', () => {
     expect(host.querySelector('.gm-tabs [data-tab="games"]')?.getAttribute('aria-pressed')).toBe('true');
     host.querySelector<HTMLButtonElement>('.gm-empty-list .btn')!.click();
     const kinds = host.querySelectorAll('.gm-kind');
-    expect(kinds).toHaveLength(12);
+    expect(kinds).toHaveLength(14);
     expect(host.querySelector('.gm-kind[data-kind="connections"]')?.textContent).toContain('Solo');
     host.querySelector<HTMLButtonElement>('.gm-kind[data-kind="crossword"]')!.click();
     expect(games().map((g) => g.kind)).toEqual(['crossword']);

@@ -926,7 +926,7 @@ function buildImportPlan(tree, ctx) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-import { z as z20 } from "zod";
+import { z as z21 } from "zod";
 
 // apps/teaching/src/curriculum/pedagogical-mode.ts
 import { z } from "zod";
@@ -4715,7 +4715,9 @@ var GAME_KINDS = [
   "connections",
   "articulate",
   "pictionary",
-  "who_said_it"
+  "who_said_it",
+  "answer_chain",
+  "fleet_week"
 ];
 var GameKindSchema = z17.enum(GAME_KINDS);
 var GAME_LIMITS = {
@@ -4740,12 +4742,16 @@ var GAME_LIMITS = {
   category: 40,
   /** Letters in a Wheel puzzle (A–Z only). */
   wheelLetters: 60,
+  fleetLabel: 40,
   wheelText: 120,
   message: 40,
   prompt: 1e3,
   criterion: 200,
   chips: 6,
-  chip: 60
+  chip: 60,
+  /** Answer chain: the answer every chain starts from, and the topic line. */
+  startAnswer: 40,
+  theme: 120
 };
 var GAME_COUNTS = {
   crossword: { min: 6, max: 30 },
@@ -4915,6 +4921,22 @@ var BattlesSchema = z17.object({
   settings: z17.object({ write_minutes: z17.number().int().min(2).max(8).default(4) }).prefault({}),
   ...ItemTagsShape
 });
+var AnswerChainSchema = z17.object({
+  ...base2,
+  kind: z17.literal("answer_chain"),
+  /** The answer every team's chain starts from (one word or a short name). */
+  start_answer: Text2(GAME_LIMITS.startAnswer),
+  /** Optional: keeps every link on topic ("The water cycle"). */
+  theme: Text2(GAME_LIMITS.theme),
+  settings: z17.object({
+    /** Links per chain: question, answer, question… always even, so a chain ends on an answer. */
+    links: z17.number().int().min(4).max(12).default(6),
+    question_seconds: z17.number().int().min(10).max(60).default(20),
+    answer_seconds: z17.number().int().min(5).max(30).default(10),
+    review_seconds: z17.number().int().min(30).max(180).default(90)
+  }).prefault({}),
+  ...ItemTagsShape
+});
 var WagerSchema = z17.object({
   ...base2,
   kind: z17.literal("wager"),
@@ -4955,6 +4977,25 @@ var WhoSaidItSchema = z17.object({
   items: z17.array(QuoteItemSchema).max(GAME_COUNTS.who_said_it.max).default([]),
   settings: z17.object({ seconds: Seconds(10, 60, 20) }).prefault({})
 });
+var FLEET_SIZE = 5;
+var FleetSquareSchema = z17.object({ variants: z17.array(QuestionItemSchema2).max(2).default([]) });
+var FleetWeekSchema = z17.object({
+  ...base2,
+  kind: z17.literal("fleet_week"),
+  columns: z17.array(z17.string().max(GAME_LIMITS.fleetLabel)).max(FLEET_SIZE).default([]),
+  rows: z17.array(z17.string().max(GAME_LIMITS.fleetLabel)).max(FLEET_SIZE).default([]),
+  /** Row-major, index = row * 5 + col. */
+  squares: z17.array(FleetSquareSchema).max(FLEET_SIZE * FLEET_SIZE).default([]),
+  /** recall[i] is ship s{i}'s line (sizes 3, 2, 2, 1). */
+  recall: z17.array(QuestionItemSchema2).max(4).default([]),
+  settings: z17.object({
+    rounds: z17.number().int().min(2).max(8).default(5),
+    round_cap_s: z17.number().int().min(60).max(600).default(240),
+    placement_cap_s: z17.number().int().min(30).max(300).default(120),
+    answer_s: z17.number().int().min(20).max(120).default(60),
+    cutoff: z17.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default("20:00")
+  }).prefault({})
+});
 var GameSchema = z17.discriminatedUnion("kind", [
   CrosswordSchema,
   FindAWordSchema,
@@ -4967,7 +5008,9 @@ var GameSchema = z17.discriminatedUnion("kind", [
   ConnectionsSchema,
   ArticulateSchema,
   PictionarySchema,
-  WhoSaidItSchema
+  WhoSaidItSchema,
+  AnswerChainSchema,
+  FleetWeekSchema
 ]);
 var GameLessonSchema = z17.object({
   games: z17.array(GameSchema).max(GAME_LIMITS.games).default([]),
@@ -5008,7 +5051,10 @@ var PublicGameSchema = z17.object({
   cast: z17.array(CastMemberSchema.pick({ id: true, name: true, emblem: true, image_url: true })).optional(),
   message: z17.object({ length: z17.number().int(), question: z17.record(z17.string(), z17.unknown()).optional() }).optional(),
   /** Crossword and find-a-word: the grid, built at publish. */
-  grid: PublicGridSchema.optional()
+  grid: PublicGridSchema.optional(),
+  /** Fleet week: the grid's axis labels (the questions stay on the server). */
+  columns: z17.array(z17.string()).optional(),
+  rows: z17.array(z17.string()).optional()
 });
 var PublicGameLessonSchema = z17.object({
   games: z17.array(PublicGameSchema).max(GAME_LIMITS.games),
@@ -5023,6 +5069,9 @@ function normaliseAnswer(value) {
 }
 var gridWord = (term) => normaliseAnswer(term).toUpperCase();
 var messageLetters = (text2) => String(text2 ?? "").normalize("NFD").replace(/\p{M}+/gu, "").toUpperCase().replace(/[^A-Z]/g, "");
+function fleetVariants(sq) {
+  return sq.variants.filter((v) => typeof v.question.prompt === "string" && v.question.prompt.trim() !== "");
+}
 function gameItems(game) {
   switch (game.kind) {
     case "crossword":
@@ -5040,7 +5089,10 @@ function gameItems(game) {
       return game.puzzles.flatMap((p) => [...p.bank, ...p.explain ? [p.explain] : []]);
     case "connections":
       return game.walls.flatMap((w) => w.groups);
+    case "fleet_week":
+      return [...game.squares.flatMap(fleetVariants), ...game.recall];
     case "battles":
+    case "answer_chain":
       return [];
   }
 }
@@ -5180,6 +5232,16 @@ function gameIssues(lesson) {
         if (game.items.length >= GAME_COUNTS.team_match.min && distinct.size < 12) out.push(`${where2} needs at least 12 different answers.`);
         break;
       }
+      case "fleet_week": {
+        if (game.squares.length < 25 || game.squares.some((sq) => fleetVariants(sq).length === 0)) out.push(`${where2} needs all 25 squares filled.`);
+        const labelled = (l) => l.length === 5 && l.every((x) => x.trim());
+        if (!labelled(game.columns) || !labelled(game.rows)) out.push(`${where2} needs five row and five column labels.`);
+        if (game.recall.length < 4) out.push(`${where2} needs a recall line for each of the four ships.`);
+        break;
+      }
+      case "answer_chain":
+        if (!game.start_answer.trim()) out.push(`${where2}: give the answer every chain starts from.`);
+        break;
       case "battles":
         if (!game.prompt.trim() && !game.question_ref) out.push(`${where2}: write the prompt students answer.`);
         if (!game.criterion.trim()) out.push(`${where2}: say what makes one answer better.`);
@@ -5211,22 +5273,115 @@ function gameIssues(lesson) {
   return [...new Set(out)];
 }
 
-// apps/teaching/src/schemas/cover.ts
+// apps/teaching/src/lab/schema.ts
 import { z as z18 } from "zod";
-var CoverSchema = z18.object({
-  url: z18.string().min(1).optional(),
-  media_id: z18.string().min(1).optional(),
-  alt_text: z18.string().optional()
+var LAB_LEVELS = ["supplied", "students", "pairs"];
+var LAB_JUDGE = ["pick", "rate"];
+var LAB_LANGUAGE_LEVELS = ["Form", "Sentence", "Word"];
+var LabFeatureSchema = z18.object({
+  name: z18.string().min(1).max(60),
+  level: z18.enum(LAB_LANGUAGE_LEVELS)
+});
+var LabPairSchema = z18.object({
+  id: z18.string().regex(/^[a-z0-9_-]{1,40}$/),
+  students: z18.array(z18.string().min(1).max(64)).min(1).max(4)
+});
+var LabSettingsSchema = z18.object({
+  class_id: z18.string().max(64).default(""),
+  level: z18.enum(LAB_LEVELS),
+  question: z18.string().max(200).default(""),
+  why: z18.string().max(400).default(""),
+  /** Pairs design it: the claim the class tests. */
+  claim: z18.string().max(200).optional(),
+  /** The two supplied levels: what stays the same. */
+  same: z18.string().max(300).optional(),
+  /** The two supplied levels: what changes, two to five options. */
+  options: z18.array(z18.string().max(40)).max(5).optional(),
+  /** You supply it: one text per option. */
+  texts: z18.array(z18.string().max(4e3)).max(5).optional(),
+  /** Pairs design it: the text every pair changes. Line breaks are kept. */
+  control: z18.string().max(4e3).optional(),
+  /** Students write it: what to write. */
+  task: z18.string().max(300).optional(),
+  judge: z18.enum(LAB_JUDGE),
+  judge_question: z18.string().max(200).default(""),
+  /** Rate on a line: the two end labels. */
+  ends: z18.tuple([z18.string().max(40), z18.string().max(40)]).optional(),
+  /** Pairs design it: the quality readers rate, as one adjective ("hesitant"). It words predictions and verdicts: "less hesitant". */
+  trait: z18.string().max(40).optional(),
+  /** Counts as a win (pick: choices ahead) or a change (rate: points out of 10). Set before any data. */
+  threshold: z18.number().min(0).max(100),
+  notes_on: z18.boolean(),
+  note_prompts: z18.record(z18.string().max(20), z18.string().max(200)).optional(),
+  features: z18.array(LabFeatureSchema).max(12).optional(),
+  pairs: z18.array(LabPairSchema).max(20).optional(),
+  /** Teacher only. */
+  debrief: z18.string().max(1200).default(""),
+  explain_prompt: z18.string().max(400).default("")
+});
+var PublicLabSchema = z18.object({
+  level: z18.enum(LAB_LEVELS),
+  question: z18.string().max(200),
+  why: z18.string().max(400),
+  claim: z18.string().max(200).optional(),
+  same: z18.string().max(300).optional(),
+  options: z18.array(z18.string().max(40)).max(5).optional(),
+  task: z18.string().max(300).optional(),
+  judge: z18.enum(LAB_JUDGE),
+  judge_question: z18.string().max(200),
+  ends: z18.tuple([z18.string().max(40), z18.string().max(40)]).optional(),
+  trait: z18.string().max(40).optional(),
+  threshold: z18.number().min(0).max(100),
+  notes_on: z18.boolean(),
+  note_prompts: z18.record(z18.string().max(20), z18.string().max(200)).optional(),
+  features: z18.array(LabFeatureSchema).max(12).optional(),
+  explain_prompt: z18.string().max(400)
+});
+var filled3 = (text2) => typeof text2 === "string" && text2.trim().length > 0;
+function labIssues(settings) {
+  const out = [];
+  if (!filled3(settings.class_id)) out.push("Choose the class this lab is for.");
+  if (!filled3(settings.question)) out.push("Write the lab\u2019s question.");
+  if (!filled3(settings.judge_question)) out.push("Write the question readers answer.");
+  if (settings.judge === "rate" && !(settings.ends && filled3(settings.ends[0]) && filled3(settings.ends[1]))) out.push("Label both ends of the line readers rate on.");
+  if (settings.level === "pairs") {
+    if (!filled3(settings.claim)) out.push("Write the claim to test.");
+    if (!filled3(settings.control)) out.push("Paste the control text.");
+    if (!settings.features?.length) out.push("List at least one feature to name.");
+    if (settings.judge !== "rate") out.push("Pairs design it is judged by rating on a line.");
+    if (!settings.pairs?.length) out.push("Make the pairs.");
+  } else {
+    const options = settings.options ?? [];
+    if (options.length < 2 || options.some((o) => !filled3(o))) out.push("Name at least two options under Changed.");
+    else if (new Set(options.map((o) => o.trim().toLowerCase())).size !== options.length) out.push("Give each option under Changed its own name.");
+  }
+  if (settings.level === "supplied") {
+    const texts = settings.texts ?? [];
+    if (texts.length !== (settings.options ?? []).length || texts.some((t) => !filled3(t))) out.push("Paste one text for each option.");
+  }
+  if (settings.level === "students") {
+    if (!filled3(settings.task)) out.push("Say what students write.");
+    if (settings.judge !== "pick") out.push("Students write it is judged by picking one.");
+  }
+  return out;
+}
+
+// apps/teaching/src/schemas/cover.ts
+import { z as z19 } from "zod";
+var CoverSchema = z19.object({
+  url: z19.string().min(1).optional(),
+  media_id: z19.string().min(1).optional(),
+  alt_text: z19.string().optional()
 }).superRefine((cover, ctx) => {
   if (!cover.url && !cover.media_id) {
     ctx.addIssue({
-      code: z18.ZodIssueCode.custom,
+      code: z19.ZodIssueCode.custom,
       message: "Cover needs a url and/or media_id"
     });
   }
   if (cover.url !== void 0 && !isHttpUrl(cover.url)) {
     ctx.addIssue({
-      code: z18.ZodIssueCode.custom,
+      code: z19.ZodIssueCode.custom,
       path: ["url"],
       message: "Cover url must be http(s)"
     });
@@ -5235,10 +5390,10 @@ var CoverSchema = z18.object({
 var CoverPatchSchema = CoverSchema.nullable();
 
 // apps/teaching/src/schemas/source.ts
-import { z as z19 } from "zod";
-var SourceSchema = z19.object({
-  system: z19.literal("notion"),
-  page_id: z19.string().min(1).max(64),
+import { z as z20 } from "zod";
+var SourceSchema = z20.object({
+  system: z20.literal("notion"),
+  page_id: z20.string().min(1).max(64),
   imported_at: IsoDateSchema,
   last_edited_at: IsoDateSchema
 });
@@ -5953,22 +6108,22 @@ function ownIssue(block, discernHosts) {
 }
 
 // apps/teaching/src/schemas/lesson.ts
-var LessonSchema = z20.object({
+var LessonSchema = z21.object({
   ...CommonFields,
   ...TrashFields,
-  type: z20.literal("lesson"),
-  unit_id: z20.string().min(1),
-  sequence: z20.number().int(),
-  blocks: z20.array(BlockSchema),
+  type: z21.literal("lesson"),
+  unit_id: z21.string().min(1),
+  sequence: z21.number().int(),
+  blocks: z21.array(BlockSchema),
   published_at: IsoDateSchema.optional(),
   cover: CoverSchema.optional(),
-  tags: z20.array(z20.string().min(1).max(40)).max(24).optional(),
-  author_id: z20.string().min(1).optional(),
-  review_status: z20.enum(["needs_review", "none"]).optional(),
-  syllabus_outcomes: z20.array(z20.string().min(1).max(32)).max(24).optional(),
-  outcome_ids: z20.array(z20.string().min(1).max(64)).max(24).optional(),
+  tags: z21.array(z21.string().min(1).max(40)).max(24).optional(),
+  author_id: z21.string().min(1).optional(),
+  review_status: z21.enum(["needs_review", "none"]).optional(),
+  syllabus_outcomes: z21.array(z21.string().min(1).max(32)).max(24).optional(),
+  outcome_ids: z21.array(z21.string().min(1).max(64)).max(24).optional(),
   /** Curriculum network: the subject lines this lesson serves, with depth for train and metro. */
-  line_stops: z20.array(LineStopSchema).max(16).optional(),
+  line_stops: z21.array(LineStopSchema).max(16).optional(),
   /** Lines taken off by hand that the dot points would add; they stay off. */
   line_off: LineOffSchema.optional(),
   /**
@@ -5980,28 +6135,28 @@ var LessonSchema = z20.object({
   route_role: LessonRouteRoleSchema.nullable().optional(),
   skip_rule: LessonSkipRuleSchema.nullable().optional(),
   /** A support, extension or optional lesson: the core lesson it branches off. Null (saves merge) goes back to its place in the order. */
-  branch_from: z20.string().min(1).max(64).nullable().optional(),
+  branch_from: z21.string().min(1).max(64).nullable().optional(),
   /** Taught before the unit officially starts: the unit map's weeks count from the first lesson after. */
-  pre_unit: z20.boolean().nullable().optional(),
+  pre_unit: z21.boolean().nullable().optional(),
   /** Syllabus dot points this lesson teaches ("human:U2"); its outcomes and concepts follow from the alignment. */
-  dot_points: z20.array(DotPointRefSchema).max(20).optional(),
+  dot_points: z21.array(DotPointRefSchema).max(20).optional(),
   /** Knowledge pieces this lesson picks from its ticked U points. Teacher-only: they only decide which chips come first. */
-  focus_pieces: z20.array(PieceIdSchema).max(24).optional(),
+  focus_pieces: z21.array(PieceIdSchema).max(24).optional(),
   /** Skills (`strand.sub`) this lesson picks from its ticked R points. Teacher-only, the same. */
-  focus_skills: z20.array(z20.string().regex(SkillRefPattern)).max(12).optional(),
+  focus_skills: z21.array(z21.string().regex(SkillRefPattern)).max(12).optional(),
   /** What the dot points ask for that this lesson's activities already cover ("outcome:3", "concept:PER2", "process:UND", "skill:analysis"). */
-  plan_covered: z20.array(z20.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
+  plan_covered: z21.array(z21.string().regex(/^(outcome|concept|process|skill):[A-Za-z0-9_]{1,40}$/)).max(120).optional(),
   /** Teacher planning metadata; optional for blob/version compatibility. */
   pedagogical_mode: PedagogicalModeSchema.optional(),
   /** Hides the student feedback dot on every block of this lesson. */
-  feedback_off: z20.boolean().optional(),
+  feedback_off: z21.boolean().optional(),
   /** Learning conditions the teacher set aside for this lesson (src/conditions). Teacher-only. */
-  conditions_off: z20.array(z20.enum(["activate", "chunks", "check", "worked", "close", "levels"])).max(6).optional(),
+  conditions_off: z21.array(z21.enum(["activate", "chunks", "check", "worked", "close", "levels"])).max(6).optional(),
   /** The two questions after the finish tick: on or off (default by lesson type), questions left out, and the "still unclear" box. */
-  end_questions: z20.object({
-    on: z20.boolean().optional(),
-    skip: z20.array(z20.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
-    unclear: z20.boolean().optional()
+  end_questions: z21.object({
+    on: z21.boolean().optional(),
+    skip: z21.array(z21.string().regex(/^[a-z_]{1,40}$/)).max(12).optional(),
+    unclear: z21.boolean().optional()
   }).optional(),
   /** Quiz lessons only: timer, attempts, feedback and other quiz settings. */
   quiz: QuizSettingsSchema.optional(),
@@ -6015,57 +6170,64 @@ var LessonSchema = z20.object({
   rotation: RotationSettingsSchema.optional(),
   /** Game lessons only: the games, in play order, and when homework closes. */
   game: GameLessonSchema.optional(),
+  /** Lab lessons only: the Plan card's lines (question, level, how readers judge, pairs). */
+  lab: LabSettingsSchema.optional(),
   source: SourceSchema.optional()
 });
 var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
   if (lesson.title.trim().length === 0) {
     ctx.addIssue({
-      code: z20.ZodIssueCode.custom,
+      code: z21.ZodIssueCode.custom,
       message: "Title is required to publish",
       path: ["title"]
     });
   }
-  if (lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "design_sprint" || lesson.pedagogical_mode === "case_study" || lesson.pedagogical_mode === "game") {
+  if (lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "design_sprint" || lesson.pedagogical_mode === "case_study" || lesson.pedagogical_mode === "game" || lesson.pedagogical_mode === "lab") {
     let stray = false;
     visitBlocks(lesson.blocks, (block) => {
       if (block.block_type === "quiz_question") stray = true;
     });
     if (stray) {
       ctx.addIssue({
-        code: z20.ZodIssueCode.custom,
-        message: lesson.pedagogical_mode === "game" ? "Quiz questions don\u2019t run in a Game lesson\u2019s blocks. Put them in a game, or remove them." : "Quiz questions don\u2019t run in a Lecture, Design Sprint or Case Study. Change the lesson type or remove them.",
+        code: z21.ZodIssueCode.custom,
+        message: lesson.pedagogical_mode === "game" ? "Quiz questions don\u2019t run in a Game lesson\u2019s blocks. Put them in a game, or remove them." : lesson.pedagogical_mode === "lab" ? "Quiz questions don\u2019t run in a Lab. Change the lesson type or remove them." : "Quiz questions don\u2019t run in a Lecture, Design Sprint or Case Study. Change the lesson type or remove them.",
         path: ["blocks"]
       });
     }
   }
   if (lesson.pedagogical_mode === "tutorial") {
     for (const message of tutorialIssues(lesson)) {
-      ctx.addIssue({ code: z20.ZodIssueCode.custom, message, path: ["blocks"] });
+      ctx.addIssue({ code: z21.ZodIssueCode.custom, message, path: ["blocks"] });
     }
   }
   if (lesson.pedagogical_mode === "design_sprint") {
     for (const message of sprintIssues(lesson)) {
-      ctx.addIssue({ code: z20.ZodIssueCode.custom, message, path: ["sprint"] });
+      ctx.addIssue({ code: z21.ZodIssueCode.custom, message, path: ["sprint"] });
     }
   }
   if (lesson.pedagogical_mode === "case_study") {
     for (const message of caseIssues(lesson)) {
-      ctx.addIssue({ code: z20.ZodIssueCode.custom, message, path: ["case"] });
+      ctx.addIssue({ code: z21.ZodIssueCode.custom, message, path: ["case"] });
     }
   }
   if (lesson.pedagogical_mode === "station_rotation") {
     for (const message of rotationIssues(lesson)) {
-      ctx.addIssue({ code: z20.ZodIssueCode.custom, message, path: ["rotation"] });
+      ctx.addIssue({ code: z21.ZodIssueCode.custom, message, path: ["rotation"] });
+    }
+  }
+  if (lesson.pedagogical_mode === "lab") {
+    for (const message of lesson.lab ? labIssues(lesson.lab) : ["Fill in the Lab card before you publish."]) {
+      ctx.addIssue({ code: z21.ZodIssueCode.custom, message, path: ["lab"] });
     }
   }
   if (lesson.pedagogical_mode === "game") {
     for (const message of gameIssues(lesson)) {
-      ctx.addIssue({ code: z20.ZodIssueCode.custom, message, path: ["game"] });
+      ctx.addIssue({ code: z21.ZodIssueCode.custom, message, path: ["game"] });
     }
   }
   for (const issue of listPublishBlockIssues(lesson.blocks, { lecture: lesson.pedagogical_mode === "lecture" || lesson.pedagogical_mode === "tutorial" })) {
     ctx.addIssue({
-      code: z20.ZodIssueCode.custom,
+      code: z21.ZodIssueCode.custom,
       message: formatPublishBlockIssue(issue),
       path: ["blocks"]
     });
@@ -6073,37 +6235,37 @@ var PublishableLessonSchema = LessonSchema.superRefine((lesson, ctx) => {
 });
 
 // apps/teaching/src/schemas/unit.ts
-import { z as z21 } from "zod";
-var WalkthruTieSchema = z21.object({
-  technique: z21.string().min(1).max(120),
-  kind: z21.enum(["du", "organiser", "block"]),
-  ref: z21.string().min(1).max(240),
-  how: z21.string().max(200).optional()
+import { z as z22 } from "zod";
+var WalkthruTieSchema = z22.object({
+  technique: z22.string().min(1).max(120),
+  kind: z22.enum(["du", "organiser", "block"]),
+  ref: z22.string().min(1).max(240),
+  how: z22.string().max(200).optional()
 });
-var UnitSchema = z21.object({
+var UnitSchema = z22.object({
   ...CommonFields,
   ...TrashFields,
-  type: z21.literal("unit"),
-  year_id: z21.string().min(1),
-  subject_id: z21.string().min(1),
-  lesson_ids: z21.array(z21.string().min(1)),
-  primary_term: z21.number().int().positive().optional(),
-  start_date: z21.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  end_date: z21.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  description: z21.string().optional(),
+  type: z22.literal("unit"),
+  year_id: z22.string().min(1),
+  subject_id: z22.string().min(1),
+  lesson_ids: z22.array(z22.string().min(1)),
+  primary_term: z22.number().int().positive().optional(),
+  start_date: z22.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  end_date: z22.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  description: z22.string().optional(),
   cover: CoverSchema.optional(),
-  blocks: z21.array(BlockSchema).optional(),
-  outcome_ids: z21.array(z21.string().min(1)).max(24).optional(),
+  blocks: z22.array(BlockSchema).optional(),
+  outcome_ids: z22.array(z22.string().min(1)).max(24).optional(),
   /** Willingham deep understandings: the unit's 3–4 claims and their knowledge pieces (deep/schema.ts). */
-  deep_understandings: z21.array(DeepUnderstandingDraftSchema).max(DEEP_LIMITS.perUnit).optional(),
-  walkthru_ties: z21.array(WalkthruTieSchema).max(120).optional(),
+  deep_understandings: z22.array(DeepUnderstandingDraftSchema).max(DEEP_LIMITS.perUnit).optional(),
+  walkthru_ties: z22.array(WalkthruTieSchema).max(120).optional(),
   /** 'program': same level as a unit, never one of a class's active units. */
-  kind: z21.enum(["program"]).optional(),
+  kind: z22.enum(["program"]).optional(),
   source: SourceSchema.optional()
 });
 
 // apps/teaching/src/schemas/class.ts
-import { z as z22 } from "zod";
+import { z as z23 } from "zod";
 
 // apps/teaching/src/schemas/student-initials.ts
 var INITIALS_PATTERN = /^[A-Z]{1,4}[0-9]?$/;
@@ -6148,74 +6310,74 @@ function validateTimetable(input) {
 }
 
 // apps/teaching/src/schemas/class.ts
-var ClassTimetableSchema = z22.unknown().transform((value, ctx) => {
+var ClassTimetableSchema = z23.unknown().transform((value, ctx) => {
   try {
     return validateTimetable(value);
   } catch (error) {
-    ctx.addIssue({ code: z22.ZodIssueCode.custom, message: error instanceof Error ? error.message : "Invalid timetable" });
-    return z22.NEVER;
+    ctx.addIssue({ code: z23.ZodIssueCode.custom, message: error instanceof Error ? error.message : "Invalid timetable" });
+    return z23.NEVER;
   }
 });
-var ClassHomepageSchema = z22.object({
-  announcements: z22.array(BlockSchema),
-  resources: z22.array(BlockSchema),
-  custom: z22.array(BlockSchema)
+var ClassHomepageSchema = z23.object({
+  announcements: z23.array(BlockSchema),
+  resources: z23.array(BlockSchema),
+  custom: z23.array(BlockSchema)
 });
-var ClassStudentSchema = z22.object({
-  name: z22.string().min(1).max(80),
-  skip_picker: z22.boolean().default(false),
+var ClassStudentSchema = z23.object({
+  name: z23.string().min(1).max(80),
+  skip_picker: z23.boolean().default(false),
   /** Never changes once saved, so renames keep a student's quiz results. */
-  id: z22.string().regex(STUDENT_ID_PATTERN).optional(),
+  id: z23.string().regex(STUDENT_ID_PATTERN).optional(),
   /** What the student types to take a quiz. Unique within the class. */
-  initials: z22.string().regex(INITIALS_PATTERN).optional()
+  initials: z23.string().regex(INITIALS_PATTERN).optional()
 });
 var MAX_CLASS_STUDENTS = 60;
-var ClassSchema = z22.object({
+var ClassSchema = z23.object({
   ...CommonFields,
   ...TrashFields,
-  type: z22.literal("class"),
-  code: z22.string().min(1),
-  display_name: z22.string().min(1).optional(),
-  academic_year: z22.number().int(),
-  year_id: z22.string().min(1),
-  subject_id: z22.string().min(1),
-  active_unit_ids: z22.array(z22.string().min(1)),
-  current_unit_id: z22.string().min(1).optional(),
-  current_scheduled_lesson_id: z22.string().min(1).optional(),
-  meeting_days: z22.array(z22.number().int().min(1).max(7)).optional(),
+  type: z23.literal("class"),
+  code: z23.string().min(1),
+  display_name: z23.string().min(1).optional(),
+  academic_year: z23.number().int(),
+  year_id: z23.string().min(1),
+  subject_id: z23.string().min(1),
+  active_unit_ids: z23.array(z23.string().min(1)),
+  current_unit_id: z23.string().min(1).optional(),
+  current_scheduled_lesson_id: z23.string().min(1).optional(),
+  meeting_days: z23.array(z23.number().int().min(1).max(7)).optional(),
   timetable: ClassTimetableSchema.optional(),
   homepage: ClassHomepageSchema.optional(),
   cover: CoverSchema.optional(),
-  students: z22.array(ClassStudentSchema).max(MAX_CLASS_STUDENTS).optional(),
+  students: z23.array(ClassStudentSchema).max(MAX_CLASS_STUDENTS).optional(),
   source: SourceSchema.optional()
 });
 
 // apps/teaching/src/schemas/subject.ts
-import { z as z23 } from "zod";
-var SubjectSchema = z23.object({
+import { z as z24 } from "zod";
+var SubjectSchema = z24.object({
   ...CommonFields,
-  type: z23.literal("subject"),
-  display_title: z23.string().min(1),
-  scope_id: z23.string().min(1).optional(),
-  unit_ids: z23.array(z23.string().min(1)),
-  outcome_ids: z23.array(z23.string().min(1)),
-  class_ids: z23.array(z23.string().min(1)),
+  type: z24.literal("subject"),
+  display_title: z24.string().min(1),
+  scope_id: z24.string().min(1).optional(),
+  unit_ids: z24.array(z24.string().min(1)),
+  outcome_ids: z24.array(z24.string().min(1)),
+  class_ids: z24.array(z24.string().min(1)),
   /** Curriculum network lines, in map column order: trains, metro, light rail. */
-  network_lines: z23.array(NetworkLineSchema).max(24).optional(),
+  network_lines: z24.array(NetworkLineSchema).max(24).optional(),
   /** Drag offsets on the year network, keyed by unit id. */
   network_nudges: NetworkNudgesSchema.optional()
 });
 
 // apps/teaching/src/schemas/document.ts
-import { z as z24 } from "zod";
-var DocumentKindSchema = z24.enum(["syllabus"]);
-var DocumentSchema = z24.object({
+import { z as z25 } from "zod";
+var DocumentKindSchema = z25.enum(["syllabus"]);
+var DocumentSchema = z25.object({
   ...CommonFields,
   ...TrashFields,
-  type: z24.literal("document"),
+  type: z25.literal("document"),
   kind: DocumentKindSchema,
-  subject_id: z24.string().min(1),
-  blocks: z24.array(BlockSchema),
+  subject_id: z25.string().min(1),
+  blocks: z25.array(BlockSchema),
   cover: CoverSchema.optional(),
   source: SourceSchema.optional()
 });

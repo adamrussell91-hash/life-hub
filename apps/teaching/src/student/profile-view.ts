@@ -31,6 +31,8 @@ import type { Practise } from '@/student/feedback-card';
 import type { RedraftApi } from '@/student/redraft-editor';
 import { countdownCard, renderTodoPanel, vivaPracticeLine, type TodoPayload } from '@/student/todo-panel';
 import { oneThing, renderNowStrip, showOnList } from '@/student/now-strip';
+import type { FleetSignals } from '@/games/kinds/fleet-week/signals';
+import { holdClassFleetSignals, type ClassFleetHold } from '@/student/fleet-toasts';
 import '@/progress/progress.css';
 import './profile.css';
 
@@ -80,6 +82,8 @@ export type RenderProfileOptions = {
   overTime?: () => HTMLElement;
   /** The student's "Don't show this again" on the Do this now pointer. */
   pointerOff?: () => void;
+  /** Fleet week signals: the anchor on the now strip. Never on a teacher's view. */
+  fleet?: FleetSignals;
 };
 
 function seeHow(r?: { url: string; title?: string; kind: string; start?: number }): HTMLElement | null {
@@ -379,7 +383,7 @@ export function renderProfile(payload: ProfilePayload, options: RenderProfileOpt
   }
   // "Do this now" sits above the tabs, so it stays on every one. The teacher sees it as the
   // student does, without the pointer.
-  const strip = renderNowStrip(payload.todo, { classId: options.classId, pointer: !options.teacher && payload.pointer !== false, pointerOff: options.pointerOff });
+  const strip = renderNowStrip(payload.todo, { classId: options.classId, pointer: !options.teacher && payload.pointer !== false, pointerOff: options.pointerOff, fleet: options.teacher ? undefined : options.fleet });
   if (strip) root.append(strip);
   const map = withTodo(renderMap(payload.map, options.classId, payload), payload, options);
   const hasReturned = !!(payload.pieces?.length || payload.has_returned);
@@ -530,8 +534,13 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
   renderStudentChrome(header, { brand: STUDENT_BRAND, links: lesson ? [{ href: lesson, label: 'Back to lesson' }] : [] });
   renderStudentStatus(content, 'Loading your progress…');
 
-  const call = <T = ProfilePayload>(action: 'progress' | 'claim' | 'returned' | 'piece' | 'seen' | 'pointer_off', extra: Record<string, unknown> = {}): Promise<T> =>
+  const call = <T = ProfilePayload>(action: 'progress' | 'claim' | 'returned' | 'piece' | 'seen' | 'pointer_off' | 'fleet_signals' | 'fleet_signals_seen', extra: Record<string, unknown> = {}): Promise<T> =>
     apiPost<T>(`/api/published/profile/${encodeURIComponent(classId)}`, { action, class_token: deviceToken(`class:${classId}`), ...extra });
+
+  // Fleet week signals (§2), class-wide: the one host every student page in this class shares
+  // (student/fleet-toasts.ts). Read once the student is known, then on focus.
+  let fleet: ClassFleetHold | null = null;
+  const startFleet = (): FleetSignals => (fleet ??= holdClassFleetSignals(classId)).signals;
 
   let organiser: OrganiserLoad | null = null;
   let latest: ProfilePayload | null = null;
@@ -548,6 +557,7 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
       renderProfile(payload, {
         classId,
         message,
+        fleet: payload.need === 'initials' ? undefined : startFleet(),
         organiser,
         tab: startTab,
         reloadOrganiser: () => {
@@ -621,6 +631,7 @@ export function mountStudentProfileView(options: MountStudentProfileViewOptions)
   return {
     dispose() {
       disposed = true;
+      fleet?.release();
       clearNoIndex();
     }
   };

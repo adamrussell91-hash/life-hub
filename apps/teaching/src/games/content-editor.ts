@@ -14,6 +14,8 @@ import {
   type QuestionItem
 } from './core/schema';
 import { checkbox, field, itemEditor, numberInput, pills, questionEditor, tagsCell, textArea, textInput, type ItemEditorContext } from './item-editors';
+import { fleetContent } from './kinds/fleet-week/editor';
+import type { UnitSources } from './api';
 import { SHAPE_LABELS, isListGame, listShapes, maxItems, newGameId, newItem, type ListGame } from './seed';
 
 /**
@@ -28,6 +30,10 @@ export type ContentContext = {
   onChange: (next: Game) => void;
   /** Opens Build from this unit for a list game. */
   openBuild?: () => void;
+  /** The unit's ready-made items, for kinds that run their own Build from this unit (Fleet week). Absent without a server. */
+  sources?: () => Promise<UnitSources>;
+  /** Starts Ann on this lesson with a brief (Fleet week's Ask Ann to draft). Absent without a server. */
+  startAnn?: (brief: string) => Promise<'started' | 'busy'>;
 };
 
 /* ── Settings row ──────────────────────────────────────────────────── */
@@ -61,6 +67,18 @@ const SETTINGS: Record<Game['kind'], SettingField[]> = {
     { key: 'class_goal', label: 'Class goal (0 for none)', type: 'num', min: 0, max: 1_000_000 }
   ],
   battles: [{ key: 'write_minutes', label: 'Writing minutes', type: 'num', min: 2, max: 8 }],
+  answer_chain: [
+    { key: 'links', label: 'Links per chain', type: 'pills', options: [[4, '4'], [6, '6'], [8, '8'], [10, '10'], [12, '12']] },
+    { key: 'question_seconds', label: 'Seconds to write a question', type: 'num', min: 10, max: 60 },
+    { key: 'answer_seconds', label: 'Seconds to answer', type: 'num', min: 5, max: 30 },
+    { key: 'review_seconds', label: 'Review seconds', type: 'num', min: 30, max: 180 }
+  ],
+  fleet_week: [
+    { key: 'rounds', label: 'Rounds', type: 'num', min: 2, max: 8 },
+    { key: 'round_cap_s', label: 'Seconds a round (lesson mode)', type: 'num', min: 60, max: 600 },
+    { key: 'placement_cap_s', label: 'Seconds to place ships', type: 'num', min: 30, max: 300 },
+    { key: 'answer_s', label: 'Seconds to answer', type: 'num', min: 20, max: 120 }
+  ],
   wager: [
     { key: 'start', label: 'Starting points', type: 'num', min: 10, max: 10_000 },
     { key: 'min_bet', label: 'Fewest points to commit', type: 'num', min: 1, max: 1000 },
@@ -446,6 +464,23 @@ function battlesContent(game: GameOf<'battles'>, ctx: ContentContext): HTMLEleme
   return root;
 }
 
+/* ── Answer chain ──────────────────────────────────────────────────── */
+
+function answerChainContent(game: GameOf<'answer_chain'>, ctx: ContentContext): HTMLElement {
+  let cur = game;
+  const set = (patch: Partial<GameOf<'answer_chain'>>) => {
+    cur = { ...cur, ...patch };
+    ctx.onChange(cur);
+  };
+  const root = el('div', 'gm-content');
+  root.append(
+    field('The answer every chain starts from', textInput(cur.start_answer, GAME_LIMITS.startAnswer, 'Start answer', (v) => set({ start_answer: v }), 'e.g. photosynthesis')),
+    field('Topic (optional, shown on every screen)', textInput(cur.theme, GAME_LIMITS.theme, 'Topic', (v) => set({ theme: v }), 'e.g. Plants and energy')),
+    tagsCell(cur, (t) => set(t))
+  );
+  return root;
+}
+
 /** The selected game's content editor. */
 export function gameContent(game: Game, ctx: ContentContext): HTMLElement {
   if (isListGame(game)) return listGameContent(game, ctx);
@@ -458,6 +493,10 @@ export function gameContent(game: Game, ctx: ContentContext): HTMLElement {
       return connectionsContent(game, ctx);
     case 'battles':
       return battlesContent(game, ctx);
+    case 'answer_chain':
+      return answerChainContent(game, ctx);
+    case 'fleet_week':
+      return fleetContent(game, ctx);
     default:
       return el('div');
   }

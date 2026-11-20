@@ -2420,3 +2420,23 @@
 .qz-tally__who { font-weight: 600; font-size: var(--text-sm); }
 .qz-tally__text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .qz-tally__mark { font-size: var(--text-sm); color: var(--muted); white-space: nowrap; }
+
+/* ── Another go: an answer the teacher sent back, rewritten under its question ── */
+
+.qz-again {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--pastel-peach);
+  color: var(--ink);
+  border-radius: var(--radius-md);
+}
+
+.qz-again--sent { background: var(--success-surface); }
+.qz-again--call { margin: 0 0 var(--space-3); }
+.qz-again__title { margin: 0; font-weight: var(--weight-semibold); color: var(--pastel-peach-ink); }
+.qz-again--sent .qz-again__title { color: var(--ink); }
+.qz-again__comment { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
+.qz-again .pg-redraft { width: 100%; }

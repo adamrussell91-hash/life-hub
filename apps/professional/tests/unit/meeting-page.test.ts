@@ -330,13 +330,13 @@ describe('meeting page', () => {
     expect(canvas.querySelector('[data-part="clare-brief"]')!.textContent).toContain('Rachel wants the date locked');
 
     canvas.querySelector<HTMLButtonElement>('[data-set-phase="during"]')!.click();
-    expect(parts()).toEqual(['live-strip', 'minutes', 'actions', 'mentions']);
+    expect(parts()).toEqual(['live-strip', 'minutes', 'rec-upload', 'actions', 'mentions']);
     expect(fullParts()).toEqual(['notes']);
     expect(notesHeading()).toBe('Notes');
     expect(canvas.querySelector('[data-part="live-strip"]')!.textContent).toContain('30 min in · 45 min left');
 
     canvas.querySelector<HTMLButtonElement>('[data-set-phase="after"]')!.click();
-    expect(parts()).toEqual(['minutes', 'purpose-check-card', 'wrap-up', 'actions', 'mentions']);
+    expect(parts()).toEqual(['minutes', 'rec-upload', 'purpose-check-card', 'wrap-up', 'actions', 'mentions']);
     expect(fullParts()).toEqual(['notes']);
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-preparation"]')!.hidden).toBe(true);
     expect(canvas.querySelector<HTMLElement>('[data-part="task-link-follow_up"]')!.hidden).toBe(false);
@@ -422,7 +422,7 @@ describe('meeting page', () => {
     const made = await opts.makeLinkedMeeting('reflecting', '2026-10-02');
     expect(made).toBe('meeting_new');
     expect(createMeeting).toHaveBeenCalledWith(expect.objectContaining({
-      title: 'Jo: lesson reflecting',
+      title: 'Jo Teacher – Observation Phase 3: Reflecting',
       // 6:00 pm Sydney, the same as this meeting, on the new day; same length.
       scheduled_start: '2026-10-02T08:00:00.000Z',
       scheduled_end: '2026-10-02T09:15:00.000Z',
@@ -434,10 +434,32 @@ describe('meeting page', () => {
     vi.mocked(listUniversalLinksForEntity).mockReset();
   });
 
-  it('linkedMeetingTitle swaps the phase word, else names the teacher', async () => {
+  it('linkedMeetingTitle names the teacher and the NESA phase', async () => {
     const { linkedMeetingTitle } = await import('@/views/meeting-page');
-    expect(linkedMeetingTitle('Observation Planning · Year 9', 'Jo Teacher', 'observing')).toBe('Observation Observing · Year 9');
-    expect(linkedMeetingTitle('Catch-up', 'Jo Teacher', 'reflecting')).toBe('Jo Teacher · observation reflecting');
+    expect(linkedMeetingTitle('Catch-up', 'Jo Teacher', 'observing')).toBe('Jo Teacher – Observation Phase 2: Observing');
+    expect(linkedMeetingTitle('Jo Teacher – Observation Phase 2: Observing', 'Jo Teacher', 'reflecting')).toBe('Jo Teacher – Observation Phase 3: Reflecting');
+    expect(linkedMeetingTitle('Year 9 – Observation Phase 1: Planning', '', 'observing')).toBe('Year 9 – Observation Phase 2: Observing');
+    expect(linkedMeetingTitle('Catch-up', ' ', 'reflecting')).toBe('Observation Phase 3: Reflecting');
+  });
+
+  it('header: what and when beside Share and Edit, then the phase row with the state buttons', async () => {
+    const canvas = await render();
+    const head = canvas.querySelector('.meeting-page__head')!;
+    expect([...head.children].map((node) => node.className)).toEqual([
+      'meeting-page__meta', 'meeting-page__head-actions', 'meeting-page__phase-row', 'meeting-form__status'
+    ]);
+    expect([...head.querySelectorAll('.meeting-page__head-actions button')].map((b) => (b as HTMLElement).dataset.part)).toEqual(['share-sheet', 'edit-details']);
+    const row = head.querySelector('.meeting-page__phase-row')!;
+    expect(row.querySelector('.comm-page__phase')).not.toBeNull();
+    expect(row.querySelectorAll('[data-state-action]').length).toBe(3);
+  });
+
+  it('Classroom observation button carries NESA wording', async () => {
+    const canvas = await render();
+    const button = canvas.querySelector<HTMLButtonElement>('[data-part="observation-start"]')!;
+    expect(button.querySelector('.meeting-page__nesa-tag')?.textContent).toBe('NESA');
+    expect(button.textContent).toContain('Classroom observation');
+    expect(button.textContent).toContain('Proficient Teacher');
   });
 
   it('End completes the meeting and opens the wrap-up', async () => {

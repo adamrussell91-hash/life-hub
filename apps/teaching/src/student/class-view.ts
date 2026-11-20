@@ -14,6 +14,7 @@ import {
 } from '@/student/continue';
 import { formatStudentDate } from '@/student/format';
 import { renderStudentHero } from '@/student/hero';
+import { holdClassFleetSignals } from '@/student/fleet-toasts';
 import {
   fetchPublishedClass,
   type PublishedClass,
@@ -258,6 +259,8 @@ export function mountStudentClassView(
   root.append(surface);
   renderStudentChrome(header, { brand: STUDENT_BRAND });
   renderStudentStatus(content, 'Loading class…');
+  // Fleet week toasts (§2) on every student page with a class: the shared class-wide host.
+  const fleet = holdClassFleetSignals(classId);
 
   void fetchPublishedClass(classId)
     .then((cls) => {
@@ -277,6 +280,7 @@ export function mountStudentClassView(
   return {
     dispose() {
       disposed = true;
+      fleet.release();
     }
   };
 }

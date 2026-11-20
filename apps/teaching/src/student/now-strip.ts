@@ -9,7 +9,8 @@
  * student list. The strip itself stays either way.
  */
 import { el } from '@/quiz/dom';
-import type { TodoBoxItem, TodoPayload } from '@/student/todo-panel';
+import { askedAnswerLesson, type TodoBoxItem, type TodoPayload } from '@/student/todo-panel';
+import type { FleetSignals } from '@/games/kinds/fleet-week/signals';
 import './now-strip.css';
 
 /** Where the thing lives: a lesson to open, or a tab on the progress page. */
@@ -29,7 +30,12 @@ function wordsFor(t: TodoBoxItem): string {
 }
 
 const open = (t: TodoBoxItem): boolean => !t.done && t.feedback?.state !== 'read';
-const goFor = (t: TodoBoxItem): NowGo => (t.feedback ? { tab: 'returned' } : { lesson: t.id });
+const goFor = (t: TodoBoxItem): NowGo => {
+  // A quiz answer asked again is rewritten in the quiz itself.
+  const asked = askedAnswerLesson(t);
+  if (asked) return { lesson: asked };
+  return t.feedback ? { tab: 'returned' } : { lesson: t.id };
+};
 
 /**
  * The one thing: the first open row in Do now, then today's organiser cards, then the first open
@@ -86,13 +92,28 @@ export type NowStripOptions = {
   pointer: boolean;
   /** "Don't show this again". */
   pointerOff?: () => void;
+  /** Fleet week signals (spec §2): an anchor on the strip that glows and counts what is waiting. */
+  fleet?: FleetSignals;
 };
+
+/** The anchor alone, when there is nothing else to do: it shows only while something waits. */
+function fleetOnlyStrip(fleet: FleetSignals): HTMLElement {
+  const strip = el('section', 'ns-strip ns-strip--fleet');
+  strip.setAttribute('aria-label', 'Fleet week');
+  const inner = el('div', 'ns-strip__in');
+  const text = el('div', 'ns-strip__text');
+  text.append(el('span', 'ns-strip__kicker', 'Fleet week'), el('span', 'ns-strip__what', 'Something is waiting at sea.'));
+  // Shown only while something waits (a class, not :has(), so older browsers hide it too).
+  inner.append(text, fleet.badge({ label: 'Fleet week', hideWhenQuiet: true, onCount: (n) => strip.classList.toggle('ns-strip--quiet', n === 0) }));
+  strip.append(inner);
+  return strip;
+}
 
 /** The strip, or null when there is nothing to do or the student hid it this visit. */
 export function renderNowStrip(todo: TodoPayload | undefined, options: NowStripOptions): HTMLElement | null {
   const thing = oneThing(todo);
   const mem = remember(options.classId);
-  if (!thing || mem.hidden) return null;
+  if (!thing || mem.hidden) return options.fleet ? fleetOnlyStrip(options.fleet) : null;
 
   const strip = el('section', 'ns-strip');
   strip.setAttribute('aria-label', 'Do this now');
@@ -104,7 +125,9 @@ export function renderNowStrip(todo: TodoPayload | undefined, options: NowStripO
   const close = el('button', 'ns-strip__close', '×');
   close.type = 'button';
   close.setAttribute('aria-label', 'Hide this for now');
-  inner.append(text, go, close);
+  inner.append(text);
+  if (options.fleet) inner.append(options.fleet.badge({ label: 'Fleet week', hideWhenQuiet: true, onCount: (n) => inner.classList.toggle('ns-strip__in--anchor', n > 0) }));
+  inner.append(go, close);
   strip.append(inner);
 
   let shut: (() => void) | null = null;

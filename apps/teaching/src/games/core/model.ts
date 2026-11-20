@@ -122,6 +122,10 @@ export type LiveContent = {
   cards?: Record<string, { banned: string[]; clues: Array<{ kind: string; text: string }>; draw?: string }>;
   /** Battles: the prompt students write to, what makes one answer better, the chips judges can tick and the prompt's tags. */
   battle?: { prompt: string; criterion: string; chips: string[]; tags: string[] };
+  /** Answer chain: the start answer every chain grows from and the optional topic line. */
+  chain?: { start: string; theme: string; tags: string[] };
+  /** Fleet week: axis labels, then item ids (two variants per square, row-major; one recall id per ship). Question heads sit in `items`. */
+  fleet?: { columns: string[]; rows: string[]; squares: string[][]; recall: string[] };
 };
 
 /**
@@ -193,6 +197,11 @@ export function checkAnswer(key: ItemKey, response: unknown): CheckResult {
 /* ── Items of a game ───────────────────────────────────────────────── */
 
 /** Every answerable item in a game, nested ones included (Jeopardy tiles, Wheel banks, the find-a-word message question). */
+/** Fleet week: a square's variants that have a question written (a blank second variant is a draft, not a question). */
+export function fleetVariants(sq: { variants: QuestionItem[] }): QuestionItem[] {
+  return sq.variants.filter((v) => typeof (v.question as { prompt?: unknown }).prompt === 'string' && ((v.question as { prompt: string }).prompt).trim() !== '');
+}
+
 export function gameItems(game: Game): GameItem[] {
   switch (game.kind) {
     case 'crossword':
@@ -210,7 +219,10 @@ export function gameItems(game: Game): GameItem[] {
       return game.puzzles.flatMap((p) => [...p.bank, ...(p.explain ? [p.explain] : [])]);
     case 'connections':
       return game.walls.flatMap((w) => w.groups);
+    case 'fleet_week':
+      return [...game.squares.flatMap(fleetVariants), ...game.recall];
     case 'battles':
+    case 'answer_chain':
       return [];
   }
 }
@@ -469,6 +481,16 @@ export function gameIssues(lesson: { game?: GameLesson | undefined }): string[] 
         if (game.items.length >= GAME_COUNTS.team_match.min && distinct.size < 12) out.push(`${where} needs at least 12 different answers.`);
         break;
       }
+      case 'fleet_week': {
+        if (game.squares.length < 25 || game.squares.some((sq) => fleetVariants(sq).length === 0)) out.push(`${where} needs all 25 squares filled.`);
+        const labelled = (l: string[]) => l.length === 5 && l.every((x) => x.trim());
+        if (!labelled(game.columns) || !labelled(game.rows)) out.push(`${where} needs five row and five column labels.`);
+        if (game.recall.length < 4) out.push(`${where} needs a recall line for each of the four ships.`);
+        break;
+      }
+      case 'answer_chain':
+        if (!game.start_answer.trim()) out.push(`${where}: give the answer every chain starts from.`);
+        break;
       case 'battles':
         if (!game.prompt.trim() && !game.question_ref) out.push(`${where}: write the prompt students answer.`);
         if (!game.criterion.trim()) out.push(`${where}: say what makes one answer better.`);
@@ -508,6 +530,11 @@ export function gameWarnings(lesson: { game?: GameLesson | undefined }): string[
     const items = gameItems(game);
     const untagged = items.filter((x) => !hasTags(x, x.shape === 'question' ? (x.question as { pieces?: string[]; outcomes?: string[]; skills?: string[] }) : undefined)).length;
     if (untagged) out.push(`${where}: ${untagged} ${untagged === 1 ? 'item has' : 'items have'} no tags, so ${untagged === 1 ? 'it' : 'they'} won’t show in Results by knowledge piece.`);
+    if (game.kind === 'fleet_week') {
+      game.squares.forEach((sq, si) => {
+        if (fleetVariants(sq).length === 1) out.push(`${where}: square ${'ABCDE'[Math.floor(si / 5)]}${(si % 5) + 1} has only one question, so partners may share answers.`);
+      });
+    }
     if (game.kind === 'articulate') {
       for (const t of game.items) {
         const term = normaliseAnswer(t.term);
@@ -693,7 +720,8 @@ export function splitGame(game: Game, random: Random = Math.random): { public: P
     }
     count = pubItems.length;
   }
-  if (game.kind === 'battles') count = 1;
+  if (game.kind === 'battles' || game.kind === 'answer_chain') count = 1;
+  if (game.kind === 'fleet_week') count = 25;
   if (!info.solo && pubItems.length) {
     keys.live = { items: pubItems };
     if (game.kind === 'jeopardy') {
@@ -720,6 +748,20 @@ export function splitGame(game: Game, random: Random = Math.random): { public: P
     }
     keys.live = { items: keys.live?.items ?? pubItems, ...keys.live, cards };
   }
+  if (game.kind === 'fleet_week') {
+    keys.live = {
+      items: pubItems,
+      fleet: {
+        columns: game.columns.map((c) => c.trim()),
+        rows: game.rows.map((r) => r.trim()),
+        squares: game.squares.map((sq) => fleetVariants(sq).map((v) => v.id)),
+        recall: game.recall.map((r) => r.id)
+      }
+    };
+  }
+  if (game.kind === 'answer_chain') {
+    keys.live = { items: [], chain: { start: game.start_answer.trim(), theme: game.theme.trim(), tags: evidenceTags(game) } };
+  }
   if (game.kind === 'battles') {
     keys.live = {
       items: [],
@@ -740,7 +782,8 @@ export function splitGame(game: Game, random: Random = Math.random): { public: P
     ...(info.solo && walls ? { walls } : {}),
     ...(info.solo && game.kind === 'who_said_it' ? { cast: game.cast.map(({ id, name, emblem, image_url }) => ({ id, name: name.trim(), ...(emblem ? { emblem } : {}), ...(image_url ? { image_url } : {}) })) } : {}),
     ...(info.solo && message ? { message } : {}),
-    ...(info.solo && grid ? { grid } : {})
+    ...(info.solo && grid ? { grid } : {}),
+    ...(game.kind === 'fleet_week' ? { columns: game.columns.map((c) => c.trim()), rows: game.rows.map((r) => r.trim()) } : {})
   };
   return { public: pub, keys };
 }

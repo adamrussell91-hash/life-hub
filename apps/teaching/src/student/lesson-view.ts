@@ -22,6 +22,8 @@ import { classForPlainLesson, mountInitialsToken, type InitialsTokenHandle } fro
 import { setVoiceClass } from '@/blocks/voice-client';
 import { mountLecturePlayer } from '@/lecture/player';
 import { mountTutorialPlayer } from '@/tutorial/player';
+import { mountLabPlayer } from '@/lab/player';
+import { labClient } from '@/lab/api';
 import { tutorialClient } from '@/tutorial/api';
 import { mountSprintPlayer } from '@/sprint/player';
 import { sprintClient } from '@/sprint/api';
@@ -30,6 +32,7 @@ import { caseClient } from '@/case-study/api';
 import { mountRotationPlayer } from '@/rotation/player';
 import { rotationClient } from '@/rotation/api';
 import { mountGameArcade } from '@/games/arcade';
+import { holdClassFleetSignals, type ClassFleetHold } from '@/student/fleet-toasts';
 import { gameClient } from '@/games/api';
 import '@/sprint/forms';
 import { lectureClient } from '@/lecture/api';
@@ -102,7 +105,7 @@ export function renderPublishedLessonHero(
   coverHost.className = 'lesson-page__cover';
   renderEntityBanner(coverHost, {
     title: lesson.title,
-    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : lesson.pedagogical_mode === 'lecture' ? 'Lecture' : lesson.pedagogical_mode === 'tutorial' ? 'Tutorial' : lesson.pedagogical_mode === 'design_sprint' ? 'Design Sprint' : lesson.pedagogical_mode === 'case_study' ? 'Case Study' : lesson.pedagogical_mode === 'station_rotation' ? 'Station Rotation' : lesson.pedagogical_mode === 'game' ? 'Game' : 'Lesson',
+    eyebrow: lesson.pedagogical_mode === 'quiz' ? 'Quiz' : lesson.pedagogical_mode === 'lecture' ? 'Lecture' : lesson.pedagogical_mode === 'tutorial' ? 'Tutorial' : lesson.pedagogical_mode === 'design_sprint' ? 'Design Sprint' : lesson.pedagogical_mode === 'case_study' ? 'Case Study' : lesson.pedagogical_mode === 'station_rotation' ? 'Station Rotation' : lesson.pedagogical_mode === 'game' ? 'Game' : lesson.pedagogical_mode === 'lab' ? 'Lab' : 'Lesson',
     entityId: lesson.lesson_id,
     cover: lesson.cover,
     media: [],
@@ -138,9 +141,24 @@ export function renderPublishedLessonHero(
 function renderPublishedLesson(
   content: HTMLElement,
   lesson: PublishedLesson,
-  extras?: { cls?: PublishedClass; quizClassId?: string }
+  extras?: { cls?: PublishedClass; quizClassId?: string; handIn?: () => Promise<boolean> }
 ): { dispose(): void } | null {
   content.replaceChildren();
+  if (lesson.pedagogical_mode === 'lab' && lesson.lab) {
+    // The question and how readers judge are in the snapshot; the round, the texts and the result come from the server, step by step.
+    const classId = extras?.cls?.id ?? extras?.quizClassId;
+    const playerHost = document.createElement('div');
+    content.append(playerHost);
+    return mountLabPlayer(playerHost, {
+      lesson,
+      classId,
+      client: classId ? labClient(lesson.lesson_id, classId) : null,
+      handIn: extras?.handIn,
+      renderHero: (hostEl) => {
+        renderPublishedLessonHero(hostEl, lesson, extras?.cls);
+      }
+    });
+  }
   if (lesson.pedagogical_mode === 'design_sprint' && lesson.sprint) {
     // The brief and phase guides are in the snapshot; the group and submissions come from the server after the claim.
     const classId = extras?.cls?.id ?? extras?.quizClassId;
@@ -342,6 +360,8 @@ export function mountStudentLessonView(
   let endCard: { dispose(): void } | null = null;
   let whyRoute: { dispose(): void } | null = null;
   let lessonMap: LessonMapHandle | null = null;
+  // Fleet week toasts (§2): the shared class-wide host. This lesson's own games toast from its arcade.
+  let fleetToasts: ClassFleetHold | null = null;
   // Plain lessons only: the players and any live quiz round keep the page to themselves.
   const addEndCard = (content: HTMLElement, lesson: PublishedLesson, classId: string, from: string, before?: Node | null): void => {
     if (lecture || lesson.pedagogical_mode === 'quiz') return;
@@ -369,15 +389,19 @@ export function mountStudentLessonView(
     lessonMap = null;
     whyRoute?.dispose();
     whyRoute = null;
+    fleetToasts?.release();
+    fleetToasts = null;
     // Sections split out of another lesson: bring this device's saved answers with them before the blocks read them.
     carrySplitWork(lesson);
-    lecture = renderPublishedLesson(content, lesson, extras);
+    // A lab hands its Explain answer in through the lesson's work sync, which is mounted just below.
+    lecture = renderPublishedLesson(content, lesson, { ...extras, handIn: () => work?.handInAll(true) ?? Promise.resolve(true) });
     // Written answers go to the teacher as they're typed, for the class this lesson was opened in.
     const workClass = extras?.cls?.id ?? extras?.quizClassId;
     setVoiceClass(workClass ?? null);
     if (workClass) work = mountWorkSync(content, { lessonId: lesson.lesson_id, classId: workClass });
     // The lesson end card, with previous and next under it. Neighbours come from the class's schedule when the lesson was opened from it.
     if (workClass) {
+      fleetToasts = holdClassFleetSignals(workClass, { except: lesson.lesson_id });
       const cls = extras?.cls;
       token = mountInitialsToken({
         classId: workClass,
@@ -545,6 +569,8 @@ export function mountStudentLessonView(
       lessonMap = null;
       whyRoute?.dispose();
       whyRoute = null;
+      fleetToasts?.release();
+      fleetToasts = null;
     }
   };
 }

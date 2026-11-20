@@ -12,6 +12,9 @@ import { openSoloPlayer } from './solo/shell';
 import { openLivePhone } from './live/phone';
 import { GAME_INVITE_EVENT, markGameRoomJoined } from '@/student/game-invite';
 import { liveStyle } from './live/board-parts';
+import { openFleetCampaign, type FleetCampaign } from './kinds/fleet-week/campaign';
+import { fleetCampaignClient, type FleetCampaignClient } from './kinds/fleet-week/campaign-api';
+import { createFleetSignals, fleetTarget, type FleetSignalKind, type FleetSignals } from './kinds/fleet-week/signals';
 import './kinds';
 import './games.css';
 
@@ -21,6 +24,8 @@ export type ArcadeOptions = {
   /** Null when opened without a class: the student is asked to open it from their class page. */
   client: GameClient | null;
   renderHero: (host: HTMLElement) => void;
+  /** Fleet week's campaign client; built from the lesson and class when absent (tests pass a fake). */
+  fleetClient?: FleetCampaignClient;
 };
 
 const NOUNS: Record<PublicGame['kind'], [string, string]> = {
@@ -35,7 +40,9 @@ const NOUNS: Record<PublicGame['kind'], [string, string]> = {
   connections: ['tile', 'tiles'],
   articulate: ['card', 'cards'],
   pictionary: ['prompt', 'prompts'],
-  who_said_it: ['quote', 'quotes']
+  who_said_it: ['quote', 'quotes'],
+  answer_chain: ['chain', 'chains'],
+  fleet_week: ['square', 'squares']
 };
 const countText = (g: PublicGame) => (g.count ? `${g.count} ${NOUNS[g.kind][g.count === 1 ? 0 : 1]}` : '');
 
@@ -55,6 +62,19 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
   let comingNext: string | null = null;
   let soloShell: { close(): Promise<void> } | null = null;
   let livePhone: { close(): void } | null = null;
+  let fleetCampaign: FleetCampaign | null = null;
+  /** Fleet week signals for this lesson (§2): the anchor on each Fleet week card, and the toasts. */
+  let signals: FleetSignals | null = null;
+  let fleetApi: FleetCampaignClient | null = null;
+  const fleetClientFor = (classId: string): FleetCampaignClient => (fleetApi ??= options.fleetClient ?? fleetCampaignClient(lesson.lesson_id, classId));
+  /** From a signal on another page (`?fleet=game&go=kind`): open that game once the student is known. */
+  let target = (() => {
+    try {
+      return fleetTarget(location.search);
+    } catch {
+      return null;
+    }
+  })();
   /** A code from a QR link (`?join=482913`), offered when the student taps Join live game. */
   const joinCode = (() => {
     try {
@@ -99,6 +119,7 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
     c.dataset.gameId = g.id;
     const top = el('div', 'gm-card__top');
     top.append(gameGlyph(g.kind, 'lg'), modeChips(g.kind));
+    if (g.kind === 'fleet_week' && signals) top.append(signals.badge({ only: (e) => e.game_id === g.id, label: g.title || 'Fleet week' }));
     const title = el('h3', 'gm-card__title', g.title || info.label);
     const meta = el('p', 'gm-card__meta', [info.label, countText(g)].filter(Boolean).join(' · '));
     c.append(top, title, meta);
@@ -137,6 +158,8 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
         shell.querySelector<HTMLElement>(`[data-game-id="${g.id}"] .gm-card__soon`)?.focus();
       });
       foot.append(play);
+    } else if (g.kind === 'fleet_week' && client && options.classId) {
+      foot.append(fleetButton(g, options.classId));
     } else if (g.solo) {
       foot.append(el('span', 'gm-card__wait', 'Homework closed'));
     } else {
@@ -173,6 +196,49 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
       code,
       onClose: () => {
         livePhone = null;
+      }
+    });
+  }
+
+  /** Fleet week: the campaign phone (kinds/fleet-week/campaign.ts); it waits for the teacher when no campaign is open. */
+  function fleetButton(g: PublicGame, classId: string): HTMLButtonElement {
+    const b = el('button', 'btn btn--primary gm-card__play', 'Open Fleet week');
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      if (nudgeInitials()) return;
+      openFleet(g, classId, null);
+    });
+    return b;
+  }
+
+  /** Open the campaign phone; whatever was waiting for this game is seen once it is open. */
+  function openFleet(g: PublicGame, classId: string, go: FleetSignalKind | null): void {
+    if (fleetCampaign || disposed) return;
+    if (signals) signals.seen(signals.events().filter((e) => e.game_id === g.id).map((e) => e.id));
+    fleetCampaign = openFleetCampaign(document.body, {
+      lessonId: lesson.lesson_id,
+      classId,
+      game: g,
+      go,
+      client: fleetClientFor(classId),
+      onClose: () => {
+        fleetCampaign = null;
+        void signals?.refresh();
+      }
+    });
+  }
+
+  /** The lesson's signals, once the student is known: read now and on focus, never on a timer. */
+  function startSignals(): void {
+    const classId = options.classId;
+    if (signals || !classId || !client || !games.some((g) => g.kind === 'fleet_week')) return;
+    const fc = fleetClientFor(classId);
+    if (!fc.signals) return;
+    signals = createFleetSignals({
+      source: { load: () => fc.signals!(), seen: (ids) => fc.signalsSeen?.(ids) ?? Promise.resolve() },
+      open: (e) => {
+        const g = games.find((x) => x.id === e.game_id && x.kind === 'fleet_week');
+        if (g) openFleet(g, classId, e.kind);
       }
     });
   }
@@ -286,7 +352,14 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
     gate.replaceChildren();
     if (next.identity.need === 'class') gateMessage('Open these games from your class page.');
     else if (next.identity.need === 'initials') gateMessage('Type your initials to keep your scores.', true);
+    if (next.identity.need === null) startSignals();
     paint();
+    const go = next.identity.need === null && options.classId ? target : null;
+    if (go) {
+      target = null;
+      const g = games.find((x) => x.id === go.game && x.kind === 'fleet_week');
+      if (g) openFleet(g, options.classId!, go.go);
+    }
     takeInvite();
   }
 
@@ -303,6 +376,8 @@ export function mountGameArcade(host: HTMLElement, options: ArcadeOptions): { di
       window.removeEventListener(GAME_INVITE_EVENT, onInvite);
       void soloShell?.close();
       livePhone?.close();
+      fleetCampaign?.close();
+      signals?.dispose();
       host.replaceChildren();
     }
   };

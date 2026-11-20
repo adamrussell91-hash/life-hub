@@ -1,5 +1,6 @@
 import { blankQuestion } from '@/quiz/core';
 import {
+  FLEET_SIZE,
   GAME_COUNTS,
   GAME_KIND_INFO,
   GAME_QUESTION_KINDS,
@@ -9,7 +10,8 @@ import {
   type GameItem,
   type GameKind,
   type GameLesson,
-  type ItemShape
+  type ItemShape,
+  type QuestionItem
 } from './core/schema';
 
 /**
@@ -29,7 +31,24 @@ export function seedGame(): GameLesson {
 
 /** A new, empty game of a kind, every default filled. */
 export function newGame(kind: GameKind, id: string = newGameId('g')): Game {
+  if (kind === 'fleet_week') {
+    // Fleet week starts as the full 5 × 5 grid: blank labels, two empty short answers a square, four recall lines.
+    return GameSchema.parse({
+      id,
+      kind,
+      title: '',
+      columns: Array.from({ length: FLEET_SIZE }, () => ''),
+      rows: Array.from({ length: FLEET_SIZE }, () => ''),
+      squares: Array.from({ length: FLEET_SIZE * FLEET_SIZE }, () => ({ variants: [newShortAnswer(), newShortAnswer()] })),
+      recall: Array.from({ length: 4 }, () => newShortAnswer())
+    });
+  }
   return GameSchema.parse({ id, kind, title: '' });
+}
+
+/** A blank one-mark short-answer question item (Fleet week squares and recall lines). */
+export function newShortAnswer(id: string = newGameId('i')): QuestionItem {
+  return ItemSchema.parse({ id, shape: 'question', question: blankQuestion('short_answer', id) }) as QuestionItem;
 }
 
 /** Kinds whose content is one flat list of items (everything but Jeopardy, Wheel, Connections and battles). */

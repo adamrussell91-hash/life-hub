@@ -1,0 +1,545 @@
+/* Fleet week control room and reveal board (control-room.ts). Variables from games/games.css. */
+.fc {
+  --fc-sea: var(--pastel-blue, #dceafa);
+  --fc-ship: var(--navy, #17375e);
+  --fc-hit: var(--game-wrong, #d4544f);
+  --fc-miss: var(--muted, #6b7a90);
+  --fc-line: var(--gm-line-2, rgba(23, 55, 94, 0.22));
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  background: var(--paper, #fbfaf7);
+  color: var(--ink, #1b2433);
+  font-size: var(--text-base, 1rem);
+  overflow: hidden;
+}
+.fc:focus {
+  outline: none;
+}
+.fc-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  border-bottom: 1px solid var(--fc-line);
+  background: var(--cotton, #fff);
+}
+.fc-top__title {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+.fc-kicker {
+  margin: 0;
+  color: var(--muted, #6b7a90);
+  font-size: var(--text-sm, 0.875rem);
+}
+.fc-h2 {
+  margin: 0;
+  font-size: var(--text-lg, 1.25rem);
+  overflow-wrap: anywhere;
+}
+.fc-h3 {
+  margin: 0 0 var(--space-2, 0.5rem);
+  font-size: var(--text-base, 1rem);
+}
+.fc-phase {
+  margin: 0;
+  font-weight: 700;
+  color: var(--navy, #17375e);
+}
+.fc-time {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: var(--text-lg, 1.25rem);
+}
+.fc-status {
+  margin: 0;
+  padding: 0 var(--space-4, 1rem);
+  min-height: 1.5em;
+  color: var(--muted, #6b7a90);
+  font-size: var(--text-sm, 0.875rem);
+}
+.fc-status.is-error {
+  color: var(--danger, #b3261e);
+}
+.fc-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  margin: 0 var(--space-4, 1rem) var(--space-2, 0.5rem);
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  border-radius: var(--radius-md, 12px);
+  background: var(--game-wrong-surface, #fbe7e6);
+}
+.fc-confirm[hidden] {
+  display: none;
+}
+.fc-confirm__q {
+  flex: 1 1 18rem;
+  margin: 0;
+  font-weight: 600;
+}
+.fc-main {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  align-content: start;
+  gap: var(--space-4, 1rem);
+  padding: var(--space-2, 0.5rem) var(--space-4, 1rem) var(--space-5, 2rem);
+  overflow: auto;
+}
+.fc-actions,
+.fc-card:has(.fc-matches) {
+  grid-column: 1 / -1;
+}
+.fc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+}
+.fc-reveal {
+  background: var(--game-gold, #f2c14e);
+  border-color: var(--game-gold, #f2c14e);
+  color: var(--ink, #1b2433);
+  font-size: var(--text-lg, 1.25rem);
+  padding-inline: var(--space-5, 1.5rem);
+}
+.fc-danger {
+  color: var(--danger, #b3261e);
+}
+.fc-card {
+  min-width: 0;
+  padding: var(--space-4, 1rem);
+  border: 1px solid var(--fc-line);
+  border-radius: var(--radius-md, 12px);
+  background: var(--cotton, #fff);
+}
+.fc-setup {
+  display: grid;
+  gap: var(--space-3, 0.75rem);
+  max-width: 36rem;
+}
+.fc-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3, 0.75rem);
+}
+.fc-open {
+  justify-self: start;
+}
+.fc-matches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr));
+  gap: var(--space-3, 0.75rem);
+}
+.fc-match {
+  padding: var(--space-3, 0.75rem);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--paper, #fbfaf7);
+}
+.fc-match__title {
+  margin: 0 0 var(--space-2, 0.5rem);
+  color: var(--muted, #6b7a90);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 700;
+}
+.fc-match__sides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: var(--space-3, 0.75rem);
+}
+.fc-team {
+  min-width: 0;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-left: 4px solid var(--game-team-1, #5b8fd6);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--game-team-1-soft, #dceafa);
+}
+.fc-team--2 {
+  border-left-color: var(--game-team-2, #4f9a72);
+  background: var(--game-team-2-soft, #dfe9e1);
+}
+.fc-team__name {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.fc-team__damage {
+  margin: 0 0 var(--space-2, 0.5rem);
+  font-size: var(--text-sm, 0.875rem);
+}
+.fc-members,
+.fc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+}
+.fc-member {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2, 0.5rem);
+  font-size: var(--text-sm, 0.875rem);
+}
+.fc-member__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.fc-pill {
+  flex: none;
+  padding: 0 var(--space-2, 0.5rem);
+  border-radius: var(--radius-full, 999px);
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 700;
+  background: var(--cotton, #fff);
+}
+.fc-pill--done {
+  background: var(--game-right-surface, #e3f4ea);
+  color: var(--success, #1f7a4a);
+}
+.fc-pill--busy {
+  background: var(--pastel-gold, #f1e2b6);
+  color: var(--pastel-gold-ink, #6c581f);
+}
+.fc-pill--idle {
+  color: var(--muted, #6b7a90);
+}
+.fc-item {
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--paper, #fbfaf7);
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+  justify-items: start;
+}
+.fc-item p {
+  margin: 0;
+}
+.fc-item__head {
+  font-weight: 600;
+}
+.fc-item__text {
+  overflow-wrap: anywhere;
+}
+.fc-flag__marks {
+  color: var(--danger, #b3261e);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 700;
+}
+.fc-replay {
+  width: 100%;
+}
+.fc-replay summary {
+  cursor: pointer;
+  font-size: var(--text-sm, 0.875rem);
+}
+.fc-replay__text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: var(--space-2, 0.5rem) 0 0;
+  padding: var(--space-2, 0.5rem);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--cotton, #fff);
+  font-family: inherit;
+}
+.fc-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--space-3, 0.75rem);
+  font-size: var(--text-sm, 0.875rem);
+}
+.fc-table caption {
+  text-align: left;
+  font-weight: 700;
+  padding-bottom: var(--space-1, 0.25rem);
+}
+.fc-table th,
+.fc-table td {
+  text-align: left;
+  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+  border-bottom: 1px solid var(--fc-line);
+}
+.fc-log {
+  font-size: var(--text-sm, 0.875rem);
+}
+
+/* 5 × 5 chart: a corner, column heads, then a row head before each row. */
+.fc-chart {
+  display: grid;
+  grid-template-columns: auto repeat(5, minmax(0, 1fr));
+  gap: 2px;
+  max-width: 12rem;
+}
+.fc-chart__corner,
+.fc-chart__head {
+  display: grid;
+  place-items: center;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted, #6b7a90);
+  padding: 0 0.2em;
+}
+.fc-chart__cell {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 3px;
+  background: var(--fc-sea);
+  font-weight: 800;
+  line-height: 1;
+}
+.fc-chart__cell.is-ship {
+  background: color-mix(in srgb, var(--fc-ship) 55%, var(--fc-sea));
+  color: #fff;
+}
+.fc-chart__cell.is-hit {
+  background: var(--fc-hit);
+  color: #fff;
+}
+.fc-chart__cell.is-miss {
+  color: var(--fc-miss);
+}
+
+/* Projector board: large type, dark sea, high contrast. */
+.fc-board {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: var(--space-3, 0.75rem);
+  padding: clamp(1rem, 3vw, 2.5rem);
+  overflow: auto;
+  background: radial-gradient(120vw 70vh at 50% -10%, #213f6e 0%, var(--marine, #142b51) 45%, var(--depth, #0a1536) 100%);
+  color: #f4f6fb;
+  --fc-sea: rgba(255, 255, 255, 0.1);
+  --fc-ship: #c9d6ea;
+  --fc-miss: rgba(244, 246, 251, 0.7);
+}
+.fc-board:focus {
+  outline: none;
+}
+.fc-board .btn {
+  color: #f4f6fb;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.fc-board__kicker {
+  margin: 0;
+  color: rgba(244, 246, 251, 0.7);
+  font-size: clamp(1rem, 1.6vw, 1.4rem);
+}
+.fc-board__nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+}
+.fc-board__count {
+  font-size: clamp(1rem, 1.6vw, 1.4rem);
+}
+.fc-board__winner {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 4rem);
+  color: var(--game-gold, #f2c14e);
+  overflow-wrap: anywhere;
+}
+.fc-board__sides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: clamp(1rem, 3vw, 3rem);
+  align-items: start;
+}
+.fc-board__side {
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+  border-radius: var(--radius-md, 12px);
+  background: rgba(255, 255, 255, 0.07);
+}
+.fc-board__side.is-winner {
+  box-shadow: 0 0 0 3px var(--game-gold, #f2c14e);
+}
+.fc-board__team {
+  margin: 0;
+  font-size: clamp(1.4rem, 3vw, 2.6rem);
+  overflow-wrap: anywhere;
+}
+.fc-board__stats {
+  margin: 0 0 var(--space-3, 0.75rem);
+  font-size: clamp(1rem, 1.8vw, 1.5rem);
+  color: rgba(244, 246, 251, 0.8);
+}
+.fc-chart--lg {
+  max-width: min(100%, 30rem);
+  gap: 4px;
+}
+.fc-chart--lg .fc-chart__head {
+  font-size: clamp(0.9rem, 1.6vw, 1.4rem);
+  color: rgba(244, 246, 251, 0.7);
+}
+.fc-chart--lg .fc-chart__cell {
+  font-size: clamp(1.2rem, 3vw, 2.4rem);
+  border-radius: 6px;
+}
+.fc-board__hard {
+  font-size: clamp(1rem, 1.8vw, 1.5rem);
+}
+.fc-board__hardlist {
+  margin: var(--space-2, 0.5rem) 0 0;
+  padding-left: 1.2em;
+}
+.fc-board__empty {
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
+}
+
+/* Board reveal on the rendered sea (sea.ts): the canvas sits under the cells,
+ * which keep their marks; the drawn ships replace the cell tint. */
+.fc-chart--sea {
+  position: relative;
+  grid-template-rows: auto repeat(5, auto);
+}
+.fc-sea {
+  position: absolute;
+  inset: 0;
+  grid-column: 2 / 7;
+  grid-row: 2 / 7;
+  z-index: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1), 0 24px 60px rgba(0, 0, 0, 0.4);
+}
+.fc-sea .fw-sea-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.fc-chart--sea .fc-chart__cell {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+.fc-chart--sea .fc-chart__cell.is-ship {
+  background: transparent;
+}
+.fc-chart--sea .fc-chart__cell.is-hit {
+  background: transparent;
+  color: #ffd9cf;
+  text-shadow: 0 1px 6px rgba(120, 20, 10, 0.8);
+}
+.fc-chart--sea .fc-chart__cell.is-miss {
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 20, 40, 0.6);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fc-chart__cell {
+    transition: background-color 0.3s var(--game-ease, ease);
+  }
+}
+
+/* Week mode: the schedule line under the actions, and the setup preview. */
+.fc-schedule {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-left: 4px solid var(--navy, #17375e);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--pastel-blue, #dceafa);
+  font-weight: 600;
+}
+.fc-cutoff {
+  min-height: 44px;
+  font-size: max(16px, var(--text-base, 1rem));
+}
+.fc-balance .gm-note {
+  margin: var(--space-1, 0.25rem) 0 0;
+}
+
+/* Shots this round: one row per shot, Void shot on each. */
+.fc-shot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--paper, #fbfaf7);
+}
+.fc-shot__who {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.fc-shot__square {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  justify-self: end;
+}
+.fc-shot__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1, 0.25rem);
+}
+.fc-shot .btn {
+  min-height: 44px;
+  justify-self: end;
+}
+.fc-shot.is-voided .fc-shot__who,
+.fc-shot.is-voided .fc-shot__square {
+  color: var(--muted, #6b7a90);
+  text-decoration: line-through;
+}
+.fc-pill--flag {
+  background: var(--game-wrong-surface, #fbe7e6);
+  color: var(--danger, #b3261e);
+}
+.fc-pill--void {
+  background: var(--ink, #1b2433);
+  color: var(--cotton, #fff);
+}
+
+/* Written answers: damage reports and recall lines with the typing replay. */
+.fc-written__prompt {
+  color: var(--muted, #6b7a90);
+  font-size: var(--text-sm, 0.875rem);
+  overflow-wrap: anywhere;
+}
+.fc-written__item .btn {
+  min-height: 44px;
+  justify-self: start;
+}
+.fc-written__item .qz-writing {
+  margin-top: var(--space-1, 0.25rem);
+}
+
+/* An ended game (read-only): no actions, a link to its results. */
+.fc-ended {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2, 0.5rem) var(--space-4, 1rem);
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  border-radius: var(--radius-md, 12px);
+  background: var(--cotton, #fff);
+  border: 1px solid var(--fc-line);
+}
+.fc-ended__text {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--text-lg, 1.25rem);
+}
+.fc-ended__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--navy, #17375e);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

@@ -2,6 +2,7 @@
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { gameTeacherAction, GameError } from './_shared/games.mjs';
 import { inviteClass, listRooms, openRoom } from './_shared/game-rooms.mjs';
+import { fleetTeacherAction, isFleetTeacherAction } from './_shared/fleet-week-teacher.mjs';
 import { errorResponse, guardRequestOrigin, okResponse, withCors, methodNotAllowed } from './_shared/http.mjs';
 export const config = { path: '/api/lessons/:id/game' };
 export function createGamesHandler(deps = {}) {
@@ -17,6 +18,8 @@ export function createGamesHandler(deps = {}) {
       const result = body?.action === 'open' ? await openRoom(store, match?.[1], body, { env, fetchImpl: deps.fetch ?? fetch })
         : body?.action === 'rooms' ? await listRooms(store, match?.[1], { env })
           : body?.action === 'invite' ? await inviteClass(store, match?.[1], body)
+          // Fleet week campaigns (fleet-week-teacher.mjs).
+          : isFleetTeacherAction(body?.action) ? await fleetTeacherAction(store, match?.[1], body)
             : await gameTeacherAction(store, match?.[1], body);
       return withCors(okResponse(200, result, { 'cache-control': 'no-store' }), request, env);
     } catch (e) {

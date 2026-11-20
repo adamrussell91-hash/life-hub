@@ -34,7 +34,9 @@ export const GAME_KINDS = [
   'connections',
   'articulate',
   'pictionary',
-  'who_said_it'
+  'who_said_it',
+  'answer_chain',
+  'fleet_week'
 ] as const;
 export type GameKind = (typeof GAME_KINDS)[number];
 export const GameKindSchema = z.enum(GAME_KINDS);
@@ -54,7 +56,9 @@ export const GAME_KIND_INFO: Record<GameKind, { label: string; solo: boolean; li
   connections: { label: 'Connections wall', solo: true, live: true, team: false, shapes: ['group'] },
   articulate: { label: 'Articulate', solo: false, live: true, team: true, shapes: ['term'] },
   pictionary: { label: 'Pictionary', solo: false, live: true, team: false, shapes: ['term', 'quote'] },
-  who_said_it: { label: 'Who said it?', solo: true, live: true, team: false, shapes: ['quote'] }
+  who_said_it: { label: 'Who said it?', solo: true, live: true, team: false, shapes: ['quote'] },
+  answer_chain: { label: 'Answer chain', solo: false, live: true, team: true, shapes: [] },
+  fleet_week: { label: 'Fleet week', solo: false, live: false, team: true, shapes: ['question'] }
 };
 
 /* ── Limits ────────────────────────────────────────────────────────── */
@@ -81,12 +85,16 @@ export const GAME_LIMITS = {
   category: 40,
   /** Letters in a Wheel puzzle (A–Z only). */
   wheelLetters: 60,
+  fleetLabel: 40,
   wheelText: 120,
   message: 40,
   prompt: 1000,
   criterion: 200,
   chips: 6,
-  chip: 60
+  chip: 60,
+  /** Answer chain: the answer every chain starts from, and the topic line. */
+  startAnswer: 40,
+  theme: 120
 } as const;
 
 /** Item counts per kind (spec §6): `min` is checked at publish, `max` always. */
@@ -309,6 +317,25 @@ export const BattlesSchema = z.object({
   ...ItemTagsShape
 });
 
+export const AnswerChainSchema = z.object({
+  ...base,
+  kind: z.literal('answer_chain'),
+  /** The answer every team's chain starts from (one word or a short name). */
+  start_answer: Text(GAME_LIMITS.startAnswer),
+  /** Optional: keeps every link on topic ("The water cycle"). */
+  theme: Text(GAME_LIMITS.theme),
+  settings: z
+    .object({
+      /** Links per chain: question, answer, question… always even, so a chain ends on an answer. */
+      links: z.number().int().min(4).max(12).default(6),
+      question_seconds: z.number().int().min(10).max(60).default(20),
+      answer_seconds: z.number().int().min(5).max(30).default(10),
+      review_seconds: z.number().int().min(30).max(180).default(90)
+    })
+    .prefault({}),
+  ...ItemTagsShape
+});
+
 export const WagerSchema = z.object({
   ...base,
   kind: z.literal('wager'),
@@ -358,6 +385,29 @@ export const WhoSaidItSchema = z.object({
   settings: z.object({ seconds: Seconds(10, 60, 20) }).prefault({})
 });
 
+/** Fleet week (spec 2026-11-19): a 5 × 5 grid; every square holds two short-answer variants; one recall line per ship. */
+export const FLEET_SIZE = 5;
+export const FleetSquareSchema = z.object({ variants: z.array(QuestionItemSchema).max(2).default([]) });
+export const FleetWeekSchema = z.object({
+  ...base,
+  kind: z.literal('fleet_week'),
+  columns: z.array(z.string().max(GAME_LIMITS.fleetLabel)).max(FLEET_SIZE).default([]),
+  rows: z.array(z.string().max(GAME_LIMITS.fleetLabel)).max(FLEET_SIZE).default([]),
+  /** Row-major, index = row * 5 + col. */
+  squares: z.array(FleetSquareSchema).max(FLEET_SIZE * FLEET_SIZE).default([]),
+  /** recall[i] is ship s{i}'s line (sizes 3, 2, 2, 1). */
+  recall: z.array(QuestionItemSchema).max(4).default([]),
+  settings: z
+    .object({
+      rounds: z.number().int().min(2).max(8).default(5),
+      round_cap_s: z.number().int().min(60).max(600).default(240),
+      placement_cap_s: z.number().int().min(30).max(300).default(120),
+      answer_s: z.number().int().min(20).max(120).default(60),
+      cutoff: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('20:00')
+    })
+    .prefault({})
+});
+
 export const GameSchema = z.discriminatedUnion('kind', [
   CrosswordSchema,
   FindAWordSchema,
@@ -370,7 +420,9 @@ export const GameSchema = z.discriminatedUnion('kind', [
   ConnectionsSchema,
   ArticulateSchema,
   PictionarySchema,
-  WhoSaidItSchema
+  WhoSaidItSchema,
+  AnswerChainSchema,
+  FleetWeekSchema
 ]);
 export type Game = z.infer<typeof GameSchema>;
 export type GameOf<K extends GameKind> = Extract<Game, { kind: K }>;
@@ -442,7 +494,10 @@ export const PublicGameSchema = z.object({
   cast: z.array(CastMemberSchema.pick({ id: true, name: true, emblem: true, image_url: true })).optional(),
   message: z.object({ length: z.number().int(), question: z.record(z.string(), z.unknown()).optional() }).optional(),
   /** Crossword and find-a-word: the grid, built at publish. */
-  grid: PublicGridSchema.optional()
+  grid: PublicGridSchema.optional(),
+  /** Fleet week: the grid's axis labels (the questions stay on the server). */
+  columns: z.array(z.string()).optional(),
+  rows: z.array(z.string()).optional()
 });
 export type PublicGame = z.infer<typeof PublicGameSchema>;
 

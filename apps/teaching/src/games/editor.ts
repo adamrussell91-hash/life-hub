@@ -14,6 +14,8 @@ import { pills, textInput } from './item-editors';
 import { canvasShowsOn, createGameTabs, type GameTab } from './editor-tabs';
 import { gridPanel, isGridGame, keepGridFields, type GridPanel } from './grid-editor';
 import { liveLauncher } from './live/launcher';
+import { fleetLauncher } from './kinds/fleet-week/control-room';
+import { fleetInsightPanel } from './kinds/fleet-week/insight';
 import './games.css';
 
 export type GameEditorOptions = {
@@ -24,6 +26,8 @@ export type GameEditorOptions = {
   /** Teacher API (results, markbook, Build from this unit). Null in previews without a server. */
   api: GameTeacherApi | null;
   onTab?: (tab: GameTab) => void;
+  /** Starts Ann on this lesson with a brief; the chat shows her plan and draft. */
+  startAnn?: (brief: string) => Promise<'started' | 'busy'>;
 };
 
 export type GameEditorHandle = {
@@ -333,10 +337,14 @@ export function mountGameEditor(o: GameEditorOptions): GameEditorHandle {
     kindLine.append(el('span', '', GAME_KIND_INFO[game.kind].label), modeChips(game.kind));
     titleWrap.append(title, kindLine);
     head.append(gameGlyph(game.kind, 'lg'), titleWrap);
+    const api = o.api;
     const ctx = {
       // The Layout panel owns the seed, the lock and the hidden message: an older copy from another editor keeps them.
       onChange: (next: Game) => putGame(game.id, keepGridFields(next, current().games.find((g) => g.id === game.id))),
-      ...(isListGame(game) ? { openBuild: () => { buildOpen = true; paintMain(); } } : {})
+      ...(isListGame(game) ? { openBuild: () => { buildOpen = true; paintMain(); } } : {}),
+      // Fleet week runs its own picker (squares and recall lines); the unit loads once per editor.
+      ...(game.kind === 'fleet_week' && api ? { sources: () => (sources ? Promise.resolve(sources) : api.sources().then((s) => (sources = s))) } : {}),
+      ...(game.kind === 'fleet_week' && api && o.startAnn ? { startAnn: o.startAnn } : {})
     };
     issuesHost = el('div', 'gm-issues-host');
     main.append(head, flashNode, settingsRow(game, ctx), issuesHost);
@@ -508,6 +516,9 @@ export function mountGameEditor(o: GameEditorOptions): GameEditorHandle {
     });
     head.append(push);
     card.append(head, status);
+    // Fleet week's own insight (heat map, first try v returning, calibration, confident errors).
+    const fleetGame = r.kind === 'fleet_week' ? current().games.find((g) => g.id === r.game_id) : undefined;
+    if (r.kind === 'fleet_week') card.append(fleetInsightPanel({ game: fleetGame ?? ({ id: r.game_id, kind: r.kind, title: r.title } as Game), classId: resultsClass, api: o.api?.fleet ?? null }));
     if (!r.plays) {
       card.append(el('p', 'gm-note', 'Nobody has played this game yet.'));
       return card;
@@ -554,6 +565,9 @@ export function mountGameEditor(o: GameEditorOptions): GameEditorHandle {
     bar.append(refresh);
     resultsHost.append(bar);
     resultsHost.append(liveLauncher({ games: current().games, classId: resultsClass, className: classes.find((c) => c.id === resultsClass)?.name, api: o.api }));
+    // Fleet week isn't a live room: its own control room (kinds/fleet-week/control-room.ts).
+    const fleet = fleetLauncher({ games: current().games, classes, classId: resultsClass, lessonId: o.getLesson().id, api: o.api?.fleet ?? null });
+    if (fleet) resultsHost.append(fleet);
     if (!o.api) {
       resultsHost.append(el('p', 'gm-note', 'Results show here once students play.'));
       return;
