@@ -353,12 +353,19 @@ let half = false;
 // A name fixed on the card, sent with its score. Kept by check id so a
 // repaint, or going back to the card, shows the fixed name.
 const renamed = new Map();
+// The rename box while it is open: what is typed, and whether it had focus.
+// The card is rebuilt whenever an earlier answer saves or retries, so the
+// box must come back as it was, mid-word, not reset to the old name.
+const renaming = new Map();
 function renameForm(ctx, check, dish, title) {
-  const toggle = ctx.button("Wrong name?", () => {
+  const original = dish.title || "";
+  const open = () => {
     toggle.hidden = true;
     form.hidden = false;
+    renaming.set(check.id, { value: input.value, focused: true, start: null, end: null });
     input.focus();
-  }, "ghost");
+  };
+  const toggle = ctx.button("Wrong name?", open, "ghost");
   toggle.classList.add("fj-check__rename");
   const form = el("form", "food-pair food-pair--end food-pair--keep");
   form.hidden = true;
@@ -369,21 +376,55 @@ function renameForm(ctx, check, dish, title) {
   label.htmlFor = input.id;
   input.maxLength = 200;
   input.autocomplete = "off";
-  input.value = renamed.get(check.id) || dish.title || "";
+  input.value = renamed.get(check.id) || original;
   wrap.append(label, input);
   const use = ctx.button("Use this name", () => {}, "secondary");
   use.type = "submit";
   form.append(wrap, use);
+  // What is typed is the name, even if a score is tapped before Use this name.
+  const take = () => {
+    const name = input.value.trim();
+    if (!name || name === original) renamed.delete(check.id);
+    else renamed.set(check.id, name);
+    title.textContent = name || original || "Untitled dish";
+  };
+  const remember = () => {
+    const draft = renaming.get(check.id);
+    if (!draft || !input.isConnected) return;
+    draft.value = input.value;
+    draft.focused = document.activeElement === input;
+    draft.start = input.selectionStart;
+    draft.end = input.selectionEnd;
+  };
+  input.addEventListener("input", () => {
+    take();
+    remember();
+  });
+  for (const type of ["keyup", "select", "focus"]) input.addEventListener(type, remember);
+  // Removing the card blurs the box before it leaves the page, so wait: a
+  // box gone by then was rebuilt, and the new one takes the focus back.
+  input.addEventListener("blur", () => queueMicrotask(remember));
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    const name = input.value.trim();
-    if (!name) return input.focus();
-    if (name === (dish.title || "")) renamed.delete(check.id);
-    else renamed.set(check.id, name);
-    title.textContent = name;
+    if (!input.value.trim()) return input.focus();
+    take();
+    renaming.delete(check.id);
     form.hidden = true;
     toggle.hidden = false;
   });
+  // Rebuilt while the box was open: put it back, with the caret where it was.
+  const draft = renaming.get(check.id);
+  if (draft) {
+    input.value = draft.value;
+    toggle.hidden = true;
+    form.hidden = false;
+    if (draft.focused)
+      queueMicrotask(() => {
+        if (!input.isConnected) return;
+        input.focus({ preventScroll: true });
+        if (draft.start != null) input.setSelectionRange(draft.start, draft.end);
+      });
+  }
   return [toggle, form];
 }
 function rateCard(ctx, session, card) {
@@ -395,8 +436,10 @@ function rateCard(ctx, session, card) {
     title,
     ...renameForm(ctx, check, dish, title),
   );
-  const withName = (answer) =>
-    renamed.has(check.id) ? { ...answer, title: renamed.get(check.id) } : answer;
+  const withName = (answer) => {
+    renaming.delete(check.id);
+    return renamed.has(check.id) ? { ...answer, title: renamed.get(check.id) } : answer;
+  };
   const said = firstSentence(plainNotes(dish.notes || ""), 220);
   if (said) body.append(el("p", "fj-check__said fj-serif", said));
   const others = withoutDeleted(visit.dishes).filter((d) => d.id !== dish.id);

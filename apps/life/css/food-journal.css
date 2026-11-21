@@ -2721,3 +2721,82 @@ body:has(#food-journal-dashboard[data-food-page]:not([hidden])) .hub-mobile-nav 
     animation: none;
   }
 }
+/* Where step: is the venue on the map, and does it agree with the photo. */
+.food-pin {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  background: var(--warm-white);
+}
+.food-pin p {
+  margin: 0;
+}
+.food-pin__title {
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+.food-pin--ok {
+  border-left-color: var(--success);
+}
+.food-pin--ok .food-pin__title {
+  color: var(--success);
+}
+.food-pin--warn {
+  border-left-color: var(--high-sea);
+  background: var(--warning-surface);
+}
+.food-pin--warn .food-pin__title {
+  color: var(--warning);
+}
+.food-pin--muted {
+  border-left-color: var(--line);
+}
+.food-pinmap {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+.food-pinmap[hidden] {
+  display: none;
+}
+.food-pinmap__canvas {
+  height: 180px;
+  width: 100%;
+  border-radius: var(--radius-sm, 8px);
+  overflow: hidden;
+  background: var(--line);
+}
+.food-pinmap__legend {
+  display: flex;
+  gap: var(--space-3);
+}
+.food-pinmap__key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.food-pinmap__key[hidden] {
+  display: none;
+}
+.food-pinmap__key::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.food-pinmap__key--venue::before {
+  background: var(--navy);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px var(--navy);
+}
+.food-pinmap__key--photo::before {
+  border: 3px solid var(--high-sea);
+  background: rgba(255, 255, 255, 0.6);
+}
+.food-pin-line--warn {
+  color: var(--warning);
+}

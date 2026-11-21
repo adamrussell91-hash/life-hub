@@ -53,6 +53,8 @@ import {
 } from "./pages.js";
 import { paintRecipeBook } from "./recipe-book.js";
 import { hasPoint, nameSimilarity, rankVenues, settleVenue, venueUnsure } from "./venue-match.js";
+import { locationStatus, pinSummary } from "./location-status.js";
+import { createPinMap } from "./pin-map.js";
 import { createQuickCheckSession, paintQuickCheck } from "./quick-check-page.js";
 import {
   compressPhoto,
@@ -312,6 +314,9 @@ export function createFoodJournalView({
     actions.dataset.part = "form-actions";
     frame.append(heading, fields, error, actions);
     let closed = false;
+    // Run once when the sheet or page goes, however it is closed.
+    const cleanups = [];
+    const cleanUp = () => cleanups.splice(0).forEach((fn) => fn());
     const handle = page ? openPage(frame, trigger) : openMorphingDialog({
       frame,
       trigger,
@@ -319,16 +324,25 @@ export function createFoodJournalView({
       closeButton: false,
       onClose: () => {
         closed = true;
+        cleanUp();
         if (dialog === handle) dialog = null;
         if (!trigger?.isConnected) host?.querySelector("button")?.focus();
       },
     });
+    if (page) {
+      const closePage = handle.close;
+      handle.close = () => {
+        closePage();
+        cleanUp();
+      };
+    }
     dialog = handle;
     return {
       frame,
       fields,
       error,
       actions,
+      onCleanup: (fn) => cleanups.push(fn),
       isOpen: () => !closed && dialog === handle && frame.isConnected,
       close: () => {
         closed = true;
@@ -1302,6 +1316,9 @@ export function createFoodJournalView({
       reading = null,
       readAgain = false,
       photoGps = null,
+      // Photos read this session, and how many carried a location.
+      photosSeen = { read: 0, located: 0 },
+      pinMap = null,
       hereGps = null,
       dateEdited = false,
       // Uploads and reads under way; Save waits for them.
@@ -1348,6 +1365,8 @@ export function createFoodJournalView({
       save.hidden = isNew && step !== STEPS.length - 1;
       save.className = `btn btn--${next.hidden ? "primary" : "secondary"}`;
       if (step === STEPS.length - 1) paintSummary();
+      // A map drawn while its step was hidden has no size until shown.
+      if (step === 0) pinMap?.update(visit.venue, photoGps);
     }
     // Uploads photos onto one dish. Their date and place fill in the visit.
     async function addPhotos(d, files) {
@@ -1361,7 +1380,11 @@ export function createFoodJournalView({
           const metadata = await inspectPhoto(file, journal);
           if (metadata.date && !original.title && !dateEdited)
             visit.date = metadata.date;
-          if (metadata.gps) photoGps = metadata.gps;
+          photosSeen.read++;
+          if (metadata.gps) {
+            photoGps = metadata.gps;
+            photosSeen.located++;
+          }
           const blob = await compressPhoto(file),
             p = await api.upload(blob),
             url = URL.createObjectURL(blob);
@@ -1593,7 +1616,25 @@ export function createFoodJournalView({
         findVenue,
       );
       nearby.append(nearbyHead, suggestions);
-      venueGroup.append(venueField, matches, nearby);
+      // Where the venue sits, where the photo was taken, and whether they
+      // agree: shown, not guessed at.
+      const where = locationStatus({ venue: visit.venue, photoGps, photos: photosSeen });
+      const pin = el("div", `food-pin food-pin--${where.tone}`);
+      pin.setAttribute("role", "status");
+      pin.append(
+        el("p", "food-pin__title", where.title),
+        el("p", "food-meta", where.detail),
+      );
+      if (where.photoLine) pin.append(el("p", "food-meta food-pin__photo", where.photoLine));
+      if (where.showMap) {
+        if (!pinMap) {
+          pinMap = createPinMap(document);
+          s.onCleanup(() => pinMap?.dispose());
+        }
+        pin.append(pinMap.element);
+        pinMap.update(visit.venue, photoGps);
+      }
+      venueGroup.append(venueField, matches, pin, nearby);
       wherePanel.append(venueGroup);
 
       const address = el("div", "food-pair");
@@ -1812,6 +1853,11 @@ export function createFoodJournalView({
             "span",
             "food-meta",
             [formatDisplayDate(visit.date), sharedMeal()].filter(Boolean).join(" · "),
+          ),
+          el(
+            "span",
+            `food-meta food-pin-line${hasPoint(visit.venue) && !venueUnsure(visit) ? "" : " food-pin-line--warn"}`,
+            pinSummary(visit.venue),
           ),
         );
         place.append(placeText, el("span", "food-summary__edit", "Edit"));
@@ -2075,7 +2121,11 @@ export function createFoodJournalView({
           const metadata = await inspectPhoto(file, journal);
           if (metadata.date && !original.title && !dateEdited)
             visit.date = metadata.date;
-          if (metadata.gps) photoGps = metadata.gps;
+          photosSeen.read++;
+          if (metadata.gps) {
+            photoGps = metadata.gps;
+            photosSeen.located++;
+          }
           const blob = await compressPhoto(file, 1200);
           const image = {
             role: "menu",
