@@ -1989,6 +1989,45 @@ for (const width of [1440, 390])
     assert.deepEqual(errors, []);
     await page.close();
   });
+test("rate dishes: a repaint while renaming keeps what is typed, and a score takes it", async () => {
+  const { page, errors, read } = await pageFor(390, { seed: quickCheckSeed, checks: () => [] });
+  // The first rating's save is slow and then fails, so its retry notice
+  // repaints the next card while the name is half typed.
+  let release;
+  const held = new Promise((r) => (release = r));
+  let first = true;
+  await page.route("**/api/food-checks", async (route) => {
+    if (route.request().method() === "POST" && first) {
+      first = false;
+      await held;
+      return route.fulfill({ status: 503, contentType: "application/json", body: '{"ok":false,"error":{"message":"busy"}}' });
+    }
+    return route.fallback();
+  });
+  await page.getByRole("tab", { name: "Rate dishes (2)", exact: true }).click();
+  await page.getByRole("heading", { name: "Paella" }).waitFor();
+  await page.locator('.fj-check__score[data-key="4"]').click();
+  await page.getByRole("heading", { name: "Tortilla" }).waitFor();
+  await page.getByRole("button", { name: "Wrong name?" }).click();
+  const box = page.getByLabel("What was it?");
+  await box.fill("Fried ch");
+  release();
+  await page.getByText("Answers are waiting to save", { exact: false }).waitFor();
+  assert.equal(await box.inputValue(), "Fried ch", "the half-typed name survives the repaint");
+  assert.equal(await box.evaluate((n) => n === document.activeElement), true, "focus stays in the box");
+  await page.keyboard.type("eese");
+  assert.equal(await box.inputValue(), "Fried cheese");
+  // Straight to a score, without Use this name: the typed name still counts.
+  await page.locator('.fj-check__score[data-key="3"]').click();
+  await page.getByText("Every dish has a rating.", { exact: false }).waitFor();
+  await page.getByRole("tab", { name: "Timeline", exact: true }).click();
+  await page.getByRole("tab", { name: /Rate dishes/ }).waitFor({ state: "detached", timeout: 20000 });
+  const dish = read().visits.flatMap((v) => v.dishes).find((d) => d.id === "dish_third");
+  assert.equal(dish.title, "Fried cheese");
+  assert.equal(dish.rating, 3);
+  assert.deepEqual(errors.filter((e) => !/503|busy/i.test(e)), []);
+  await page.close();
+});
 for (const width of [1440, 390])
   test(`quick check moves card to card and answers reach the journal, ${width}`, async () => {
     const { page, errors, read } = await pageFor(width, {
