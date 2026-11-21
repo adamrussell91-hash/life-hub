@@ -55,8 +55,14 @@ test('approve: every answer waits until approved', async () => {
 test('approve all: every waiting answer goes up at once, flagged ones still wait', async () => {
   const store = storeFixture({ safety: 'approve' });
   const { students: [a, b] } = await startWith(store, 2);
+  // The board orders by created_at, then by an id from each student's random
+  // symbol. Answers sent in the same millisecond would order by chance, so
+  // each lands a tick after the last.
+  const tick = () => new Promise(resolve => setTimeout(resolve, 2));
   await submit(store, a, 'Nature mirrors him');
+  await tick();
   await submit(store, b, 'Guilt');
+  await tick();
   await submit(store, b, 'you idiot');
   const before = await teach(store, {});
   await teach(store, { action: 'remove', id: before.answers[1].id });

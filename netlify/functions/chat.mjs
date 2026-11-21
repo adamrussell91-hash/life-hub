@@ -429,6 +429,7 @@ import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays, daysBetween } fr
 import { parseEventDocument } from '../../apps/life/js/core/records.js';
 import { load as loadYaml } from 'js-yaml';
 import { withoutDeleted } from './_shared/record-liveness.mjs';
+import { findCountedMeal, resolveDishMealPath } from './_shared/food-journal-meal-sync.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 // Phone photos ship as base64 data URLs (≈4/3 of raw). Cap under Netlify's ~6MB
@@ -3914,6 +3915,23 @@ async function persistOrProposeLogEntry({
       }
     } catch {
       // Fall through to a normal new-path proposal if the tree cannot be read.
+    }
+  }
+
+  // A Food Journal dish shows the path Confirm will write: its own earlier
+  // count when re-counting, else a free one beside the meal's other dishes.
+  if (proposal.record.type === 'meal' && proposal.record.food_dish_id) {
+    try {
+      const current = await client.resolveTree();
+      const dishId = proposal.record.food_dish_id;
+      const counted = await findCountedMeal(client, current.tree, dishId);
+      const target = counted && counted.date === proposal.record.date && counted.meal === proposal.record.meal
+        ? { path: counted.path, existingSha: counted.sha }
+        : await resolveDishMealPath(client, current.tree, path, dishId);
+      path = target.path;
+      existingSha = target.existingSha ?? null;
+    } catch {
+      // Confirm resolves the path again; the card keeps the derived one.
     }
   }
 

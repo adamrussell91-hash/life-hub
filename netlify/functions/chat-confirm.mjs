@@ -30,7 +30,7 @@ import {
 } from './_shared/exercise-library.mjs';
 import { persistLogEntry, renderMarkdown, syncCentralNodeAfterMealDeletes, syncCentralNodeAfterCreatineWrites } from './_shared/persist-log.mjs';
 import { mealDeletesFromWrites, resolveMealWritePath } from './_shared/delete-meal.mjs';
-import { findCountedMeal, removeOldCountedMeal } from './_shared/food-journal-meal-sync.mjs';
+import { findCountedMeal, removeOldCountedMeal, resolveDishMealPath } from './_shared/food-journal-meal-sync.mjs';
 import { getSydneyDateKey, getSydneyTimestamp } from '../../apps/life/js/core/time.js';
 import { sendDiaryToDayOne } from './_shared/dayone-send.mjs';
 import {
@@ -403,7 +403,15 @@ export function createChatConfirmHandler({
           // Another date or slot: write a new file, then remove the old count.
           staleCountedMeal = counted;
         }
-        if (path !== counted?.path && parsed.overwrite) {
+        if (path !== counted?.path && validation.record.food_dish_id) {
+          // Each dish is its own meal file. Never overwrite another dish's
+          // (or a hand-logged) meal, even when the chat asks to overwrite.
+          const target = await resolveDishMealPath(
+            client, current.tree, path, validation.record.food_dish_id
+          );
+          path = target.path;
+          existingSha = target.existingSha;
+        } else if (path !== counted?.path && parsed.overwrite) {
           const target = resolveMealWritePath(current.tree, {
             date: validation.record.date,
             meal: validation.record.meal,
