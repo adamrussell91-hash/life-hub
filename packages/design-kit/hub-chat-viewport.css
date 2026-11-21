@@ -71,6 +71,15 @@
   color: var(--muted);
 }
 
+/* Shown while two or more meal Confirms wait, e.g. a meal's dishes. */
+.chat-pending-confirms__all {
+  align-self: flex-start;
+}
+
+.chat-pending-confirms__all[hidden] {
+  display: none;
+}
+
 .chat-pending-confirms__list {
   list-style: none;
   margin: 0;

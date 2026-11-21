@@ -45,7 +45,8 @@ import {
   mountPendingActionCards,
   moveConfirmReceiptToTranscript,
   removePendingConfirmCard,
-  syncChatPendingConfirmsVisibility
+  syncChatPendingConfirmsVisibility,
+  syncConfirmAllButton
 } from './chat-pending-confirms.js';
 
 const STATUS_BUBBLE_CLASS = 'chat-message--status';
@@ -972,15 +973,62 @@ export function createChatController({
     return { ok: !failed };
   }
 
+  // Meal Confirms waiting in the tray. With two or more (a meal's dishes sent
+  // to Brisket together) the tray offers one "Confirm all".
+  const waitingMeals = [];
+  let confirmingAll = false;
+
+  function paintConfirmAll() {
+    // A card that left the page some other way no longer counts.
+    for (let i = waitingMeals.length - 1; i >= 0; i -= 1) {
+      if (waitingMeals[i].proposal.card?.isConnected === false) waitingMeals.splice(i, 1);
+    }
+    syncConfirmAllButton(root, {
+      count: waitingMeals.length,
+      busy: confirmingAll,
+      onConfirmAll: confirmAllMeals
+    });
+  }
+
+  function forgetMeal(proposal) {
+    const at = waitingMeals.findIndex(entry => entry.proposal === proposal);
+    if (at >= 0) waitingMeals.splice(at, 1);
+    paintConfirmAll();
+  }
+
+  // One at a time, in order, so each save sees the last; stops at the first
+  // that fails and leaves the rest waiting with their own Confirm.
+  async function confirmAllMeals() {
+    if (confirmingAll || waitingMeals.length < 2) return;
+    confirmingAll = true;
+    paintConfirmAll();
+    try {
+      for (const entry of [...waitingMeals]) {
+        if (!waitingMeals.includes(entry)) continue;
+        if (entry.proposal.confirm.disabled) continue;
+        const overwrite = entry.proposal.confirm.dataset.overwrite === '1' || entry.event.overwrite === true;
+        if (!(await confirmProposal(entry.proposal, entry.event, overwrite))) break;
+      }
+    } finally {
+      confirmingAll = false;
+      paintConfirmAll();
+    }
+  }
+
   function bindProposal(proposal, event) {
     if (!proposal) return;
     if (event?.overwrite === true) proposal.confirm.dataset.overwrite = '1';
+    if (event?.record?.type === 'meal') {
+      waitingMeals.push({ proposal, event });
+      paintConfirmAll();
+    }
     proposal.confirm.addEventListener('click', () => {
       const overwrite = proposal.confirm.dataset.overwrite === '1' || event.overwrite === true;
       void confirmProposal(proposal, event, overwrite);
     });
     proposal.discard.addEventListener('click', () => {
       dismissPendingCard(proposal.card);
+      forgetMeal(proposal);
     });
   }
 
@@ -1197,6 +1245,8 @@ export function createChatController({
         showChatError(root, message);
       }
       onRecordWritten?.(result);
+      forgetMeal(proposal);
+      return true;
     } catch (error) {
       proposal.confirm.disabled = false;
       proposal.confirm.textContent = previousLabel;
@@ -1227,6 +1277,7 @@ export function createChatController({
       } else {
         showChatError(root, `The record was not saved (${error.code || 'request_failed'}). Confirm again.`);
       }
+      return false;
     }
   }
 

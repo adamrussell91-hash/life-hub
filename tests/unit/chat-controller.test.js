@@ -2596,3 +2596,115 @@ test('an error before the agent takes the turn is not reported as accepted', asy
   assert.deepEqual(await controller.send('Count this', { onAccepted: () => { accepted += 1; } }), { ok: false });
   assert.equal(accepted, 0);
 });
+
+// Tapas: several dishes sent to Brisket together come back as several meal
+// Confirms, and one "Confirm all" saves them in order.
+function mealRecord(id, meal = 'dinner') {
+  return {
+    schema_version: 1,
+    id,
+    type: 'meal',
+    meal,
+    date: '2026-10-22',
+    created_at: '2026-10-22T08:00:00.000Z',
+    updated_at: '2026-10-22T08:00:00.000Z',
+    source: 'chat',
+    calories: 300,
+    protein_g: 10,
+    fat_g: 12,
+    food_dish_id: `dish_${id}`
+  };
+}
+
+function mealsChatApi(ids, confirmImpl) {
+  const confirmCalls = [];
+  return {
+    confirmCalls,
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      for (const id of ids) {
+        yield { type: 'record_proposal', path: `data/nutrition/2026/10/2026-10-22-dinner-${id}.md`, record: mealRecord(id) };
+      }
+    },
+    async confirm(payload) {
+      confirmCalls.push(payload);
+      return confirmImpl(payload, confirmCalls.length);
+    }
+  };
+}
+
+function confirmAllButton(root) {
+  return root.querySelector('#chat-pending-confirms')?.querySelector('#chat-confirm-all') ?? null;
+}
+
+test('two or more meal Confirms offer Confirm all, which saves each in order', async () => {
+  const root = new FakeDocument();
+  let release;
+  const chatApi = mealsChatApi(['1900', '1901', '1902'], async (payload, n) => {
+    await new Promise(resolve => { release = resolve; });
+    return { ok: true, centralNodeUpdated: true, foodJournalUpdated: true, n };
+  });
+  const controller = createChatController({ root, chatApi });
+  await controller.send('Count these 3 Food Journal dishes for me');
+
+  const button = confirmAllButton(root);
+  assert.ok(button, 'the tray shows Confirm all');
+  assert.equal(button.hidden, false);
+  assert.equal(button.textContent, 'Confirm all 3');
+
+  button.dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+  assert.equal(chatApi.confirmCalls.length, 1, 'one save at a time');
+  assert.equal(button.disabled, true);
+  assert.equal(button.textContent, 'Saving all…');
+  for (let i = 0; i < 3; i += 1) {
+    release();
+    await flushMicrotasks();
+    await flushMicrotasks();
+  }
+  assert.deepEqual(
+    chatApi.confirmCalls.map(call => call.candidate.fields.food_dish_id),
+    ['dish_1900', 'dish_1901', 'dish_1902']
+  );
+  assert.equal(button.hidden, true, 'nothing left to confirm');
+});
+
+test('Confirm all stops at the first failed save and leaves the rest waiting', async () => {
+  const root = new FakeDocument();
+  const chatApi = mealsChatApi(['1900', '1901', '1902'], async (payload, n) => {
+    if (n === 2) throw Object.assign(new Error('fail'), { code: 'github_unavailable' });
+    return { ok: true, centralNodeUpdated: true };
+  });
+  const controller = createChatController({ root, chatApi });
+  await controller.send('Count these 3 Food Journal dishes for me');
+
+  confirmAllButton(root).dispatchEvent(new Event('click'));
+  for (let i = 0; i < 4; i += 1) await flushMicrotasks();
+  assert.equal(chatApi.confirmCalls.length, 2, 'the third is not tried after the second fails');
+  const button = confirmAllButton(root);
+  assert.equal(button.disabled, false);
+  assert.equal(button.textContent, 'Confirm all 2');
+  assert.match(root.querySelector('#chat-error').textContent, /data store was unavailable/);
+});
+
+test('one meal Confirm, or Confirms that are not meals, show no Confirm all', async () => {
+  const one = new FakeDocument();
+  await createChatController({ root: one, chatApi: mealsChatApi(['1900'], async () => ({ ok: true })) })
+    .send('Count this Food Journal dish for me');
+  assert.equal(confirmAllButton(one), null);
+
+  const other = new FakeDocument();
+  const chatApi = fakeChatApi({ record: skincareRecord(), path: '2026/2026-08-02-hyaluronica-skincare.md', confirmImpl: async () => ({ ok: true }) });
+  await createChatController({ root: other, chatApi }).send('log skincare');
+  assert.equal(confirmAllButton(other), null);
+});
+
+test('discarding one of two meal Confirms hides Confirm all', async () => {
+  const root = new FakeDocument();
+  const controller = createChatController({ root, chatApi: mealsChatApi(['1900', '1901'], async () => ({ ok: true })) });
+  await controller.send('Count these 2 Food Journal dishes for me');
+  assert.equal(confirmAllButton(root).textContent, 'Confirm all 2');
+  const card = findProposalCardInRoot(root);
+  findProposalButton(card, 'record-proposal__discard').dispatchEvent(new Event('click'));
+  assert.equal(confirmAllButton(root).hidden, true);
+});

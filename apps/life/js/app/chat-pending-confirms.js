@@ -206,6 +206,40 @@ export function ensureChatPendingConfirmsTray(root) {
   return tray;
 }
 
+export const CHAT_CONFIRM_ALL_ID = 'chat-confirm-all';
+
+/**
+ * "Confirm all N" in the tray, shown while two or more cards it can confirm
+ * are waiting (a meal sent to Brisket as several dishes). `onConfirmAll` runs
+ * on click; the latest one passed is used. Returns the button, or null when
+ * the tray is not mounted.
+ */
+export function syncConfirmAllButton(root, { count = 0, busy = false, onConfirmAll = null } = {}) {
+  const tray = root?.querySelector?.(`#${CHAT_PENDING_CONFIRMS_ID}`);
+  if (!tray) return null;
+  let button = tray.querySelector?.(`#${CHAT_CONFIRM_ALL_ID}`) ?? null;
+  if (!button) {
+    if (count < 2) return null;
+    const create = resolveCreateElement(root, tray);
+    if (typeof create !== 'function') return null;
+    button = create('button');
+    button.id = CHAT_CONFIRM_ALL_ID;
+    button.type = 'button';
+    button.className = 'btn btn--primary chat-pending-confirms__all';
+    button.addEventListener?.('click', () => {
+      if (!button.disabled) void button.onConfirmAll?.();
+    });
+    const list = tray.querySelector?.(`#${CHAT_PENDING_CONFIRMS_LIST_ID}`);
+    if (list && typeof tray.insertBefore === 'function') tray.insertBefore(button, list);
+    else tray.append(button);
+  }
+  if (typeof onConfirmAll === 'function') button.onConfirmAll = onConfirmAll;
+  button.hidden = count < 2 && !busy;
+  button.disabled = busy;
+  button.textContent = busy ? 'Saving all…' : `Confirm all ${count}`;
+  return button;
+}
+
 export function syncChatPendingConfirmsVisibility(root) {
   const tray = root?.querySelector?.(`#${CHAT_PENDING_CONFIRMS_ID}`);
   if (!tray) return;
