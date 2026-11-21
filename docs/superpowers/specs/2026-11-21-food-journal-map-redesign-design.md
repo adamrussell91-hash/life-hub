@@ -2,7 +2,7 @@
 
 Date: 21 November 2026
 Hub: Life (Food Journal)
-Status: approved design, not built
+Status: built
 Mockup: `docs/mockups/food-journal-map.html` (option B, "Bottom sheet")
 
 ## Purpose
@@ -15,11 +15,11 @@ The Map tab is for reliving and browsing where the owner has eaten. Today it is 
 |---|---|
 | What the map is for | Relive and browse. No "near me", no rating or cuisine filters. |
 | Pattern | Full-screen map with photo pins; a pin tap opens a bottom sheet (mockup option B). |
-| Add visit row | Hidden in Map mode, so the map gets the height. It stays on every other tab. |
+| Add visit row | Add visit and the import, backup and restore menu are hidden in Map mode, so the map gets the height. They stay on every other tab. |
 | Heading and count | The "World map" heading and "N mapped visits" line become one chip on the map: "401 visits · 212 places". The canvas keeps its accessible name. |
 | Finding a venue | The native "Find a venue" select goes. A search button on the map opens a type-to-filter venue list in the same sheet. |
 | Basemap | OpenFreeMap `positron`, flat: pitch and rotation off, no building extrusion layer. |
-| Opening view | Framed on the most recent mapped visit (zoom 12). A "Show all" button fits every venue. |
+| Opening view | Framed on the most recent mapped visit (zoom 14). A "Show all" button fits every venue. |
 | Pins | Clusters stay as accent count bubbles. An unclustered venue is a round photo pin (44px) of its best dish photo; a venue with no photo is a styled dot of the same size. |
 | Best photo | First photo of the venue's highest-rated dish that has one, newest visit breaking ties; else the first photo of the newest visit. |
 | Out of scope | Other Food Journal tabs, the shared `mountHubPlacesMap`, filters, directions, editing from the sheet. |
@@ -43,7 +43,7 @@ Sheet contents, top to bottom:
 - Venue name (serif), address, average rating across rated dishes to one decimal (omitted when nothing is rated), visit count.
 - Visits, newest first: title and display date. Tapping one opens the entry through `ctx.openEntry`.
 
-The sheet has two heights, about 56% and 86% of the map panel; dragging the handle or tapping it moves between them, and dragging down from the lower one closes it. Close, a tap on empty map, Escape and Back all dismiss it and clear the selected pin. Opening the sheet pushes one history entry; Back closes it without leaving the page.
+On a phone the sheet has two heights, about 56% and 86% of the map panel (from 900px wide it is a card down the map's left side); dragging the handle or tapping it moves between them, and dragging down from the lower one closes it. Close, a tap on empty map, Escape and Back all dismiss it and clear the selected pin. Opening the sheet pushes one history entry; Back closes it without leaving the page.
 
 The search list uses the same sheet at the tall height: a text input (16px, so iOS does not zoom) and the venues filtered by name or address. Choosing one selects that venue as a pin tap would and flies the map to it at zoom 15.
 
@@ -51,14 +51,16 @@ The search list uses the same sheet at the tall height: a text input (16px, so i
 
 - `world-map.js` keeps `mappedVenues` and `paintWorldMap`, and stays the only map entry point for the tab. It owns the map, the sources and layers, and selection state.
 - New `world-map-sheet.js`: builds and controls the sheet (open with a venue, open with the search list, close, height changes, drag). It knows nothing about MapLibre; it takes a venue and callbacks.
-- New `world-map-pins.js`: photo pins as MapLibre DOM markers. Given the map and the venues, it keeps markers in step with the unclustered features on screen (on `moveend` and source `data`), and signs photos only for those venues.
-- `model.js` gains `venueBestPhoto(venue)` and `venueRating(venue)`, pure and unit-tested.
-- `view.js` passes its photo signing through the page context (`ctx.photoNode` or equivalent) so the map uses the same signed-URL cache and retry path as every other photo, and hides the Add visit row when the mode is `map`.
+- New `world-map-pins.js`: photo pins and count bubbles as MapLibre DOM markers, regrouped as the map moves. `groupPins` is pure and unit-tested.
+- `model.js` gains `venuePhotos(venue, limit)` (best first) and `venueRating(venue)`, pure and unit-tested.
+- `view.js` already offers `ctx.photoNode`, so the map uses the same signed-URL cache and retry path as every other photo. It leaves Add visit and the import menu out of the toolbar when the mode is `map`.
 - `hub-places-map.js` exports a `QUIET_MAP_STYLE` constant for `positron`. `DEFAULT_MAP_STYLE` and its other users are untouched.
 
 ## Data flow
 
-`liveVisits(journal)` → `mappedVenues` (unchanged grouping by name and rounded coordinates) → GeoJSON source with clustering, as now. Photo keys come from `visit.dishes[].photos`; URLs come from the existing batched `api.media({ action: "read" })` signer, requested only for venues that are on screen and unclustered, and for the open sheet's strip.
+`liveVisits(journal)` → `mappedVenues` (unchanged grouping by name and rounded coordinates). Pins and count bubbles are DOM markers: on every map move, `groupPins` merges venues whose pins would overlap on screen (closer than a pin's width; from zoom 17 in, only pins on the same spot). The selected venue always stands alone. A bubble zooms to its venues; a bubble that cannot split opens them as a list in the sheet. Photo keys come from `visit.dishes[].photos`; URLs come from the existing batched signer through `ctx.photoNode`, so only pins on screen and the open sheet's strip are signed.
+
+The map's centre, zoom and open venue are remembered for the page's lifetime, so a journal repaint or a trip into an entry and back returns to the same place.
 
 ## Failure and empty states
 
@@ -94,6 +96,6 @@ From `docs/CURSOR-UI-FAILURES.md`:
 
 ## Testing
 
-- Unit: `venueBestPhoto`, `venueRating`, and the existing `mappedVenues` cases.
+- Unit: `venuePhotos`, `venueRating`, `latestVenue`, `groupPins`, and the existing `mappedVenues` case.
 - Browser (`tests/browser/food-journal.spec.mjs`), replacing "world map opens a mapped venue's visits at phone width" at 390: Map tab shows the chip count and no Add visit; no horizontal overflow; tapping the map at a seeded venue opens the sheet with its visits; a visit row opens the entry; Back closes the sheet; search finds a venue by name; with the style request aborted, "Map unavailable." shows and the list still opens the sheet. No page errors.
 - `npm run pre-pr-check` passes before the PR.

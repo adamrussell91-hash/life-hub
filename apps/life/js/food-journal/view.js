@@ -1033,15 +1033,18 @@ export function createFoodJournalView({
       ],
       { label: "Import, backup and restore" },
     );
-    toolbar.append(
-      pills,
-      button(
-        "Add visit",
-        (e) => editVisit(newVisit(), e.currentTarget),
-        "primary",
-      ),
-      more,
-    );
+    // The map is the whole screen in Map mode, so Add visit and the import
+    // menu step aside there; every other tab keeps them.
+    toolbar.append(pills);
+    if (mode !== "map")
+      toolbar.append(
+        button(
+          "Add visit",
+          (e) => editVisit(newVisit(), e.currentTarget),
+          "primary",
+        ),
+      );
+    if (mode !== "map") toolbar.append(more);
     host.append(toolbar);
     const line = el("p", "canvas-status");
     line.dataset.foodStatus = "";

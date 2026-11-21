@@ -1994,15 +1994,21 @@ for (const width of [1440, 390])
     await page.close();
   });
 
-test("world map opens a mapped venue's visits at phone width", async () => {
-  const { page, errors } = await pageFor(390, { seed(journal) {
-    const visit = journal.visits[0];
-    visit.venue = { ...visit.venue, lat: 0, lon: 0 };
-    journal.visits.push(
-      { ...newVisit(), title: "Second lunch", date: "2026-10-14", venue: visit.venue },
-      { ...newVisit(), title: "Unmapped lunch", date: "2026-10-15" },
-    );
-  } });
+test("world map fills the phone screen and opens a place in a bottom sheet", async () => {
+  const { page, errors } = await pageFor(390, {
+    media: { "food/photos/photo_lasagne.jpg": Buffer.from(JPEG, "base64") },
+    seed(journal) {
+      const visit = journal.visits[0];
+      visit.venue = { ...visit.venue, lat: 0, lon: 0 };
+      visit.dishes[0].photos = [{ id: "photo_lasagne", key: "food/photos/photo_lasagne.jpg" }];
+      journal.visits.push(
+        { ...newVisit(), title: "Second lunch", date: "2026-10-14", venue: visit.venue },
+        { ...newVisit(), title: "Harbour dinner", date: "2026-09-01",
+          venue: { name: "Quay Kitchen", address: "Harbour Road", lat: 40, lon: 60 } },
+        { ...newVisit(), title: "Unmapped lunch", date: "2026-10-15" },
+      );
+    },
+  });
   try {
     await page.route(/^https:\/\/cdn\.jsdelivr\.net\/npm\/maplibre-gl@6\.16\.0\/dist\/maplibre-gl[^/]*\.mjs(?:\?.*)?$/, (route) =>
       route.fulfill({
@@ -2010,33 +2016,101 @@ test("world map opens a mapped venue's visits at phone width", async () => {
         contentType: "text/javascript",
         headers: { "Access-Control-Allow-Origin": "*" },
       }));
-    await page.route("https://tiles.openfreemap.org/styles/liberty", (route) =>
+    const style = "https://tiles.openfreemap.org/styles/positron";
+    await page.route(style, (route) =>
       route.fulfill({
         json: { version: 8, sources: {}, layers: [] },
         headers: { "Access-Control-Allow-Origin": "*" },
       }));
     await page.getByRole("tab", { name: "Map", exact: true }).click();
-    await page.getByRole("heading", { name: "World map" }).waitFor();
     await page.getByLabel("World map of Food Journal venues").waitFor();
-    assert.equal(await page.getByText("2 mapped visits", { exact: true }).count(), 1);
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
-    const picker = page.getByLabel("Find a venue");
-    const map = page.getByLabel("World map of Food Journal venues");
-    await page.waitForFunction(() => Boolean(document.querySelector(".maplibregl-canvas")));
-    for (let attempt = 0; attempt < 6 && await picker.inputValue() === ""; attempt++) {
-      await map.click();
-      await page.getByRole("button", { name: /Second lunch/ }).waitFor({ timeout: 600 }).catch(() => {});
-    }
-    assert.equal(await picker.inputValue(), "0");
-    await page.getByRole("button", { name: /Second lunch/ }).waitFor();
-    await page.getByRole("button", { name: /Tapas night/ }).click();
+    assert.equal(await page.getByText("3 visits · 2 places", { exact: true }).count(), 1);
+    // The map is the screen: no Add visit, nothing to scroll, and it ends at the bottom bar.
+    assert.equal(await page.getByRole("button", { name: "Add visit" }).count(), 0);
+    const box = await page.evaluate(() => {
+      const map = document.querySelector(".fj-map").getBoundingClientRect();
+      const frame = document.querySelector(".fj-map__canvas").getBoundingClientRect();
+      const root = document.documentElement;
+      return {
+        width: root.scrollWidth,
+        scrolls: root.scrollHeight > innerHeight + 1,
+        bottom: map.bottom, height: map.height, canvas: frame.height,
+        bar: document.querySelector(".hub-mobile-nav").getBoundingClientRect().top,
+      };
+    });
+    assert.equal(box.width, 390);
+    assert.equal(box.scrolls, false, JSON.stringify(box));
+    assert.ok(box.height >= 320 && box.canvas === box.height, JSON.stringify(box));
+    assert.ok(box.bottom <= box.bar, JSON.stringify(box));
+
+    // The newest mapped visit is where the map opens, as a photo pin.
+    const pin = page.getByRole("button", { name: "Cafe Test, 2 visits" });
+    await pin.locator("img[src]").waitFor();
+    await pin.click();
+    const sheet = page.locator(".fj-map-sheet");
+    await sheet.getByRole("heading", { name: "Cafe Test" }).waitFor();
+    assert.equal(await pin.getAttribute("aria-pressed"), "true");
+    await sheet.locator(".fj-map-sheet__strip img[src]").waitFor();
+    assert.match(await sheet.locator(".fj-map-sheet__stats").innerText(), /★ 4\.0\s+2 visits/);
+    await sheet.getByRole("button", { name: /Second lunch/ }).waitFor();
+    const placed = await page.evaluate(() => {
+      const rect = (selector) => document.querySelector(selector).getBoundingClientRect();
+      return {
+        sheetTop: rect(".fj-map-sheet").top, sheetBottom: rect(".fj-map-sheet").bottom,
+        pinBottom: rect(".fj-map-pin.is-selected").bottom,
+        bar: rect(".hub-mobile-nav").top,
+        solid: getComputedStyle(document.querySelector(".fj-map-sheet")).backgroundColor,
+      };
+    });
+    assert.ok(placed.pinBottom <= placed.sheetTop, JSON.stringify(placed));
+    assert.ok(placed.sheetBottom <= placed.bar, JSON.stringify(placed));
+    assert.doesNotMatch(placed.solid, /rgba\(.*, 0(\.\d+)?\)$/);
+
+    // Back closes the sheet and stays on the page.
+    const hash = await page.evaluate(() => location.hash);
+    await page.goBack();
+    await sheet.waitFor({ state: "hidden" });
+    assert.equal(await page.evaluate(() => location.hash), hash);
+    assert.equal(await pin.getAttribute("aria-pressed"), "false");
+
+    // Search finds a place by name and opens it.
+    await page.getByRole("button", { name: "Search", exact: true }).click();
+    const search = page.getByLabel("Search places");
+    assert.equal(await search.evaluate((n) => parseFloat(getComputedStyle(n).fontSize) >= 16), true);
+    await search.fill("zzz");
+    await sheet.getByText("No places match.").waitFor();
+    await search.fill("quay");
+    assert.equal(await sheet.getByRole("button", { name: /Cafe Test/ }).isVisible(), false);
+    await sheet.getByRole("button", { name: /Quay Kitchen/ }).click();
+    await sheet.getByRole("heading", { name: "Quay Kitchen" }).waitFor();
+    await sheet.getByText("Harbour Road", { exact: true }).waitFor();
+    assert.equal(await sheet.locator(".fj-map-sheet__strip").count(), 0);
+    await page.getByRole("button", { name: "Quay Kitchen, 1 visit" }).waitFor();
+    await page.keyboard.press("Escape");
+    await sheet.waitFor({ state: "hidden" });
+
+    // A visit row opens the entry; coming back, the place is still open.
+    await page.getByRole("button", { name: "Show all" }).click();
+    await page.getByRole("button", { name: "Cafe Test, 2 visits" }).click();
+    await sheet.getByRole("button", { name: /Tapas night/ }).click();
     await page.getByRole("heading", { name: "Tapas night" }).waitFor();
-    await page.unroute("https://tiles.openfreemap.org/styles/liberty");
-    await page.route("https://tiles.openfreemap.org/styles/liberty", (route) => route.abort());
+    assert.equal(await page.evaluate(() => Boolean(history.state?.fjMapSheet)), false);
+
+    // No map: the same places as a list, opening the same sheet.
+    await page.unroute(style);
+    await page.route(style, (route) => route.abort());
     await page.getByRole("tab", { name: "Map", exact: true }).click();
     await page.getByText("Map unavailable.", { exact: false }).waitFor();
-    await picker.selectOption({ label: "Cafe Test · Sydney" });
-    await page.getByRole("button", { name: /Second lunch/ }).waitFor();
+    await sheet.getByRole("heading", { name: "Cafe Test" }).waitFor();
+    await sheet.getByRole("button", { name: "Close" }).click();
+    await sheet.waitFor({ state: "hidden" });
+    await page.locator(".fj-map__fallback").getByRole("button", { name: /Quay Kitchen/ }).click();
+    await sheet.getByRole("heading", { name: "Quay Kitchen" }).waitFor();
+    const fixed = await page.evaluate(() => ({
+      bottom: document.querySelector(".fj-map-sheet").getBoundingClientRect().bottom,
+      bar: document.querySelector(".hub-mobile-nav").getBoundingClientRect().top,
+    }));
+    assert.ok(fixed.bottom <= fixed.bar + 1, JSON.stringify(fixed));
     assert.deepEqual(errors, []);
   } finally {
     await page.close();

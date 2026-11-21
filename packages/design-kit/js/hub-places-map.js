@@ -5,6 +5,8 @@
 
 export const MAP_PLACES_TYPE = 'map_places';
 export const DEFAULT_MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+// Flat and pale, for maps where the pins are the picture.
+export const QUIET_MAP_STYLE = 'https://tiles.openfreemap.org/styles/positron';
 
 /**
  * @typedef {{
