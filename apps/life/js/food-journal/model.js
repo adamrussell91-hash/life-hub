@@ -843,3 +843,29 @@ export function recipeSections(sorted, sort = "az") {
   }
   return sections;
 }
+
+// ── World map ──────────────────────────────────────────────────────────────
+// A mapped venue's dish photos, best first: the highest-rated dish leads, the
+// newer visit breaks a tie, and unrated dishes follow in the same visit order.
+export function venuePhotos(venue, limit = 12) {
+  const dishes = [];
+  venue.visits.forEach((visit, order) => {
+    for (const dish of visit.dishes || [])
+      if (dish.photos?.length) dishes.push({ dish, date: visit.date || "", order });
+  });
+  dishes.sort(
+    (a, b) =>
+      (b.dish.rating ?? -1) - (a.dish.rating ?? -1) ||
+      b.date.localeCompare(a.date) ||
+      a.order - b.order,
+  );
+  return dishes.flatMap(({ dish }) => dish.photos).slice(0, limit);
+}
+// The mean of every rated dish at a venue, to one decimal, or null.
+export function venueRating(venue) {
+  const rated = venue.visits
+    .flatMap((visit) => visit.dishes || [])
+    .filter((dish) => dish.rating != null);
+  if (!rated.length) return null;
+  return Math.round((rated.reduce((n, d) => n + d.rating, 0) / rated.length) * 10) / 10;
+}

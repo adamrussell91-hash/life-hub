@@ -2354,34 +2354,372 @@ body:has(#food-journal-dashboard[data-food-page]:not([hidden])) .hub-mobile-nav 
   }
 }
 
-.fj-world-map {
+/* World map: the map is the screen; a pin opens a sheet over its lower part. */
+#food-journal-dashboard:has(> .fj-map) {
+  min-height: 0;
+}
+/* The shell pads under a full-height frame, which leaves every phone page a
+   bar's height of scroll. The map page is exactly one screen. */
+.app-shell:has(#food-journal-dashboard:not([hidden]) > .fj-map) {
+  padding-bottom: 0;
+}
+.fj-map {
+  position: relative;
   width: 100%;
-  aspect-ratio: 1;
-  max-height: min(64vh, 38rem);
+  min-height: 20rem;
   border-radius: var(--radius-md);
   overflow: hidden;
+  background: #f5efe4;
+  isolation: isolate;
 }
-
-.fj-world-map-picker {
+.fj-map > .fj-map__canvas {
+  position: absolute;
+  inset: 0;
+}
+.fj-map [hidden] {
+  display: none;
+}
+.fj-map__title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.fj-map__top,
+.fj-map__tools {
+  position: absolute;
+  top: var(--space-3);
+  z-index: 2;
   display: grid;
   gap: var(--space-2);
-  margin-block: var(--space-4);
+  justify-items: start;
+}
+.fj-map__top {
+  left: var(--space-3);
+}
+.fj-map__tools {
+  right: var(--space-3);
+  justify-items: end;
+}
+.fj-map__chip,
+.fj-map__tool {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--paper);
+  color: var(--ink);
+  font: 600 var(--text-sm) / 1.2 var(--font-ui);
+  box-shadow: 0 4px 14px rgba(10, 21, 54, 0.14);
+  white-space: nowrap;
+}
+.fj-map__chip {
+  padding: 0.6rem 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.fj-map__tool {
+  min-height: 44px;
+  padding: 0 1rem;
+  cursor: pointer;
+}
+.fj-map__tool:focus-visible,
+.fj-map-pin:focus-visible,
+.fj-map-sheet button:focus-visible {
+  outline: 2px solid var(--high-sea);
+  outline-offset: 2px;
+}
+.fj-map__status {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  z-index: 1;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.fj-map__status:empty {
+  display: none;
+}
+/* The zoom buttons sit under Search. */
+.fj-map .maplibregl-ctrl-top-right {
+  top: calc(44px + var(--space-3) + var(--space-2));
+  right: var(--space-1);
 }
 
-.fj-world-map-picker select {
+.fj-map .fj-map-marker {
+  z-index: 1;
+}
+.fj-map .fj-map-marker.is-selected {
+  z-index: 3;
+}
+.fj-map-pin {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--high-sea);
+  color: #fff;
+  font: 700 var(--text-sm) / 1 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 3px 10px rgba(10, 21, 54, 0.32);
+  cursor: pointer;
+  transition: transform 0.28s cubic-bezier(0.3, 1.5, 0.5, 1), box-shadow 0.28s;
+}
+.fj-map-pin > img.food-photo {
   width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  object-fit: cover;
+}
+.fj-map-pin > img.food-photo:not([src]) {
+  visibility: hidden;
+}
+.fj-map-pin.is-selected {
+  transform: scale(1.35);
+  box-shadow: 0 0 0 3px var(--high-sea), 0 8px 18px rgba(10, 21, 54, 0.36);
+}
+
+.fj-map-sheet {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 4;
+  max-height: 56%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--paper);
+  box-shadow: 0 -10px 32px rgba(10, 21, 54, 0.2);
+  padding-bottom: var(--space-4);
+  outline: none;
+  animation: fj-map-sheet-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: max-height 0.3s ease;
+}
+.fj-map-sheet.is-tall {
+  max-height: 86%;
+}
+.fj-map-sheet.is-dragging {
+  transition: none;
+}
+@keyframes fj-map-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+.fj-map-sheet__handle {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: grab;
+  touch-action: none;
+}
+.fj-map-sheet__handle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 11px;
+  width: 40px;
+  height: 5px;
+  margin-left: -20px;
+  border-radius: 3px;
+  background: rgba(23, 55, 94, 0.22);
+}
+.fj-map-sheet__close {
+  position: absolute;
+  top: 34px;
+  right: var(--space-4);
+  z-index: 1;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(10, 21, 54, 0.6);
+  color: #fff;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.fj-map-sheet__strip {
+  display: flex;
+  gap: var(--space-2);
+  padding-inline: var(--space-4);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.fj-map-sheet__strip::-webkit-scrollbar {
+  display: none;
+}
+.fj-map-sheet__strip > img.food-photo {
+  flex: 0 0 72%;
+  width: 72%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-sm);
+  background: rgba(23, 55, 94, 0.08);
+  scroll-snap-align: center;
+}
+.fj-map-sheet__strip.is-single > img.food-photo {
+  flex-basis: 100%;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+.fj-map-sheet__body {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-5) 0;
   min-width: 0;
+}
+/* With no photos the name starts beside the close button, not under it. */
+.fj-map-sheet__handle + .fj-map-sheet__close + .fj-map-sheet__body {
+  padding-right: calc(44px + var(--space-5));
+}
+.fj-map-sheet__name {
+  margin: 0;
+  font-size: 1.6rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.fj-map-sheet__meta,
+.fj-map-sheet__stats {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.fj-map-sheet__stats {
+  display: flex;
+  gap: var(--space-3);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.fj-map-sheet__rating {
+  color: var(--high-sea-ink);
+}
+.fj-map-sheet__rows {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+.fj-map-sheet__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 48px;
+  padding: var(--space-2) 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--ink);
+  font: 500 0.95rem / 1.3 var(--font-ui);
+  text-align: start;
+  cursor: pointer;
+}
+.fj-map-sheet__row-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.fj-map-sheet__row-note {
+  flex: none;
+  color: var(--muted);
+  font-weight: 400;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.fj-map-sheet__row--place {
+  display: grid;
+  justify-content: stretch;
+  gap: 2px;
+}
+.fj-map-list {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  min-width: 0;
+}
+.fj-map-list > input.fj-map-list__search {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
   font-size: 1rem;
 }
-
-.fj-world-map-visits {
-  padding-inline-start: var(--space-4);
+.fj-map-list .fj-map-sheet__rows {
+  margin-top: 0;
 }
 
-.fj-world-map-visits .btn {
-  min-height: 44px;
-  white-space: normal;
-  text-align: start;
+/* No map: the list is the page, and a chosen place opens over it. */
+.fj-map.fj-map--list {
+  min-height: 24rem;
+  overflow: visible;
+  background: none;
+}
+.fj-map--list .fj-map__status {
+  position: static;
+  transform: none;
+  margin-bottom: var(--space-3);
+}
+.fj-map--list .fj-map-sheet {
+  position: fixed;
+  z-index: 40;
+  max-height: 70dvh;
+  bottom: 0;
+}
+
+@media (min-width: 900px) {
+  .fj-map-sheet,
+  .fj-map-sheet.is-tall {
+    inset: var(--space-4) auto auto var(--space-4);
+    width: 24rem;
+    max-height: calc(100% - var(--space-4) * 2);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 12px 36px rgba(10, 21, 54, 0.22);
+    animation-name: fj-map-sheet-side;
+  }
+  .fj-map-sheet__handle {
+    visibility: hidden;
+    height: var(--space-4);
+  }
+  .fj-map-sheet__close {
+    top: var(--space-5);
+  }
+  .fj-map--list .fj-map-sheet {
+    inset: auto auto var(--space-4) var(--space-4);
+    max-height: 80dvh;
+  }
+  .fj-map__top {
+    left: calc(24rem + var(--space-4) * 2);
+  }
+}
+@keyframes fj-map-sheet-side {
+  from {
+    opacity: 0;
+    transform: translateX(-1rem);
+  }
+}
+@media (max-width: 899px) {
+  /* Above the fixed bottom bar when the sheet is fixed to the screen. */
+  .fj-map--list .fj-map-sheet {
+    bottom: calc(4.65rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fj-map-pin,
+  .fj-map-sheet {
+    transition: none;
+    animation: none;
+  }
 }
 /* Where step: is the venue on the map, and does it agree with the photo. */
 .food-pin {

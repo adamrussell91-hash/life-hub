@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Food Journal Map Mockup</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;1,6..96,500&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: one phone-sized screen. Slim header with the A/B switch, then a full-bleed map stage; the rail or sheet floats over the map's lower edge. */
+:root {
+  --paper: #fbf8f2; --ink: #13233a; --muted: #6b7788; --line: rgba(23,55,94,.12);
+  --accent: #f68620; --accent-ink: #a85a0c; --depth: #0a1536; --card: #ffffff;
+  --land: #f3ecdf; --water: #bfd6e6; --park: #d5e2c4; --road: #ffffff; --road-minor: #faf5ea; --map-label: #8b8473;
+  --shadow: 0 10px 30px rgba(10,21,54,.18);
+  --serif: "Bodoni Moda", Didot, "Bodoni 72", Georgia, serif;
+  --sans: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #0d1526; --ink: #eef1f6; --muted: #9aa6b8; --line: rgba(255,255,255,.14);
+  --accent: #f68620; --accent-ink: #ffb066; --depth: #eef1f6; --card: #17223a;
+  --land: #1b2438; --water: #0f2c47; --park: #1e3330; --road: #2b3650; --road-minor: #232d45; --map-label: #7f8aa0;
+  --shadow: 0 10px 30px rgba(0,0,0,.5); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #0d1526; --ink: #eef1f6; --muted: #9aa6b8; --line: rgba(255,255,255,.14);
+  --accent: #f68620; --accent-ink: #ffb066; --depth: #eef1f6; --card: #17223a;
+  --land: #1b2438; --water: #0f2c47; --park: #1e3330; --road: #2b3650; --road-minor: #232d45; --map-label: #7f8aa0;
+  --shadow: 0 10px 30px rgba(0,0,0,.5); color-scheme: dark }
+
+html, body { height: 100%; }
+body { background: var(--paper); color: var(--ink); font-family: var(--sans); display: flex; justify-content: center; overflow: hidden; }
+.app { width: 100%; max-width: 460px; height: 100%; display: flex; flex-direction: column; }
+header { padding-block: 10px 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 10px; }
+.head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+h1 { font-family: var(--serif); font-weight: 500; font-size: 1.5rem; margin: 0; letter-spacing: -.01em; }
+.count { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.switch { display: grid; grid-template-columns: 1fr 1fr; background: var(--line); border-radius: 12px; padding: 3px; }
+.switch button { font: 600 .875rem var(--sans); color: var(--muted); background: none; border: 0; border-radius: 10px; min-height: 40px; cursor: pointer; }
+.switch button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(10,21,54,.15); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--land); touch-action: none; }
+.map { position: absolute; left: 0; top: 0; width: 1000px; height: 1000px; max-width: none; transition: transform .55s cubic-bezier(.2,.8,.2,1); }
+.map.dragging { transition: none; }
+.map svg { position: absolute; inset: 0; width: 1000px; height: 1000px; max-width: none; }
+.map text { font: 600 11px var(--sans); letter-spacing: .14em; fill: var(--map-label); }
+
+.pin { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; border: 3px solid var(--card); padding: 0; cursor: pointer; box-shadow: 0 3px 10px rgba(10,21,54,.3); background-size: cover; transition: transform .3s cubic-bezier(.3,1.6,.5,1), box-shadow .3s; }
+.pin[aria-pressed="true"] { transform: scale(1.4); box-shadow: 0 0 0 3px var(--accent), 0 8px 18px rgba(10,21,54,.35); z-index: 2; }
+.cluster { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; background: var(--accent); color: #fff; border: 3px solid var(--card); display: grid; place-items: center; font: 600 .8rem var(--sans); box-shadow: 0 3px 10px rgba(10,21,54,.3); }
+
+/* A: photo rail */
+.rail { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 14px 11% calc(14px + env(safe-area-inset-bottom, 0px)); scrollbar-width: none; touch-action: pan-x; }
+.rail::-webkit-scrollbar { display: none; }
+.card { flex: 0 0 100%; scroll-snap-align: center; background: var(--card); border-radius: 20px; box-shadow: var(--shadow); display: grid; grid-template-columns: 104px 1fr; gap: 12px; padding: 8px; border: 0; text-align: start; color: inherit; font: inherit; cursor: pointer; opacity: .75; transition: opacity .3s; }
+.card.on { opacity: 1; }
+.card .photo { width: 104px; height: 104px; border-radius: 14px; background-size: cover; }
+.card .body { min-width: 0; display: grid; align-content: center; gap: 4px; padding-right: 6px; }
+.name { font-family: var(--serif); font-size: 1.15rem; line-height: 1.15; }
+.meta { font-size: .8rem; color: var(--muted); }
+.dish { font-size: .8rem; font-style: italic; }
+.stats { display: flex; gap: 10px; align-items: center; font-size: .8rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stars { color: var(--accent-ink); }
+.visits { color: var(--muted); font-weight: 500; }
+
+/* B: bottom sheet */
+.hint { position: absolute; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--card); padding: 10px 16px; border-radius: 999px; font-size: .85rem; font-weight: 500; box-shadow: var(--shadow); white-space: nowrap; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--card); border-radius: 24px 24px 0 0; box-shadow: var(--shadow); transform: translateY(105%); transition: transform .45s cubic-bezier(.2,.8,.2,1), max-height .35s; max-height: 56%; overflow-y: auto; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); touch-action: pan-y; }
+.sheet.open { transform: none; }
+.sheet.tall { max-height: 86%; }
+.handle { display: block; width: 100%; height: 26px; background: none; border: 0; cursor: pointer; position: relative; }
+.handle::after { content: ""; position: absolute; left: 50%; top: 10px; width: 40px; height: 5px; margin-left: -20px; border-radius: 3px; background: var(--line); }
+.close { position: absolute; top: 34px; right: 26px; width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(10,21,54,.55); color: #fff; font-size: 1.1rem; cursor: pointer; z-index: 1; }
+.strip { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 0 16px; scrollbar-width: none; touch-action: pan-x; }
+.strip::-webkit-scrollbar { display: none; }
+.strip div { flex: 0 0 72%; aspect-ratio: 4 / 3; border-radius: 16px; background-size: cover; scroll-snap-align: center; }
+.sheet .body { padding: 14px 20px 0; display: grid; gap: 6px; }
+.sheet .name { font-size: 1.6rem; }
+.vlist { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.vlist button { width: 100%; display: flex; justify-content: space-between; gap: 12px; align-items: center; min-height: 48px; background: none; border: 0; border-bottom: 1px solid var(--line); color: inherit; font: 500 .9rem var(--sans); text-align: start; cursor: pointer; padding: 0; }
+.vlist span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 400; }
+
+.toast { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: var(--depth); color: var(--paper); padding: 8px 14px; border-radius: 999px; font-size: .8rem; opacity: 0; transition: opacity .25s; pointer-events: none; white-space: nowrap; }
+.toast.show { opacity: 1; }
+.note { position: absolute; top: 10px; left: 12px; font-size: .7rem; color: var(--map-label); background: var(--land); padding: 3px 8px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { .map, .pin, .sheet, .card { transition: none; } }
+</style>
+
+<div class="app">
+  <header>
+    <div class="head-row"><h1>Food Journal map</h1><span class="count">6 sample venues</span></div>
+    <div class="switch" role="group" aria-label="Mockup option">
+      <button id="optA" aria-pressed="true">A · Photo rail</button>
+      <button id="optB" aria-pressed="false">B · Bottom sheet</button>
+    </div>
+  </header>
+  <div class="stage" id="stage">
+    <div class="map" id="map">
+      <svg viewBox="0 0 1000 1000" aria-hidden="true">
+        <path d="M0 0H1000V250C900 300 820 230 720 270C620 310 560 240 450 265C340 290 260 220 150 250C90 265 40 240 0 250Z" fill="var(--water)"/>
+        <rect x="610" y="600" width="170" height="120" rx="26" fill="var(--park)"/>
+        <rect x="180" y="380" width="110" height="150" rx="26" fill="var(--park)"/>
+        <rect x="420" y="820" width="220" height="90" rx="26" fill="var(--park)"/>
+        <g stroke="var(--road-minor)" stroke-width="7" stroke-linecap="round">
+          <path d="M0 360L1000 330M0 470L1000 450M0 590L1000 575M0 700L1000 690M0 800L1000 795M0 900L1000 900"/>
+          <path d="M90 250L70 1000M210 260L200 1000M330 280L330 1000M560 260L575 1000M690 280L710 1000M820 250L850 1000M930 260L960 1000"/>
+        </g>
+        <g stroke="var(--road)" stroke-width="15" stroke-linecap="round" fill="none">
+          <path d="M0 530L1000 510"/><path d="M450 265L445 1000"/><path d="M0 310C300 330 700 290 1000 320"/><path d="M120 1000L900 300"/>
+        </g>
+        <text x="160" y="140">HARBOUR</text><text x="640" y="170">NORTH QUAY</text>
+        <text x="470" y="430">OLD TOWN</text><text x="635" y="665">FIG GARDENS</text>
+        <text x="110" y="640">MARKET ROW</text><text x="700" y="860">EASTSIDE</text>
+      </svg>
+      <div class="cluster" style="left:140px;top:820px" aria-hidden="true">12</div>
+      <div class="cluster" style="left:880px;top:420px" aria-hidden="true">7</div>
+    </div>
+    <span class="note">Sample places and stand-in pictures</span>
+    <div class="rail" id="rail"></div>
+    <div class="hint" id="hint" hidden>Tap a photo pin</div>
+    <div class="sheet" id="sheet" aria-live="polite"></div>
+    <div class="toast" id="toast">In the app this opens the entry</div>
+  </div>
+</div>
+
+<script>
+const plate = (food, sauce, a, b) =>
+  `radial-gradient(circle at 50% 54%, ${food} 0 20%, ${sauce} 21% 29%, #fffdf8 30% 44%, #e6dfd2 45% 47%, transparent 48%), linear-gradient(135deg, ${a}, ${b})`;
+const V = [
+  { name: "Saltwater Counter", area: "Harbour", cuisine: "Seafood", dish: "Grilled scallops, brown butter", rating: 4.8, x: 300, y: 300,
+    pics: [plate("#f4d9a8","#c98b3c","#274b63","#16314a"), plate("#f0b9a0","#b64a3a","#3b5d6e","#1c3a4f"), plate("#e9e2c0","#7fa05a","#2f5568","#173247")],
+    visits: [["Birthday dinner","14/03/26"],["Oysters at the bar","02/08/25"],["First visit","19/11/24"]] },
+  { name: "Juniper & Rye", area: "North Quay", cuisine: "Bakery", dish: "Cardamom bun", rating: 4.5, x: 660, y: 340,
+    pics: [plate("#d9a15c","#8a5a2b","#e8d8bf","#cdb593"), plate("#e7c48a","#a8743a","#dfcfb5","#c2a985")],
+    visits: [["Saturday pastries","05/09/26"],["Coffee stop","11/01/26"]] },
+  { name: "Little Ember", area: "Old Town", cuisine: "Wood fire", dish: "Charred leeks, romesco", rating: 4.9, x: 500, y: 500,
+    pics: [plate("#c9d6a0","#d2603a","#3a2a24","#1f1512"), plate("#e8a35c","#8c2f1f","#46302a","#241613"), plate("#f2e3c2","#b9772f","#3d2b25","#201412")],
+    visits: [["Tasting menu","27/06/26"],["Anniversary","30/10/25"],["Walk-in lunch","08/02/25"],["Opening week","16/05/24"]] },
+  { name: "Noodle Alley 88", area: "Market Row", cuisine: "Noodles", dish: "Hand-pulled beef noodles", rating: 4.3, x: 260, y: 640,
+    pics: [plate("#e6c27a","#9b3d24","#b8442f","#7d2a1d"), plate("#f0dba0","#5f7d3a","#c2513a","#872f20")],
+    visits: [["Late supper","21/07/26"]] },
+  { name: "The Fig Room", area: "Fig Gardens", cuisine: "Mediterranean", dish: "Burrata, figs, honey", rating: 4.6, x: 700, y: 570,
+    pics: [plate("#faf3e6","#7a3b63","#6e8a5a","#48633d"), plate("#e9b6c0","#8a2f52","#7c9766","#516b45")],
+    visits: [["Long lunch","12/04/26"],["Garden table","23/12/25"]] },
+  { name: "Harbour Bakehouse", area: "Eastside", cuisine: "Brunch", dish: "Ricotta hotcakes", rating: 4.1, x: 620, y: 800,
+    pics: [plate("#f3d38a","#c4572f","#e6c9a1","#caa26f"), plate("#f6e6b8","#a34a6a","#dcc19a","#bf9a68")],
+    visits: [["Sunday brunch","18/10/26"],["Takeaway loaf","03/03/26"]] },
+];
+const $ = (id) => document.getElementById(id);
+const stage = $("stage"), map = $("map"), rail = $("rail"), sheet = $("sheet"), hint = $("hint"), toast = $("toast");
+let mode = "A", sel = 0, tx = 0, ty = 0;
+const stars = (r) => `<span class="stars">★ ${r.toFixed(1)}</span>`;
+const visitLabel = (v) => `${v.visits.length} ${v.visits.length === 1 ? "visit" : "visits"}`;
+
+const pins = V.map((v, i) => {
+  const b = document.createElement("button");
+  b.className = "pin"; b.style.cssText = `left:${v.x}px;top:${v.y}px;background-image:${v.pics[0]}`;
+  b.setAttribute("aria-label", v.name);
+  b.addEventListener("click", () => select(i, true));
+  map.append(b); return b;
+});
+const cards = V.map((v, i) => {
+  const c = document.createElement("button");
+  c.className = "card";
+  c.innerHTML = `<div class="photo" style="background-image:${v.pics[0]}"></div><div class="body">
+    <div class="name">${v.name}</div><div class="meta">${v.area} · ${v.cuisine}</div>
+    <div class="dish">${v.dish}</div><div class="stats">${stars(v.rating)}<span class="visits">${visitLabel(v)}</span></div></div>`;
+  c.addEventListener("click", () => (i === sel ? flash() : select(i, true)));
+  rail.append(c); return c;
+});
+
+function flash() { toast.classList.add("show"); clearTimeout(flash.t); flash.t = setTimeout(() => toast.classList.remove("show"), 1600); }
+function place(x, y, f) {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  tx = Math.min(0, Math.max(w - 1000, w / 2 - x)); ty = Math.min(0, Math.max(h - 1000, h * f - y));
+  map.style.transform = `translate(${tx}px, ${ty}px)`;
+}
+function renderSheet(v) {
+  sheet.innerHTML = `<button class="handle" aria-label="Expand or shrink"></button><button class="close" aria-label="Close">×</button>
+    <div class="strip">${v.pics.map((p) => `<div style="background-image:${p}"></div>`).join("")}</div>
+    <div class="body"><div class="name">${v.name}</div><div class="meta">${v.area} · ${v.cuisine}</div>
+    <div class="stats">${stars(v.rating)}<span class="visits">${visitLabel(v)}</span></div>
+    <ul class="vlist">${v.visits.map(([t, d]) => `<li><button><span>${t}</span><span>${d}</span></button></li>`).join("")}</ul></div>`;
+  sheet.querySelector(".handle").onclick = () => sheet.classList.toggle("tall");
+  sheet.querySelector(".close").onclick = () => select(-1);
+  sheet.querySelectorAll(".vlist button").forEach((b) => (b.onclick = flash));
+}
+function select(i, scrollRail) {
+  sel = i;
+  pins.forEach((p, n) => p.setAttribute("aria-pressed", n === i));
+  cards.forEach((c, n) => c.classList.toggle("on", n === i));
+  const v = V[i];
+  if (mode === "A") {
+    if (scrollRail) cards[i].scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    place(v.x, v.y, 0.36);
+  } else {
+    hint.hidden = !!v; sheet.classList.toggle("open", !!v); sheet.classList.remove("tall");
+    if (v) { renderSheet(v); place(v.x, v.y, 0.22); }
+  }
+}
+function setMode(m) {
+  mode = m;
+  $("optA").setAttribute("aria-pressed", m === "A"); $("optB").setAttribute("aria-pressed", m === "B");
+  rail.hidden = m !== "A"; sheet.classList.remove("open"); hint.hidden = m !== "B";
+  if (m === "A") select(Math.max(sel, 0), true); else { select(-1); place(500, 520, 0.5); }
+}
+$("optA").onclick = () => setMode("A"); $("optB").onclick = () => setMode("B");
+
+let railTimer;
+rail.addEventListener("scroll", () => {
+  clearTimeout(railTimer);
+  railTimer = setTimeout(() => {
+    const mid = rail.getBoundingClientRect().left + rail.clientWidth / 2;
+    let best = 0, dist = Infinity;
+    cards.forEach((c, n) => { const r = c.getBoundingClientRect(); const d = Math.abs(r.left + r.width / 2 - mid); if (d < dist) { dist = d; best = n; } });
+    if (best !== sel) select(best, false);
+  }, 90);
+});
+
+let drag = null;
+stage.addEventListener("pointerdown", (e) => { if (e.target.closest(".rail, .sheet, .pin")) return; drag = { x: e.clientX - tx, y: e.clientY - ty }; map.classList.add("dragging"); stage.setPointerCapture(e.pointerId); });
+stage.addEventListener("pointermove", (e) => { if (!drag) return;
+  tx = Math.min(0, Math.max(stage.clientWidth - 1000, e.clientX - drag.x)); ty = Math.min(0, Math.max(stage.clientHeight - 1000, e.clientY - drag.y));
+  map.style.transform = `translate(${tx}px, ${ty}px)`; });
+const endDrag = () => { drag = null; map.classList.remove("dragging"); };
+stage.addEventListener("pointerup", endDrag); stage.addEventListener("pointercancel", endDrag);
+addEventListener("resize", () => sel >= 0 && select(sel, false));
+setMode("A");
+</script>
+</body>
+</html>
