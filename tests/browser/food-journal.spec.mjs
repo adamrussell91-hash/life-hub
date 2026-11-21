@@ -1321,6 +1321,43 @@ test("Find venue searches the typed venue and offers it when the map does not kn
   await page.close();
 });
 
+for (const width of [1440, 390])
+  test(`where step ${width}: the location card says whether the venue is pinned`, async () => {
+    const { page, errors } = await pageFor(width, { seed: unsureVenue });
+    await page.route("**/api/food-places**", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          data: {
+            street: "4 Quay Street, Harbourside",
+            candidates: [{ name: "Two Herons Cafe", address: "4 Quay Street, Harbourside", lat: -32.9001, lon: 151.7 }],
+          },
+        }),
+      }),
+    );
+    await page.getByRole("tab", { name: "Check venues (1)" }).click();
+    await page.getByRole("button", { name: "Edit visit", exact: true }).click();
+    await page.locator(".food-sheet").waitFor();
+    const card = page.locator(".food-pin");
+    await card.waitFor();
+    assert.equal(await card.locator(".food-pin__title").textContent(), "Venue not confirmed");
+    assert.ok(await card.evaluate((n) => n.classList.contains("food-pin--warn")));
+    assert.equal(await card.locator(".food-pinmap").count(), 1);
+    await page.getByRole("button", { name: "Find venue", exact: true }).click();
+    await page.getByRole("button", { name: "Two Herons Cafe · 11 m", exact: true }).click();
+    assert.equal(await card.locator(".food-pin__title").textContent(), "On the map");
+    assert.equal(await card.locator(".food-meta").first().textContent(), "4 Quay Street, Harbourside");
+    // The card fits the phone: no sideways scroll.
+    const box = await card.boundingBox();
+    assert.ok(box.x >= 0 && box.x + box.width <= width, `card ${box.x}+${box.width} within ${width}`);
+    await page.getByRole("button", { name: /Step 3/ }).click();
+    assert.equal(await page.locator(".food-pin-line").first().textContent(), "On the map");
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+
 // Invented recipes: a book big enough for the Just added spread.
 function seedBook(journal) {
   const visit = journal.visits[0];
