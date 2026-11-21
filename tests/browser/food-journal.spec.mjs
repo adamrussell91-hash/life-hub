@@ -2028,6 +2028,50 @@ test("rate dishes: a repaint while renaming keeps what is typed, and a score tak
   assert.deepEqual(errors.filter((e) => !/503|busy/i.test(e)), []);
   await page.close();
 });
+function rateRunSeed(journal) {
+  const [v] = journal.visits;
+  const photo = { id: "photo_lasagne", key: "food/photos/photo_lasagne.jpg" };
+  ["Paella", "Tortilla", "Croquetas", "Gambas"].forEach((title, i) => {
+    const visit = structuredClone(v);
+    visit.id = `visit_run_${i}`;
+    visit.date = `2026-10-${String(20 - i).padStart(2, "0")}`;
+    visit.title = `${title} night`;
+    // Every other dish has a photo, so the card changes shape between dishes.
+    visit.dishes = [{ ...newDish(), id: `dish_run_${i}`, title, photos: i % 2 ? [] : [photo] }];
+    journal.visits.push(visit);
+  });
+}
+for (const width of [1440, 390])
+  test(`rate dishes ${width}: the score row stays put from card to card`, async () => {
+    const { page, errors } = await pageFor(width, {
+      seed: rateRunSeed,
+      checks: () => [],
+      media: { "food/photos/photo_lasagne.jpg": Buffer.from(JPEG, "base64") },
+    });
+    await page.getByRole("tab", { name: /^Rate dishes/ }).click();
+    await page.locator(".fj-check__score").first().waitFor();
+    // Scrolled a little, as a thumb on the scores would have it.
+    await page.evaluate(() => window.scrollBy(0, 200));
+    const scoresTop = () =>
+      page.evaluate(() => document.querySelector(".fj-check__scores").getBoundingClientRect().top);
+    const start = await scoresTop();
+    const titles = [];
+    for (const answer of ["4", "3", "skip"]) {
+      const before = await page.locator(".fj-check__card h3").textContent();
+      if (answer === "skip") await page.getByRole("button", { name: "Skip for now" }).click();
+      else await page.locator(`.fj-check__score[data-key="${answer}"]`).click();
+      await page.waitForFunction(
+        (t) => document.querySelector(".fj-check__card h3")?.textContent !== t,
+        before,
+      );
+      titles.push(await page.locator(".fj-check__card h3").textContent());
+      assert.ok(Math.abs((await scoresTop()) - start) <= 2, `scores moved on ${titles.at(-1)}`);
+    }
+    // Newest first; the skipped dish comes back after the last one.
+    assert.deepEqual(titles, ["Tortilla", "Croquetas", "Gambas"]);
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
 for (const width of [1440, 390])
   test(`quick check moves card to card and answers reach the journal, ${width}`, async () => {
     const { page, errors, read } = await pageFor(width, {

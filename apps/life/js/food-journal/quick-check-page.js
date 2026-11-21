@@ -350,6 +350,13 @@ function dishCard(ctx, session, card, excluded) {
 // Only Adam can rate, so a rating card suggests nothing: a score, half a
 // point more, or "Can't remember" so it is never asked again.
 let half = false;
+// Where the score row sat on screen when a rating card was answered or
+// skipped. The next card is scrolled so its scores land in the same place:
+// the thumb stays put and the page does not jump between cards.
+let scoresAt = null;
+const holdScores = (scores) => {
+  scoresAt = scores.getBoundingClientRect().top;
+};
 // A name fixed on the card, sent with its score. Kept by check id so a
 // repaint, or going back to the card, shows the fixed name.
 const renamed = new Map();
@@ -454,6 +461,7 @@ function rateCard(ctx, session, card) {
     const b = ctx.button("", () => {
       const rating = value(n);
       half = false;
+      holdScores(scores);
       session.answer(check, withName({ pick: "rate", rating }));
     }, "secondary");
     b.classList.add("fj-check__pick", "fj-check__score");
@@ -482,6 +490,7 @@ function rateCard(ctx, session, card) {
   show();
   const unknown = choice(ctx, 0, "Can't remember", "It won't be asked again", "ghost", () => {
     half = false;
+    holdScores(scores);
     session.answer(check, withName({ pick: "unknown" }));
   });
   body.append(scores, unknown);
@@ -535,14 +544,23 @@ export function paintQuickCheck(ctx, host, session, kind = "checks") {
   if (shots.length) article.append(photos);
   article.append(built.body);
   const actions = el("div", "food-actions fj-check__actions");
-  const skip = ctx.button("Skip for now", () => session.skip(card.check), "ghost");
+  const skip = ctx.button("Skip for now", () => {
+    const scores = rating && article.querySelector(".fj-check__scores");
+    if (scores) holdScores(scores);
+    session.skip(card.check);
+  }, "ghost");
   actions.append(backButton, skip);
   const link = dayOneLink(built.visit);
   if (link) actions.append(link);
   built.body.append(actions);
   page.append(article);
   host.append(page);
-  if (session.takeMoved()) article.scrollIntoView?.({ block: "start" });
+  const moved = session.takeMoved();
+  const scores = rating && scoresAt != null && article.querySelector(".fj-check__scores");
+  if (scores) {
+    window.scrollBy(0, scores.getBoundingClientRect().top - scoresAt);
+  } else if (moved) article.scrollIntoView?.({ block: "start" });
+  scoresAt = null;
   // Sign the next card's photo now so it is there when the answer lands.
   const nextVisit = cards[1]?.visits?.[0]?.visit || cards[1]?.dishes?.[0]?.visit || cards[1]?.visit;
   const nextPhoto = cards[1]?.dish?.photos?.[0] || (nextVisit && firstPhoto(nextVisit));
