@@ -36,7 +36,8 @@ export async function completeMessage({
   signal,
   thinking = { type: 'disabled' },
   outputConfig = null,
-  onUsage = null
+  onUsage = null,
+  onStop = null
 } = {}) {
   if (typeof apiKey !== 'string' || apiKey.length === 0) {
     throw new TypeError('An Anthropic API key is required.');
@@ -87,6 +88,11 @@ export async function completeMessage({
   // Optional: the caller logs token usage (e.g. the thinking guide's spend line).
   if (typeof onUsage === 'function' && json?.usage) {
     try { onUsage(json.usage); } catch { /* usage logging never fails the call */ }
+  }
+  // Optional: the caller learns why the model stopped, e.g. "max_tokens" when
+  // a long answer was cut off and its JSON is incomplete.
+  if (typeof onStop === 'function') {
+    try { onStop(json?.stop_reason ?? null); } catch { /* never fails the call */ }
   }
   if (!Array.isArray(json?.content)) return '';
   return json.content
