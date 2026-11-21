@@ -1801,6 +1801,37 @@ for (const width of [1440, 390])
     await page.close();
   });
 
+// Tapas: every dish due goes to Brisket in one message, so he works through
+// the meal in one turn instead of one turn per dish.
+test("several dishes due after a save go to Brisket in one message", async () => {
+  const { page, read, errors } = await pageFor(390, {
+    seed: (j) => countedDish(j),
+    media: { "food/photos/photo_lasagne.jpg": Buffer.from(JPEG, "base64") },
+  });
+  const sent = await mockChat(page);
+  await openFirstEntry(page);
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.locator(".food-sheet").waitFor();
+  await saveVisit(page, { brisket: "keep" });
+  const offer = page.getByRole("dialog", { name: "Count these in Brisket?" });
+  await offer.waitFor();
+  await offer.getByRole("button", { name: "Send 2 to Brisket", exact: true }).click();
+  await page.locator("#nutrition-dashboard #chat-view").waitFor();
+  await expectSent(sent, 1);
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(sent.length, 1, "one message for the whole meal");
+  const [lasagne, croquettes] = read().visits[0].dishes;
+  const { message, attachments } = sent[0];
+  assert.match(message, /^Count these 2 Food Journal dishes/);
+  assert.match(message, new RegExp(`food_dish_id: ${lasagne.id}`));
+  assert.match(message, new RegExp(`food_dish_id: ${croquettes.id}`));
+  assert.ok(message.indexOf(lasagne.id) < message.indexOf(croquettes.id));
+  assert.match(message, /Photos attached, in order, for dish 1\./);
+  assert.equal(attachments.length, 1);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
 test("a hand-off Brisket can't take keeps the sheet, the choice and the photo for another go", async () => {
   const { page, errors } = await pageFor(390, {
     seed: (j) => countedDish(j),

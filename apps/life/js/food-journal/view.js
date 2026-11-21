@@ -67,7 +67,7 @@ import {
   ingredientsFromMenu,
 } from "./capture.js";
 import { PORTION_CHIPS, portionOf } from "./portion.js";
-import { handoffMessage, needsRecount } from "./brisket-handoff.js";
+import { handoffBatchMessage, handoffMessage, needsRecount } from "./brisket-handoff.js";
 import {
   fileToChatAttachment,
   MAX_CHAT_IMAGE_BYTES,
@@ -2285,8 +2285,8 @@ export function createFoodJournalView({
     withoutDeleted(visit.dishes).filter(
       (d) => !d.brisket || d.brisket.needs_recount,
     );
-  // Straight after a save: how much of each dish was eaten, then each one
-  // goes to Brisket's chat, one hand-off per dish.
+  // Straight after a save: how much of each dish was eaten, then all of them
+  // go to Brisket's chat in one hand-off.
   function offerBrisket(visit, dishes) {
     const s = modal(
       dishes.length === 1 ? "Count it in Brisket?" : "Count these in Brisket?",
@@ -2329,38 +2329,37 @@ export function createFoodJournalView({
         if (!chosen.length) return;
         e.currentTarget.disabled = true;
         s.error.textContent = "Sending to Brisket.";
-        let first = true;
-        for (const r of chosen) {
-          const message = handoffMessage({
-            visit,
-            dish: r.dish,
-            portion: { ...portionOf({ chip: r.chip }), note: "" },
-            previous: r.dish.brisket || undefined,
-          });
-          const photo = await dishAttachment(r.dish);
-          if (first && !s.isOpen()) return;
-          const result = await Promise.resolve(
-            sendToBrisket(message, photo ? [photo] : []),
-          ).catch(() => ({ ok: false }));
-          if (result?.ok === false) {
-            if (first) {
-              if (!s.isOpen()) return;
-              s.error.textContent =
-                "Couldn't reach Brisket. Try again, or send it from the dish later.";
-              paint();
-              return;
-            }
-            showHubToast(
-              `Couldn't send ${r.dish.title} to Brisket. Send it from the dish.`,
-            );
-            continue;
-          }
-          sentToBrisket = true;
-          if (first) {
-            first = false;
-            if (s.isOpen()) s.close();
-          }
+        // One message for the whole meal: Brisket researches the dishes
+        // together and proposes them all in one turn. Chat takes three
+        // photos, so the first three dishes that have one send it.
+        const items = chosen.map((r) => ({
+          dish: r.dish,
+          portion: { ...portionOf({ chip: r.chip }), note: "" },
+          previous: r.dish.brisket || undefined,
+        }));
+        const attachments = [],
+          photos = [];
+        for (const [n, item] of items.entries()) {
+          if (attachments.length >= 3) break;
+          const photo = await dishAttachment(item.dish);
+          if (!photo) continue;
+          attachments.push(photo);
+          photos.push(n + 1);
         }
+        if (!s.isOpen()) return;
+        const message = handoffBatchMessage({ visit, items, photos });
+        const result = await Promise.resolve(
+          sendToBrisket(message, attachments),
+        ).catch(() => ({ ok: false }));
+        if (result?.ok === false) {
+          if (!s.isOpen()) return;
+          s.error.textContent =
+            "Couldn't reach Brisket. Try again, or send it from the dish later.";
+          paint();
+          return;
+        }
+        sentToBrisket = true;
+        if (s.isOpen()) s.close();
       },
       "primary",
     );
