@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   findCountedMeal,
   mealNamesDish,
+  resolveDishMealPath,
   removeOldCountedMeal,
   markDishCounted,
   syncFoodJournalAfterMeal,
@@ -280,4 +281,61 @@ test("persistLogEntry says why when the dish was deleted", async () => {
   });
   assert.equal(result.foodJournalUpdated, false);
   assert.equal(result.foodJournalReason, "dish_missing");
+});
+
+// Dishes carry no time, so every dish from one meal derives breakfast-0000.
+// The second dish must land beside the first, never on top of it.
+const breakfast = "data/nutrition/2026/10/2026-10-22-breakfast-0000.md";
+const dishMeal = (id, calories = 400) =>
+  `---\ntype: "meal"\ndate: "2026-10-22"\nmeal: "breakfast"\ncalories: ${calories}\nprotein_g: 20\nfat_g: 10\n${id ? `food_dish_id: "${id}"\n` : ""}---\n`;
+
+test("resolveDishMealPath uses the derived path when it is free", async () => {
+  const client = fakeClient({});
+  assert.deepEqual(await resolveDishMealPath(client, [], breakfast, "dish_2"), { path: breakfast, existingSha: undefined });
+});
+
+test("resolveDishMealPath steps past another dish's or a hand-logged meal", async () => {
+  const next = "data/nutrition/2026/10/2026-10-22-breakfast-0001.md";
+  for (const other of [dishMeal("dish_1"), dishMeal(null)]) {
+    const client = fakeClient({ [breakfast]: other });
+    const { tree } = await client.resolveTree();
+    assert.deepEqual(await resolveDishMealPath(client, tree, breakfast, "dish_2"), { path: next, existingSha: undefined });
+  }
+  const three = fakeClient({ [breakfast]: dishMeal("dish_1"), [next]: dishMeal("dish_2") });
+  const { tree } = await three.resolveTree();
+  assert.equal((await resolveDishMealPath(three, tree, breakfast, "dish_3")).path, "data/nutrition/2026/10/2026-10-22-breakfast-0002.md");
+});
+
+test("resolveDishMealPath returns this dish's own file with its sha", async () => {
+  const next = "data/nutrition/2026/10/2026-10-22-breakfast-0001.md";
+  const client = fakeClient({ [breakfast]: dishMeal("dish_1"), [next]: dishMeal("dish_2") });
+  const { tree } = await client.resolveTree();
+  assert.deepEqual(await resolveDishMealPath(client, tree, breakfast, "dish_2"), { path: next, existingSha: "2".repeat(40) });
+});
+
+test("the day's nutrition total counts every dish logged at the same meal", async () => {
+  const client = fakeClient({ [breakfast]: dishMeal("dish_1", 400) });
+  await persistLogEntry(client, {
+    record: { type: "meal", date: "2026-10-22", meal: "breakfast", calories: 300, protein_g: 15, fat_g: 5, food_dish_id: "dish_2" },
+    notes: "",
+    path: "data/nutrition/2026/10/2026-10-22-breakfast-0001.md",
+    nowDateKey: "2026-10-22",
+    now: new Date("2026-10-22T09:00:00+11:00"),
+  });
+  const cn = client.writes.find((w) => w.path === "central-node.md");
+  assert.match(cn.content, /\*\*Nutrition:\*\* 700 kcal, 35g P, 15g F\./);
+});
+
+test("overwriting a meal file counts it once in the day's total", async () => {
+  const client = fakeClient({ [breakfast]: dishMeal("dish_1", 400) });
+  await persistLogEntry(client, {
+    record: { type: "meal", date: "2026-10-22", meal: "breakfast", calories: 300, protein_g: 15, fat_g: 5, food_dish_id: "dish_1" },
+    notes: "",
+    path: breakfast,
+    existingSha: "1".repeat(40),
+    nowDateKey: "2026-10-22",
+    now: new Date("2026-10-22T09:00:00+11:00"),
+  });
+  const cn = client.writes.find((w) => w.path === "central-node.md");
+  assert.match(cn.content, /\*\*Nutrition:\*\* 300 kcal, 15g P, 5g F\./);
 });

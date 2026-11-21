@@ -132,7 +132,7 @@ export async function persistLogEntry(client, { record, notes, path, existingSha
     centralNodeUpdated = true;
   } else {
     try {
-      const cn = await syncCentralNodeAfterLog(client, record, notes, {date:nowDateKey ?? getSydneyDateKey(now), now});
+      const cn = await syncCentralNodeAfterLog(client, record, notes, {date:nowDateKey ?? getSydneyDateKey(now), now, path});
       centralNodeUpdated = cn?.updated === true;
     } catch {
       centralNodeUpdated = false;
@@ -184,7 +184,7 @@ async function syncCentralNodeAfterLog(client, record, notes, options) {
   return retryWriteConflict(() => syncCentralNodeAfterLogOnce(client, record, notes, options));
 }
 
-async function syncCentralNodeAfterLogOnce(client, record, notes, {date, now}) {
+async function syncCentralNodeAfterLogOnce(client, record, notes, {date, now, path}) {
   const current = await client.resolveTree();
   const entry = current.tree.find(item => item.path === CENTRAL_NODE_PATH && item.type === 'blob');
 
@@ -203,7 +203,7 @@ async function syncCentralNodeAfterLogOnce(client, record, notes, {date, now}) {
   const actionLine = `\n**${formatLogDate(record.date)}:** ${agentNameForType(record.type)}: ${describeRecordForLog(record, notes)}`;
   let nutritionTotals = null;
   if (record.type === 'meal') {
-    nutritionTotals = await sumDayMealTotals(client, current.tree, record);
+    nutritionTotals = await sumDayMealTotals(client, current.tree, record, path);
   }
 
   let updated = record.type === 'meal' && record.date !== date
@@ -231,7 +231,7 @@ async function syncCentralNodeAfterLogOnce(client, record, notes, {date, now}) {
   return { updated: true };
 }
 
-async function sumDayMealTotals(client, tree, record) {
+async function sumDayMealTotals(client, tree, record, path) {
   const seed = {
     calories: Number(record.calories) || 0,
     protein_g: Number(record.protein_g) || 0,
@@ -241,9 +241,11 @@ async function sumDayMealTotals(client, tree, record) {
   if (record.calcium_mg != null) seed.calcium_mg = Number(record.calcium_mg) || 0;
   if (record.polyphenol_score != null) seed.polyphenol_score = Number(record.polyphenol_score) || 0;
 
+  // Skip only the file just written (it is the seed). Another meal of the same
+  // type that day, such as a second Food Journal dish at breakfast, still counts.
   const siblings = await sumDayMealFiles(client, tree, {
     date: record.date,
-    skipMeal: record.meal
+    ...(typeof path === 'string' && path ? { excludePaths: [path] } : { skipMeal: record.meal })
   });
   if (!siblings) return seed;
   return addMealTotals(seed, siblings);

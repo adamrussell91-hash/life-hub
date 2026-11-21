@@ -107,3 +107,28 @@ export async function removeOldCountedMeal(client, prior, dishId) {
   });
   return { date: prior.date, meal: prior.meal };
 }
+
+// Where a Food Journal dish's meal is written. Dishes carry no time of their
+// own, so dishes from one meal logged together derive the same path
+// (dinner-1600). A file there that
+// is not this dish's meal is someone else's: step the minute until the path is
+// free or holds this dish, so a second dish never collides with or replaces
+// the first. Returns { path, existingSha } (existingSha only for this dish's
+// own file).
+export async function resolveDishMealPath(client, tree, path, dishId) {
+  const match = /^(.*-[a-z]+-)(\d{2})(\d{2})\.md$/.exec(path);
+  if (!match) return { path, existingSha: undefined };
+  const start = Number(match[2]) * 60 + Number(match[3]);
+  for (let minute = start; minute < 24 * 60; minute += 1) {
+    const hh = String(Math.floor(minute / 60)).padStart(2, "0");
+    const mm = String(minute % 60).padStart(2, "0");
+    const candidate = `${match[1]}${hh}${mm}.md`;
+    const entry = (tree ?? []).find(
+      (b) => b?.type === "blob" && b.path === candidate,
+    );
+    if (!entry) return { path: candidate, existingSha: undefined };
+    if (await blobNamesDish(client, entry.sha, dishId))
+      return { path: candidate, existingSha: entry.sha };
+  }
+  return { path, existingSha: undefined };
+}

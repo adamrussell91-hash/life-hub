@@ -3123,3 +3123,25 @@ test('confirmed creatine doses add to embedded meal intake and corrections repla
   assert.equal(index.records[secondPath].record.grams, 5);
   assert.equal(index.records[mealPath].record.creatine_g, 7);
 });
+
+// Brisket logs each dish of a meal separately. Dishes carry no time of their
+// own, so dishes confirmed together derive the same path. The second dish lands beside the first,
+// even when the chat asks to overwrite.
+test('a second Food Journal dish at the same meal lands beside the first, never over it', async () => {
+  const mealPath = 'data/nutrition/2026/08/2026-08-01-dinner-1600.md';
+  const mealSha = '7'.repeat(40);
+  const { calls, fetchImpl } = recountFetch({ mealPath, mealSha, oldDishId: 'dish_1' });
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+  const second = { ...candidate, fields: { ...candidate.fields, meal: 'dinner', food_dish_id: 'dish_2', portion: 'All', portion_fraction: 1 } };
+
+  for (const overwrite of [false, true]) {
+    calls.length = 0;
+    const response = await handler(request({ candidate: second, slug: 'brisket', ...(overwrite ? { overwrite: true } : {}) }));
+    const payload = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-dinner-1601.md');
+    const mealPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('2026-08-01-dinner-1601.md'));
+    assert.equal(JSON.parse(mealPut.options.body).sha, undefined);
+    assert.ok(!calls.some(call => call.url.includes('dinner-1600') && ['PUT', 'DELETE'].includes(call.options?.method)));
+  }
+});
