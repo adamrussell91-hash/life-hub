@@ -456,7 +456,7 @@ test("background capture lifecycle polls a result and strips input image payload
       JSON.stringify({
         title: "Food",
         venue: { name: "", address: "" },
-        menu_text: "Menu",
+        menu_items: [{ name: "Chips", price: "$6" }],
         dishes: [],
       }),
   });
@@ -502,7 +502,7 @@ test("background capture lifecycle polls a result and strips input image payload
     ).json()
   ).data;
   assert.equal(result.status, "done");
-  assert.equal(result.result.data.draft.menu_text, "Menu");
+  assert.equal(result.result.data.draft.menu_text, "Chips · $6");
   assert.equal((await store.get(created.id)).body.input, undefined);
 });
 test("recipe research accepts ten verified candidates and three sources, rejects fabricated URLs", async () => {
@@ -1558,9 +1558,13 @@ test("capture keeps the original and the English for a non-English menu", async 
     });
   resetRateLimits();
   const h = createFoodJournalProcessHandler(deps(r, { complete }));
-  const res = await h(req("POST", { action: "capture", images: [{ role: "menu", id: "m1", mime: "image/jpeg", data: "YWJj" }] }));
+  const res = await h(req("POST", { action: "capture", images: [
+    { role: "menu", id: "m1", mime: "image/jpeg", data: "YWJj" },
+    { role: "dish", id: "d1", mime: "image/jpeg", data: "YWJj" },
+  ] }));
   const { draft } = (await res.json()).data;
-  assert.equal(draft.menu_text_en, "Spanish omelette 6€");
+  assert.equal(draft.menu_text, "Tortilla · Huevo, patata · 6€");
+  assert.equal(draft.menu_text_en, "Spanish omelette · Egg, potato · 6€");
   assert.equal(draft.menu_items[0].name_en, "Spanish omelette");
   assert.equal(draft.menu_items[0].description_en, "Egg, potato");
   assert.equal(draft.dishes[0].title_en, "Spanish omelette");
@@ -1975,4 +1979,90 @@ test("without clear_recount a re-count flag stays put", async () => {
   first.journal.visits[0].dishes[0].brisket.needs_recount = false;
   const res = await h(req("PUT", { journal: first.journal, if_version: first.version }));
   assert.equal((await res.json()).data.journal.visits[0].dishes[0].brisket.needs_recount, true);
+});
+
+// A dense two-page menu ran past one call's output cap and time limit, so each
+// page is read in its own call, in parallel, alongside one call for the dishes.
+test("capture reads each menu page in its own call and the dishes in another", async () => {
+  resetRateLimits();
+  const calls = [];
+  const complete = async (opts) => {
+    const ids = opts.messages[0].content
+      .filter((c) => c.type === "text")
+      .map((c) => c.text.match(/identifier: (\S+)/)[1]);
+    calls.push({ ids, menu: /menu photo/.test(opts.system), opts });
+    if (ids.length === 1 && ids[0] === "m1")
+      return JSON.stringify({ venue: { name: "Test Diner", address: "" }, menu_items: [
+        { name: "Classic stack", description: "Whipped butter", price: "$15", kind: "dish" },
+        { name: "Fries", price: "$6", kind: "extra" },
+      ] });
+    if (ids.length === 1 && ids[0] === "m2")
+      return JSON.stringify({ venue: { name: "", address: "" }, menu_items: [
+        { name: "FRIES", price: "$6", kind: "extra" },
+        { name: "Lemonade", price: "$6", kind: "dish" },
+      ] });
+    return JSON.stringify({ title: "Brunch", venue: { name: "", address: "" }, dishes: [
+      { title: "Classic stack", meal_type: "Breakfast", tags: ["Pancakes"], photo_ids: ["d1", "m1"] },
+    ] });
+  };
+  const h = createFoodJournalProcessHandler(deps(repo(fixture()), { complete }));
+  const res = await h(req("POST", { action: "capture", images: [
+    { role: "menu", id: "m1", mime: "image/jpeg", data: "YWJj" },
+    { role: "menu", id: "m2", mime: "image/jpeg", data: "YWJj" },
+    { role: "dish", id: "d1", mime: "image/jpeg", data: "YWJj" },
+  ] }));
+  assert.equal(res.status, 200);
+  const { draft } = (await res.json()).data;
+  assert.equal(calls.length, 3);
+  assert.deepEqual(calls.filter((c) => c.menu).map((c) => c.ids), [["m1"], ["m2"]]);
+  // The dish call sees the menu pages as evidence for names.
+  assert.deepEqual(calls.find((c) => !c.menu).ids, ["m1", "m2", "d1"]);
+  for (const c of calls) {
+    assert.equal(c.opts.maxTokens, 16000);
+    assert.equal(typeof c.opts.onStop, "function");
+  }
+  assert.equal(draft.title, "Brunch");
+  assert.equal(draft.venue.name, "Test Diner");
+  assert.deepEqual(draft.menu_items.map((i) => i.name), ["Classic stack", "Fries", "Lemonade"]);
+  assert.equal(draft.menu_text, "Classic stack · Whipped butter · $15\nFries · $6\nLemonade · $6");
+  assert.equal("menu_text_en" in draft, false);
+  assert.deepEqual(draft.dishes.map((d) => [d.title, d.photo_ids]), [["Classic stack", ["d1"]]]);
+});
+test("capture with only menu photos makes no dish call and returns no dishes", async () => {
+  resetRateLimits();
+  let n = 0;
+  const complete = async () => {
+    n++;
+    return JSON.stringify({ menu_items: [{ name: "Chips", price: "$6" }], dishes: [{ title: "Chips" }] });
+  };
+  const h = createFoodJournalProcessHandler(deps(repo(fixture()), { complete }));
+  const res = await h(req("POST", { action: "capture", images: [{ role: "menu", id: "m1", mime: "image/jpeg", data: "YWJj" }] }));
+  const { draft } = (await res.json()).data;
+  assert.equal(n, 1);
+  assert.deepEqual(draft.dishes, []);
+});
+test("a cut-off menu read says the menu is too long instead of a generic failure", async () => {
+  resetRateLimits();
+  const complete = async (opts) => {
+    opts.onStop("max_tokens");
+    return '{"menu_items":[{"name":"Chi';
+  };
+  const h = createFoodJournalProcessHandler(deps(repo(fixture()), { complete }));
+  const res = await h(req("POST", { action: "capture", images: [{ role: "menu", id: "m1", mime: "image/jpeg", data: "YWJj" }] }));
+  assert.equal(res.status, 422);
+  const body = await res.json();
+  assert.equal(body.error.code, "menu_too_long");
+  assert.match(body.error.message, /too long.*one section at a time/);
+});
+test("completeMessage reports the stop reason to the caller", async () => {
+  const { completeMessage } = await import("../../netlify/functions/_shared/anthropic-client.mjs");
+  let stop;
+  const text = await completeMessage({
+    apiKey: "test",
+    messages: [{ role: "user", content: "x" }],
+    fetchImpl: async () => new Response(JSON.stringify({ content: [{ type: "text", text: "{" }], stop_reason: "max_tokens" })),
+    onStop: (r) => { stop = r; },
+  });
+  assert.equal(text, "{");
+  assert.equal(stop, "max_tokens");
 });
